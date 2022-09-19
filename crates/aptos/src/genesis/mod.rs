@@ -283,6 +283,15 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfigurat
     )?
     .unwrap_or_default();
 
+    // Default to true for whether the validator should be joining during genesis.
+    let join_during_genesis = parse_optional_option(
+        &owner_config.join_during_genesis,
+        owner_file,
+        "join_during_genesis",
+        bool::from_str,
+    )?
+    .unwrap_or(true);
+
     // Check and convert fields in operator file
     let operator_account_address_from_file = parse_required_option(
         &operator_config.operator_account_address,
@@ -359,6 +368,7 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfigurat
         full_node_host: operator_config.full_node_host,
         stake_amount,
         commission_percentage,
+        join_during_genesis,
     })
 }
 

@@ -209,6 +209,8 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
             full_node_host,
             stake_amount: config.genesis_stake_amount,
             commission_percentage: config.commission_percentage,
+            // Default to joining the genesis validator set.
+            join_during_genesis: true,
         })
     }
 }

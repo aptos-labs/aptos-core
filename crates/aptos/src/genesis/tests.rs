@@ -83,6 +83,7 @@ async fn test_mainnet_genesis_e2e_flow() {
         PathBuf::from(git_dir),
         admin,
         &vec![vec![employee_1, employee_2], vec![employee_3, employee_4]],
+        &[true, false],
     )
     .await;
 
@@ -251,6 +252,7 @@ async fn set_validator_config(
         operator_public_identity_file: None,
         voter_public_identity_file: None,
         commission_percentage,
+        join_during_genesis: true,
     };
 
     command.execute().await.unwrap()
@@ -277,6 +279,7 @@ async fn create_employee_vesting_accounts_file(
     path: PathBuf,
     admin_address: AccountAddress,
     employee_groups: &Vec<Vec<AccountAddress>>,
+    join_during_genesis: &[bool],
 ) {
     let test_validators =
         TestValidator::new_test_set(Some(employee_groups.len()), Some(INITIAL_BALANCE));
@@ -293,6 +296,7 @@ async fn create_employee_vesting_accounts_file(
                 validator: ValidatorWithCommissionRate {
                     validator,
                     validator_commission_percentage: 10,
+                    join_during_genesis: join_during_genesis[index],
                 },
                 vesting_schedule_numerators: vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1,
