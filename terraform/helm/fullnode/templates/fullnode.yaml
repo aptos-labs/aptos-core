@@ -20,6 +20,8 @@ spec:
         app.kubernetes.io/name: fullnode
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
       containers:
@@ -67,9 +69,11 @@ spec:
         ports:
         - containerPort: 6182
         - containerPort: 6186
-        - containerPort: 8080
         - containerPort: 8081
+        - containerPort: 8080
+          name: api
         - containerPort: 9101
+          name: metrics
         livenessProbe:
           tcpSocket:
             port: 9101
