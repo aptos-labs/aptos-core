@@ -479,7 +479,7 @@ test(
 );
 
 test(
-  "gets block by height", 
+  "gets block by height",
   async () => {
     const blockHeight = 100;
     const client = new AptosClient(NODE_URL);
@@ -490,7 +490,7 @@ test(
 );
 
 test(
-  "gets block by version", 
+  "gets block by version",
   async () => {
     const version = 100;
     const client = new AptosClient(NODE_URL);
