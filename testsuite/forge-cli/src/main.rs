@@ -493,7 +493,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_fullnode_count(1)
             .with_network_tests(vec![&ValidatorRebootStressTest])
             .with_success_criteria(SuccessCriteria::new(
-                3000,
+                2000,
                 50000,
                 false,
                 Some(Duration::from_secs(600)),
