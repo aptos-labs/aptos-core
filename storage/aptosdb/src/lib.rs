@@ -121,7 +121,7 @@ use storage_interface::{
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 
-const MAX_LIMIT: u64 = 5000;
+const MAX_LIMIT: u64 = 10000;
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -865,17 +865,6 @@ impl DbReader for AptosDB {
             let (ledger_info_with_sigs, more) =
                 Self::get_epoch_ending_ledger_infos(self, start_epoch, end_epoch)?;
             Ok(EpochChangeProof::new(ledger_info_with_sigs, more))
-        })
-    }
-
-    fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>> {
-        gauged_api("get_latest_state_value", || {
-            let ledger_info_with_sigs = self.ledger_store.get_latest_ledger_info()?;
-            let version = ledger_info_with_sigs.ledger_info().version();
-            let (blob, _proof) = self
-                .state_store
-                .get_state_value_with_proof_by_version(&state_key, version)?;
-            Ok(blob)
         })
     }
 

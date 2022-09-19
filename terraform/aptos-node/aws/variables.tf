@@ -221,16 +221,6 @@ variable "logger_helm_values" {
   default     = {}
 }
 
-variable "enable_vector_daemonset_logger" {
-  description = "Enable vector daemonset logger helm chart"
-  default     = false
-}
-
-variable "vector_daemonset_helm_values" {
-  description = "Map of helm values to pass to vector-daemonset chart"
-  type        = list(string)
-  default     = []
-}
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
@@ -241,6 +231,16 @@ variable "monitoring_helm_values" {
   description = "Map of values to pass to monitoring Helm"
   type        = any
   default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  default     = false
 }
 
 variable "helm_release_name_override" {

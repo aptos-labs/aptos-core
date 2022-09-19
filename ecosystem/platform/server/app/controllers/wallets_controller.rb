@@ -26,6 +26,6 @@ class WalletsController < ApplicationController
       wallet:
     )
 
-    render json: { created: result.created?, errors: result.wallet.errors }
+    render json: { created: result.created?, errors: result.wallet.errors.map(&:full_message) }
   end
 end

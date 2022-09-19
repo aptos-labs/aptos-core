@@ -14,14 +14,14 @@ fn main() {
 
     println!();
 
-    let auth_key = AuthenticationKey::ed25519(&pubkey).to_vec();
-    let account_addr = &auth_key[..];
+    let auth_key = AuthenticationKey::ed25519(&pubkey);
+    let account_addr = auth_key.derived_address();
 
     println!("Auth Key:");
-    println!("{}", hex::encode(account_addr));
+    println!("{}", auth_key.to_encoded_string().unwrap());
     println!();
 
     println!("Account Address:");
-    println!("0x{}", hex::encode(account_addr));
+    println!("{}", account_addr);
     println!();
 }

@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0.57"
@@ -35,6 +35,7 @@ aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
 move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
 
 [dev-dependencies]
+claims = "0.7"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 regex = "1.5.5"

@@ -4,6 +4,7 @@
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::account::create::DEFAULT_FUNDED_COINS;
 use aptos::common::types::GasOptions;
+use aptos_crypto::{PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_keygen::KeyGen;
 
 #[tokio::test]
@@ -81,4 +82,50 @@ async fn test_account_flow() {
     .unwrap_err();
 
     assert!(cli.account_balance_now(2).await.unwrap() < DEFAULT_FUNDED_COINS - gas_used - 5);
+}
+
+#[tokio::test]
+async fn test_account_key_rotation() {
+    let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .build_with_cli(2)
+        .await;
+    let account_id = cli.account_id(0);
+    let original_public_key = cli.private_key(0).public_key();
+    assert_eq!(
+        cli.lookup_address(&original_public_key).await.unwrap(),
+        account_id
+    );
+
+    let mut keygen = KeyGen::from_seed([9u8; 32]);
+    let new_private_key = keygen.generate_ed25519_private_key();
+    cli.rotate_key(0, new_private_key.to_encoded_string().unwrap(), None)
+        .await
+        .unwrap();
+    // Ensure account id in framework is still the same
+    assert_eq!(account_id, cli.account_id(0));
+
+    // Original should still work
+    assert_eq!(
+        cli.lookup_address(&original_public_key).await.unwrap(),
+        account_id
+    );
+    // And new one should work
+    assert_eq!(
+        cli.lookup_address(&new_private_key.public_key())
+            .await
+            .unwrap(),
+        account_id
+    );
+
+    // And now a transfer with the old key should not work
+    cli.transfer_coins(0, 1, 5, None)
+        .await
+        .expect_err("Old key should not be able to transfer");
+
+    // But the new one should
+    cli.set_private_key(0, new_private_key);
+    cli.transfer_coins(0, 1, 5, None)
+        .await
+        .expect("New key should be able to transfer");
 }

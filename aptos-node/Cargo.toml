@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0.58"
@@ -28,6 +28,7 @@ aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-data-client = { path = "../state-sync/aptos-data-client" }
 aptos-fh-stream = { path = "../ecosystem/sf-indexer/firehose-stream" }
 aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
+aptos-indexer = { path = "../crates/indexer", optional = true }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
@@ -66,3 +67,4 @@ jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_
 default = []
 assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
 failpoints = ["fail/failpoints", "consensus/failpoints", "executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
+indexer = ["aptos-indexer"]

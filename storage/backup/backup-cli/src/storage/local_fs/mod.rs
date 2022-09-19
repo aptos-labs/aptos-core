@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use std::path::{Path, PathBuf};
 use tokio::{
-    fs::{create_dir, create_dir_all, read_dir, OpenOptions},
+    fs::{create_dir_all, read_dir, OpenOptions},
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
 };
 
@@ -54,9 +54,9 @@ impl LocalFs {
 #[async_trait]
 impl BackupStorage for LocalFs {
     async fn create_backup(&self, name: &ShellSafeName) -> Result<BackupHandle> {
-        create_dir(self.dir.join(name.as_ref()))
+        create_dir_all(self.dir.join(name.as_ref()))
             .await
-            .err_notes(name)?;
+            .err_notes(self.dir.join(name.as_ref()))?;
         Ok(name.to_string())
     }
 

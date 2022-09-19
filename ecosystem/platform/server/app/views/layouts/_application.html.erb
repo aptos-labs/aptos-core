@@ -26,15 +26,23 @@
       <meta name="twitter:image" content="https://aptoslabs.com/images/meta/APTOS_meta_twitter_051222.jpg">
     <% end %>
 
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="icon" type="image/png" href="/favicon.png">
+    <%= favicon_link_tag image_path('favicon.ico'), sizes: 'any' %>
+    <%= favicon_link_tag image_path('favicon.svg'), type: 'image/svg+xml' %>
+    <%= favicon_link_tag image_path('favicon.png'), type: 'image/png' %>
     <link rel="apple-touch-icon" type="image/png" href="/apple-touch-icon.png">
 
     <%= stylesheet_link_tag "https://use.typekit.net/#{ENV.fetch('TYPEKIT_CSS_ID')}.css" %>
     <%= stylesheet_link_tag 'application', 'data-turbo-track': 'reload' %>
     <%= javascript_include_tag 'application', 'data-turbo-track': 'reload', defer: true %>
-    <%= render 'layouts/google_analytics' %>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=<%= ENV.fetch('GOOGLE_ANALYTICS_ID', '') %>"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', <%= ENV.fetch('GOOGLE_ANALYTICS_ID', '').to_json.html_safe %>, <%= { debug_mode: !Rails.env.production? }.to_json.html_safe %>);
+    </script>
   </head>
 
   <body class="flex flex-col h-screen justify-between antialiased bg-neutral-900 <%= content_for(:body_class) %>">

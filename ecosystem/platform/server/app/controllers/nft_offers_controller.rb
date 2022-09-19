@@ -6,16 +6,26 @@
 class NftOffersController < ApplicationController
   before_action :authenticate_user!, only: %i[create]
 
+  def short
+    @nft_offer = NftOffer.find(params[:offer_id])
+    redirect_to nft_offer_path(slug: @nft_offer.slug, v: params[:txn_version])
+  end
+
   def show
+    @image_dialog = DialogComponent.new(id: 'image_dialog', class: '!w-max max-h-max')
     store_location_for(:user, request.path)
-    @nft_offer = NftOffer.find(params[:slug])
+    @nft_offer = NftOffer.find_by(slug: params[:slug])
     @wallet = current_user&.wallets&.find_by(network: @nft_offer.network, public_key: params[:wallet]) ||
               Wallet.new(network: @nft_offer.network, challenge: 24.times.map { rand(10) }.join)
 
     @transaction_hash = params[:txn]
+    @transaction_version = params[:v].to_i
 
-    return render :minted if @transaction_hash.is_a?(String) && @transaction_hash.match?(/^0x[0-9a-f]{64}$/)
+    txn_hash_valid = @transaction_hash.is_a?(String) && @transaction_hash.match?(/^0x[0-9a-f]{64}$/)
+    txn_version_valid = @transaction_version.positive?
+    return render :minted if txn_hash_valid || txn_version_valid
 
+    @transaction_version = nil
     @transaction_hash = nil
 
     @steps = [
@@ -32,8 +42,14 @@ class NftOffersController < ApplicationController
   end
 
   def update
-    @nft_offer = NftOffer.find(params[:slug])
-    @wallet = current_user.wallets.find_by(network: @nft_offer.network, public_key: params[:wallet])
+    @nft_offer = NftOffer.find_by(slug: params[:slug])
+    @wallet = current_user.wallets.find_by(
+      network: @nft_offer.network,
+      public_key: params[:wallet],
+      wallet_name: params[:wallet_name]
+    )
+
+    return render json: { error: 'wallet_not_found' } if @wallet.nil?
 
     result = NftClaimer.new.claim_nft(
       nft_offer: @nft_offer,

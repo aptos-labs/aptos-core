@@ -80,13 +80,15 @@ impl DBPruner for LedgerPruner {
         };
         match version.cmp(&stored_min_version) {
             std::cmp::Ordering::Greater => {
-                self.db.put::<DbMetadataSchema>(
+                let res = self.db.put::<DbMetadataSchema>(
                     &DbMetadataKey::LedgerPrunerProgress,
                     &DbMetadataValue::Version(version),
-                )?;
+                );
                 warn!(
-                    "Updated stored min readable transaction version ({}) to the actual one ({}).",
-                    stored_min_version, version
+                    stored_min_version = stored_min_version,
+                    actual_min_version = version,
+                    res = ?res,
+                    "Try to update stored min readable transaction version to the actual one.",
                 );
                 Ok(version)
             }

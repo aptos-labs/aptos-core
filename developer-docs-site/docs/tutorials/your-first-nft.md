@@ -10,7 +10,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Your First NFT
 
-This tutorial describes, in the following step-by-step approach, how to create and transfer NFTs on the Aptos Blockchain. The Aptos implementation for core NFTs or Tokens can be found in [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move).
+This tutorial describes, in the following step-by-step approach, how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs or Tokens can be found in [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move).
 
 ## Step 1: Pick an SDK
 
@@ -58,7 +58,7 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   poetry update
   ```
 
-  Run the `transfer-coin` example:
+  Run the `simple-nft` example:
   ```sh
   poetry run python -m examples.simple-nft
   ```

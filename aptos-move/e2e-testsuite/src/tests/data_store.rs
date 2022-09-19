@@ -14,7 +14,7 @@ use move_deps::{
 
 #[test]
 fn move_from_across_blocks() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -93,7 +93,7 @@ fn move_from_across_blocks() {
 
 #[test]
 fn borrow_after_move() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -150,7 +150,7 @@ fn borrow_after_move() {
 
 #[test]
 fn change_after_move() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);

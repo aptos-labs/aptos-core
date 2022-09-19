@@ -2,12 +2,16 @@ import { Controller } from "./controller";
 
 // Connects to data-controller="project-images"
 export default class extends Controller {
-  static targets = ["thumbnail", "screenshotPreviews", "screenshotPreviewTemplate"];
+  static targets = [
+    "thumbnail",
+    "screenshotPreviews",
+    "screenshotPreviewTemplate",
+  ];
 
   static values = {
     thumbnailUrl: String,
     screenshotUrls: Array,
-  }
+  };
 
   declare readonly thumbnailTarget: HTMLButtonElement;
   declare readonly screenshotPreviewsTarget: HTMLElement;
@@ -43,7 +47,7 @@ export default class extends Controller {
 
   imageButtonClick(event: Event) {
     if (!(event.currentTarget instanceof Element)) return;
-    const input = event.currentTarget.querySelector('input');
+    const input = event.currentTarget.querySelector("input");
     if (event.target !== input) {
       event.preventDefault();
       input?.click();
@@ -54,7 +58,7 @@ export default class extends Controller {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
 
-    const {files} = input;
+    const { files } = input;
     if (files == null || files.length === 0) return;
 
     const file = files[0];
@@ -65,7 +69,7 @@ export default class extends Controller {
   addThumbnailPreview(url: string) {
     this.thumbnailTarget.style.backgroundImage = `url(${url})`;
 
-    for (const text of this.thumbnailTarget.querySelectorAll('p, svg')) {
+    for (const text of this.thumbnailTarget.querySelectorAll("p, svg")) {
       text.remove();
     }
   }
@@ -74,7 +78,7 @@ export default class extends Controller {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
 
-    const {files} = input;
+    const { files } = input;
     if (files == null || files.length === 0) return;
 
     const file = files[0];
@@ -95,15 +99,18 @@ export default class extends Controller {
   }
 
   addScreenshotPreview(url: string): Element {
-    const screenshotPreview = this.screenshotPreviewTemplateTarget.content.cloneNode(true) as DocumentFragment;
-    screenshotPreview.querySelector('img')!.src = url;
+    const screenshotPreview =
+      this.screenshotPreviewTemplateTarget.content.cloneNode(
+        true
+      ) as DocumentFragment;
+    screenshotPreview.querySelector("img")!.src = url;
     this.screenshotPreviewsTarget.appendChild(screenshotPreview);
     return this.screenshotPreviewsTarget.lastElementChild!;
   }
 
   removeScreenshotPreview(event: Event) {
     if (!(event.target instanceof HTMLElement)) return;
-    const container = event.target.closest('div');
+    const container = event.target.closest("div");
     container?.remove();
   }
 }

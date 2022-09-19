@@ -12,6 +12,10 @@ export const $VersionedEvent = {
             type: 'EventKey',
             isRequired: true,
         },
+        guid: {
+            type: 'EventGuid',
+            isRequired: true,
+        },
         sequence_number: {
             type: 'U64',
             isRequired: true,

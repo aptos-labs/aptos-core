@@ -46,6 +46,12 @@ pub struct Context {
     gas_estimation: Arc<RwLock<GasEstimationCache>>,
 }
 
+impl std::fmt::Debug for Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Context<chain_id: {}>", self.chain_id)
+    }
+}
+
 impl Context {
     pub fn new(
         chain_id: ChainId,
@@ -63,6 +69,14 @@ impl Context {
                 median_gas_price: MIN_GAS_PRICE,
             })),
         }
+    }
+
+    pub fn max_transactions_page_size(&self) -> u16 {
+        self.node_config.api.max_transactions_page_size
+    }
+
+    pub fn max_events_page_size(&self) -> u16 {
+        self.node_config.api.max_events_page_size
     }
 
     pub fn move_resolver(&self) -> Result<StorageAdapterOwned<DbStateView>> {

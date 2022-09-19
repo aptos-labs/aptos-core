@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-This example depends on the HelloBlockchain.move module having already been published to the destination blockchain.
+This example depends on the MoonCoin.move module having already been published to the destination blockchain.
 
 One method to do so is to use the CLI:
-    * Acquire the Aptos CLI
-    * `python -m examples.your-coin ~/aptos-core/aptos-move/move-examples/moon_coin/build`.
-    * Open another terminal and `cd ~/aptos-core/aptos-move/move-examples/moon_coin`.
+    * Acquire the Aptos CLI, see https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
+    * `python -m examples.your-coin ~/aptos-core/aptos-move/move-examples/moon_coin`.
+    * Open another terminal and `aptos move compile --package-dir ~/aptos-core/aptos-move/move-examples/moon_coin --save-metadata --named-addresses MoonCoin=<Alice address from above step>`.
     * Return to the first terminal and press enter.
 """
 
@@ -35,7 +35,8 @@ class CoinClient(RestClient):
         payload = EntryFunction.natural(
             "0x1::managed_coin",
             "register",
-            [TypeTag(StructTag.from_str(f"{coin_address}::moon_coin::MoonCoin"))],
+            [TypeTag(StructTag.from_str(
+                f"{coin_address}::moon_coin::MoonCoin"))],
             [],
         )
         signed_transaction = self.create_single_signer_bcs_transaction(
@@ -46,12 +47,13 @@ class CoinClient(RestClient):
     def mint_coin(
         self, minter: Account, receiver_address: AccountAddress, amount: int
     ) -> str:
-        """Register the receiver account to receive transfers for the new coin."""
+        """Mints the newly created coin to a specified receiver address."""
 
         payload = EntryFunction.natural(
             "0x1::managed_coin",
             "mint",
-            [TypeTag(StructTag.from_str(f"{minter.address()}::moon_coin::MoonCoin"))],
+            [TypeTag(StructTag.from_str(
+                f"{minter.address()}::moon_coin::MoonCoin"))],
             [
                 TransactionArgument(receiver_address, Serializer.struct),
                 TransactionArgument(amount, Serializer.u64),
@@ -119,7 +121,7 @@ if __name__ == "__main__":
     txn_hash = rest_client.register_coin(alice.address(), bob)
     rest_client.wait_for_transaction(txn_hash)
     print(
-        f"Bob's updated MoonCoin balance: {rest_client.get_balance(alice.address(), bob.address())}."
+        f"Bob's initial MoonCoin balance: {rest_client.get_balance(alice.address(), bob.address())}."
     )
 
     print("Alice mints Bob some of the new coin.")

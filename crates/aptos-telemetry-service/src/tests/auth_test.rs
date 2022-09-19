@@ -14,6 +14,7 @@ use aptos_types::{
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde_json::json;
 
+use crate::types::common::NodeType;
 use crate::{
     tests::test_context::new_test_context,
     types::auth::{AuthResponse, Claims},
@@ -134,7 +135,7 @@ async fn test_auth_validator() {
         Claims {
             chain_id,
             peer_id,
-            peer_role: PeerRole::Validator,
+            node_type: NodeType::Validator,
             epoch: 1,
             exp: decoded.claims.exp,
             iat: decoded.claims.iat
@@ -174,7 +175,7 @@ async fn test_auth_validatorfullnode() {
         Claims {
             chain_id,
             peer_id,
-            peer_role: PeerRole::ValidatorFullNode,
+            node_type: NodeType::ValidatorFullNode,
             epoch: 1,
             exp: decoded.claims.exp,
             iat: decoded.claims.iat

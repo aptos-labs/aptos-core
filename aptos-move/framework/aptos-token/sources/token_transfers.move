@@ -11,11 +11,6 @@ module aptos_token::token_transfers {
 
     const ETOKEN_OFFER_NOT_EXIST: u64 = 1;
 
-    /// deprecated resource
-    struct TokenTransfers has key {
-        pending_claims: Table<TokenOfferId, Token>,
-    }
-
     struct PendingClaims has key {
         pending_claims: Table<TokenOfferId, Token>,
         offer_events: EventHandle<TokenOfferEvent>,

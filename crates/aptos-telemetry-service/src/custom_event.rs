@@ -9,12 +9,11 @@ use crate::{
     error::ServiceError,
     types::{
         auth::Claims,
-        common::EventIdentity,
+        common::{EventIdentity, NodeType},
         telemetry::{BigQueryRow, TelemetryDump},
     },
 };
 use anyhow::anyhow;
-use aptos_config::config::PeerRole;
 use aptos_logger::{debug, error};
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use serde_json::json;
@@ -27,9 +26,10 @@ pub fn custom_event(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(with_auth(
             context,
             vec![
-                PeerRole::Validator,
-                PeerRole::ValidatorFullNode,
-                PeerRole::Unknown,
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+                NodeType::Unknown,
             ],
         ))
         .and(warp::body::json())

@@ -1,0 +1,250 @@
+# These templates originate / are inspired from https://github.com/vectordotdev/vector/tree/master/distribution/kubernetes/vector-agent
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: vector
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - "hostPath"
+    - "configMap"
+    - "emptyDir"
+    - "secret"
+    - "projected"
+  allowedHostPaths:
+    - pathPrefix: "/var/log"
+      readOnly: true
+    - pathPrefix: "/var/lib"
+      readOnly: true
+    - pathPrefix: "/var/lib/vector"
+      readOnly: false
+    - pathPrefix: "/sys"
+      readOnly: true
+    - pathPrefix: "/proc"
+      readOnly: true
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: "RunAsAny"
+  seLinux:
+    rule: "RunAsAny"
+  supplementalGroups:
+    rule: "MustRunAs"
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: "MustRunAs"
+    ranges:
+      - min: 1
+        max: 65535
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+data:
+  vector-config.yaml: |-
+{{ (tpl (.Files.Get "files/vector-config.yaml") .) | indent 4 }}
+  vector-transforms.yaml: |-
+{{ (tpl (.Files.Get "files/vector-transforms.yaml") .) | indent 4 }}
+{{- range $sinkName, $sinkConfig := .Values.loggingSinks }}
+  "{{ $sinkName }}-sink.yaml": |- 
+    sinks:
+      {{ $sinkName }}: {{ toYaml $sinkConfig | nindent 8 }}
+{{- end }}
+
+---
+# Permissions to use Kubernetes API.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - nodes
+      - pods
+    verbs:
+      - list
+      - watch
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    verbs: ["use"]
+    resourceNames:
+      - vector
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vector
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vector
+subjects:
+  - kind: ServiceAccount
+    name: vector
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vector
+      app.kubernetes.io/instance: vector
+      app.kubernetes.io/component: Agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: "33%"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vector
+        app.kubernetes.io/instance: vector
+        app.kubernetes.io/component: Agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      serviceAccountName: vector
+      dnsPolicy: ClusterFirst
+      tolerations:
+        - effect: NoExecute
+          operator: Exists
+        - effect: NoSchedule
+          operator: Exists
+      containers:
+        - name: vector
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --watch-config
+            - --config
+            - /etc/vector/vector-config.yaml
+            - --config
+            - /etc/vector/vector-transforms.yaml
+            {{- range $sinkName, $sinkConfig := .Values.loggingSinks }}
+            - --config
+            - "/etc/vector/{{ $sinkName }}-sink.yaml"
+            {{- end }}
+          env:
+            - name: K8S_CLUSTER
+              value: "{{ .Values.k8sCluster }}"
+            - name: VECTOR_SELF_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: VECTOR_SELF_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: VECTOR_SELF_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: VECTOR_LOG_FORMAT
+              value: json
+            - name: PROCFS_ROOT
+              value: "/host/proc"
+            - name: SYSFS_ROOT
+              value: "/host/sys"
+            {{- range $secretName, $secretKeyValuePairs := .Values.secretVars }}
+            {{- range $key, $value := $secretKeyValuePairs }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
+          ports:
+            - name: prom-exporter
+              containerPort: 9090
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: "/vector-data-dir"
+            - name: config
+              mountPath: "/etc/vector/"
+              readOnly: true
+            - name: var-log
+              mountPath: "/var/log/"
+              readOnly: true
+            - name: var-lib
+              mountPath: "/var/lib"
+              readOnly: true
+            - name: procfs
+              mountPath: "/host/proc"
+              readOnly: true
+            - name: sysfs
+              mountPath: "/host/sys"
+              readOnly: true
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: config
+          projected:
+            sources:
+              - configMap:
+                  name: vector
+        - name: data
+          hostPath:
+            path: "/var/lib/vector"
+        - name: var-log
+          hostPath:
+            path: "/var/log/"
+        - name: var-lib
+          hostPath:
+            path: "/var/lib/"
+        - name: procfs
+          hostPath:
+            path: "/proc"
+        - name: sysfs
+          hostPath:
+            path: "/sys"

@@ -5,7 +5,7 @@
 
 class Wallet < ApplicationRecord
   VALID_NETWORKS = %w[devnet testnet ait3].freeze
-  VALID_WALLET_NAMES = %w[petra].freeze
+  VALID_WALLET_NAMES = %w[petra martian].freeze
 
   attr_accessor :challenge, :signed_challenge
 
@@ -13,7 +13,8 @@ class Wallet < ApplicationRecord
 
   validates :network, presence: true, inclusion: { in: VALID_NETWORKS }
   validates :wallet_name, presence: true, inclusion: { in: VALID_WALLET_NAMES }
-  validates :public_key, presence: true, uniqueness: { scope: :network }, format: { with: /\A0x[a-f0-9]{64}\z/ }
+  validates :public_key, presence: true, uniqueness: { scope: %i[network wallet_name] },
+                         format: { with: /\A0x[a-f0-9]{64}\z/ }
 
   validates :challenge, presence: true, format: { with: /\A[0-9]{24}\z/ }
   validates :signed_challenge, presence: true, format: { with: /\A0x[a-f0-9]{128}\z/ }

@@ -1,10 +1,10 @@
 ---
-title: "Troubleshooting FullNode Setup"
+title: "Troubleshooting Fullnode Setup"
 slug: "troubleshooting-fullnode-setup"
 sidebar_position: 13
 ---
 
-# Troubleshooting FullNode Setup
+# Troubleshooting Fullnode Setup
 
 **Q: When starting the node, it throws a YAML-parsing error.**
 
@@ -20,7 +20,7 @@ curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{type=\
 
 Also my sync version does not increase, indicating that I am not syncing.
 
-**A:** The Devnet validator FullNodes will only accept a maximum of connections. If Aptos devnet is experiencing high network connection volume, your FullNode might not able to connect. It is also possible that you do not have proper network configuration with firewall rules to allow outbound traffic.
+**A:** The Devnet validator fullnodes will only accept a maximum of connections. If Aptos devnet is experiencing high network connection volume, your fullnode might not able to connect. It is also possible that you do not have proper network configuration with firewall rules to allow outbound traffic.
 
 You can workaround this by:
 

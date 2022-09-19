@@ -1,9 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::account::key_rotation::LookupAddress;
 use crate::account::{
     create::{CreateAccount, DEFAULT_FUNDED_COINS},
     fund::FundWithFaucet,
+    key_rotation::{RotateKey, RotateSummary},
     list::{ListAccount, ListQuery},
     transfer::{TransferCoins, TransferSummary},
 };
@@ -11,8 +13,8 @@ use crate::common::init::InitTool;
 use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
     EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-    MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions, RestOptions,
-    RngArgs, SaveFile, TransactionOptions, TransactionSummary,
+    MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+    PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
@@ -32,6 +34,7 @@ use crate::stake::{
 };
 use crate::CliCommand;
 use aptos_config::config::Peer;
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
@@ -39,15 +42,13 @@ use aptos_logger::warn;
 use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
-use aptos_types::{
-    on_chain_config::ConsensusScheme, validator_config::ValidatorConfig,
-    validator_info::ValidatorInfo,
-};
+use aptos_types::on_chain_config::ValidatorSet;
+use aptos_types::validator_config::ValidatorConfig;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
 
@@ -75,6 +76,7 @@ module NamedAddress0::store {
 
 /// A framework for testing the CLI
 pub struct CliTestFramework {
+    account_addresses: Vec<AccountAddress>,
     account_keys: Vec<Ed25519PrivateKey>,
     endpoint: Url,
     faucet_endpoint: Url,
@@ -85,6 +87,7 @@ impl CliTestFramework {
     pub fn local_new(num_accounts: usize) -> CliTestFramework {
         let dummy_url = Url::parse("http://localhost").unwrap();
         let mut framework = CliTestFramework {
+            account_addresses: Vec::new(),
             account_keys: Vec::new(),
             endpoint: dummy_url.clone(),
             faucet_endpoint: dummy_url,
@@ -92,15 +95,15 @@ impl CliTestFramework {
         };
         let mut keygen = KeyGen::from_seed([0; 32]);
         for _ in 0..num_accounts {
-            framework
-                .account_keys
-                .push(keygen.generate_ed25519_private_key());
+            let key = keygen.generate_ed25519_private_key();
+            framework.add_account_to_cli(key);
         }
         framework
     }
 
     pub async fn new(endpoint: Url, faucet_endpoint: Url, num_accounts: usize) -> CliTestFramework {
         let mut framework = CliTestFramework {
+            account_addresses: Vec::new(),
             account_keys: Vec::new(),
             endpoint,
             faucet_endpoint,
@@ -126,6 +129,8 @@ impl CliTestFramework {
     }
 
     pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
+        let address = account_address_from_public_key(&private_key.public_key());
+        self.account_addresses.push(address);
         self.account_keys.push(private_key);
         self.account_keys.len() - 1
     }
@@ -178,6 +183,49 @@ impl CliTestFramework {
         }
         .execute()
         .await
+    }
+
+    pub async fn lookup_address(
+        &self,
+        public_key: &Ed25519PublicKey,
+    ) -> CliTypedResult<AccountAddress> {
+        LookupAddress {
+            public_key_options: PublicKeyInputOptions::from_key(public_key),
+            rest_options: self.rest_options(),
+            encoding_options: Default::default(),
+            profile_options: Default::default(),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn rotate_key(
+        &mut self,
+        index: usize,
+        new_private_key: String,
+        gas_options: Option<GasOptions>,
+    ) -> CliTypedResult<RotateSummary> {
+        let response = RotateKey {
+            txn_options: TransactionOptions {
+                private_key_options: PrivateKeyInputOptions::from_private_key(
+                    self.private_key(index),
+                )
+                .unwrap(),
+                sender_account: Some(self.account_id(index)),
+                rest_options: self.rest_options(),
+                gas_options: gas_options.unwrap_or_default(),
+                prompt_options: PromptOptions::no(),
+                estimate_max_gas: true,
+                ..Default::default()
+            },
+            new_private_key: Some(new_private_key),
+            save_to_profile: None,
+            new_private_key_file: None,
+        }
+        .execute()
+        .await?;
+
+        Ok(response)
     }
 
     pub async fn list_account(&self, index: usize, query: ListQuery) -> CliTypedResult<Vec<Value>> {
@@ -233,7 +281,7 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map(|v| to_validator_config(&v))
+        .map(|v| (&v).into())
     }
 
     pub async fn show_validator_set(&self) -> CliTypedResult<ValidatorSet> {
@@ -243,7 +291,7 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map(|v| to_validator_set(&v))
+        .map(|v| (&v).into())
     }
 
     pub async fn show_validator_stake(&self, pool_index: usize) -> CliTypedResult<Value> {
@@ -799,6 +847,7 @@ impl CliTestFramework {
         TransactionOptions {
             private_key_options: PrivateKeyInputOptions::from_private_key(self.private_key(index))
                 .unwrap(),
+            sender_account: Some(self.account_id(index)),
             rest_options: self.rest_options(),
             gas_options: gas_options.unwrap_or_default(),
             prompt_options: PromptOptions::yes(),
@@ -819,72 +868,22 @@ impl CliTestFramework {
         self.account_keys.get(index).unwrap()
     }
 
+    pub fn set_private_key(
+        &mut self,
+        index: usize,
+        new_key: Ed25519PrivateKey,
+    ) -> Ed25519PrivateKey {
+        // Insert the new private key into the test framework, returning the old one
+        mem::replace(&mut self.account_keys[index], new_key)
+    }
+
     pub fn account_id(&self, index: usize) -> AccountAddress {
-        let private_key = self.private_key(index);
-        account_address_from_public_key(&private_key.public_key())
+        *self.account_addresses.get(index).unwrap()
     }
 }
 
 // ValidatorConfig/ValidatorSet doesn't match Move ValidatorSet struct,
 // and json is serialized with different types from both, so hardcoding deserialization.
-
-fn str_to_vec(value: &serde_json::Value) -> Vec<u8> {
-    let str = value.as_str().unwrap();
-    (&*hex::decode(&str[2..str.len()]).unwrap()).to_vec()
-}
-
-fn to_validator_config(value: &serde_json::Value) -> ValidatorConfig {
-    ValidatorConfig {
-        consensus_public_key: serde_json::from_value(
-            value.get("consensus_pubkey").unwrap().clone(),
-        )
-        .unwrap(),
-        validator_network_addresses: str_to_vec(value.get("network_addresses").unwrap()),
-        fullnode_network_addresses: str_to_vec(value.get("fullnode_addresses").unwrap()),
-        validator_index: u64::from_str(value.get("validator_index").unwrap().as_str().unwrap())
-            .unwrap(),
-    }
-}
-
-fn to_validator_info_vec(value: &serde_json::Value) -> Vec<ValidatorInfo> {
-    value
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|value| {
-            let account_addr =
-                AccountAddress::from_hex_literal(value.get("addr").unwrap().as_str().unwrap())
-                    .unwrap();
-            ValidatorInfo::new(
-                account_addr,
-                u64::from_str(value.get("voting_power").unwrap().as_str().unwrap()).unwrap(),
-                to_validator_config(value.get("config").unwrap()),
-            )
-        })
-        .collect()
-}
-
-// Original ValidatorSet has private fields, to make sure invariants are kept,
-// so creating a new one for testing
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ValidatorSet {
-    pub consensus_scheme: ConsensusScheme,
-    pub active_validators: Vec<ValidatorInfo>,
-    pub pending_inactive: Vec<ValidatorInfo>,
-    pub pending_active: Vec<ValidatorInfo>,
-}
-
-pub fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
-    ValidatorSet {
-        consensus_scheme: match value.get("consensus_scheme").unwrap().as_u64().unwrap() {
-            0u64 => ConsensusScheme::BLS12381,
-            _ => panic!(),
-        },
-        active_validators: to_validator_info_vec(value.get("active_validators").unwrap()),
-        pending_inactive: to_validator_info_vec(value.get("pending_inactive").unwrap()),
-        pending_active: to_validator_info_vec(value.get("pending_active").unwrap()),
-    }
-}
 
 fn json_account_to_balance(value: &Value) -> u64 {
     u64::from_str(

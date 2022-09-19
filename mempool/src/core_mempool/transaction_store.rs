@@ -15,13 +15,14 @@ use crate::{
 };
 use aptos_config::config::MempoolConfig;
 use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
+use aptos_logger::{prelude::*, Level};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
+use std::cmp::max;
 use std::mem::size_of;
 use std::{
     collections::HashMap,
@@ -39,6 +40,9 @@ pub const TXN_INDEX_ESTIMATED_BYTES: usize = size_of::<crate::core_mempool::inde
 pub struct TransactionStore {
     // main DS
     transactions: HashMap<AccountAddress, AccountTransactions>,
+
+    // Sequence numbers for accounts with transactions
+    sequence_numbers: HashMap<AccountAddress, u64>,
 
     // indexes
     priority_index: PriorityIndex,
@@ -74,6 +78,7 @@ impl TransactionStore {
         Self {
             // main DS
             transactions: HashMap::new(),
+            sequence_numbers: HashMap::new(),
 
             // various indexes
             system_ttl_index: TTLIndex::new(Box::new(|t: &MempoolTransaction| t.expiration_time)),
@@ -119,16 +124,28 @@ impl TransactionStore {
         }
     }
 
-    /// Fetch mempool transaction by account address + sequence_number.
-    pub(crate) fn get_mempool_txn(
-        &self,
-        address: &AccountAddress,
+    pub(crate) fn remove(
+        &mut self,
+        sender: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<MempoolTransaction> {
-        self.transactions
-            .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
-            .cloned()
+        is_rejected: bool,
+    ) {
+        let current_seq_number = self.get_sequence_number(sender).map_or(0, |v| *v);
+        if is_rejected {
+            if sequence_number >= current_seq_number {
+                self.reject_transaction(sender, sequence_number);
+            }
+        } else {
+            let new_seq_number =
+                AccountSequenceInfo::Sequential(max(current_seq_number, sequence_number + 1));
+            self.sequence_numbers
+                .insert(*sender, new_seq_number.min_seq());
+            self.commit_transaction(sender, new_seq_number);
+        }
+    }
+
+    pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
+        self.sequence_numbers.get(address)
     }
 
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
@@ -190,14 +207,14 @@ impl TransactionStore {
             ));
         }
 
-        self.transactions
-            .entry(address)
-            .or_insert_with(AccountTransactions::new);
-
         self.clean_committed_transactions(
             &address,
             sequence_number.account_sequence_number_type.min_seq(),
         );
+
+        self.transactions
+            .entry(address)
+            .or_insert_with(AccountTransactions::new);
 
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
@@ -212,17 +229,19 @@ impl TransactionStore {
             }
 
             // insert into storage and other indexes
+            let sender = txn.get_sender();
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
             self.hash_index.insert(
                 txn.get_committed_hash(),
-                (
-                    txn.get_sender(),
-                    sequence_number.transaction_sequence_number,
-                ),
+                (sender, sequence_number.transaction_sequence_number),
             );
             let txn_size_bytes = txn.get_estimated_bytes();
             txns.insert(sequence_number.transaction_sequence_number, txn);
+            self.sequence_numbers.insert(
+                sender,
+                sequence_number.account_sequence_number_type.min_seq(),
+            );
             self.size_bytes += txn_size_bytes;
             self.track_indices();
         }
@@ -378,7 +397,10 @@ impl TransactionStore {
             txns.clear();
             txns.append(&mut active);
 
-            let mut rm_txns = TxnsLog::new();
+            let mut rm_txns = match aptos_logger::enabled!(Level::Trace) {
+                true => TxnsLog::new(),
+                false => TxnsLog::new_with_max(10),
+            };
             for transaction in txns_for_removal.values() {
                 rm_txns.add(
                     transaction.get_sender(),
@@ -398,7 +420,7 @@ impl TransactionStore {
     /// Handles transaction commit.
     /// It includes deletion of all transactions with sequence number <= `account_sequence_number`
     /// and potential promotion of sequential txns to PriorityIndex/TimelineIndex.
-    pub(crate) fn commit_transaction(
+    fn commit_transaction(
         &mut self,
         account: &AccountAddress,
         account_sequence_number: AccountSequenceInfo,
@@ -407,9 +429,12 @@ impl TransactionStore {
         self.process_ready_transactions(account, account_sequence_number);
     }
 
-    pub(crate) fn reject_transaction(&mut self, account: &AccountAddress, _sequence_number: u64) {
+    fn reject_transaction(&mut self, account: &AccountAddress, _sequence_number: u64) {
         if let Some(txns) = self.transactions.remove(account) {
-            let mut txns_log = TxnsLog::new();
+            let mut txns_log = match aptos_logger::enabled!(Level::Trace) {
+                true => TxnsLog::new(),
+                false => TxnsLog::new_with_max(10),
+            };
             for transaction in txns.values() {
                 txns_log.add(
                     transaction.get_sender(),
@@ -421,7 +446,7 @@ impl TransactionStore {
         }
     }
 
-    /// Removes transaction from all indexes.
+    /// Removes transaction from all indexes. Only call after removing from main transactions DS.
     fn index_remove(&mut self, txn: &MempoolTransaction) {
         counters::CORE_MEMPOOL_REMOVED_TXNS.inc();
         self.system_ttl_index.remove(txn);
@@ -431,6 +456,16 @@ impl TransactionStore {
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
+
+        // Remove account datastructures if there are no more transactions for the account.
+        let address = &txn.get_sender();
+        if let Some(txns) = self.transactions.get(address) {
+            if txns.is_empty() {
+                self.transactions.remove(address);
+                self.sequence_numbers.remove(address);
+            }
+        }
+
         self.track_indices();
     }
 
@@ -486,10 +521,9 @@ impl TransactionStore {
     pub(crate) fn gc_by_system_ttl(
         &mut self,
         metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
+        gc_time: Duration,
     ) {
-        let now = aptos_infallible::duration_since_epoch();
-
-        self.gc(now, true, metrics_cache);
+        self.gc(gc_time, true, metrics_cache);
     }
 
     /// Garbage collect old transactions based on client-specified expiration time.
@@ -529,7 +563,10 @@ impl TransactionStore {
         gc_txns.sort_by_key(|key| (key.address, key.sequence_number));
         let mut gc_iter = gc_txns.iter().peekable();
 
-        let mut gc_txns_log = TxnsLog::new();
+        let mut gc_txns_log = match aptos_logger::enabled!(Level::Trace) {
+            true => TxnsLog::new(),
+            false => TxnsLog::new_with_max(10),
+        };
         while let Some(key) = gc_iter.next() {
             if let Some(txns) = self.transactions.get_mut(&key.address) {
                 let park_range_start = Bound::Excluded(key.sequence_number);
@@ -603,5 +640,10 @@ impl TransactionStore {
     #[cfg(test)]
     pub(crate) fn get_parking_lot_size(&self) -> usize {
         self.parking_lot_index.size()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_transactions(&self) -> &HashMap<AccountAddress, AccountTransactions> {
+        &self.transactions
     }
 }

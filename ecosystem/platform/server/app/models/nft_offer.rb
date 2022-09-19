@@ -12,7 +12,17 @@ class NftOffer
   # Constants for slugs
   APTOS_ZERO = 'aptos-zero'
 
-  def self.find(slug)
+  ID_TO_SLUG = {
+    0 => APTOS_ZERO
+  }.freeze
+
+  SLUG_TO_ID = ID_TO_SLUG.invert.freeze
+
+  def self.find(id)
+    find_by(slug: ID_TO_SLUG.fetch(id.to_i, ''))
+  end
+
+  def self.find_by(slug:)
     case slug
     when APTOS_ZERO
       NftOffer.new(
@@ -25,6 +35,10 @@ class NftOffer
     else
       raise ActiveRecord::RecordNotFound
     end
+  end
+
+  def id
+    SLUG_TO_ID[slug]
   end
 
   def private_key_bytes

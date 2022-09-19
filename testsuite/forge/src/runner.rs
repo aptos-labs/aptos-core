@@ -16,6 +16,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::success_criteria::SuccessCriteria;
+use crate::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
 use framework::ReleaseBundle;
 use rand::rngs::OsRng;
 
@@ -118,9 +119,9 @@ pub type NodeConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 pub type GenesisConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 
 pub struct ForgeConfig<'cfg> {
-    aptos_tests: &'cfg [&'cfg dyn AptosTest],
-    admin_tests: &'cfg [&'cfg dyn AdminTest],
-    network_tests: &'cfg [&'cfg dyn NetworkTest],
+    aptos_tests: Vec<&'cfg dyn AptosTest>,
+    admin_tests: Vec<&'cfg dyn AdminTest>,
+    network_tests: Vec<&'cfg dyn NetworkTest>,
 
     /// The initial number of validators to spawn when the test harness creates a swarm
     initial_validator_count: NonZeroUsize,
@@ -152,17 +153,17 @@ impl<'cfg> ForgeConfig<'cfg> {
         Self::default()
     }
 
-    pub fn with_aptos_tests(mut self, aptos_tests: &'cfg [&'cfg dyn AptosTest]) -> Self {
+    pub fn with_aptos_tests(mut self, aptos_tests: Vec<&'cfg dyn AptosTest>) -> Self {
         self.aptos_tests = aptos_tests;
         self
     }
 
-    pub fn with_admin_tests(mut self, admin_tests: &'cfg [&'cfg dyn AdminTest]) -> Self {
+    pub fn with_admin_tests(mut self, admin_tests: Vec<&'cfg dyn AdminTest>) -> Self {
         self.admin_tests = admin_tests;
         self
     }
 
-    pub fn with_network_tests(mut self, network_tests: &'cfg [&'cfg dyn NetworkTest]) -> Self {
+    pub fn with_network_tests(mut self, network_tests: Vec<&'cfg dyn NetworkTest>) -> Self {
         self.network_tests = network_tests;
         self
     }
@@ -224,7 +225,7 @@ impl<'cfg> ForgeConfig<'cfg> {
         self.admin_tests.len() + self.network_tests.len() + self.aptos_tests.len()
     }
 
-    pub fn all_tests(&self) -> impl Iterator<Item = &'cfg dyn Test> + 'cfg {
+    pub fn all_tests(&self) -> impl Iterator<Item = &'_ dyn Test> {
         self.admin_tests
             .iter()
             .map(|t| t as &dyn Test)
@@ -235,10 +236,28 @@ impl<'cfg> ForgeConfig<'cfg> {
 
 impl<'cfg> Default for ForgeConfig<'cfg> {
     fn default() -> Self {
+        let forge_run_mode =
+            std::env::var("FORGE_RUNNER_MODE").unwrap_or_else(|_| "k8s".to_string());
+        let success_criteria = if forge_run_mode.eq("local") {
+            SuccessCriteria::new(600, 60000, true, None, None)
+        } else {
+            SuccessCriteria::new(
+                3500,
+                10000,
+                true,
+                None,
+                Some(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
+            )
+        };
         Self {
-            aptos_tests: &[],
-            admin_tests: &[],
-            network_tests: &[],
+            aptos_tests: vec![],
+            admin_tests: vec![],
+            network_tests: vec![],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_fullnode_count: 0,
             initial_version: InitialVersion::Oldest,
@@ -246,9 +265,9 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             genesis_helm_config_fn: None,
             node_helm_config_fn: None,
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-                mempool_backlog: 30000,
+                mempool_backlog: 40000,
             }),
-            success_criteria: SuccessCriteria::new(3500, 10000, true, None),
+            success_criteria,
         }
     }
 }

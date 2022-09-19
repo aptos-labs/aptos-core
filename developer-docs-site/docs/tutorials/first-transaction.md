@@ -9,7 +9,7 @@ import TabItem from '@theme/TabItem';
 
 # Your First Transaction
 
-This tutorial introduces the Aptos SDKs and how to generate, submit, and verify transactions submitted to the Aptos Blockchain. We will be running the `transfer-coin` example.
+This tutorial introduces the Aptos SDKs and how to generate, submit, and verify transactions submitted to the Aptos blockchain. We will be running the `transfer-coin` example.
 
 ## Step 1: Pick an SDK
 

@@ -1,30 +1,38 @@
-<%= form_with id: 'connect_wallet', model: @wallet, data: { controller: 'connect-wallet', action: 'connect-wallet#beforeSubmit', turbo_frame: @turbo_frame, connect_wallet_wallet_persisted_value: @wallet.persisted?, connect_wallet_required_network_value: @required_network } do |form| %>
-  <% if @wallet.errors.any? %>
-    <div class="flex p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert">
-      <div class="ml-3 text-sm font-medium text-red-700">
-        <h2><%= pluralize(@wallet.errors.count, 'error') %> prohibited this wallet from being saved:</h2>
+<%= content_tag :div, data: { controller: 'connect-wallet', connect_wallet_required_network_value: @required_network } do %>
+  <%= render @dialog do |dialog| %>
+    <% dialog.with_title do %>
+      Select Wallet
+    <% end %>
 
-        <ul>
-          <% @wallet.errors.each do |error| %>
-            <li><%= error.full_message %></li>
-          <% end %>
-        </ul>
+    <% dialog.with_body do %>
+      <ul>
+        <% supported_wallets.each do |wallet_name| %>
+          <li class="mb-4 last:mb-0">
+            <%= render ButtonComponent.new(class: 'w-full', data: { action: 'connect-wallet#selectWallet', wallet: wallet_name }) do %>
+              <%= wallet_name.capitalize %> Wallet
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  <% end %>
+
+  <%= form_with id: 'connect_wallet', model: @wallet, data: { action: 'connect-wallet#beforeSubmit', turbo_frame: @turbo_frame, connect_wallet_target: 'form' } do |form| %>
+    <div class="hidden p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert" data-connect-wallet-target="errors">
+      <div class="ml-3 text-sm font-medium text-red-700">
+        <h2>Errors prohibited this wallet from being saved:</h2>
+        <ul></ul>
       </div>
     </div>
+
+    <%= form.hidden_field :network %>
+    <%= form.hidden_field :wallet_name %>
+    <%= form.hidden_field :public_key %>
+    <%= form.hidden_field :challenge %>
+    <%= form.hidden_field :signed_challenge %>
   <% end %>
 
-  <% if @required_network %>
-    <p class="text-red-400 hidden mb-4" data-connect-wallet-target="requiredNetworkError">
-    </p>
-  <% end %>
-
-  <%= form.hidden_field :network %>
-  <%= form.hidden_field :wallet_name %>
-  <%= form.hidden_field :public_key %>
-  <%= form.hidden_field :challenge %>
-  <%= form.hidden_field :signed_challenge %>
-
-  <%= render ButtonComponent.new(type: :submit, **@rest) do %>
+  <%= render ButtonComponent.new(dialog: @dialog, **@rest) do %>
     <% if content %>
       <%= content %>
     <% else %>

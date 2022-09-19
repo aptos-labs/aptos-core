@@ -15,6 +15,8 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "account", "create-resource-account", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "account", "fund-with-faucet", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "account", "list", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "account", "lookup-address", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "account", "rotate-key", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "account", "transfer", "--help"]).await;
 
     assert_cmd_not_panic(&["aptos", "config"]).await;
@@ -54,11 +56,13 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "move", "prove", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "publish", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "run", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "move", "run-script", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "test", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "transactional-test", "--help"]).await;
 
     assert_cmd_not_panic(&["aptos", "node"]).await;
     assert_cmd_not_panic(&["aptos", "node", "analyze-validator-performance", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "node", "bootstrap-db-from-backup", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "node", "initialize-validator", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "node", "join-validator-set", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "node", "leave-validator-set", "--help"]).await;

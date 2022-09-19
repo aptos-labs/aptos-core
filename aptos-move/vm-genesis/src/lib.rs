@@ -16,6 +16,7 @@ use aptos_gas::{
     ToOnChainGasSchedule,
 };
 use aptos_types::account_config::aptos_test_root_address;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -114,6 +115,7 @@ pub fn encode_genesis_change_set(
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -450,15 +452,23 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
 /// should be used.
 #[derive(Debug, Eq, PartialEq)]
 pub enum GenesisOptions {
-    Compiled,
-    Fresh,
+    /// Framework compiled from head
+    Head,
+    /// Framework as it was released or upgraded in testnet
+    Testnet,
+    /// Framework as it was released or upgraded in mainnet
+    Mainnet,
 }
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Compiled => cached_packages::head_release_bundle(),
-        GenesisOptions::Fresh => cached_packages::devnet_release_bundle(),
+        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        GenesisOptions::Mainnet => {
+            // We don't yet have mainnet, so returning testnet here
+            framework::testnet_release_bundle()
+        }
     };
 
     generate_test_genesis(framework, Some(1)).0
@@ -467,8 +477,12 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Compiled => cached_packages::head_release_bundle(),
-        GenesisOptions::Fresh => cached_packages::devnet_release_bundle(),
+        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        GenesisOptions::Mainnet => {
+            // We don't yet have mainnet, so returning testnet here
+            framework::testnet_release_bundle()
+        }
     };
 
     generate_mainnet_genesis(framework, Some(1)).0
@@ -634,6 +648,7 @@ pub fn test_genesis_module_publishing() {
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();

@@ -5,7 +5,6 @@ pub mod aptos;
 pub mod error;
 pub mod faucet;
 
-use aptos_api_types::TransactionsBatchSubmissionResult;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
@@ -16,25 +15,23 @@ pub use aptos_api_types::{
     self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
 };
 pub use state::State;
-pub use types::{Account, Resource};
+pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 
 use crate::aptos::{AptosVersion, Balance};
 use crate::error::RestError;
 use anyhow::{anyhow, Result};
-use aptos_api_types::mime_types::BCS;
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, BcsBlock, Block,
-    GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData,
-    UserTransaction, VersionedEvent,
+    deserialize_from_string,
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
+    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData,
+    TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
-use aptos_types::account_config::AccountResource;
-use aptos_types::contract_event::EventWithVersion;
-use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
-    transaction::SignedTransaction,
+    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    contract_event::EventWithVersion,
+    transaction::{ExecutionStatus, SignedTransaction},
 };
 use move_deps::move_core_types::language_storage::StructTag;
 use reqwest::header::ACCEPT;
@@ -45,7 +42,6 @@ use std::collections::BTreeMap;
 use std::future::Future;
 use std::time::Duration;
 use tokio::time::Instant;
-use types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
 use url::Url;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
@@ -190,6 +186,20 @@ impl Client {
         })
     }
 
+    pub async fn get_account_balance_bcs(
+        &self,
+        address: AccountAddress,
+        coin_type: &str,
+    ) -> AptosResult<Response<u64>> {
+        let resp = self
+            .get_account_resource_bcs::<CoinStoreResource>(
+                address,
+                &format!("0x1::coin::CoinStore<{}>", coin_type),
+            )
+            .await?;
+        resp.and_then(|resource| Ok(resource.coin()))
+    }
+
     pub async fn get_account_balance_at_version(
         &self,
         address: AccountAddress,
@@ -215,8 +225,14 @@ impl Client {
         self.get(self.build_path("")?).await
     }
 
+    pub async fn get_index_bcs(&self) -> AptosResult<Response<IndexResponse>> {
+        let url = self.build_path("")?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_ledger_information(&self) -> AptosResult<Response<State>> {
-        let response = self.get_index().await?.map(|r| State {
+        let response = self.get_index_bcs().await?.map(|r| State {
             chain_id: r.chain_id,
             epoch: r.epoch.into(),
             version: r.ledger_version.into(),
@@ -669,6 +685,19 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_resources_at_version_bcs(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/resources?ledger_version={}",
+            address, version
+        ))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_resource<T: DeserializeOwned>(
         &self,
         address: AccountAddress,
@@ -712,6 +741,21 @@ impl Client {
         resource_type: &str,
     ) -> AptosResult<Response<T>> {
         let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_account_resource_at_version_bcs<T: DeserializeOwned>(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+        version: u64,
+    ) -> AptosResult<Response<T>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/resource/{}?ledger_version={}",
+            address, resource_type, version
+        ))?;
+
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
@@ -884,7 +928,7 @@ impl Client {
 
     pub async fn get_table_item<K: Serialize>(
         &self,
-        table_handle: u128,
+        table_handle: AccountAddress,
         key_type: &str,
         value_type: &str,
         key: K,
@@ -898,6 +942,24 @@ impl Client {
 
         let response = self.inner.post(url).json(&data).send().await?;
         self.json(response).await
+    }
+
+    pub async fn get_table_item_bcs<K: Serialize, T: DeserializeOwned>(
+        &self,
+        table_handle: AccountAddress,
+        key_type: &str,
+        value_type: &str,
+        key: K,
+    ) -> AptosResult<Response<T>> {
+        let url = self.build_path(&format!("tables/{}/item", table_handle))?;
+        let data = json!({
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": json!(key),
+        });
+
+        let response = self.post_bcs(url, data).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn get_account(&self, address: AccountAddress) -> AptosResult<Response<Account>> {
@@ -987,6 +1049,21 @@ impl Client {
         self.check_and_parse_bcs_response(response).await
     }
 
+    async fn post_bcs(
+        &self,
+        url: Url,
+        data: serde_json::Value,
+    ) -> AptosResult<Response<bytes::Bytes>> {
+        let response = self
+            .inner
+            .post(url)
+            .header(ACCEPT, BCS)
+            .json(&data)
+            .send()
+            .await?;
+        self.check_and_parse_bcs_response(response).await
+    }
+
     async fn get_bcs_with_page(
         &self,
         url: Url,
@@ -1040,7 +1117,7 @@ impl Client {
                     RestError::Api(inner) => {
                         should_retry(inner.status_code, Some(inner.error.clone()))
                     }
-                    RestError::Http(inner) => should_retry(*inner, None),
+                    RestError::Http(status_code, _e) => should_retry(*status_code, None),
                     RestError::Bcs(_)
                     | RestError::Json(_)
                     | RestError::Timeout(_)
@@ -1118,6 +1195,6 @@ async fn parse_error(response: reqwest::Response) -> RestError {
     let maybe_state = parse_state_optional(&response);
     match response.json::<AptosError>().await {
         Ok(error) => (error, maybe_state, status_code).into(),
-        Err(_) => RestError::Http(status_code),
+        Err(e) => RestError::Http(status_code, e),
     }
 }

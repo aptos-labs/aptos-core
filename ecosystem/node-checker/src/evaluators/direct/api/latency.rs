@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::time::{Duration, Instant};
 
 const LINK: &str =
-    "https://aptos.dev/nodes/node-health-checker-faq#how-does-the-latency-evaluator-work";
+    "https://aptos.dev/nodes/node-health-checker/node-health-checker-faq#how-does-the-latency-evaluator-work";
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct LatencyEvaluatorArgs {

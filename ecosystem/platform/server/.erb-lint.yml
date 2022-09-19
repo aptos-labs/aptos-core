@@ -1,6 +1,6 @@
 ---
 exclude:
-  - '**/vendor/**/*'
+  - "**/vendor/**/*"
 linters:
   ErbSafety:
     enabled: true

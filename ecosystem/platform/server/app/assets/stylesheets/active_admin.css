@@ -96,7 +96,7 @@
  */
   /* line 95, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   b,
-strong {
+  strong {
     font-weight: bolder;
   }
   /**
@@ -105,8 +105,8 @@ strong {
  */
   /* line 105, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   code,
-kbd,
-samp {
+  kbd,
+  samp {
     font-family: monospace, monospace;
     /* 1 */
     font-size: 1em;
@@ -125,7 +125,7 @@ samp {
  */
   /* line 125, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   sub,
-sup {
+  sup {
     font-size: 75%;
     line-height: 0;
     position: relative;
@@ -156,10 +156,10 @@ sup {
  */
   /* line 160, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button,
-input,
-optgroup,
-select,
-textarea {
+  input,
+  optgroup,
+  select,
+  textarea {
     font-family: inherit;
     /* 1 */
     font-size: 100%;
@@ -175,7 +175,7 @@ textarea {
  */
   /* line 176, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button,
-input {
+  input {
     /* 1 */
     overflow: visible;
   }
@@ -185,7 +185,7 @@ input {
  */
   /* line 186, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button,
-select {
+  select {
     /* 1 */
     text-transform: none;
   }
@@ -194,9 +194,9 @@ select {
  */
   /* line 195, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button,
-[type="button"],
-[type="reset"],
-[type="submit"] {
+  [type="button"],
+  [type="reset"],
+  [type="submit"] {
     -webkit-appearance: button;
   }
   /**
@@ -204,9 +204,9 @@ select {
  */
   /* line 206, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button::-moz-focus-inner,
-[type="button"]::-moz-focus-inner,
-[type="reset"]::-moz-focus-inner,
-[type="submit"]::-moz-focus-inner {
+  [type="button"]::-moz-focus-inner,
+  [type="reset"]::-moz-focus-inner,
+  [type="submit"]::-moz-focus-inner {
     border-style: none;
     padding: 0;
   }
@@ -215,9 +215,9 @@ select {
  */
   /* line 218, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button:-moz-focusring,
-[type="button"]:-moz-focusring,
-[type="reset"]:-moz-focusring,
-[type="submit"]:-moz-focusring {
+  [type="button"]:-moz-focusring,
+  [type="reset"]:-moz-focusring,
+  [type="submit"]:-moz-focusring {
     outline: 1px dotted ButtonText;
   }
   /**
@@ -268,7 +268,7 @@ select {
  */
   /* line 270, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   [type="checkbox"],
-[type="radio"] {
+  [type="radio"] {
     box-sizing: border-box;
     /* 1 */
     padding: 0;
@@ -279,7 +279,7 @@ select {
  */
   /* line 280, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   [type="number"]::-webkit-inner-spin-button,
-[type="number"]::-webkit-outer-spin-button {
+  [type="number"]::-webkit-outer-spin-button {
     height: auto;
   }
   /**
@@ -353,12 +353,22 @@ select {
     font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
   }
   /* line 31, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-weight: normal;
-    color: #5E6469;
+    color: #5e6469;
   }
   /* line 34, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  h1 img, h2 img, h3 img, h4 img, h5 img, h6 img {
+  h1 img,
+  h2 img,
+  h3 img,
+  h4 img,
+  h5 img,
+  h6 img {
     margin: 0;
   }
   /* line 37, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
@@ -424,20 +434,23 @@ select {
     font-style: italic;
   }
   /* line 56, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  strong, dfn {
+  strong,
+  dfn {
     font-weight: bold;
   }
   /* line 57, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  em, dfn {
+  em,
+  dfn {
     font-style: italic;
   }
   /* line 58, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  sup, sub {
+  sup,
+  sub {
     line-height: 0;
   }
   /* line 60, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
   abbr,
-acronym {
+  acronym {
     border-bottom: 1px dotted #666;
   }
   /* line 62, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
@@ -455,17 +468,20 @@ acronym {
     white-space: pre;
   }
   /* line 66, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  pre, code, tt {
-    font: 1em 'andale mono', 'lucida console', monospace;
+  pre,
+  code,
+  tt {
+    font: 1em "andale mono", "lucida console", monospace;
     line-height: 1.5;
   }
   /* line 69, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
   li ul,
-li ol {
+  li ol {
     margin: 0;
   }
   /* line 71, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  ul, ol {
+  ul,
+  ol {
     margin: 0 1.5em 1.5em 0;
     padding-left: 1.5em;
   }
@@ -503,12 +519,14 @@ li ol {
     background: #c3d9ff;
   }
   /* line 84, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  th, td, caption {
+  th,
+  td,
+  caption {
     padding: 4px 10px 4px 5px;
   }
   /* line 87, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
   .small {
-    font-size: .8em;
+    font-size: 0.8em;
     margin-bottom: 1.875em;
     line-height: 1.875em;
   }
@@ -606,7 +624,8 @@ li ol {
     top: -2px;
   }
   /* line 40, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
-  #header a, #header a:link {
+  #header a,
+  #header a:link {
     color: #cdcdcd;
   }
   /* line 42, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
@@ -637,7 +656,7 @@ li ol {
     margin-right: 4px;
     margin-top: 5px;
     margin-bottom: 5px;
-    font-size: 1.0em;
+    font-size: 1em;
     position: relative;
     /* Drop down menus */
   }
@@ -655,12 +674,15 @@ li ol {
   }
   /* line 80, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
   #header ul.tabs > li.has_nested > a {
-    background: url("data:image/png;base64,R0lGODlhBwAEAKIAAL6+vry8vIiIiJWVlf///3t7ewAAAAAAACH5BAEAAAUALAAAAAAHAAQAAAMLWLol80MoF5mQKgEAOw==") no-repeat calc(100% - 7px) 50%;
+    background: url("data:image/png;base64,R0lGODlhBwAEAKIAAL6+vry8vIiIiJWVlf///3t7ewAAAAAAACH5BAEAAAUALAAAAAAHAAQAAAMLWLol80MoF5mQKgEAOw==")
+      no-repeat calc(100% - 7px) 50%;
     padding-right: 20px;
   }
   /* line 85, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
   #header ul.tabs > li.has_nested.current > a {
-    background: #7b8389 url("data:image/png;base64,R0lGODlhBwAEAKIAAG1tbWxsbElJSVBQUP///0JCQgAAAAAAACH5BAEAAAUALAAAAAAHAAQAAAMLWLol80MoF5mQKgEAOw==") no-repeat calc(100% - 7px) 50%;
+    background: #7b8389
+      url("data:image/png;base64,R0lGODlhBwAEAKIAAG1tbWxsbElJSVBQUP///0JCQgAAAAAAACH5BAEAAAUALAAAAAAHAAQAAAMLWLol80MoF5mQKgEAOw==")
+      no-repeat calc(100% - 7px) 50%;
     padding-right: 20px;
   }
   /* line 90, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
@@ -674,7 +696,9 @@ li ol {
     border-top-right-radius: 10px;
     border-top-left-radius: 10px;
     border-bottom: 5px solid #7b8389;
-    background: #7b8389 url("data:image/png;base64,R0lGODlhBwAEAKIAAG1tbWxsbElJSVBQUP///0JCQgAAAAAAACH5BAEAAAUALAAAAAAHAAQAAAMLWLol80MoF5mQKgEAOw==") no-repeat calc(100% - 7px) 50%;
+    background: #7b8389
+      url("data:image/png;base64,R0lGODlhBwAEAKIAAG1tbWxsbElJSVBQUP///0JCQgAAAAAAACH5BAEAAAUALAAAAAAHAAQAAAMLWLol80MoF5mQKgEAOw==")
+      no-repeat calc(100% - 7px) 50%;
     z-index: 1020;
   }
   /* line 104, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
@@ -717,12 +741,14 @@ li ol {
   }
   /* line 132, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
   #header ul.tabs > li ul li.has_nested > a {
-    background: url("data:image/gif;base64,R0lGODlhBAAHAKECAKqqqszMzPkVFfkVFSH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5BAEKAAIALAAAAAAEAAcAAAIJlA0XKbH9nmAFADs=") no-repeat calc(100% - 7px) 55%;
+    background: url("data:image/gif;base64,R0lGODlhBAAHAKECAKqqqszMzPkVFfkVFSH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5BAEKAAIALAAAAAAEAAcAAAIJlA0XKbH9nmAFADs=")
+      no-repeat calc(100% - 7px) 55%;
     padding-right: 20px;
   }
   /* line 137, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
   #header ul.tabs > li ul li.has_nested:hover > a {
-    background: url("data:image/gif;base64,R0lGODlhBAAHAMIEAG1tbWxsbElJSVBQUPkVFfkVFfkVFfkVFSH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5BAEKAAEALAAAAAAEAAcAAAMKGKqy02G8OGeACQA7") no-repeat calc(100% - 7px) 55%;
+    background: url("data:image/gif;base64,R0lGODlhBAAHAMIEAG1tbWxsbElJSVBQUPkVFfkVFfkVFfkVFSH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5BAEKAAEALAAAAAAEAAcAAAMKGKqy02G8OGeACQA7")
+      no-repeat calc(100% - 7px) 55%;
     color: #fff;
   }
   /* line 142, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_header.scss */
@@ -784,12 +810,21 @@ li ol {
     /* Buttons */
   }
   /* line 4, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form ul, form ol, form li, form fieldset, form legend, form input, form textarea, form select, form p {
+  form ul,
+  form ol,
+  form li,
+  form fieldset,
+  form legend,
+  form input,
+  form textarea,
+  form select,
+  form p {
     margin: 0;
     padding: 0;
   }
   /* line 5, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form ol, form ul {
+  form ol,
+  form ul {
     list-style: none;
   }
   /* line 7, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -820,12 +855,12 @@ li ol {
     border-right-color: #d4d4d4;
     border-bottom-color: #cdcdcd;
     border-left-color: #d4d4d4;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #FFF inset;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #fff inset;
     font-size: 1em;
     font-weight: bold;
     line-height: 18px;
     margin-bottom: 0.5em;
-    color: #5E6469;
+    color: #5e6469;
     padding: 5px 10px 3px 10px;
   }
   /* line 19, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -837,9 +872,9 @@ li ol {
     display: block;
     width: 20%;
     float: left;
-    font-size: 1.0em;
+    font-size: 1em;
     font-weight: bold;
-    color: #5E6469;
+    color: #5e6469;
   }
   /* line 28, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
   form fieldset ol > li label abbr {
@@ -887,7 +922,13 @@ li ol {
     margin-right: 2em;
   }
   /* line 75, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form .ui-sortable input[type=text], form .ui-sortable input[type=password], form .ui-sortable input[type=email], form .ui-sortable input[type=number], form .ui-sortable input[type=url], form .ui-sortable input[type=tel], form .ui-sortable textarea {
+  form .ui-sortable input[type="text"],
+  form .ui-sortable input[type="password"],
+  form .ui-sortable input[type="email"],
+  form .ui-sortable input[type="number"],
+  form .ui-sortable input[type="url"],
+  form .ui-sortable input[type="tel"],
+  form .ui-sortable textarea {
     width: calc(80% - 22px - 2em - 1px);
   }
   /* line 83, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -915,38 +956,38 @@ li ol {
     margin: 0;
   }
   /* line 109, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form input[type=text],
-form input[type=password],
-form input[type=email],
-form input[type=number],
-form input[type=url],
-form input[type=tel],
-form input[type=date],
-form input[type=time],
-form textarea {
+  form input[type="text"],
+  form input[type="password"],
+  form input[type="email"],
+  form input[type="number"],
+  form input[type="url"],
+  form input[type="tel"],
+  form input[type="date"],
+  form input[type="time"],
+  form textarea {
     width: calc(80% - 22px);
     border: 1px solid #c9d0d6;
     border-radius: 3px;
     font-size: 0.95em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     outline: none;
     padding: 8px 10px 7px;
   }
   /* line 126, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form input[type=text]:focus,
-form input[type=password]:focus,
-form input[type=email]:focus,
-form input[type=number]:focus,
-form input[type=url]:focus,
-form input[type=tel]:focus,
-form input[type=date]:focus,
-form input[type=time]:focus,
-form textarea:focus {
+  form input[type="text"]:focus,
+  form input[type="password"]:focus,
+  form input[type="email"]:focus,
+  form input[type="number"]:focus,
+  form input[type="url"]:focus,
+  form input[type="tel"]:focus,
+  form input[type="date"]:focus,
+  form input[type="time"]:focus,
+  form textarea:focus {
     border: 1px solid #99a2aa;
     box-shadow: 0 0 4px #99a2aa;
   }
   /* line 132, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form input[type=date] {
+  form input[type="date"] {
     width: calc(100% - 22px);
   }
   /* line 136, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -966,36 +1007,46 @@ form textarea:focus {
     margin: 0.5em 0 0 20%;
   }
   /* line 148, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset > ol > li.date_select fieldset ol li, form fieldset > ol > li.time_select fieldset ol li, form fieldset > ol > li.datetime_select fieldset ol li {
+  form fieldset > ol > li.date_select fieldset ol li,
+  form fieldset > ol > li.time_select fieldset ol li,
+  form fieldset > ol > li.datetime_select fieldset ol li {
     float: left;
     width: auto;
     margin: 0 0.5em 0 0;
   }
   /* line 150, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset > ol > li.date_select fieldset ol li label, form fieldset > ol > li.time_select fieldset ol li label, form fieldset > ol > li.datetime_select fieldset ol li label {
+  form fieldset > ol > li.date_select fieldset ol li label,
+  form fieldset > ol > li.time_select fieldset ol li label,
+  form fieldset > ol > li.datetime_select fieldset ol li label {
     display: none;
   }
   /* line 151, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset > ol > li.date_select fieldset ol li input, form fieldset > ol > li.time_select fieldset ol li input, form fieldset > ol > li.datetime_select fieldset ol li input {
+  form fieldset > ol > li.date_select fieldset ol li input,
+  form fieldset > ol > li.time_select fieldset ol li input,
+  form fieldset > ol > li.datetime_select fieldset ol li input {
     display: inline;
     margin: 0;
     padding: 0;
   }
   /* line 157, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset > ol > li.check_boxes fieldset ol, form fieldset > ol > li.radio fieldset ol {
+  form fieldset > ol > li.check_boxes fieldset ol,
+  form fieldset > ol > li.radio fieldset ol {
     margin-bottom: -0.6em;
   }
   /* line 159, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset > ol > li.check_boxes fieldset ol li, form fieldset > ol > li.radio fieldset ol li {
+  form fieldset > ol > li.check_boxes fieldset ol li,
+  form fieldset > ol > li.radio fieldset ol li {
     margin: 0.1em 0 0.5em 0;
   }
   /* line 161, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset > ol > li.check_boxes fieldset ol li label, form fieldset > ol > li.radio fieldset ol li label {
+  form fieldset > ol > li.check_boxes fieldset ol li label,
+  form fieldset > ol > li.radio fieldset ol li label {
     float: none;
     width: 100%;
   }
   /* line 164, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset > ol > li.check_boxes fieldset ol li label input, form fieldset > ol > li.radio fieldset ol li label input {
+  form fieldset > ol > li.check_boxes fieldset ol li label input,
+  form fieldset > ol > li.radio fieldset ol li label input {
     margin-right: 0.2em;
   }
   /* line 171, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -1037,7 +1088,13 @@ form textarea:focus {
     display: list-item;
   }
   /* line 202, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset > ol > li.error input[type=text], form fieldset > ol > li.error input[type=password], form fieldset > ol > li.error input[type=email], form fieldset > ol > li.error input[type=number], form fieldset > ol > li.error input[type=url], form fieldset > ol > li.error input[type=tel], form fieldset > ol > li.error textarea {
+  form fieldset > ol > li.error input[type="text"],
+  form fieldset > ol > li.error input[type="password"],
+  form fieldset > ol > li.error input[type="email"],
+  form fieldset > ol > li.error input[type="number"],
+  form fieldset > ol > li.error input[type="url"],
+  form fieldset > ol > li.error input[type="tel"],
+  form fieldset > ol > li.error textarea {
     border: 1px solid #932419;
   }
   /* line 209, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -1058,12 +1115,14 @@ form textarea:focus {
     display: list-item;
   }
   /* line 222, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form input[type=submit], form input[type=button], form button {
+  form input[type="submit"],
+  form input[type="button"],
+  form button {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
@@ -1071,7 +1130,8 @@ form textarea:focus {
     background-color: #838a90;
     background-image: linear-gradient(180deg, #838a90, #414549);
     text-shadow: #000 0 1px 0;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0px rgba(255, 255, 255, 0.2) inset;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0px rgba(255, 255, 255, 0.2) inset;
     border: solid 1px #484e53;
     border-color: #484e53;
     border-top-color: #616a71;
@@ -1082,27 +1142,39 @@ form textarea:focus {
     cursor: pointer;
   }
   /* line 12, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  form input.disabled[type=submit], form input.disabled[type=button], form button.disabled {
+  form input.disabled[type="submit"],
+  form input.disabled[type="button"],
+  form button.disabled {
     opacity: 0.5;
     cursor: default;
   }
   /* line 29, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  form input[type=submit]:not(.disabled):hover, form input[type=button]:not(.disabled):hover, form button:not(.disabled):hover {
+  form input[type="submit"]:not(.disabled):hover,
+  form input[type="button"]:not(.disabled):hover,
+  form button:not(.disabled):hover {
     background-color: #8b9297;
     background-image: linear-gradient(180deg, #8b9297, #484d51);
   }
   /* line 33, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  form input[type=submit]:not(.disabled):active, form input[type=button]:not(.disabled):active, form button:not(.disabled):active {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset, 0 1px 0 0px #FFF;
+  form input[type="submit"]:not(.disabled):active,
+  form input[type="button"]:not(.disabled):active,
+  form button:not(.disabled):active {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset, 0 1px 0 0px #fff;
     background-color: #71797f;
     background-image: linear-gradient(180deg, #71797f, #35383b);
   }
   /* line 228, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form .buttons, form .actions {
+  form .buttons,
+  form .actions {
     margin-top: 15px;
   }
   /* line 230, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form .buttons input[type=submit], form .buttons input[type=button], form .buttons button, form .actions input[type=submit], form .actions input[type=button], form .actions button {
+  form .buttons input[type="submit"],
+  form .buttons input[type="button"],
+  form .buttons button,
+  form .actions input[type="submit"],
+  form .actions input[type="button"],
+  form .actions button {
     margin-right: 10px;
   }
   /* line 233, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -1116,24 +1188,27 @@ form textarea:focus {
     display: inline;
   }
   /* line 243, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset.buttons li, form fieldset.actions li {
+  form fieldset.buttons li,
+  form fieldset.actions li {
     float: left;
     padding: 0;
   }
   /* line 247, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form fieldset.buttons li.cancel a, form fieldset.actions li.cancel a {
+  form fieldset.buttons li.cancel a,
+  form fieldset.actions li.cancel a {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -1141,34 +1216,37 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
+    color: #5e6469;
   }
   /* line 12, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  form fieldset.buttons li.cancel a.disabled, form fieldset.actions li.cancel a.disabled {
+  form fieldset.buttons li.cancel a.disabled,
+  form fieldset.actions li.cancel a.disabled {
     opacity: 0.5;
     cursor: default;
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  form fieldset.buttons li.cancel a:not(.disabled):hover, form fieldset.actions li.cancel a:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+  form fieldset.buttons li.cancel a:not(.disabled):hover,
+  form fieldset.actions li.cancel a:not(.disabled):hover {
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  form fieldset.buttons li.cancel a:not(.disabled):active, form fieldset.actions li.cancel a:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+  form fieldset.buttons li.cancel a:not(.disabled):active,
+  form fieldset.actions li.cancel a:not(.disabled):active {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 255, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
   .sidebar_section label {
     display: block;
     text-transform: uppercase;
-    color: #5E6469;
+    color: #5e6469;
     font-size: 0.9em;
     font-weight: bold;
   }
@@ -1177,7 +1255,12 @@ form textarea:focus {
     width: 240px;
   }
   /* line 267, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  .sidebar_section input[type=text], .sidebar_section input[type=password], .sidebar_section input[type=email], .sidebar_section input[type=url], .sidebar_section input[type=tel], .sidebar_section textarea {
+  .sidebar_section input[type="text"],
+  .sidebar_section input[type="password"],
+  .sidebar_section input[type="email"],
+  .sidebar_section input[type="url"],
+  .sidebar_section input[type="tel"],
+  .sidebar_section textarea {
     width: 220px;
   }
   /* line 276, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -1186,7 +1269,7 @@ form textarea:focus {
     clear: both;
   }
   /* line 281, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form.filter_form .filter_form_field.select_and_search input[type=text] {
+  form.filter_form .filter_form_field.select_and_search input[type="text"] {
     margin-left: 16px;
     width: 88px;
   }
@@ -1204,22 +1287,32 @@ form textarea:focus {
     padding-bottom: 0px;
   }
   /* line 296, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form.filter_form .filter_form_field.filter_check_boxes .check_boxes_wrapper label {
+  form.filter_form
+    .filter_form_field.filter_check_boxes
+    .check_boxes_wrapper
+    label {
     font-weight: normal;
     margin-bottom: 3px;
     text-transform: none;
-    font-size: 1.0em;
+    font-size: 1em;
   }
   /* line 301, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form.filter_form .filter_form_field.filter_check_boxes .check_boxes_wrapper label input {
+  form.filter_form
+    .filter_form_field.filter_check_boxes
+    .check_boxes_wrapper
+    label
+    input {
     vertical-align: baseline;
   }
   /* line 306, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form.filter_form .filter_form_field.filter_date_range input[type=text] {
+  form.filter_form .filter_form_field.filter_date_range input[type="text"] {
     width: 114px;
   }
   /* line 309, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
-  form.filter_form .filter_form_field.filter_date_range input[type=text] + input {
+  form.filter_form
+    .filter_form_field.filter_date_range
+    input[type="text"]
+    + input {
     margin-left: 6px;
   }
   /* line 315, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_forms.scss */
@@ -1227,15 +1320,16 @@ form textarea:focus {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -1243,7 +1337,7 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
+    color: #5e6469;
   }
   /* line 12, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   form.filter_form a.clear_filters_btn.disabled {
@@ -1252,19 +1346,19 @@ form textarea:focus {
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   form.filter_form a.clear_filters_btn:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   form.filter_form a.clear_filters_btn:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 4, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_comments.scss */
   .comments .active_admin_comment {
@@ -1289,11 +1383,14 @@ form textarea:focus {
     color: #767e84;
   }
   /* line 16, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_comments.scss */
-  .comments .active_admin_comment .active_admin_comment_meta .active_admin_comment_author {
+  .comments
+    .active_admin_comment
+    .active_admin_comment_meta
+    .active_admin_comment_author {
     font-size: 1.2em;
     font-weight: bold;
     margin: 0;
-    color: #5E6469;
+    color: #5e6469;
   }
   /* line 23, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_comments.scss */
   .comments .active_admin_comment .active_admin_comment_body {
@@ -1330,7 +1427,7 @@ form textarea:focus {
     color: #cb9810;
     font-weight: bold;
     font-size: 1.1em;
-    line-height: 1.0em;
+    line-height: 1em;
     padding: 13px 30px 11px;
     position: relative;
   }
@@ -1355,7 +1452,7 @@ form textarea:focus {
     background: none;
     color: #666;
     font-weight: bold;
-    line-height: 1.0em;
+    line-height: 1em;
     padding: 0;
     margin-bottom: 8px;
   }
@@ -1414,11 +1511,17 @@ form textarea:focus {
     text-align: center;
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_date_picker.scss */
-  .ui-datepicker .ui-datepicker-header .ui-datepicker-title .ui-datepicker-month {
+  .ui-datepicker
+    .ui-datepicker-header
+    .ui-datepicker-title
+    .ui-datepicker-month {
     margin: -4px 0 0 0;
   }
   /* line 53, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_date_picker.scss */
-  .ui-datepicker .ui-datepicker-header .ui-datepicker-title .ui-datepicker-year {
+  .ui-datepicker
+    .ui-datepicker-header
+    .ui-datepicker-title
+    .ui-datepicker-year {
     margin: -4px 0 0 0;
   }
   /* line 59, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_date_picker.scss */
@@ -1468,7 +1571,8 @@ form textarea:focus {
     width: 156px;
   }
   /* line 102, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_date_picker.scss */
-  .ui-datepicker table.ui-datepicker-calendar td, .ui-datepicker table.ui-datepicker-calendar th {
+  .ui-datepicker table.ui-datepicker-calendar td,
+  .ui-datepicker table.ui-datepicker-calendar th {
     padding: 0px;
     text-align: center;
   }
@@ -1504,7 +1608,11 @@ form textarea:focus {
     color: #fff;
   }
   /* line 133, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_date_picker.scss */
-  .ui-datepicker table.ui-datepicker-calendar tbody td a.ui-state-active.ui-state-hover {
+  .ui-datepicker
+    table.ui-datepicker-calendar
+    tbody
+    td
+    a.ui-state-active.ui-state-hover {
     background-color: #5a5f64;
     color: #fff;
   }
@@ -1542,27 +1650,30 @@ form textarea:focus {
     border-right-color: #d4d4d4;
     border-bottom-color: #cdcdcd;
     border-left-color: #d4d4d4;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #FFF inset;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #fff inset;
     font-size: 1em;
     font-weight: bold;
     line-height: 18px;
     margin-bottom: 0.5em;
-    color: #5E6469;
+    color: #5e6469;
     padding: 5px 10px 3px 10px;
     border-right: none;
     padding-left: 12px;
     padding-right: 12px;
   }
   /* line 27, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tables.scss */
-  table.index_table th a, table.index_table th a:link, table.index_table th a:visited {
-    color: #5E6469;
+  table.index_table th a,
+  table.index_table th a:link,
+  table.index_table th a:visited {
+    color: #5e6469;
     text-decoration: none;
     display: block;
     white-space: nowrap;
   }
   /* line 34, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tables.scss */
   table.index_table th.sortable a {
-    background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAcAAABGCAYAAAAAVo4aAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAH5JREFUeNpi3LhlOwMU1AExGxDXwARYoHQLEFdD2cxAXAliMKFJgEAFEHfBJEHGMKLhMpgkTsAEdch/NNwCk2xCdiEQtML4LEgCf6EubUX3Cgh0oNvJ+P//f7wOGpUclRwYSZb41CyidNbB8giNM+9oXhmVHHm5bJjUSAABBgDKKiwMMUxPwgAAAABJRU5ErkJggg==") no-repeat 0 4px;
+    background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAcAAABGCAYAAAAAVo4aAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAH5JREFUeNpi3LhlOwMU1AExGxDXwARYoHQLEFdD2cxAXAliMKFJgEAFEHfBJEHGMKLhMpgkTsAEdch/NNwCk2xCdiEQtML4LEgCf6EubUX3Cgh0oNvJ+P//f7wOGpUclRwYSZb41CyidNbB8giNM+9oXhmVHHm5bJjUSAABBgDKKiwMMUxPwgAAAABJRU5ErkJggg==")
+      no-repeat 0 4px;
     padding-left: 13px;
   }
   /* line 38, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tables.scss */
@@ -1574,7 +1685,8 @@ form textarea:focus {
     background-position: 0 -56px;
   }
   /* line 41, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tables.scss */
-  table.index_table th.sorted-asc, table.index_table th.sorted-desc {
+  table.index_table th.sorted-asc,
+  table.index_table th.sorted-desc {
     background-color: #e2e2e2;
     background-image: linear-gradient(180deg, #e2e2e2, #d2d4d6);
   }
@@ -1604,7 +1716,7 @@ form textarea:focus {
   .panel_contents table th {
     padding-top: 10px;
     background: none;
-    color: #5E6469;
+    color: #5e6469;
     box-shadow: none;
     text-shadow: #fff 0 1px 0;
     text-transform: uppercase;
@@ -1631,7 +1743,8 @@ form textarea:focus {
     background: #ecedee;
   }
   /* line 87, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tables.scss */
-  .attributes_table table th, .attributes_table table td {
+  .attributes_table table th,
+  .attributes_table table td {
     padding: 8px 12px 6px 12px;
     vertical-align: top;
     border-bottom: 1px solid #e8e8e8;
@@ -1644,7 +1757,7 @@ form textarea:focus {
     font-size: 0.9em;
     padding-left: 0;
     text-transform: uppercase;
-    color: #5E6469;
+    color: #5e6469;
     text-shadow: #fff 0 1px 0;
   }
   /* line 103, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tables.scss */
@@ -1700,12 +1813,12 @@ form textarea:focus {
     border-right-color: #d4d4d4;
     border-bottom-color: #cdcdcd;
     border-left-color: #d4d4d4;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #FFF inset;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #fff inset;
     font-size: 1em;
     font-weight: bold;
     line-height: 18px;
     margin-bottom: 0.5em;
-    color: #5E6469;
+    color: #5e6469;
     padding: 5px 10px 3px 10px;
   }
   /* line 16, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_modal_dialog.scss */
@@ -1725,7 +1838,8 @@ form textarea:focus {
     margin-right: 10px;
   }
   /* line 23, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_modal_dialog.scss */
-  .ui-dialog .ui-dialog-buttonpane, .ui-dialog form {
+  .ui-dialog .ui-dialog-buttonpane,
+  .ui-dialog form {
     padding: 7px 15px 13px;
   }
   /* line 27, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_modal_dialog.scss */
@@ -1733,8 +1847,8 @@ form textarea:focus {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
@@ -1742,7 +1856,8 @@ form textarea:focus {
     background-color: #838a90;
     background-image: linear-gradient(180deg, #838a90, #414549);
     text-shadow: #000 0 1px 0;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0px rgba(255, 255, 255, 0.2) inset;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0px rgba(255, 255, 255, 0.2) inset;
     border: solid 1px #484e53;
     border-color: #484e53;
     border-top-color: #616a71;
@@ -1763,7 +1878,7 @@ form textarea:focus {
   }
   /* line 33, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .ui-dialog .ui-dialog-buttonpane button:not(.disabled):active {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset, 0 1px 0 0px #FFF;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset, 0 1px 0 0px #fff;
     background-color: #71797f;
     background-image: linear-gradient(180deg, #71797f, #35383b);
   }
@@ -1772,15 +1887,16 @@ form textarea:focus {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -1788,7 +1904,7 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
+    color: #5e6469;
   }
   /* line 12, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .ui-dialog .ui-dialog-buttonpane button.disabled:last-child {
@@ -1797,19 +1913,19 @@ form textarea:focus {
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .ui-dialog .ui-dialog-buttonpane button:last-child:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .ui-dialog .ui-dialog-buttonpane button:last-child:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 33, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_modal_dialog.scss */
   .active_admin_dialog.ui-dialog .ui-dialog-titlebar-close {
@@ -1823,8 +1939,8 @@ form textarea:focus {
   /* line 5, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_blank_slates.scss */
   .blank_slate_container .blank_slate {
     border-radius: 3px;
-    border: 1px dashed #DADADA;
-    color: #AAA;
+    border: 1px dashed #dadada;
+    color: #aaa;
     display: inline-block;
     font-size: 1.2em;
     font-weight: bold;
@@ -1851,12 +1967,15 @@ form textarea:focus {
     display: block;
     font-size: 0.9em;
     font-weight: normal;
-    line-height: 1.0em;
+    line-height: 1em;
     margin-bottom: 12px;
     text-transform: uppercase;
   }
   /* line 9, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_breadcrumbs.scss */
-  .breadcrumb a, .breadcrumb a:link, .breadcrumb a:visited, .breadcrumb a:active {
+  .breadcrumb a,
+  .breadcrumb a:link,
+  .breadcrumb a:visited,
+  .breadcrumb a:active {
     color: #8a949e;
     text-decoration: none;
   }
@@ -1878,15 +1997,16 @@ form textarea:focus {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -1894,7 +2014,7 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
+    color: #5e6469;
     position: relative;
     padding-right: 22px !important;
     cursor: pointer;
@@ -1906,35 +2026,35 @@ form textarea:focus {
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .dropdown_menu .dropdown_menu_button:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .dropdown_menu .dropdown_menu_button:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 10, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_dropdown_menu.scss */
   .dropdown_menu .dropdown_menu_button:before {
-    content: ' ';
+    content: " ";
     position: absolute;
     width: 0;
     height: 0;
     border-width: 3px 3px 0;
     border-style: solid;
-    border-color: #FFF transparent;
+    border-color: #fff transparent;
     right: 12px;
     top: 45%;
   }
   /* line 22, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_dropdown_menu.scss */
   .dropdown_menu .dropdown_menu_button:after {
-    content: ' ';
+    content: " ";
     position: absolute;
     width: 0;
     height: 0;
@@ -1959,7 +2079,7 @@ form textarea:focus {
   }
   /* line 51, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_dropdown_menu.scss */
   .dropdown_menu .dropdown_menu_nipple:before {
-    content: ' ';
+    content: " ";
     position: absolute;
     width: 0;
     height: 0;
@@ -1971,7 +2091,7 @@ form textarea:focus {
   }
   /* line 65, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_dropdown_menu.scss */
   .dropdown_menu .dropdown_menu_nipple:after {
-    content: ' ';
+    content: " ";
     position: absolute;
     width: 0;
     height: 0;
@@ -1988,7 +2108,7 @@ form textarea:focus {
     background-color: white;
     padding: 2px;
     box-shadow: rgba(0, 0, 0, 0.4) 0 1px 3px, #838a90 0px 1px 0px 0px inset;
-    background-color: #5E6469;
+    background-color: #5e6469;
     background-color: #686e74;
     background-image: linear-gradient(180deg, #686e74, #52575c);
     border: solid 1px #464a4e;
@@ -2001,7 +2121,7 @@ form textarea:focus {
   /* line 93, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_dropdown_menu.scss */
   .dropdown_menu .dropdown_menu_list_wrapper .dropdown_menu_list {
     display: block;
-    background-color: #FFF;
+    background-color: #fff;
     border: solid 1px #464a4e;
     box-shadow: #6a7176 0px 1px 0px 0px;
     border-radius: 3px;
@@ -2032,16 +2152,20 @@ form textarea:focus {
     background-color: #75a1c2;
     background-image: linear-gradient(180deg, #75a1c2, #608cb4);
     text-shadow: #5a83aa 0 1px 0;
-    color: #FFF;
+    color: #fff;
   }
   /* line 126, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_dropdown_menu.scss */
   .dropdown_menu .dropdown_menu_list_wrapper .dropdown_menu_list li a:active {
     background-color: #608cb4;
     background-image: linear-gradient(180deg, #608cb4, #75a1c2);
-    color: #FFF;
+    color: #fff;
   }
   /* line 134, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_dropdown_menu.scss */
-  .dropdown_menu .dropdown_menu_list_wrapper .dropdown_menu_list li:first-child a {
+  .dropdown_menu
+    .dropdown_menu_list_wrapper
+    .dropdown_menu_list
+    li:first-child
+    a {
     border-top-left-radius: 2px;
     border-top-right-radius: 2px;
   }
@@ -2050,7 +2174,11 @@ form textarea:focus {
     border: none;
   }
   /* line 142, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_dropdown_menu.scss */
-  .dropdown_menu .dropdown_menu_list_wrapper .dropdown_menu_list li:last-child a {
+  .dropdown_menu
+    .dropdown_menu_list_wrapper
+    .dropdown_menu_list
+    li:last-child
+    a {
     border-bottom-left-radius: 2px;
     border-bottom-right-radius: 2px;
   }
@@ -2060,12 +2188,17 @@ form textarea:focus {
     white-space: nowrap;
   }
   /* line 6, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_buttons.scss */
-  a.button, a.button:link, a.button:visited, input[type=submit], input[type=button], button {
+  a.button,
+  a.button:link,
+  a.button:visited,
+  input[type="submit"],
+  input[type="button"],
+  button {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
@@ -2073,7 +2206,8 @@ form textarea:focus {
     background-color: #838a90;
     background-image: linear-gradient(180deg, #838a90, #414549);
     text-shadow: #000 0 1px 0;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0px rgba(255, 255, 255, 0.2) inset;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0px rgba(255, 255, 255, 0.2) inset;
     border: solid 1px #484e53;
     border-color: #484e53;
     border-top-color: #616a71;
@@ -2083,18 +2217,33 @@ form textarea:focus {
     color: #efefef;
   }
   /* line 12, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  a.button.disabled, a.button.disabled:link, a.button.disabled:visited, input.disabled[type=submit], input.disabled[type=button], button.disabled {
+  a.button.disabled,
+  a.button.disabled:link,
+  a.button.disabled:visited,
+  input.disabled[type="submit"],
+  input.disabled[type="button"],
+  button.disabled {
     opacity: 0.5;
     cursor: default;
   }
   /* line 29, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  a.button:not(.disabled):hover, a.button:link:not(.disabled):hover, a.button:visited:not(.disabled):hover, input[type=submit]:not(.disabled):hover, input[type=button]:not(.disabled):hover, button:not(.disabled):hover {
+  a.button:not(.disabled):hover,
+  a.button:link:not(.disabled):hover,
+  a.button:visited:not(.disabled):hover,
+  input[type="submit"]:not(.disabled):hover,
+  input[type="button"]:not(.disabled):hover,
+  button:not(.disabled):hover {
     background-color: #8b9297;
     background-image: linear-gradient(180deg, #8b9297, #484d51);
   }
   /* line 33, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  a.button:not(.disabled):active, a.button:link:not(.disabled):active, a.button:visited:not(.disabled):active, input[type=submit]:not(.disabled):active, input[type=button]:not(.disabled):active, button:not(.disabled):active {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset, 0 1px 0 0px #FFF;
+  a.button:not(.disabled):active,
+  a.button:link:not(.disabled):active,
+  a.button:visited:not(.disabled):active,
+  input[type="submit"]:not(.disabled):active,
+  input[type="button"]:not(.disabled):active,
+  button:not(.disabled):active {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset, 0 1px 0 0px #fff;
     background-color: #71797f;
     background-image: linear-gradient(180deg, #71797f, #35383b);
   }
@@ -2115,7 +2264,9 @@ form textarea:focus {
     float: left;
   }
   /* line 1, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_links.scss */
-  a, a:link, a:visited {
+  a,
+  a:link,
+  a:visited {
     color: #38678b;
     text-decoration: underline;
   }
@@ -2138,15 +2289,16 @@ form textarea:focus {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -2154,7 +2306,7 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
+    color: #5e6469;
   }
   /* line 12, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .pagination a.disabled {
@@ -2163,27 +2315,27 @@ form textarea:focus {
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .pagination a:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .pagination a:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 14, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_pagination.scss */
   .pagination span.page.current {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
@@ -2191,7 +2343,8 @@ form textarea:focus {
     background-color: #838a90;
     background-image: linear-gradient(180deg, #838a90, #414549);
     text-shadow: #000 0 1px 0;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0px rgba(255, 255, 255, 0.2) inset;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0px rgba(255, 255, 255, 0.2) inset;
     border: solid 1px #484e53;
     border-color: #484e53;
     border-top-color: #616a71;
@@ -2212,12 +2365,13 @@ form textarea:focus {
   }
   /* line 33, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .pagination span.page.current:not(.disabled):active {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset, 0 1px 0 0px #FFF;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset, 0 1px 0 0px #fff;
     background-color: #71797f;
     background-image: linear-gradient(180deg, #71797f, #35383b);
   }
   /* line 18, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_pagination.scss */
-  .pagination a, .pagination span.page.current {
+  .pagination a,
+  .pagination span.page.current {
     border-radius: 0px;
     margin-right: 4px;
     padding: 2px 5px;
@@ -2246,15 +2400,16 @@ form textarea:focus {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -2262,7 +2417,7 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
+    color: #5e6469;
     border-radius: 0px;
     padding: 1px 5px;
   }
@@ -2273,19 +2428,19 @@ form textarea:focus {
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .pagination_per_page select:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .pagination_per_page select:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 47, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_pagination.scss */
   .comments .pagination {
@@ -2298,14 +2453,16 @@ form textarea:focus {
     color: #000;
   }
   /* line 2, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_panels.scss */
-  .section, .panel {
+  .section,
+  .panel {
     background: #f4f4f4;
     border-radius: 4px;
     box-shadow: inset 0 1px 4px #ddd;
     margin-bottom: 20px;
   }
   /* line 27, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_sections.scss */
-  .section > h3, .panel > h3 {
+  .section > h3,
+  .panel > h3 {
     background-color: #efefef;
     background-image: linear-gradient(180deg, #efefef, #dfe1e2);
     text-shadow: #fff 0 1px 0;
@@ -2315,26 +2472,29 @@ form textarea:focus {
     border-right-color: #d4d4d4;
     border-bottom-color: #cdcdcd;
     border-left-color: #d4d4d4;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #FFF inset;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #fff inset;
     font-size: 1em;
     font-weight: bold;
     line-height: 18px;
     margin-bottom: 0.5em;
-    color: #5E6469;
+    color: #5e6469;
     padding: 5px 10px 3px 10px;
   }
   /* line 30, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_sections.scss */
-  .section > h3 .header_action, .panel > h3 .header_action {
+  .section > h3 .header_action,
+  .panel > h3 .header_action {
     float: right;
   }
   /* line 35, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_sections.scss */
-  .section > div, .panel > div {
+  .section > div,
+  .panel > div {
     padding: 3px 15px 15px 15px;
   }
   /* line 37, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_sections.scss */
-  .section hr, .panel hr {
+  .section hr,
+  .panel hr {
     border: none;
-    border-bottom: 1px solid #E8E8E8;
+    border-bottom: 1px solid #e8e8e8;
   }
   /* line 6, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_panels.scss */
   .sidebar_section {
@@ -2354,12 +2514,12 @@ form textarea:focus {
     border-right-color: #d4d4d4;
     border-bottom-color: #cdcdcd;
     border-left-color: #d4d4d4;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #FFF inset;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #fff inset;
     font-size: 1em;
     font-weight: bold;
     line-height: 18px;
     margin-bottom: 0.5em;
-    color: #5E6469;
+    color: #5e6469;
     padding: 5px 10px 3px 10px;
   }
   /* line 30, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_sections.scss */
@@ -2373,7 +2533,7 @@ form textarea:focus {
   /* line 37, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_sections.scss */
   .sidebar_section hr {
     border: none;
-    border-bottom: 1px solid #E8E8E8;
+    border-bottom: 1px solid #e8e8e8;
   }
   /* line 1, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_columns.scss */
   .columns {
@@ -2401,7 +2561,7 @@ form textarea:focus {
   }
   /* line 9, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_status_tags.scss */
   .status_tag.yes {
-    background: #6090DB;
+    background: #6090db;
   }
   /* line 10, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_status_tags.scss */
   .status_tag.no {
@@ -2424,19 +2584,21 @@ form textarea:focus {
     float: left;
   }
   /* line 10, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_table_tools.scss */
-  a.table_tools_button, .table_tools .dropdown_menu_button {
+  a.table_tools_button,
+  .table_tools .dropdown_menu_button {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -2444,9 +2606,9 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F0F0F0);
+    color: #5e6469;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f0f0f0);
     border-color: #d0d0d0;
     border-top-color: #d9d9d9;
     border-right-color: #d0d0d0;
@@ -2457,41 +2619,46 @@ form textarea:focus {
     margin: 0;
   }
   /* line 12, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  a.table_tools_button.disabled, .table_tools .dropdown_menu_button.disabled {
+  a.table_tools_button.disabled,
+  .table_tools .dropdown_menu_button.disabled {
     opacity: 0.5;
     cursor: default;
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  a.table_tools_button:not(.disabled):hover, .table_tools .dropdown_menu_button:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+  a.table_tools_button:not(.disabled):hover,
+  .table_tools .dropdown_menu_button:not(.disabled):hover {
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  a.table_tools_button:not(.disabled):active, .table_tools .dropdown_menu_button:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+  a.table_tools_button:not(.disabled):active,
+  .table_tools .dropdown_menu_button:not(.disabled):active {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 19, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_table_tools.scss */
-  a.table_tools_button:not(.disabled):hover, .table_tools .dropdown_menu_button:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F6F6F6);
+  a.table_tools_button:not(.disabled):hover,
+  .table_tools .dropdown_menu_button:not(.disabled):hover {
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f6f6f6);
   }
   /* line 23, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_table_tools.scss */
-  a.table_tools_button:not(.disabled):active, .table_tools .dropdown_menu_button:not(.disabled):active {
+  a.table_tools_button:not(.disabled):active,
+  .table_tools .dropdown_menu_button:not(.disabled):active {
     border-color: #c8c8c8;
     border-top-color: #d7d7d7;
     border-right-color: #c8c8c8;
     border-bottom-color: #c3c3c3;
     border-left-color: #c8c8c8;
     box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.17) inset;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E8E8E8);
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e8e8e8);
   }
   /* line 31, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_table_tools.scss */
   .table_tools_segmented_control {
@@ -2505,7 +2672,7 @@ form textarea:focus {
   }
   /* line 39, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_table_tools.scss */
   .table_tools_segmented_control li a {
-    border-width: 1px .5px 1px .5px;
+    border-width: 1px 0.5px 1px 0.5px;
     border-radius: 0;
   }
   /* line 44, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_table_tools.scss */
@@ -2522,15 +2689,15 @@ form textarea:focus {
   }
   /* line 56, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_table_tools.scss */
   .table_tools_segmented_control li.selected a {
-    background-color: #F0F0F0;
-    background-image: linear-gradient(180deg, #F0F0F0, #FDFDFD);
+    background-color: #f0f0f0;
+    background-image: linear-gradient(180deg, #f0f0f0, #fdfdfd);
     box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.1) inset;
     cursor: default;
   }
   /* line 61, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_table_tools.scss */
   .table_tools_segmented_control li.selected a:hover {
-    background-color: #F0F0F0;
-    background-image: linear-gradient(180deg, #F0F0F0, #FDFDFD);
+    background-color: #f0f0f0;
+    background-image: linear-gradient(180deg, #f0f0f0, #fdfdfd);
   }
   /* line 1, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_index_list.scss */
   .indexes {
@@ -2596,15 +2763,16 @@ form textarea:focus {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -2612,9 +2780,9 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F0F0F0);
+    color: #5e6469;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f0f0f0);
     border-color: #d0d0d0;
     border-top-color: #d9d9d9;
     border-right-color: #d0d0d0;
@@ -2622,7 +2790,7 @@ form textarea:focus {
     border-left-color: #d0d0d0;
     text-decoration: none;
     border-radius: 0;
-    border-width: 1px .5px 1px .5px;
+    border-width: 1px 0.5px 1px 0.5px;
     margin-right: 0;
     padding: 4px 14px 4px;
   }
@@ -2633,40 +2801,40 @@ form textarea:focus {
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .ui-tabs-nav li a:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
   .ui-tabs-nav li a:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 40, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tabs.scss */
   .ui-tabs-nav li a:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F6F6F6);
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f6f6f6);
   }
   /* line 47, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tabs.scss */
   .ui-tabs-nav li.ui-tabs-active a {
     cursor: default;
-    background-color: #F0F0F0;
-    background-image: linear-gradient(180deg, #F0F0F0, #FDFDFD);
+    background-color: #f0f0f0;
+    background-image: linear-gradient(180deg, #f0f0f0, #fdfdfd);
     box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.1) inset;
   }
   /* line 52, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tabs.scss */
   .ui-tabs-nav li.ui-tabs-active a a:hover {
-    background-color: #F0F0F0;
-    background-image: linear-gradient(180deg, #F0F0F0, #FDFDFD);
+    background-color: #f0f0f0;
+    background-image: linear-gradient(180deg, #f0f0f0, #fdfdfd);
   }
   /* line 60, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/components/_tabs.scss */
   .tab-content {
-    border: 1px solid #D3D3D3;
+    border: 1px solid #d3d3d3;
     padding: 15px;
     padding-top: 30px;
     text-align: left;
@@ -2697,12 +2865,12 @@ form textarea:focus {
     border-right-color: #d4d4d4;
     border-bottom-color: #cdcdcd;
     border-left-color: #d4d4d4;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #FFF inset;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #fff inset;
     font-size: 1em;
     font-weight: bold;
     line-height: 18px;
     margin-bottom: 0.5em;
-    color: #5E6469;
+    color: #5e6469;
     padding: 5px 10px 3px 10px;
     background-color: #6a7176;
     background-image: linear-gradient(180deg, #6a7176, #4d5256);
@@ -2729,7 +2897,9 @@ form textarea:focus {
     padding: 10px 0;
   }
   /* line 33, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/pages/_logged_out.scss */
-  body.logged_out #login form fieldset input[type=text], body.logged_out #login form fieldset input[type=email], body.logged_out #login form fieldset input[type=password] {
+  body.logged_out #login form fieldset input[type="text"],
+  body.logged_out #login form fieldset input[type="email"],
+  body.logged_out #login form fieldset input[type="password"] {
     width: 70%;
   }
   /* line 36, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/pages/_logged_out.scss */
@@ -2804,16 +2974,16 @@ form textarea:focus {
     border-right-color: #d4d4d4;
     border-bottom-color: #cdcdcd;
     border-left-color: #d4d4d4;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #FFF inset;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px #fff inset;
     font-size: 1em;
     font-weight: bold;
     line-height: 18px;
     margin-bottom: 0.5em;
-    color: #5E6469;
+    color: #5e6469;
     padding: 5px 10px 3px 10px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.37);
     display: table;
-    border-bottom-color: #EEE;
+    border-bottom-color: #eee;
     width: 100%;
     position: relative;
     margin: 0;
@@ -2829,7 +2999,8 @@ form textarea:focus {
     height: 0;
   }
   /* line 13, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/structure/_title_bar.scss */
-  #title_bar #titlebar_left, #title_bar #titlebar_right {
+  #title_bar #titlebar_left,
+  #title_bar #titlebar_right {
     height: 50px;
     vertical-align: middle;
     display: table-cell;
@@ -2847,19 +3018,21 @@ form textarea:focus {
     font-weight: bold;
   }
   /* line 33, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/structure/_title_bar.scss */
-  #title_bar .action_items span.action_item > a, #title_bar .action_items span.action_item > .dropdown_menu > a {
+  #title_bar .action_items span.action_item > a,
+  #title_bar .action_items span.action_item > .dropdown_menu > a {
     border-radius: 200px;
     display: inline-block;
     font-weight: bold;
-    font-size: 1.0em;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 1em;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 12px;
     margin-right: 3px;
     padding: 7px 16px 6px;
     text-decoration: none;
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #E7E7E7);
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #e7e7e7);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
+      0 1px 0 0 rgba(255, 255, 255, 0.8) inset;
     border: solid 1px #c7c7c7;
     border-color: #c7c7c7;
     border-top-color: #d3d3d3;
@@ -2867,30 +3040,41 @@ form textarea:focus {
     border-bottom-color: #c2c2c2;
     border-left-color: #c7c7c7;
     text-shadow: #fff 0 1px 0;
-    color: #5E6469;
+    color: #5e6469;
     padding: 12px 17px 10px;
     margin: 0px;
   }
   /* line 12, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  #title_bar .action_items span.action_item > a.disabled, #title_bar .action_items span.action_item > .dropdown_menu > a.disabled {
+  #title_bar .action_items span.action_item > a.disabled,
+  #title_bar .action_items span.action_item > .dropdown_menu > a.disabled {
     opacity: 0.5;
     cursor: default;
   }
   /* line 50, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  #title_bar .action_items span.action_item > a:not(.disabled):hover, #title_bar .action_items span.action_item > .dropdown_menu > a:not(.disabled):hover {
-    background-color: #FFFFFF;
-    background-image: linear-gradient(180deg, #FFFFFF, #F1F1F1);
+  #title_bar .action_items span.action_item > a:not(.disabled):hover,
+  #title_bar
+    .action_items
+    span.action_item
+    > .dropdown_menu
+    > a:not(.disabled):hover {
+    background-color: #ffffff;
+    background-image: linear-gradient(180deg, #ffffff, #f1f1f1);
   }
   /* line 54, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/mixins/_buttons.scss */
-  #title_bar .action_items span.action_item > a:not(.disabled):active, #title_bar .action_items span.action_item > .dropdown_menu > a:not(.disabled):active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #EEE;
+  #title_bar .action_items span.action_item > a:not(.disabled):active,
+  #title_bar
+    .action_items
+    span.action_item
+    > .dropdown_menu
+    > a:not(.disabled):active {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22) inset, 0 1px 0 0px #eee;
     border-color: #b9b9b9;
     border-top-color: #c2c2c2;
     border-right-color: #b9b9b9;
     border-bottom-color: #b7b7b7;
     border-left-color: #b9b9b9;
-    background-color: #F3F3F3;
-    background-image: linear-gradient(180deg, #F3F3F3, #D8D8D8);
+    background-color: #f3f3f3;
+    background-image: linear-gradient(180deg, #f3f3f3, #d8d8d8);
   }
   /* line 36, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_base.scss */
   html {
@@ -2898,16 +3082,16 @@ form textarea:focus {
   }
   /* line 40, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_base.scss */
   *,
-*:before,
-*:after {
+  *:before,
+  *:after {
     box-sizing: inherit;
   }
   /* line 46, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_base.scss */
   body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 1.5;
     font-size: 72%;
-    background: #FFF;
+    background: #fff;
     color: #323537;
   }
 }
@@ -3006,7 +3190,7 @@ form textarea:focus {
  */
   /* line 95, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   b,
-strong {
+  strong {
     font-weight: bolder;
   }
   /**
@@ -3015,8 +3199,8 @@ strong {
  */
   /* line 105, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   code,
-kbd,
-samp {
+  kbd,
+  samp {
     font-family: monospace, monospace;
     /* 1 */
     font-size: 1em;
@@ -3035,7 +3219,7 @@ samp {
  */
   /* line 125, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   sub,
-sup {
+  sup {
     font-size: 75%;
     line-height: 0;
     position: relative;
@@ -3066,10 +3250,10 @@ sup {
  */
   /* line 160, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button,
-input,
-optgroup,
-select,
-textarea {
+  input,
+  optgroup,
+  select,
+  textarea {
     font-family: inherit;
     /* 1 */
     font-size: 100%;
@@ -3085,7 +3269,7 @@ textarea {
  */
   /* line 176, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button,
-input {
+  input {
     /* 1 */
     overflow: visible;
   }
@@ -3095,7 +3279,7 @@ input {
  */
   /* line 186, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button,
-select {
+  select {
     /* 1 */
     text-transform: none;
   }
@@ -3104,9 +3288,9 @@ select {
  */
   /* line 195, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button,
-[type="button"],
-[type="reset"],
-[type="submit"] {
+  [type="button"],
+  [type="reset"],
+  [type="submit"] {
     -webkit-appearance: button;
   }
   /**
@@ -3114,9 +3298,9 @@ select {
  */
   /* line 206, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button::-moz-focus-inner,
-[type="button"]::-moz-focus-inner,
-[type="reset"]::-moz-focus-inner,
-[type="submit"]::-moz-focus-inner {
+  [type="button"]::-moz-focus-inner,
+  [type="reset"]::-moz-focus-inner,
+  [type="submit"]::-moz-focus-inner {
     border-style: none;
     padding: 0;
   }
@@ -3125,9 +3309,9 @@ select {
  */
   /* line 218, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   button:-moz-focusring,
-[type="button"]:-moz-focusring,
-[type="reset"]:-moz-focusring,
-[type="submit"]:-moz-focusring {
+  [type="button"]:-moz-focusring,
+  [type="reset"]:-moz-focusring,
+  [type="submit"]:-moz-focusring {
     outline: 1px dotted ButtonText;
   }
   /**
@@ -3178,7 +3362,7 @@ select {
  */
   /* line 270, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   [type="checkbox"],
-[type="radio"] {
+  [type="radio"] {
     box-sizing: border-box;
     /* 1 */
     padding: 0;
@@ -3189,7 +3373,7 @@ select {
  */
   /* line 280, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_normalize.scss */
   [type="number"]::-webkit-inner-spin-button,
-[type="number"]::-webkit-outer-spin-button {
+  [type="number"]::-webkit-outer-spin-button {
     height: auto;
   }
   /**
@@ -3263,12 +3447,22 @@ select {
     font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
   }
   /* line 31, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-weight: normal;
     color: black;
   }
   /* line 34, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  h1 img, h2 img, h3 img, h4 img, h5 img, h6 img {
+  h1 img,
+  h2 img,
+  h3 img,
+  h4 img,
+  h5 img,
+  h6 img {
     margin: 0;
   }
   /* line 37, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
@@ -3334,20 +3528,23 @@ select {
     font-style: italic;
   }
   /* line 56, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  strong, dfn {
+  strong,
+  dfn {
     font-weight: bold;
   }
   /* line 57, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  em, dfn {
+  em,
+  dfn {
     font-style: italic;
   }
   /* line 58, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  sup, sub {
+  sup,
+  sub {
     line-height: 0;
   }
   /* line 60, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
   abbr,
-acronym {
+  acronym {
     border-bottom: 1px dotted #666;
   }
   /* line 62, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
@@ -3365,17 +3562,20 @@ acronym {
     white-space: pre;
   }
   /* line 66, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  pre, code, tt {
-    font: 1em 'andale mono', 'lucida console', monospace;
+  pre,
+  code,
+  tt {
+    font: 1em "andale mono", "lucida console", monospace;
     line-height: 1.5;
   }
   /* line 69, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
   li ul,
-li ol {
+  li ol {
     margin: 0;
   }
   /* line 71, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  ul, ol {
+  ul,
+  ol {
     margin: 0 1.5em 1.5em 0;
     padding-left: 1.5em;
   }
@@ -3413,12 +3613,14 @@ li ol {
     background: #c3d9ff;
   }
   /* line 84, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
-  th, td, caption {
+  th,
+  td,
+  caption {
     padding: 4px 10px 4px 5px;
   }
   /* line 87, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_typography.scss */
   .small {
-    font-size: .8em;
+    font-size: 0.8em;
     margin-bottom: 1.875em;
     line-height: 1.875em;
   }
@@ -3482,7 +3684,7 @@ li ol {
     background: #fff;
     width: 99%;
     margin: 0;
-    padding: .5%;
+    padding: 0.5%;
     color: black;
   }
   /* line 24, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
@@ -3493,14 +3695,16 @@ li ol {
   /* line 29, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
   h3 {
     font-weight: bold;
-    margin-bottom: .5em;
+    margin-bottom: 0.5em;
   }
   /* line 35, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
   #header {
     float: left;
   }
   /* line 38, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  #header #tabs, #header .tabs, #header #utility_nav {
+  #header #tabs,
+  #header .tabs,
+  #header #utility_nav {
     display: none;
   }
   /* line 42, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
@@ -3521,7 +3725,8 @@ li ol {
     margin: 0;
   }
   /* line 59, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  #title_bar .breadcrumb, #title_bar #titlebar_right {
+  #title_bar .breadcrumb,
+  #title_bar #titlebar_right {
     display: none;
   }
   /* line 65, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
@@ -3548,22 +3753,26 @@ li ol {
     margin-bottom: 1em;
   }
   /* line 89, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  .table_tools ul li.scope.selected, .table_tools ul li.index.selected {
+  .table_tools ul li.scope.selected,
+  .table_tools ul li.index.selected {
     display: block;
   }
   /* line 92, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  .table_tools ul li.scope.selected:before, .table_tools ul li.index.selected:before {
+  .table_tools ul li.scope.selected:before,
+  .table_tools ul li.index.selected:before {
     content: "Showing ";
   }
   /* line 96, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  .table_tools ul li.scope.selected a, .table_tools ul li.index.selected a {
+  .table_tools ul li.scope.selected a,
+  .table_tools ul li.index.selected a {
     font-weight: bold;
   }
   /* line 100, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  .table_tools ul li.scope.selected span, .table_tools ul li.index.selected span {
+  .table_tools ul li.scope.selected span,
+  .table_tools ul li.index.selected span {
     display: inline-block;
     font-weight: normal;
-    font-size: .9em;
+    font-size: 0.9em;
   }
   /* line 111, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
   table {
@@ -3586,11 +3795,13 @@ li ol {
     text-decoration: none;
   }
   /* line 130, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  table th, table td {
-    padding: .5em 1em;
+  table th,
+  table td {
+    padding: 0.5em 1em;
   }
   /* line 133, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  table th .member_link, table td .member_link {
+  table th .member_link,
+  table td .member_link {
     display: none;
   }
   /* line 138, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
@@ -3602,7 +3813,8 @@ li ol {
     page-break-inside: avoid;
   }
   /* line 148, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  #index_footer, .pagination_information {
+  #index_footer,
+  .pagination_information {
     display: none;
   }
   /* line 153, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
@@ -3640,12 +3852,12 @@ li ol {
     font-size: 1em;
     font-weight: bold;
     float: left;
-    margin-right: .5em;
+    margin-right: 0.5em;
     margin-bottom: 0;
   }
   /* line 194, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
   .comments .active_admin_comment .active_admin_comment_meta span {
-    font-size: .9em;
+    font-size: 0.9em;
     font-style: italic;
     vertical-align: top;
   }
@@ -3665,7 +3877,7 @@ li ol {
   }
   /* line 217, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
   .attributes_table th:after {
-    content: ':';
+    content: ":";
   }
   /* line 223, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
   .attributes_table td img {
@@ -3687,7 +3899,8 @@ li ol {
     border-bottom: none;
   }
   /* line 247, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  form .buttons, form abbr {
+  form .buttons,
+  form abbr {
     display: none;
   }
   /* line 250, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
@@ -3704,7 +3917,8 @@ li ol {
     overflow: hidden;
   }
   /* line 261, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  form ol li.password, form ol li.hidden {
+  form ol li.password,
+  form ol li.hidden {
     display: none;
   }
   /* line 265, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
@@ -3714,13 +3928,15 @@ li ol {
     width: 20%;
   }
   /* line 271, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  form ol li input, form ol li textarea, form ol li select {
+  form ol li input,
+  form ol li textarea,
+  form ol li select {
     background: none;
     border: 0;
     font: Arial, Helvetica, sans-serif;
   }
   /* line 277, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */
-  form ol li input[type=file] {
+  form ol li input[type="file"] {
     display: none;
   }
   /* line 285, ../../local/bundle/gems/activeadmin-2.12.0/app/assets/stylesheets/active_admin/_print.scss */

@@ -60,6 +60,7 @@ impl RestoreHandler {
             &self.state_store,
             version,
             expected_root_hash,
+            true, /* async_commit */
         )
     }
 

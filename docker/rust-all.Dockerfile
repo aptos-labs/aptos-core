@@ -51,6 +51,8 @@ RUN apt-get update && apt-get install -y \
     procps \
     gdb \
     curl \
+    # postgres client lib required for indexer
+    libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 ### Because build machine perf might not match run machine perf, we have to symlink
@@ -87,39 +89,6 @@ ARG GIT_BRANCH
 ENV GIT_BRANCH ${GIT_BRANCH}
 ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
-
-
-### Indexer Image ###
-
-FROM debian-base AS indexer
-
-RUN apt-get update && apt-get install -y \
-    libssl1.1 \
-    ca-certificates \
-    net-tools \
-    tcpdump \
-    iproute2 \
-    netcat \
-    libpq-dev \
-    && apt-get clean && rm -r /var/lib/apt/lists/*
-
-COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
-# streamingfast indexer
-COPY --link --from=builder /aptos/dist/aptos-sf-indexer /usr/local/bin/aptos-sf-indexer
-COPY --link --from=builder /aptos/ecosystem/sf-indexer/aptos-substreams/*.spkg /aptos-substreams/
-
-ENV RUST_LOG_FORMAT=json
-
-# add build info
-ARG BUILD_DATE
-ENV BUILD_DATE ${BUILD_DATE}
-ARG GIT_TAG
-ENV GIT_TAG ${GIT_TAG}
-ARG GIT_BRANCH
-ENV GIT_BRANCH ${GIT_BRANCH}
-ARG GIT_SHA
-ENV GIT_SHA ${GIT_SHA}
-
 
 ### Node Checker Image ###
 

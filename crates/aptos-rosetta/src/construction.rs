@@ -24,7 +24,7 @@
 //! a connection to a full node.  The online ones need a connection to a full node.
 //!
 
-use crate::common::parse_currency;
+use crate::common::{native_coin_tag, parse_currency};
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
@@ -264,7 +264,7 @@ async fn construction_metadata(
         max_gas.0
     } else {
         let account_balance = rest_client
-            .get_account_balance(address)
+            .get_account_balance_bcs(address, &native_coin_tag().to_string())
             .await
             .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
             .into_inner();
@@ -272,17 +272,12 @@ async fn construction_metadata(
         let maximum_possible_gas =
             if let InternalOperation::Transfer(ref transfer) = request.options.internal_operation {
                 std::cmp::min(
-                    (account_balance
-                        .coin
-                        .value
-                        .0
-                        .saturating_sub(transfer.amount.0))
-                        / gas_price_per_unit,
+                    (account_balance.saturating_sub(transfer.amount.0)) / gas_price_per_unit,
                     MAX_GAS_UNITS_PER_REQUEST,
                 )
             } else {
                 std::cmp::min(
-                    account_balance.coin.value.0 / gas_price_per_unit,
+                    account_balance / gas_price_per_unit,
                     MAX_GAS_UNITS_PER_REQUEST,
                 )
             };
@@ -318,7 +313,8 @@ async fn construction_metadata(
         let signed_transaction = SignedTransaction::new(
             unsigned_transaction,
             public_key,
-            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+            Ed25519Signature::try_from([0u8; 64].as_ref())
+                .expect("Zero signature should always work"),
         );
 
         let request = rest_client
@@ -687,7 +683,10 @@ async fn construction_preprocess(
         .as_ref()
         .and_then(|inner| inner.max_gas_amount)
         .is_none()
-        && (public_keys.is_none() || public_keys.unwrap().is_empty())
+        && public_keys
+            .as_ref()
+            .map(|inner| inner.is_empty())
+            .unwrap_or(false)
     {
         return Err(ApiError::InvalidInput(Some(
             "Must provide either max gas amount or public keys to estimate max gas amount"
@@ -735,8 +734,9 @@ async fn construction_submit(
     let rest_client = server_context.rest_client()?;
 
     let txn: SignedTransaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
-    let response = rest_client.submit(&txn).await?;
+    let hash = txn.clone().committed_hash();
+    rest_client.submit_bcs(&txn).await?;
     Ok(ConstructionSubmitResponse {
-        transaction_identifier: response.inner().hash.into(),
+        transaction_identifier: hash.into(),
     })
 }

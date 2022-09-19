@@ -36,7 +36,6 @@ use futures::{stream, TryStreamExt};
 use std::sync::Arc;
 use storage_interface::StateSnapshotReceiver;
 use tokio::time::Instant;
-use tokio::try_join;
 
 #[derive(Parser)]
 pub struct StateSnapshotRestoreOpt {
@@ -79,11 +78,12 @@ impl StateSnapshotRestoreController {
 
     pub async fn run(self) -> Result<()> {
         let name = self.name();
+        let start = Instant::now();
         info!("{} started. Manifest: {}", name, self.manifest_handle);
         self.run_impl()
             .await
             .map_err(|e| anyhow!("{} failed: {}", name, e))?;
-        info!("{} succeeded.", name);
+        info!(time = start.elapsed().as_secs(), "{} succeeded.", name);
         Ok(())
     }
 }
@@ -144,7 +144,7 @@ impl StateSnapshotRestoreController {
         tgt_leaf_idx.set(manifest.chunks.last().map_or(0, |c| c.last_idx as i64));
         let total_chunks = manifest.chunks.len();
 
-        let resume_point_opt = receiver.lock().as_mut().unwrap().previous_key_hash();
+        let resume_point_opt = receiver.lock().as_mut().unwrap().previous_key_hash()?;
         let chunks = if let Some(resume_point) = resume_point_opt {
             manifest
                 .chunks
@@ -169,17 +169,19 @@ impl StateSnapshotRestoreController {
         let futs_iter = chunks.into_iter().enumerate().map(|(chunk_idx, chunk)| {
             let storage = storage.clone();
             async move {
-                let (blobs, proof) = try_join!(
-                    Self::read_state_value(&storage, chunk.blobs.clone()),
-                    storage.load_bcs_file(&chunk.proof)
-                )?;
-                Result::<_>::Ok((chunk_idx, chunk, blobs, proof))
+                tokio::spawn(async move {
+                    let blobs = Self::read_state_value(&storage, chunk.blobs.clone()).await?;
+                    let proof = storage.load_bcs_file(&chunk.proof).await?;
+                    Result::<_>::Ok((chunk_idx, chunk, blobs, proof))
+                })
+                .await?
             }
         });
         let con = self.concurrent_downloads;
         let mut futs_stream = stream::iter(futs_iter).buffered_x(con * 2, con);
-        let start = Instant::now();
+        let mut start = None;
         while let Some((chunk_idx, chunk, blobs, proof)) = futs_stream.try_next().await? {
+            start = start.or_else(|| Some(Instant::now()));
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["add_state_chunk"])
                 .start_timer();
@@ -194,7 +196,8 @@ impl StateSnapshotRestoreController {
                 chunks_to_add = chunks_to_add,
                 last_idx = chunk.last_idx,
                 values_per_second = ((chunk.last_idx + 1 - start_idx) as f64
-                    / start.elapsed().as_secs_f64()) as u64,
+                    / start.as_ref().unwrap().elapsed().as_secs_f64())
+                    as u64,
                 "State chunk added.",
             );
         }

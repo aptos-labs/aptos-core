@@ -64,6 +64,14 @@ module aptos_token::token_coin_swap {
         coin_type_info: TypeInfo,
     }
 
+    public fun does_listing_exist<CoinType>(
+        token_owner: address,
+        token_id: TokenId
+    ): bool acquires TokenListings {
+        let token_listing = borrow_global<TokenListings<CoinType>>(token_owner);
+        table::contains(&token_listing.listings, token_id)
+    }
+
     /// Coin owner withdraw coin to swap with tokens listed for swapping at the token owner's address.
     public fun exchange_coin_for_token<CoinType>(
         coin_owner: &signer,
@@ -227,7 +235,16 @@ module aptos_token::token_coin_swap {
         assert!(table::contains(tokens_in_escrow, token_id), ETOKEN_NOT_IN_ESCROW);
         let token_escrow = table::borrow_mut(tokens_in_escrow, token_id);
         assert!(timestamp::now_seconds() > token_escrow.locked_until_secs, ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME);
-        split(&mut token_escrow.token, amount)
+        if (amount == token::get_token_amount(&token_escrow.token)) {
+            // destruct the token escrow to reclaim storage
+            let TokenEscrow {
+                token: tokens,
+                locked_until_secs: _
+            } = table::remove(tokens_in_escrow, token_id);
+            tokens
+        } else {
+            split(&mut token_escrow.token, amount)
+        }
     }
 
     /// Withdraw tokens from the token escrow. It needs a signer to authorize

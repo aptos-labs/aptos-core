@@ -75,7 +75,8 @@ Rails.application.routes.draw do
 
   # NFTs
   resources :nft_offers, param: :slug, only: %i[show update]
-  get 'nft_images/:nft_offer_slug/:image_num', { to: 'nft_images#show', constraints: { image_num: /\d+/ } }
+  get 'nft_images/:nft_offer_slug/:image_num', to: 'nft_images#show', constraints: { image_num: /\d+/ }
+  get 'n/:offer_id/:txn_version', as: 'nft_offer_short', to: 'nft_offers#short', constraints: { txn_version: /\d+/ }
 
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')
@@ -87,7 +88,7 @@ Rails.application.routes.draw do
   get 'it2', to: 'leaderboard#it2'
 
   # Projects
-  resources :projects
+  resources :projects, except: %i[edit update]
 
   # User profiles
   resources :users, only: %i[show] do
@@ -98,6 +99,9 @@ Rails.application.routes.draw do
 
   # Wallets
   resources :wallets, only: %i[show create]
+
+  # Discord invite link
+  get 'discord', to: redirect('https://discord.com/invite/aptoslabs')
 
   # Static pages
   get 'community', to: 'static_page#community'

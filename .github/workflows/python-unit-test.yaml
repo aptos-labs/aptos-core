@@ -1,0 +1,41 @@
+name: "Run Python Tests"
+
+on:
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: false
+        type: string
+
+jobs:
+  python-unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+          # Get enough commits to compare to
+          fetch-depth: 100
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v29.0.3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+
+      - name: Install Python Dependencies
+        run: pip install -r testsuite/requirements.txt
+
+      - name: Should run tests
+        run: >
+          python testsuite/determinator.py
+          changed-files
+          --github-output-key SHOULD_RUN
+          --pattern 'testsuite/.*py'
+          ${{ steps.changed-files.outputs.all_changed_files }}
+        id: should-run-tests
+
+      - name: Run python unit tests
+        if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
+        run: python -m unittest testsuite/*test*.py

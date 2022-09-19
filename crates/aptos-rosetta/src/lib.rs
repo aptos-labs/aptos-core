@@ -55,6 +55,10 @@ pub struct RosettaContext {
     pub coin_cache: Arc<CoinCache>,
     /// Block index cache
     pub block_cache: Option<Arc<BlockRetriever>>,
+
+    /// If using synthetic blocks, this will be the block size
+    pub synthetic_block_size: Option<u16>,
+
     pub accounts: Arc<Mutex<BTreeMap<AccountAddress, SequenceNumber>>>,
 }
 
@@ -81,6 +85,7 @@ pub fn bootstrap(
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
+    synthetic_block_size: Option<u16>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .thread_name_fn(|| {
@@ -95,7 +100,12 @@ pub fn bootstrap(
 
     debug!("Starting up Rosetta server with {:?}", api_config);
 
-    runtime.spawn(bootstrap_async(chain_id, api_config, rest_client));
+    runtime.spawn(bootstrap_async(
+        chain_id,
+        api_config,
+        rest_client,
+        synthetic_block_size,
+    ));
     Ok(runtime)
 }
 
@@ -104,6 +114,7 @@ pub async fn bootstrap_async(
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
+    synthetic_block_size: Option<u16>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
 
@@ -120,20 +131,28 @@ pub async fn bootstrap_async(
         );
     }
 
+    if matches!(synthetic_block_size, Some(0)) {
+        panic!("Cannot have a synthetic block size of 0");
+    }
+
     let api = WebServer::from(api_config);
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
         let rest_client = rest_client.map(Arc::new);
-        let block_cache = rest_client
-            .as_ref()
-            .map(|rest_client| Arc::new(BlockRetriever::new(rest_client.clone())));
+        let block_cache = rest_client.as_ref().map(|rest_client| {
+            Arc::new(BlockRetriever::new(
+                rest_client.clone(),
+                synthetic_block_size,
+            ))
+        });
 
         let context = RosettaContext {
             rest_client: rest_client.clone(),
             chain_id,
-            coin_cache: Arc::new(CoinCache::new()),
+            coin_cache: Arc::new(CoinCache::new(rest_client.clone())),
             block_cache,
             accounts: Arc::new(Mutex::new(BTreeMap::new())),
+            synthetic_block_size,
         };
         api.serve(routes(context)).await;
     });

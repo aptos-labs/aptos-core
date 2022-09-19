@@ -25,6 +25,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "sum by (status) (rate(aptos_api_response_status_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=~\"$status\"}[$interval]))",
           "legendFormat": "{{status}}"
         }
@@ -79,6 +80,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=~\"$status\"}[$interval]))",
           "legendFormat": "{{operation_id}}"
         }
@@ -133,17 +135,20 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
           "legendFormat": "p90",
           "format": "time_series"
         },
         {
           "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "histogram_quantile(0.99, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
           "legendFormat": "p99"
         },
         {
           "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "histogram_quantile(1, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
           "legendFormat": "p100"
         }
@@ -198,6 +203,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=\"500\"}[$interval]))"
         }
       ],
@@ -402,7 +408,26 @@
     "list": [
       {
         "name": "Annotations \u0026 Alerts",
-        "datasource": "-- Grafana --",
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      },
+      {
+        "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "datasource", "uid": "grafana" },
         "showLine": false,
         "iconColor": "rgba(0, 211, 255, 1)",
         "lineColor": "",
@@ -421,8 +446,8 @@
       }
     ]
   },
-  "schemaVersion": 30,
-  "version": 4,
+  "schemaVersion": 37,
+  "version": 3,
   "links": [],
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }

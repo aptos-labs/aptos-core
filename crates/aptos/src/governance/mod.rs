@@ -59,12 +59,12 @@ impl GovernanceTool {
 #[derive(Parser)]
 pub struct SubmitProposal {
     /// Location of the JSON metadata of the proposal
-    #[clap(long, group = "proposal-metadata")]
+    #[clap(long)]
     pub(crate) metadata_url: Url,
 
     #[cfg(feature = "no-upload-proposal")]
     /// A JSON file to be uploaded later at the metadata URL
-    #[clap(long, group = "proposal-metadata")]
+    #[clap(long)]
     pub(crate) metadata_path: Option<PathBuf>,
 
     #[clap(flatten)]
@@ -72,7 +72,7 @@ pub struct SubmitProposal {
     #[clap(flatten)]
     pub(crate) pool_address_args: PoolAddressArgs,
     #[clap(flatten)]
-    pub(crate) compile_proposal_args: CompileProposalArgs,
+    pub(crate) compile_proposal_args: CompileScriptFunction,
 }
 
 #[async_trait]
@@ -370,7 +370,7 @@ pub struct ExecuteProposal {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
-    pub(crate) compile_proposal_args: CompileProposalArgs,
+    pub(crate) compile_proposal_args: CompileScriptFunction,
 }
 
 #[async_trait]
@@ -397,7 +397,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
 
 /// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
-pub struct CompileProposalArgs {
+pub struct CompileScriptFunction {
     /// Path to the Move script for the proposal
     #[clap(long, parse(from_os_str))]
     pub script_path: PathBuf,
@@ -411,8 +411,11 @@ pub struct CompileProposalArgs {
     pub(crate) framework_git_rev: Option<String>,
 }
 
-impl CompileProposalArgs {
-    fn compile(&self, prompt_options: PromptOptions) -> CliTypedResult<(Vec<u8>, HashValue)> {
+impl CompileScriptFunction {
+    pub(crate) fn compile(
+        &self,
+        prompt_options: PromptOptions,
+    ) -> CliTypedResult<(Vec<u8>, HashValue)> {
         // Check script file
         let script_path = self.script_path.as_path();
         if !self.script_path.exists() {

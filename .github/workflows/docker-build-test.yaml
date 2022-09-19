@@ -32,6 +32,7 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - canary
       - devnet
       - testnet
+      - testnet-stable
       - chaotic
 
 # cancel redundant builds
@@ -207,31 +208,4 @@ jobs:
       - name: Build and Push Community Platform image
         run: |
           cd ecosystem/platform/server
-          docker buildx bake --progress=plain --push -f ./docker-bake.hcl
-
-  indexer-server:
-    needs: [permission-check]
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.GIT_SHA }}
-
-      - uses: ./.github/actions/gar-auth
-        with:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Login to ECR
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
-          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - uses: ./.github/actions/docker-buildx-setup
-
-      - name: Build and Push Indexer Server image
-        run: |
-          cd ecosystem/indexer-server
           docker buildx bake --progress=plain --push -f ./docker-bake.hcl

@@ -35,6 +35,8 @@ pub use move_types::{
     MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
     MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue, U128, U64,
 };
+use serde::{Deserialize, Deserializer};
+use std::str::FromStr;
 pub use table::TableItemRequest;
 pub use transaction::{
     AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
@@ -47,4 +49,16 @@ pub use transaction::{
     UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
     WriteSetPayload, WriteTableItem,
 };
-pub use wrappers::IdentifierWrapper;
+pub use wrappers::{EventGuid, IdentifierWrapper};
+
+pub fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    <T as FromStr>::Err: std::fmt::Display,
+{
+    use serde::de::Error;
+
+    let s = <String>::deserialize(deserializer)?;
+    s.parse::<T>().map_err(D::Error::custom)
+}

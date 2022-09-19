@@ -7,7 +7,7 @@ description = "Aptos's Restful Vault Client"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 base64 = "0.13.0"

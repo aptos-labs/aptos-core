@@ -146,7 +146,7 @@ pub trait TreeWriter<K>: Send + Sync {
     fn write_node_batch(&self, node_batch: &HashMap<NodeKey, Node<K>>) -> Result<()>;
 }
 
-pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {
+pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync + 'static {
     fn key_size(&self) -> usize;
 }
 

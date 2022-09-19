@@ -18,24 +18,45 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
   test 'view all projects' do
     3.times do
-      FactoryBot.create(:project, user: @user)
+      FactoryBot.create(:project, user: @user, verified: true)
     end
     sign_out @user
     get projects_path
     assert_response :success
   end
 
+  test 'search for projects' do
+    ActiveRecord.verbose_query_logs = true
+    a = FactoryBot.create(:project, user: @user, verified: true, title: 'Revenge of the Fnords')
+    b = FactoryBot.create(:project, user: @user, verified: true, short_description: 'chronicles a group of fnords')
+    c = FactoryBot.create(:project, user: @user, verified: true,
+                                    full_description: 'The fnords decide to seek membership on the Greek Council ' * 10)
+    d = FactoryBot.create(:project, user: @user, verified: true, title: 'Episode V')
+    get projects_path(s: 'fnord')
+    assert_response :success
+    assert_select "[data-project-id=#{a.id}]"
+    assert_select "[data-project-id=#{b.id}]"
+    assert_select "[data-project-id=#{c.id}]"
+    assert_select "[data-project-id=#{d.id}]", false
+  end
+
   test 'view project' do
     sign_out @user
-    project = FactoryBot.create(:project, user: @user)
+    project = FactoryBot.create(:project, user: @user, verified: true)
     get project_path(project)
     assert_response :success
   end
 
   test 'view private project fails if current user is not the creator' do
-    project = FactoryBot.create(:project, user: FactoryBot.create(:user), public: false)
+    project = FactoryBot.create(:project, public: false, verified: true)
     get project_path(project)
     assert_response :forbidden
+  end
+
+  test 'view public, unverified project fails' do
+    project = FactoryBot.create(:project, user: FactoryBot.create(:user), public: true, verified: false)
+    get project_path(project)
+    assert_response :not_found
   end
 
   test 'new project page' do
@@ -44,12 +65,14 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'edit project page' do
+    skip('project editing disabled')
     project = FactoryBot.create(:project, user: @user)
     get edit_project_path(project)
     assert_response :success
   end
 
   test 'edit project page fails if current user is not the creator' do
+    skip('project editing disabled')
     project = FactoryBot.create(:project, user: FactoryBot.create(:user))
     get edit_project_path(project)
     assert_response :forbidden
@@ -70,13 +93,10 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
         telegram_url: Faker::Internet.url(host: 't.me'),
         linkedin_url: Faker::Internet.url(host: 'linkedin.com'),
         youtube_url: Faker::Internet.url(host: 'www.youtube.com'),
-        thumbnail: Rack::Test::UploadedFile.new('public/favicon.png', 'image/png'),
+        thumbnail: Rack::Test::UploadedFile.new('app/assets/images/favicon.png', 'image/png'),
         category_ids: [category.id],
-        project_members_attributes: [
-          { user_id: @user.id, role: 'admin', public: true }
-        ],
         screenshots: [
-          Rack::Test::UploadedFile.new('public/favicon.png', 'image/png')
+          Rack::Test::UploadedFile.new('app/assets/images/favicon.png', 'image/png')
         ],
         public: true
       } }
@@ -88,6 +108,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'update existing project' do
+    skip('project editing disabled')
     project = FactoryBot.create(:project, user: @user)
     assert_equal true, project.public
 
@@ -101,6 +122,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'update existing project fails if current user is not the creator' do
+    skip('project editing disabled')
     project = FactoryBot.create(:project, user: FactoryBot.create(:user))
     patch project_path(project), params: { project: {
       public: true

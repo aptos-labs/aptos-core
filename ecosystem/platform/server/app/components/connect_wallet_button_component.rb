@@ -11,6 +11,11 @@ class ConnectWalletButtonComponent < ViewComponent::Base
     @wallet = wallet
     @required_network = required_network
     @turbo_frame = @rest[:turbo_frame]
+    @dialog = DialogComponent.new
+  end
+
+  def supported_wallets
+    %w[petra martian]
   end
 
   private
