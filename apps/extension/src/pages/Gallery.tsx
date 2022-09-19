@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Flex,
   Center,
   SimpleGrid,
   Spinner,
@@ -12,7 +11,6 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import SquareBox from 'core/components/SquareBox';
-import CreateNFTDrawer from 'core/components/CreateNFTDrawer';
 import GalleryItem from 'core/components/GalleryItem';
 import WalletLayout from 'core/layouts/WalletLayout';
 import { TokenAttributes, useDepositTokens } from 'core/queries/collectibles';
@@ -63,9 +61,6 @@ function Gallery() {
   return (
     <WalletLayout title="Collectibles">
       <VStack width="100%" paddingTop={4} px={4}>
-        <Flex alignSelf="end">
-          <CreateNFTDrawer />
-        </Flex>
         <GallerySection galleryItems={depositItems} isLoading={isDepositLoading} />
       </VStack>
     </WalletLayout>
