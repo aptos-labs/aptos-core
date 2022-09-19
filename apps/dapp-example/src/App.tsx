@@ -147,6 +147,10 @@ function App() {
     }
   };
 
+  const onIsConnectedClick = async () => {
+    console.log(await window.aptos.isConnected());
+  };
+
   return (
     <div className="App">
       <header className="App-header">
@@ -161,6 +165,7 @@ function App() {
         <button className="Button" type="button" onClick={onSignTransactionClick}>{isSigningTransaction ? 'Sigining...' : 'Sign Transaction'}</button>
         <button className="Button" type="button" onClick={onSignMessageClick}>{isSigningMessage ? 'Signing...' : 'Sign Message'}</button>
         <button className="Button" type="button" onClick={onVerifyClick}>{isVerifying ? 'Verifying...' : 'Verify Message'}</button>
+        <button className="Button" type="button" onClick={onIsConnectedClick}>isConnected</button>
       </header>
     </div>
   );
