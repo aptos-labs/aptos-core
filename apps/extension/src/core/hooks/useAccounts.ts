@@ -60,6 +60,9 @@ export const [AccountsProvider, useAccounts] = constate(() => {
    * @param initialAccounts initial accounts
    */
   async function initAccounts(password: string, initialAccounts: Accounts) {
+    if (password.length < 1) {
+      throw new Error('Password must be at least 1 character');
+    }
     // Generate salt and use it to derive encryption key
     const newSalt = randomBytes(pbkdf2SaltSize);
     const newEncryptionKey = await deriveEncryptionKey(password, newSalt);
@@ -168,7 +171,6 @@ export const [InitializedAccountsProvider, useInitializedAccounts] = constate(({
   };
 
   const unlockAccounts = async (password: string) => {
-    console.log(password);
     const ciphertext = bs58.decode(encryptedAccounts.ciphertext);
     const nonce = bs58.decode(encryptedAccounts.nonce);
 

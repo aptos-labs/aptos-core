@@ -79,9 +79,7 @@ export default function CreatePasswordBody() {
   const passwordScore = result.score;
 
   useEffect(() => () => {
-    // clear out password when exiting this screen for security purposes
-    setValue('initialPassword', '');
-    setValue('confirmPassword', '');
+    setValue('showPassword', false);
   }, [setValue]);
 
   const passwordWarningText = useMemo(() => {
