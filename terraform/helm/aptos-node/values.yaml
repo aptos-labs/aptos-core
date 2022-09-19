@@ -31,11 +31,11 @@ haproxy:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 1.5
-      memory: 2Gi
+      cpu: 4
+      memory: 8Gi
     requests:
-      cpu: 1.5
-      memory: 2Gi
+      cpu: 4
+      memory: 8Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
