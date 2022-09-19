@@ -3818,6 +3818,7 @@ version = "0.0.0"
 dependencies = [
  "again",
  "anyhow",
+ "aptos",
  "aptos-config",
  "aptos-genesis",
  "aptos-infallible",
