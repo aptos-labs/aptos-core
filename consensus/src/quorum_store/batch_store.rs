@@ -6,6 +6,7 @@ use crate::quorum_store::proof_builder::ProofBuilderCommand;
 use crate::quorum_store::types::{Batch, PersistedValue};
 use crate::quorum_store::{
     batch_reader::{BatchReader, BatchReaderCommand},
+    counters,
     quorum_store_db::QuorumStoreDB,
 };
 use aptos_crypto::HashValue;
@@ -194,6 +195,9 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                                 .expect("Failed to send to ProofBuilder");
                             debug!("QS: sent signed digest to ProofBuilder");
                         } else {
+                            // Quorum store metrics
+                            counters::DELIVERED_BATCHES_COUNT.inc();
+
                             self.network_sender
                                 .send_signed_digest(signed_digest, vec![author])
                                 .await;

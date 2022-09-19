@@ -162,6 +162,8 @@ impl QuorumStoreWrapper {
             }
 
             // Quorum store metrics
+            counters::CREATED_BATCHES_COUNT.inc();
+
             let duration = chrono::Utc::now().naive_utc().timestamp_millis() as u64
                 - self.batch_builder.time_created();
             counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_millis(duration));

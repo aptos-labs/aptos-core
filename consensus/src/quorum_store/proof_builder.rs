@@ -116,10 +116,9 @@ impl ProofBuilder {
             info.digest,
             IncrementalProofState::new(info.clone(), batch_id, tx),
         );
-        self.digest_to_time.insert(
-            info.digest,
-            chrono::Utc::now().naive_utc().timestamp_millis() as u64,
-        );
+        self.digest_to_time
+            .entry(info.digest)
+            .or_insert(chrono::Utc::now().naive_utc().timestamp_millis() as u64);
         Ok(())
     }
 

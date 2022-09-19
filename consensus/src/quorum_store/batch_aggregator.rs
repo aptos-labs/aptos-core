@@ -78,9 +78,6 @@ impl IncrementalBatchState {
     pub(crate) fn finalize_batch(
         self,
     ) -> Result<(usize, Vec<SignedTransaction>, HashValue), BatchAggregatorError> {
-        // Quorum store metrics
-        counters::DELIVERED_BATCHES_COUNT.inc();
-
         self.status
             .clone()
             .map(|_| (self.num_bytes, self.txns, self.hasher.finish()))
