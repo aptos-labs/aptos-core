@@ -52,12 +52,6 @@ impl NetworkTest for TwinValidatorTest {
                     .await
                     .expect(format!("Error while getting identity for {main_id}").as_str());
                 ctx.swarm()
-                    .validator_mut(main_id)
-                    .unwrap()
-                    .stop()
-                    .await
-                    .expect(format!("Error while stopping {twin_id}").as_str());
-                ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .set_identity(main_identity)
@@ -75,12 +69,6 @@ impl NetworkTest for TwinValidatorTest {
                     .wait_until_healthy(Instant::now() + Duration::from_secs(300))
                     .await
                     .expect(format!("Error while waiting for {twin_id}").as_str());
-                ctx.swarm()
-                    .validator_mut(main_id)
-                    .unwrap()
-                    .start()
-                    .await
-                    .expect(format!("Error while starting {twin_id}").as_str());
             }
         });
         <dyn NetworkLoadTest>::run(self, ctx)

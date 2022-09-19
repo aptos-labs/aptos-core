@@ -651,36 +651,31 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
             .with_initial_fullnode_count(5)
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                // Have single epoch change in land blocking
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))
-            .with_success_criteria(get_land_blocking_success_criteria(duration)),
+            .with_success_criteria(SuccessCriteria::new(
+                if duration.as_secs() > 1200 {
+                    5000
+                } else {
+                    6000
+                },
+                10000,
+                true,
+                Some(Duration::from_secs(if duration.as_secs() > 1200 {
+                    240
+                } else {
+                    60
+                })),
+                Some(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
+            )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
-}
-
-fn get_land_blocking_success_criteria(duration: Duration) -> SuccessCriteria {
-    SuccessCriteria::new(
-        if duration.as_secs() > 1200 {
-            5000
-        } else {
-            6000
-        },
-        10000,
-        true,
-        Some(Duration::from_secs(if duration.as_secs() > 1200 {
-            240
-        } else {
-            60
-        })),
-        Some(SystemMetricsThreshold::new(
-            // Check that we don't use more than 12 CPU cores for 30% of the time.
-            MetricsThreshold::new(12, 30),
-            // Check that we don't use more than 5 GB of memory for 30% of the time.
-            MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
-        )),
-    )
 }
 
 /// A default config for running various state sync performance tests
@@ -754,7 +749,26 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
-        .with_success_criteria(get_land_blocking_success_criteria(duration))
+        .with_success_criteria(SuccessCriteria::new(
+            if duration.as_secs() > 1200 {
+                5000
+            } else {
+                6000
+            },
+            10000,
+            true,
+            Some(Duration::from_secs(if duration.as_secs() > 1200 {
+                240
+            } else {
+                60
+            })),
+            Some(SystemMetricsThreshold::new(
+                // Check that we don't use more than 12 CPU cores for 30% of the time.
+                MetricsThreshold::new(12, 30),
+                // Check that we don't use more than 5 GB of memory for 30% of the time.
+                MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+            )),
+        ))
 }
 
 fn pre_release_suite() -> ForgeConfig<'static> {
