@@ -170,10 +170,10 @@ const sidebars = {
         {
           type: "category",
           label: "Typescript SDK",
-          link: { type: "doc", id: "sdks/ts-sdk/typescript-sdk" },
+          link: { type: "doc", id: "sdks/ts-sdk/index" },
           collapsible: true,
           collapsed: true,
-          items: ["sdks/ts-sdk/typescript-sdk-overview"],
+          items: ["sdks/ts-sdk/typescript-sdk", "sdks/ts-sdk/typescript-sdk-overview"],
         },
         "sdks/rust-sdk",
       ],
