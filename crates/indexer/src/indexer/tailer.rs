@@ -74,7 +74,7 @@ impl Tailer {
 
         let query_chain = dsl::ledger_infos
             .select(dsl::chain_id)
-            .load::<i64>(&conn)
+            .load::<i64>(&mut conn)
             .expect("Error loading chain id from db");
         let maybe_existing_chain_id = query_chain.first();
 
@@ -234,14 +234,14 @@ impl Tailer {
           ";
         #[derive(Debug, QueryableByName)]
         pub struct Gap {
-            #[sql_type = "BigInt"]
+            #[diesel(sql_type = BigInt)]
             pub version: i64,
         }
         let mut res: Vec<Option<Gap>> = sql_query(sql)
             .bind::<Text, _>(processor_name)
             // This is the number used to determine how far we look back for gaps. Increasing it may result in slower startup
             .bind::<BigInt, _>(1500000)
-            .get_results(&conn)
+            .get_results(&mut conn)
             .unwrap();
         res.pop().unwrap().map(|g| g.version)
     }

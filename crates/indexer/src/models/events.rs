@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
     Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize,
 )]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
-#[primary_key(account_address, creation_number, sequence_number)]
+#[diesel(primary_key(account_address, creation_number, sequence_number))]
 #[diesel(table_name = events)]
 pub struct Event {
     pub sequence_number: i64,

@@ -5,7 +5,7 @@ use crate::{indexer::errors::TransactionProcessingError, schema::processor_statu
 use field_count::FieldCount;
 
 #[derive(AsChangeset, Debug, FieldCount, Insertable, Queryable)]
-#[changeset_options(treat_none_as_null = "true")]
+#[diesel(treat_none_as_null = true)]
 #[diesel(table_name = processor_statuses)]
 pub struct ProcessorStatus {
     pub name: &'static str,
