@@ -44,6 +44,7 @@ storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
 aptos-api-test-context = { path = "./test-context", package = "aptos-api-test-context" }
+aptos-gas = { path = "../aptos-move/aptos-gas", features = ["testing"] }
 aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers" }
 aptos-sdk = { path = "../sdk" }
 percent-encoding = "2.1.0"

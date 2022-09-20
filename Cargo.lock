@@ -150,6 +150,7 @@ dependencies = [
  "aptos-gas",
  "aptos-genesis",
  "aptos-github-client",
+ "aptos-global-constants",
  "aptos-keygen",
  "aptos-logger",
  "aptos-module-verifier",
@@ -454,6 +455,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-keygen",
  "aptos-logger",
@@ -608,6 +610,7 @@ dependencies = [
 name = "aptos-gas"
 version = "0.1.0"
 dependencies = [
+ "aptos-global-constants",
  "aptos-types",
  "framework",
  "gas-algebra-ext",
@@ -1121,6 +1124,7 @@ version = "0.0.3"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-global-constants",
  "aptos-rest-client",
  "aptos-types",
  "bcs",
@@ -3806,6 +3810,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-genesis",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
  "aptos-rest-client",
@@ -9740,6 +9745,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
  "aptos-rest-client",

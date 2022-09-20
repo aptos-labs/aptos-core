@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.57"
 aptos-crypto = { path = "../crates/aptos-crypto" }
+aptos-global-constants = { path = "../config/global-constants" }
 aptos-rest-client = { path = "../crates/aptos-rest-client" }
 aptos-types = { path = "../types" }
 bcs = "0.1.3"

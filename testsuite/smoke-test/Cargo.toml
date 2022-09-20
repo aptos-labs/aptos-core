@@ -24,7 +24,8 @@ aptos = { path = "../../crates/aptos", features = ["fuzzing"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-faucet = { path = "../../crates/aptos-faucet" }
-aptos-gas = { path = "../../aptos-move/aptos-gas" }
+aptos-gas = { path = "../../aptos-move/aptos-gas", features = ["testing"] }
+aptos-global-constants = { path = "../../config/global-constants", features = ["testing"] }
 aptos-indexer = { path = "../../crates/indexer" }
 aptos-keygen = { path = "../../crates/aptos-keygen" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
@@ -35,7 +36,7 @@ aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["fuzzing"] }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 consensus = { path = "../../consensus" }
-forge = { path = "../forge" }
+forge = { path = "../forge", features = ["testing"] }
 framework = { path = "../../aptos-move/framework" }
 move-deps = { path = "../../aptos-move/move-deps" }
 
@@ -49,7 +50,6 @@ regex = "1.5.5"
 serde_yaml = "0.8.24"
 
 aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
-aptos-global-constants = { path = "../../config/global-constants" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-secure-storage = { path = "../../secure/storage", features = ["testing"] }
