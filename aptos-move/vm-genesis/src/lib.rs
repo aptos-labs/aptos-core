@@ -800,6 +800,8 @@ pub struct EmployeeAccountMap {
     pub validator: ValidatorWithCommissionRate,
     pub vesting_schedule_numerators: Vec<u64>,
     pub vesting_schedule_denominator: u64,
+    // Address that can reset the beneficiary for any shareholder.
+    pub beneficiary_resetter: AccountAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -979,6 +981,7 @@ pub fn test_mainnet_end_to_end() {
             },
             vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
             vesting_schedule_denominator: 48,
+            beneficiary_resetter: AccountAddress::ZERO,
         },
         EmployeeAccountMap {
             accounts: vec![account48, account49],
@@ -989,6 +992,7 @@ pub fn test_mainnet_end_to_end() {
             },
             vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
             vesting_schedule_denominator: 48,
+            beneficiary_resetter: account44,
         },
     ];
 

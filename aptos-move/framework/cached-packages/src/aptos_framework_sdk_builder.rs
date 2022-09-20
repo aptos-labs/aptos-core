@@ -352,6 +352,13 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
     },
 
+    /// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
+    /// account.
+    VestingResetBeneficiary {
+        contract_address: AccountAddress,
+        shareholder: AccountAddress,
+    },
+
     VestingResetLockup {
         contract_address: AccountAddress,
     },
@@ -360,6 +367,17 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
         shareholder: AccountAddress,
         new_beneficiary: AccountAddress,
+    },
+
+    VestingSetBeneficiaryResetter {
+        contract_address: AccountAddress,
+        beneficiary_resetter: AccountAddress,
+    },
+
+    VestingSetManagementRole {
+        contract_address: AccountAddress,
+        role: Vec<u8>,
+        role_holder: AccountAddress,
     },
 
     /// Terminate the vesting contract and send all funds back to the withdrawal address.
@@ -577,12 +595,25 @@ impl EntryFunctionCall {
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
             VestingDistribute { contract_address } => vesting_distribute(contract_address),
+            VestingResetBeneficiary {
+                contract_address,
+                shareholder,
+            } => vesting_reset_beneficiary(contract_address, shareholder),
             VestingResetLockup { contract_address } => vesting_reset_lockup(contract_address),
             VestingSetBeneficiary {
                 contract_address,
                 shareholder,
                 new_beneficiary,
             } => vesting_set_beneficiary(contract_address, shareholder, new_beneficiary),
+            VestingSetBeneficiaryResetter {
+                contract_address,
+                beneficiary_resetter,
+            } => vesting_set_beneficiary_resetter(contract_address, beneficiary_resetter),
+            VestingSetManagementRole {
+                contract_address,
+                role,
+                role_holder,
+            } => vesting_set_management_role(contract_address, role, role_holder),
             VestingTerminateVestingContract { contract_address } => {
                 vesting_terminate_vesting_contract(contract_address)
             }
@@ -1566,6 +1597,29 @@ pub fn vesting_distribute(contract_address: AccountAddress) -> TransactionPayloa
     ))
 }
 
+/// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
+/// account.
+pub fn vesting_reset_beneficiary(
+    contract_address: AccountAddress,
+    shareholder: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("reset_beneficiary").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&shareholder).unwrap(),
+        ],
+    ))
+}
+
 pub fn vesting_reset_lockup(contract_address: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1600,6 +1654,50 @@ pub fn vesting_set_beneficiary(
             bcs::to_bytes(&contract_address).unwrap(),
             bcs::to_bytes(&shareholder).unwrap(),
             bcs::to_bytes(&new_beneficiary).unwrap(),
+        ],
+    ))
+}
+
+pub fn vesting_set_beneficiary_resetter(
+    contract_address: AccountAddress,
+    beneficiary_resetter: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("set_beneficiary_resetter").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&beneficiary_resetter).unwrap(),
+        ],
+    ))
+}
+
+pub fn vesting_set_management_role(
+    contract_address: AccountAddress,
+    role: Vec<u8>,
+    role_holder: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("set_management_role").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&role).unwrap(),
+            bcs::to_bytes(&role_holder).unwrap(),
         ],
     ))
 }
@@ -2245,6 +2343,17 @@ mod decoder {
         }
     }
 
+    pub fn vesting_reset_beneficiary(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingResetBeneficiary {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                shareholder: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_reset_lockup(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingResetLockup {
@@ -2261,6 +2370,31 @@ mod decoder {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 shareholder: bcs::from_bytes(script.args().get(1)?).ok()?,
                 new_beneficiary: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn vesting_set_beneficiary_resetter(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingSetBeneficiaryResetter {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                beneficiary_resetter: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn vesting_set_management_role(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingSetManagementRole {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                role: bcs::from_bytes(script.args().get(1)?).ok()?,
+                role_holder: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None
@@ -2517,12 +2651,24 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::vesting_distribute),
         );
         map.insert(
+            "vesting_reset_beneficiary".to_string(),
+            Box::new(decoder::vesting_reset_beneficiary),
+        );
+        map.insert(
             "vesting_reset_lockup".to_string(),
             Box::new(decoder::vesting_reset_lockup),
         );
         map.insert(
             "vesting_set_beneficiary".to_string(),
             Box::new(decoder::vesting_set_beneficiary),
+        );
+        map.insert(
+            "vesting_set_beneficiary_resetter".to_string(),
+            Box::new(decoder::vesting_set_beneficiary_resetter),
+        );
+        map.insert(
+            "vesting_set_management_role".to_string(),
+            Box::new(decoder::vesting_set_management_role),
         );
         map.insert(
             "vesting_terminate_vesting_contract".to_string(),

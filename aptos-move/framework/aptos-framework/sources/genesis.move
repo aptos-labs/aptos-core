@@ -40,6 +40,7 @@ module aptos_framework::genesis {
         validator: ValidatorConfigurationWithCommission,
         vesting_schedule_numerator: vector<u64>,
         vesting_schedule_denominator: u64,
+        beneficiary_resetter: address,
     }
 
     struct ValidatorConfiguration has copy, drop {
@@ -237,8 +238,9 @@ module aptos_framework::genesis {
             );
 
             let admin = employee_group.validator.validator_config.owner_address;
+            let admin_signer = &create_signer(admin);
             let contract_address = vesting::create_vesting_contract(
-                &create_signer(admin),
+                admin_signer,
                 &employee_group.accounts,
                 buy_ins,
                 vesting_schedule,
@@ -249,6 +251,10 @@ module aptos_framework::genesis {
                 x"",
             );
             let pool_address = vesting::stake_pool_address(contract_address);
+
+            if (employee_group.beneficiary_resetter != @0x0) {
+                vesting::set_beneficiary_resetter(admin_signer, contract_address, employee_group.beneficiary_resetter);
+            };
 
             let validator = &employee_group.validator.validator_config;
             assert!(
