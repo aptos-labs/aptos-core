@@ -130,7 +130,7 @@ impl Default for EmitJobRequest {
             mode: EmitJobMode::MaxLoad {
                 mempool_backlog: 3000,
             },
-            gas_price: 0,
+            gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             invalid_transaction_ratio: 0,
             reuse_accounts: false,
             mint_to_root: false,
