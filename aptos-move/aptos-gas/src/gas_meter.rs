@@ -162,7 +162,7 @@ impl AptosGasMeter {
     ) -> Self {
         assert!(
             (gas_feature_version == 0 && storage_gas_params.is_none())
-                || storage_gas_params.is_some(),
+                || (gas_feature_version > 0 && storage_gas_params.is_some()),
             "Invalid gas meter configuration"
         );
 

@@ -39,7 +39,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.95, avg(rate(quorum_store_batch_creation_duration_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_batch_creation_duration_sum[$__rate_interval]) / rate(quorum_store_batch_creation_duration_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -94,7 +94,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.95, avg(rate(quorum_store_empty_batch_creation_duration_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_empty_batch_creation_duration_sum[$__rate_interval]) / rate(quorum_store_empty_batch_creation_duration_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -149,7 +149,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.90, avg(rate(quorum_store_batch_to_PoS_duration_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_batch_to_PoS_duration_sum[$__rate_interval]) / rate(quorum_store_batch_to_PoS_duration_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -217,7 +217,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.95, sum(rate(quorum_store_num_batch_per_block_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_num_batch_per_block_sum[$__rate_interval]) / rate(quorum_store_num_batch_per_block_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -272,7 +272,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.95, sum(rate(quorum_store_num_txn_per_batch_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_num_txn_per_batch_sum[$__rate_interval]) / rate(quorum_store_num_txn_per_batch_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -383,16 +383,16 @@
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
           "expr": "rate(quorum_store_created_empty_batch_count[$__rate_interval])",
-          "legendFormat": "__auto"
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
       ],
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "single" }
+        "tooltip": { "mode": "multi" }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "",
+          "unit": "none",
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
@@ -779,7 +779,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 7,
+  "version": 8,
   "links": [],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }

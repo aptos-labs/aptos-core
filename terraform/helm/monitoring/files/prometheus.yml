@@ -89,6 +89,17 @@ scrape_configs:
     target_label: __metrics_path__
     replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
 
+  {{ if not .Values.monitoring.prometheus.fullKubernetesScrape }}
+  # Only keep container task state for key containers
+  metric_relabel_configs:
+  - source_labels: [__name__, container]
+    action: drop
+    regex: container_tasks_state;!validator|!fullnode
+  - source_labels: [container]
+    action: drop
+    regex: calico.*|csi.*|ebs.*|chaos.*|aws-node|node-driver-registrar
+  {{ end }}
+
 # Scrape config for service endpoints.
 #
 # The relabeling allows the actual service scrape endpoint to be configured
@@ -133,6 +144,15 @@ scrape_configs:
     - source_labels: [__meta_kubernetes_pod_node_name]
       action: replace
       target_label: kubernetes_node
+
+  # Drop some redundant labels from kube-state-metrics
+  metric_relabel_configs:
+  - action: labeldrop
+    regex: uid|container_id
+  # Drop tmpfs metrics from node-exporter
+  - source_labels: [fstype]
+    regex: tmpfs
+    action: drop
 
   # Scrape config for pods
   #

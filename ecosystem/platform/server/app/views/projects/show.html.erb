@@ -28,7 +28,7 @@
               </a>
             <% end %>
           </div>
-          <%= render ButtonComponent.new(href: projects_path, title: 'Back to Projects', scheme: :tertiary, size: :small, class: 'block py-16 !px-0') do %>
+          <%= render ButtonComponent.new(href: ecosystem_path, title: 'Back to Projects', scheme: :tertiary, size: :small, class: 'block py-16 !px-0') do %>
             ← Back to Projects
           <% end %>
         </div>
@@ -38,7 +38,7 @@
         <p class="font-light text-base text-neutral-300 mb-4"><%= @project.short_description %></p>
         <div class="flex gap-2 mb-8">
           <% @project.categories.sort.each do |category| %>
-            <%= content_tag :a, category.title, href: projects_path(category: category.id), class: 'rounded-full px-6 py-2 border font-medium text-neutral-300 border-neutral-400 leading-none hover:bg-neutral-800 focus:bg-neutral-800' %>
+            <%= content_tag :a, category.title, href: ecosystem_path(category: category.id), class: 'rounded-full px-6 py-2 border font-medium text-neutral-300 border-neutral-400 leading-none hover:bg-neutral-800 focus:bg-neutral-800' %>
           <% end %>
         </div>
         <div class="rounded-xl border border-neutral-700 overflow-hidden mb-8">

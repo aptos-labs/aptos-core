@@ -21,7 +21,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
       FactoryBot.create(:project, user: @user, verified: true)
     end
     sign_out @user
-    get projects_path
+    get ecosystem_path
     assert_response :success
   end
 
@@ -32,7 +32,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     c = FactoryBot.create(:project, user: @user, verified: true,
                                     full_description: 'The fnords decide to seek membership on the Greek Council ' * 10)
     d = FactoryBot.create(:project, user: @user, verified: true, title: 'Episode V')
-    get projects_path(s: 'fnord')
+    get ecosystem_path(s: 'fnord')
     assert_response :success
     assert_select "[data-project-id=#{a.id}]"
     assert_select "[data-project-id=#{b.id}]"
@@ -153,7 +153,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
       delete project_path(project)
     end
 
-    assert_redirected_to projects_path
+    assert_redirected_to ecosystem_path
   end
 
   test 'delete existing project fails if current user is not the creator' do

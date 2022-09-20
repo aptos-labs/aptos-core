@@ -79,6 +79,26 @@ pub async fn initialize_nft_collection(
     collection_name: &[u8],
     token_name: &[u8],
 ) {
+    // resync root account sequence number
+    match rest_client.get_account(root_account.address()).await {
+        Ok(result) => {
+            let account = result.into_inner();
+            if root_account.sequence_number() < account.sequence_number {
+                warn!(
+                    "Root account sequence number got out of sync: remotely {}, locally {}",
+                    account.sequence_number,
+                    root_account.sequence_number_mut()
+                );
+                *root_account.sequence_number_mut() = account.sequence_number;
+            }
+        }
+        Err(e) => warn!(
+            "[{}] Couldn't check account sequence number due to {:?}",
+            rest_client.path_prefix_string(),
+            e
+        ),
+    }
+
     // Create and mint the owner account first
     let create_account_txn = create_and_fund_account_request(
         root_account,

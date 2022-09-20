@@ -21,6 +21,7 @@ use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::state_sync_performance::StateSyncValidatorPerformance;
 use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
+use testcases::twin_validator_test::TwinValidatorTest;
 use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
@@ -516,19 +517,23 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 None,
                 None,
             )),
-        "account_creation_state_sync" => config
+        "account_creation" | "nft_mint" => config
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_initial_fullnode_count(3)
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["chain"]["epoch_duration_secs"] = 1200.into();
+                helm_values["chain"]["epoch_duration_secs"] = 600.into();
             }))
             .with_emit_job(
                 EmitJobRequest::default()
                     .mode(EmitJobMode::MaxLoad {
                         mempool_backlog: 30000,
                     })
-                    .transaction_type(TransactionType::AccountGeneration),
+                    .transaction_type(if test_name == "account_creation" {
+                        TransactionType::AccountGeneration
+                    } else {
+                        TransactionType::NftMint
+                    }),
             )
             .with_success_criteria(SuccessCriteria::new(
                 4000,
@@ -660,6 +665,29 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             },
             false,
         ),
+        "twin_validator_test" => config
+            .with_network_tests(vec![&TwinValidatorTest])
+            .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+            .with_initial_fullnode_count(5)
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            }))
+            .with_success_criteria(SuccessCriteria::new(
+                6000,
+                10000,
+                true,
+                Some(Duration::from_secs(60)),
+                Some(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
+                Some(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+            )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -834,9 +862,8 @@ fn changing_working_quorum_test(
                     EmitJobMode::ConstTps { tps: target_tps }
                 })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 75),
+                    (TransactionType::P2P, 80),
                     (TransactionType::AccountGeneration, 20),
-                    (TransactionType::NftMint, 5),
                 ]),
         )
         .with_success_criteria(SuccessCriteria::new(
