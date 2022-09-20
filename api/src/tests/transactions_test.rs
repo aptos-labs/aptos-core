@@ -321,7 +321,7 @@ async fn test_multi_ed25519_signed_transaction() {
         .expiration_timestamp_secs(u64::MAX) // set timestamp to max to ensure static raw transaction
         .build();
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
     let txn = SignedTransaction::new_multisig(raw_txn, public_key, signature.clone());
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -530,14 +530,20 @@ async fn test_signing_message_with_payload(
         signing_msg.to_string(),
         format!(
             "0x{}",
-            hex::encode(&txn.clone().into_raw_transaction().signing_message())
+            hex::encode(
+                &txn.clone()
+                    .into_raw_transaction()
+                    .signing_message()
+                    .unwrap()
+            )
         )
     );
 
     let sig = context
         .root_account()
         .private_key()
-        .sign_arbitrary_message(signing_msg.inner());
+        .sign_arbitrary_message(signing_msg.inner())
+        .unwrap();
     let expected_sig = match txn.authenticator() {
         TransactionAuthenticator::Ed25519 {
             public_key: _,

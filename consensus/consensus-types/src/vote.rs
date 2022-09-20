@@ -62,7 +62,7 @@ impl Vote {
         validator_signer: &ValidatorSigner,
     ) -> Self {
         ledger_info_placeholder.set_consensus_data_hash(vote_data.hash());
-        let signature = validator_signer.sign(&ledger_info_placeholder);
+        let signature = validator_signer.sign(&ledger_info_placeholder).unwrap();
         Self::new_with_signature(vote_data, author, ledger_info_placeholder, signature)
     }
 

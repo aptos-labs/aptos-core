@@ -128,8 +128,11 @@ pub fn assert_successful_payload_key_rotation<
     // sign the rotation message by the current private key and the new private key
     let signature_by_curr_privkey = current_account
         .privkey
-        .sign_arbitrary_message(&rotation_msg.clone().unwrap());
-    let signature_by_new_privkey = new_private_key.sign_arbitrary_message(&rotation_msg.unwrap());
+        .sign_arbitrary_message(&rotation_msg.clone().unwrap())
+        .unwrap();
+    let signature_by_new_privkey = new_private_key
+        .sign_arbitrary_message(&rotation_msg.unwrap())
+        .unwrap();
 
     assert_success!(harness.run_transaction_payload(
         &current_account,

@@ -83,6 +83,7 @@ fn sig_subgroup_membership<M: Measurement>(g: &mut BenchmarkGroup<M>) {
                 // Currently, there's no better way of sampling a group element here
                 kp.private_key
                     .sign(&TestAptosCrypto("Hello Aptos!".to_owned()))
+                    .unwrap()
             },
             |sig| sig.subgroup_check(),
         )
@@ -133,7 +134,7 @@ fn sign<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     let msg = random_message(&mut rng);
 
     g.throughput(Throughput::Elements(1));
-    g.bench_function("sign", move |b| b.iter(|| priv_key.sign(&msg)));
+    g.bench_function("sign", move |b| b.iter(|| priv_key.sign(&msg).unwrap()));
 }
 
 fn verify_signature_share<M: Measurement>(g: &mut BenchmarkGroup<M>) {
@@ -141,7 +142,7 @@ fn verify_signature_share<M: Measurement>(g: &mut BenchmarkGroup<M>) {
 
     let keypair = KeyPair::<bls12381::PrivateKey, bls12381::PublicKey>::generate(&mut rng);
     let msg = random_message(&mut rng);
-    let sig = keypair.private_key.sign(&msg);
+    let sig = keypair.private_key.sign(&msg).unwrap();
 
     g.throughput(Throughput::Elements(1));
     g.bench_function("verify_signature_share", move |b| {
@@ -203,7 +204,7 @@ fn aggregate_sigshare<M: Measurement>(g: &mut BenchmarkGroup<M>, size: usize) {
                     // each signer computes a signature share on the random message
                     let mut sigshares = vec![];
                     for kp in key_pairs.iter() {
-                        sigshares.push(kp.private_key.sign(&msg));
+                        sigshares.push(kp.private_key.sign(&msg).unwrap());
                     }
                     sigshares
                 },
@@ -248,7 +249,7 @@ fn verify_multisig<M: Measurement>(g: &mut BenchmarkGroup<M>, size: usize) {
                     let mut pks = vec![];
 
                     for i in subset {
-                        sigshares.push(key_pairs[i].private_key.sign(&msg));
+                        sigshares.push(key_pairs[i].private_key.sign(&msg).unwrap());
                         pks.push(&key_pairs[i].public_key)
                     }
 
@@ -292,7 +293,7 @@ fn verify_aggsig<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
 
                 for kp in key_pairs.iter() {
                     msgs.push(random_message(&mut rng));
-                    sigshares.push(kp.private_key.sign(msgs.last().unwrap()));
+                    sigshares.push(kp.private_key.sign(msgs.last().unwrap()).unwrap());
                     pks.push(&kp.public_key)
                 }
 

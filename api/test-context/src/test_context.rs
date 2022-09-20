@@ -480,7 +480,8 @@ impl TestContext {
 
         let sig = account
             .private_key()
-            .sign_arbitrary_message(signing_msg.inner());
+            .sign_arbitrary_message(signing_msg.inner())
+            .unwrap();
 
         request["signature"] = json!({
             "type": "ed25519_signature",

@@ -34,11 +34,11 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
 
     let private_key = Ed25519PrivateKey::generate(&mut rng);
     let public_key = private_key.public_key();
-    let signature = private_key.sign(&message);
+    let signature = private_key.sign(&message).unwrap();
 
     let bls_private_key = bls12381::PrivateKey::generate(&mut rng);
     let bls_public_key = bls_private_key.public_key();
-    let bls_signature = bls_private_key.sign(&message);
+    let bls_signature = bls_private_key.sign(&message).unwrap();
 
     tracer.trace_value(samples, &public_key)?;
     tracer.trace_value(samples, &signature)?;
