@@ -367,7 +367,7 @@ impl AptosDataBuilder {
         }
     }
 
-    pub fn build(&mut self) -> Arc<AptosData> {
+    fn build_logger(&mut self) -> Arc<AptosData> {
         let filter = self.build_filter();
 
         if let Ok(log_format) = env::var(RUST_LOG_FORMAT) {
@@ -378,7 +378,7 @@ impl AptosDataBuilder {
             }
         }
 
-        let logger = if self.is_async {
+        if self.is_async {
             let (sender, receiver) = sync::mpsc::sync_channel(self.channel_size);
             let mut remote_tx = None;
             if let Some(tx) = &self.remote_log_tx {
@@ -412,7 +412,11 @@ impl AptosDataBuilder {
                 enable_telemetry_flush: self.enable_telemetry_flush,
                 formatter: self.custom_format.take().unwrap_or(text_format),
             })
-        };
+        }
+    }
+
+    pub fn build(&mut self) -> Arc<AptosData> {
+        let logger = self.build_logger();
 
         let console_port = if cfg!(feature = "aptos-console") {
             self.console_port
@@ -777,17 +781,19 @@ impl LoggerFilterUpdater {
     }
 
     pub fn run(self) {
-        thread::spawn(move || {
-            loop {
-                thread::sleep(FILTER_REFRESH_INTERVAL);
+        thread::spawn(move || loop {
+            thread::sleep(FILTER_REFRESH_INTERVAL);
 
-                // TODO: check for change to env var before rebuilding filter.
-                let filter = self.logger_builder.build_filter();
-                self.logger.set_filter(filter);
+            self.update_filter();
 
-                info!("Logger filters rebuilt and reset.");
-            }
+            info!("Logger filters rebuilt and reset.");
         });
+    }
+
+    fn update_filter(&self) {
+        // TODO: check for change to env var before rebuilding filter.
+        let filter = self.logger_builder.build_filter();
+        self.logger.set_filter(filter);
     }
 }
 
@@ -795,8 +801,11 @@ impl LoggerFilterUpdater {
 mod tests {
     use super::LogEntry;
     use crate::{
-        aptos_logger::json_format, debug, error, info, logger::Logger, trace, warn, Event, Key,
-        KeyValue, Level, Metadata, Schema, Value, Visitor,
+        aptos_logger::{json_format, RUST_LOG_TELEMETRY},
+        debug, error, info,
+        logger::Logger,
+        trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
+        Schema, Value, Visitor,
     };
     use chrono::{DateTime, Utc};
     #[cfg(test)]
@@ -1010,5 +1019,30 @@ mod tests {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "DisplayStruct!")
         }
+    }
+
+    #[test]
+    fn test_logger_filter_updater() {
+        let mut logger_builder = AptosDataBuilder::new();
+        let logger = logger_builder.build_logger();
+
+        let debug_metadata = &Metadata::new(Level::Debug, "target", "module_path", "source_path");
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug");
+
+        let updater = LoggerFilterUpdater::new(logger.clone(), logger_builder);
+        updater.update_filter();
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
     }
 }
