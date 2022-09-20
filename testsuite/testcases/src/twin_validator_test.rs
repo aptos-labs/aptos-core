@@ -41,34 +41,34 @@ impl NetworkTest for TwinValidatorTest {
                     .unwrap()
                     .clear_storage()
                     .await
-                    .expect(
-                        format!("Error while clearing storage and stopping {twin_id}").as_str(),
-                    );
+                    .unwrap_or_else(|_| {
+                        panic!("Error while clearing storage and stopping {twin_id}")
+                    });
                 let main_identity = ctx
                     .swarm()
                     .validator_mut(main_id)
                     .unwrap()
                     .get_identity()
                     .await
-                    .expect(format!("Error while getting identity for {main_id}").as_str());
+                    .unwrap_or_else(|_| panic!("Error while getting identity for {main_id}"));
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .set_identity(main_identity)
                     .await
-                    .expect(format!("Error while setting identity for {twin_id}").as_str());
+                    .unwrap_or_else(|_| panic!("Error while setting identity for {twin_id}"));
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .start()
                     .await
-                    .expect(format!("Error while starting {twin_id}").as_str());
+                    .unwrap_or_else(|_| panic!("Error while starting {twin_id}"));
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .wait_until_healthy(Instant::now() + Duration::from_secs(300))
                     .await
-                    .expect(format!("Error while waiting for {twin_id}").as_str());
+                    .unwrap_or_else(|_| panic!("Error while waiting for {twin_id}"));
             }
         });
         <dyn NetworkLoadTest>::run(self, ctx)

@@ -52,6 +52,6 @@ aptosdb = { path = "../../storage/aptosdb" }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 framework = { path = "../../aptos-move/framework" }
 inspection-service = { path = "../../crates/inspection-service" }
+json-patch = "0.2.6"
 state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" }
 transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }
-json-patch = "0.2.6"

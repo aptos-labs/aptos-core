@@ -388,7 +388,7 @@ fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'s
         // TODO(rustielin): verify each test suite
         "k8s_suite" => Ok(k8s_test_suite()),
         "chaos" => Ok(chaos_test_suite(duration)),
-        single_test => single_test_suite(single_test, duration),
+        single_test => single_test_suite(single_test),
     }
 }
 
@@ -420,7 +420,7 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
         ])
 }
 
-fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
+fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
