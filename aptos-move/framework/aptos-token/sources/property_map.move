@@ -106,7 +106,7 @@ module aptos_token::property_map {
 
     public fun borrow(map: &PropertyMap, key: &String): &PropertyValue {
         let found = contains_key(map, key);
-        assert!(found, EPROPERTY_NOT_EXIST);
+        assert!(found, error::not_found(EPROPERTY_NOT_EXIST));
         simple_map::borrow(&map.map, key)
     }
 
@@ -216,18 +216,7 @@ module aptos_token::property_map {
     /// create a property value from generic type data
     public fun create_property_value<T: copy>(data: &T): PropertyValue {
         let name = type_name<T>();
-        if (
-            name == string::utf8(b"bool") ||
-                name == string::utf8(b"u8") ||
-                name == string::utf8(b"u64") ||
-                name == string::utf8(b"u128") ||
-                name == string::utf8(b"address") ||
-                name == string::utf8(b"0x1::string::String")
-        ) {
-            create_property_value_raw(bcs::to_bytes<T>(data), name)
-        } else {
-            create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"vector<u8>"))
-        }
+        create_property_value_raw(bcs::to_bytes<T>(data), name)
     }
 
     #[test_only]
