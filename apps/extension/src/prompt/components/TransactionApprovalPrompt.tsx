@@ -29,6 +29,7 @@ import { useTransactionSimulation } from 'core/hooks/useTransactions';
 import { useAccountOctaCoinBalance } from 'core/queries/account';
 import { formatCoin } from 'core/utils/coin';
 import { maxGasFeeFromEstimated } from 'shared/transactions';
+import { parseMoveAbortDetails } from 'shared/move';
 import { usePermissionRequestContext } from '../hooks';
 import { LoadableContent } from './LoadableContent';
 import { PermissionPromptLayout } from './PermissionPromptLayout';
@@ -223,10 +224,13 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
   useEffect(() => {
     if (simulation.error) {
       setSimulationError(simulation.error.message);
+    } else if (simulation.data?.success === false) {
+      const abortDetails = parseMoveAbortDetails(simulation.data.vm_status);
+      setSimulationError(abortDetails?.reasonDescr);
     } else if (!simulation.isLoading) {
       setSimulationError(undefined);
     }
-  }, [simulation.error, simulation.isLoading]);
+  }, [simulation.data, simulation.error, simulation.isLoading]);
 
   useEffect(() => {
     const isSimulationSuccessful = simulation.data?.success === true;
@@ -258,7 +262,7 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
                 ? (
                   <Box color={secondaryErrorMessageColor[colorMode]}>
                     <Heading {...headingProps}>
-                      Simulation error
+                      Transaction error
                     </Heading>
                     <Text fontSize="sm" lineHeight="20px">
                       {simulationError}
@@ -268,7 +272,7 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
                 : null
             }
             {
-              details?.networkFee !== undefined
+              !simulationError && details?.networkFee !== undefined
                 ? (
                   <Box>
                     <Heading {...headingProps}>
@@ -282,12 +286,12 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
                 : null
             }
             {
-              details?.aptosCoinStore !== undefined
+              !simulationError && details?.aptosCoinStore !== undefined
                 ? <TransactionCoinBalanceChange coinStore={details.aptosCoinStore} />
                 : null
             }
             {
-              simulation.data !== undefined
+              !simulationError && simulation.data !== undefined
                 ? <TransactionWriteset txn={simulation.data} />
                 : null
             }
