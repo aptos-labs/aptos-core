@@ -164,7 +164,19 @@ const sidebars = {
       label: "SDKs",
       collapsible: true,
       collapsed: true,
-      items: ["sdks/aptos-sdk-overview", "sdks/typescript-sdk", "sdks/python-sdk", "sdks/rust-sdk"],
+      link: { type: "doc", id: "sdks/index" },
+      items: [
+        "sdks/python-sdk",
+        {
+          type: "category",
+          label: "Typescript SDK",
+          link: { type: "doc", id: "sdks/ts-sdk/typescript-sdk" },
+          collapsible: true,
+          collapsed: true,
+          items: ["sdks/ts-sdk/typescript-sdk-overview"],
+        },
+        "sdks/rust-sdk",
+      ],
     },
     {
       type: "category",
