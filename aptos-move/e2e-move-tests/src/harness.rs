@@ -31,6 +31,7 @@ use rand::{
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
 use std::path::Path;
+use aptos_types::contract_event::ContractEvent;
 
 /// A simple test harness for defining Move e2e tests.
 ///
@@ -125,6 +126,15 @@ impl MoveHarness {
             self.executor.apply_write_set(output.write_set());
         }
         output.status().to_owned()
+    }
+
+    /// Runs a signed transaction. On success, applies the write set.
+    pub fn run_with_events(&mut self, txn: SignedTransaction) -> (TransactionStatus,  Vec<ContractEvent>) {
+        let output = self.executor.execute_transaction(txn);
+        if matches!(output.status(), TransactionStatus::Keep(_)) {
+            self.executor.apply_write_set(output.write_set());
+        }
+        (output.status().to_owned(), output.events().to_owned())
     }
 
     /// Runs a block of signed transactions. On success, applies the write set.
