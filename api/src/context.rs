@@ -335,17 +335,23 @@ impl Context {
                 E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
             })?;
         let block_timestamp = new_block_event.proposed_time();
+
+        // We can only get the max_transactions page size
+        let max_txns = std::cmp::min(
+            self.node_config.api.max_transactions_page_size,
+            (last_version - first_version + 1) as u16,
+        );
         let txns = if with_transactions {
             Some(
-                self.get_transactions(
-                    first_version,
-                    (last_version - first_version + 1) as u16,
-                    ledger_version,
-                )
-                .context("Failed to read raw transactions from storage")
-                .map_err(|err| {
-                    E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
-                })?,
+                self.get_transactions(first_version, max_txns, ledger_version)
+                    .context("Failed to read raw transactions from storage")
+                    .map_err(|err| {
+                        E::internal_with_code(
+                            err,
+                            AptosErrorCode::InternalError,
+                            latest_ledger_info,
+                        )
+                    })?,
             )
         } else {
             None
