@@ -42,6 +42,7 @@ url = "2.2.2"
 aptos = { path = "../../crates/aptos" }
 aptos-config = { path = "../../config" }
 aptos-genesis = { path = "../../crates/aptos-genesis" }
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
@@ -55,3 +56,7 @@ inspection-service = { path = "../../crates/inspection-service" }
 json-patch = "0.2.6"
 state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" }
 transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }
+
+[features]
+default = []
+testing = ["aptos-global-constants/testing"]

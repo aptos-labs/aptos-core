@@ -123,8 +123,8 @@ class RestClient:
         txn_request = {
             "sender": f"{sender.address()}",
             "sequence_number": str(self.account_sequence_number(sender.address())),
-            "max_gas_amount": "2000",
-            "gas_unit_price": "1",
+            "max_gas_amount": "10000",
+            "gas_unit_price": "100",
             "expiration_timestamp_secs": str(int(time.time()) + 600),
             "payload": payload,
         }
@@ -164,7 +164,7 @@ class RestClient:
 
         count = 0
         while self.transaction_pending(txn_hash):
-            assert count < 10, f"transaction {txn_hash} timed out"
+            assert count < 20, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
@@ -187,8 +187,8 @@ class RestClient:
                 sender.address(),
                 self.account_sequence_number(sender.address()),
                 payload,
-                2000,
-                1,
+                100_000,
+                100,
                 int(time.time()) + 600,
                 self.chain_id,
             ),
@@ -223,8 +223,8 @@ class RestClient:
             sender.address(),
             self.account_sequence_number(sender.address()),
             payload,
-            2000,
-            1,
+            100_000,
+            100,
             int(time.time()) + 600,
             self.chain_id,
         )
