@@ -38,6 +38,7 @@
 ///      + The challenge is that curve25519-dalek's RistrettoBasepointTable is not serializable
 
 module aptos_std::ristretto255 {
+    use std::features;
     use std::option::Option;
 
     #[test_only]
@@ -75,6 +76,8 @@ module aptos_std::ristretto255 {
     const E_ZERO_POINTS: u64 = 2;
     /// Expected more than zero scalars as input.
     const E_ZERO_SCALARS: u64 = 3;
+    /// The native functions have not been rolled out yet.
+    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 4;
 
     //
     // Scalar and point structs
@@ -200,9 +203,14 @@ module aptos_std::ristretto255 {
         RistrettoPoint { handle }
     }
 
+    /// Clones a RistrettoPoint.
     public fun point_clone(point: &RistrettoPoint): RistrettoPoint {
-        RistrettoPoint {
-            handle: point_clone_internal(point.handle)
+        if(features::bulletproofs_enabled()) {
+            RistrettoPoint {
+                handle: point_clone_internal(point.handle)
+            }
+        } else {
+            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
         }
     }
 
@@ -285,8 +293,12 @@ module aptos_std::ristretto255 {
     /// Computes a double-scalar multiplication, returning a_1 p_1 + a_2 p_2
     /// This function is much faster than computing each a_i p_i using `point_mul` and adding up the results using `point_add`.
     public fun double_scalar_mul(scalar1: &Scalar, point1: &RistrettoPoint, scalar2: &Scalar, point2: &RistrettoPoint): RistrettoPoint {
-        RistrettoPoint {
-            handle: double_scalar_mul_internal(point1.handle, point2.handle, scalar1.data, scalar2.data)
+        if(features::bulletproofs_enabled()) {
+            RistrettoPoint {
+                handle: double_scalar_mul_internal(point1.handle, point2.handle, scalar1.data, scalar2.data)
+            }
+        } else {
+            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
         }
     }
 
@@ -824,8 +836,10 @@ module aptos_std::ristretto255 {
         assert!(point_equals(&expected, &basepoint_mul(&a)), 1);
     }
 
-    #[test]
-    fun test_basepoint_double_mul() {
+    #[test(fx = @std)]
+    fun test_basepoint_double_mul(fx: signer) {
+        features::change_feature_flags(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+
         let expected = option::extract(&mut new_point_from_bytes(x"be5d615d8b8f996723cdc6e1895b8b6d312cc75d1ffb0259873b99396a38c05a"));
 
         let a = Scalar { data: A_SCALAR };

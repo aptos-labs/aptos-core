@@ -40,7 +40,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 300],
 
     [.ristretto255.point_add, "ristretto255.point_add", 300],
-    [.ristretto255.point_clone, "ristretto255.point_clone", 1],
+    [.ristretto255.point_clone, "ristretto255.point_clone", 300],
     [.ristretto255.point_compress, "ristretto255.point_compress", 300],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 300],
     [.ristretto255.point_equals, "ristretto255.point_equals", 300],
@@ -59,8 +59,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     // DEPRECATED
     [.ristretto255.sha512_per_hash, "ristretto255.scalar_sha512_per_hash", 300],
 
-    [.ristretto255.sha2_512_per_byte, optional "ristretto255.sha2_512_per_byte", 1],
-    [.ristretto255.sha2_512_per_hash, optional "ristretto255.sha2_512_per_hash", 1],
+    [.ristretto255.sha2_512_per_byte, "ristretto255.sha2_512_per_byte", 300],
+    [.ristretto255.sha2_512_per_hash, "ristretto255.sha2_512_per_hash", 300],
 
     [.ristretto255.scalar_add, "ristretto255.scalar_add", 300],
     [.ristretto255.scalar_reduced_from_32_bytes, "ristretto255.scalar_reduced_from_32_bytes", 300],
@@ -77,9 +77,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.sip_hash.base, "hash.sip_hash.base", 1000],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 20],
 
-    [.bulletproofs.base, optional "bulletproofs.base", 1],
-    [.bulletproofs.per_byte_rangeproof_deserialize, optional "bulletproofs.per_byte_rangeproof_deserialize", 1],
-    [.bulletproofs.per_bit_rangeproof_verify, optional "bulletproofs.per_bit_rangeproof_verify", 1],
+    [.bulletproofs.base, "bulletproofs.base", 3000],
+    [.bulletproofs.per_byte_rangeproof_deserialize, "bulletproofs.per_byte_rangeproof_deserialize", 500],
+    [.bulletproofs.per_bit_rangeproof_verify, "bulletproofs.per_bit_rangeproof_verify", 500],
 
     [.hash.keccak256.base, optional "hash.keccak256.base", 3000],
     [.hash.keccak256.per_byte, optional "hash.keccak256.per_byte", 50],

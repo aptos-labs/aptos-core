@@ -10631,3 +10631,8 @@ dependencies = [
  "syn 1.0.99",
  "synstructure",
 ]
+
+[[patch.unused]]
+name = "diesel"
+version = "1.4.8"
+source = "git+https://github.com/aptos-labs/diesel?branch=1.4.x#1346b2087fb11ba2feca1153a88a598a17da0d38"

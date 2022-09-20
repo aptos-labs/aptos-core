@@ -100,6 +100,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();

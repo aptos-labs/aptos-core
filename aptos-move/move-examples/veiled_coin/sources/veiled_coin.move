@@ -294,8 +294,9 @@ module veiled_coin::veiled_coin {
         pedersen::commitment_sub_assign(&mut private_balance, &private_value);
 
         // This function is splitting a commitment 'bal' into a commitment 'amount' and a commitment 'new_bal' =
-        // = 'bal' - 'amount'. The key invariant we want to enforce is that 'bal' is in range [0, 2^{64}). Therefore, we verify a
-        // proof that 'new_bal' is in range. This implies that 'bal' - 'amount' >= 0 and therefore that 'bal' >= 'amount'.
+        // = 'bal' - 'amount'. We assume that 'bal' is in [0, 2^{64}). All we have to do to enforce this invariant is to
+        // verify a range proof that 'new_bal' is in [0, 2^{64}). Since 'new_bal' = 'bal' - 'amount' this implies that
+        // 'bal' - 'amount' >= 0 and therefore that 'bal' >= 'amount'.
         assert!(bulletproofs::verify_range_proof(&private_balance, range_proof, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
 
         coin_store.private_balance = pedersen::commitment_as_compressed_point(&private_balance);
