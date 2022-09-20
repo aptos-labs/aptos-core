@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::experimental::buffer_manager::{Receiver, Sender};
+use aptos_logger::debug;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use std::sync::{
@@ -71,6 +72,7 @@ impl<T: StatelessPipeline> PipelinePhase<T> {
             let response = self.processor.process(req).await;
             if let Some(tx) = &mut self.maybe_tx {
                 if tx.send(response).await.is_err() {
+                    debug!("Failed to send response, buffer manager probably dropped");
                     break;
                 }
             }
