@@ -679,6 +679,10 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
                     MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
                 )),
+                Some(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
             )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
