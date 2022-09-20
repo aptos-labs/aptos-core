@@ -70,7 +70,7 @@ async fn test_external_transaction_signer() {
     assert_eq!(unsigned_txn.sender(), sender_address);
 
     // sign the transaction with the private key
-    let signature = private_key.sign(&unsigned_txn);
+    let signature = private_key.sign(&unsigned_txn).unwrap();
 
     // submit the transaction
     let txn = SignedTransaction::new(unsigned_txn.clone(), public_key, signature);

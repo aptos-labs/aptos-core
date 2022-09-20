@@ -606,7 +606,12 @@ async fn construction_payloads(
     }
     let unsigned_transaction = txn_builder.build();
 
-    let signing_message = hex::encode(signing_message(&unsigned_transaction));
+    let signing_message = hex::encode(signing_message(&unsigned_transaction).map_err(|err| {
+        ApiError::InvalidInput(Some(format!(
+            "Invalid transaction, can't build into a signing message {}",
+            err
+        )))
+    })?);
     let payload = SigningPayload {
         account_identifier: AccountIdentifier::from(sender),
         hex_bytes: signing_message,

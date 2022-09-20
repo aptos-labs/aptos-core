@@ -354,7 +354,8 @@ async fn test_illegal_timestamp() {
         certificate_for_genesis(),
         &signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let result = block_store
         .execute_and_insert_block(block_with_illegal_timestamp)
         .await;

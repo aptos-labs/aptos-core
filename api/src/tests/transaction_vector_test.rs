@@ -210,7 +210,7 @@ fn sign_transaction(raw_txn: RawTransaction) -> serde_json::Value {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = Ed25519PublicKey::from(&private_key);
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
     let txn = SignedTransaction::new(raw_txn.clone(), public_key, signature);
 
     let mut raw_txn_json_out = Vec::new();

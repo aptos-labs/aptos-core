@@ -140,7 +140,7 @@ pub fn small_order_pk_with_adversarial_message(
             |(R, pk_point, msg)| {
                 let pk_bytes = pk_point.compress().to_bytes();
 
-                let msg_bytes = signing_message(msg);
+                let msg_bytes = signing_message(msg).unwrap();
 
                 let mut h: Sha512 = Sha512::new();
                 h.update(R.compress().as_bytes());

@@ -44,7 +44,7 @@ async fn test_proposal_generation_empty_tree() {
         .generate_proposal(1, &mut proposer_election, empty_callback())
         .await
         .unwrap();
-    let proposal = Block::new_proposal_from_block_data(proposal_data, &signer);
+    let proposal = Block::new_proposal_from_block_data(proposal_data, &signer).unwrap();
     assert_eq!(proposal.parent_id(), genesis.id());
     assert_eq!(proposal.round(), 1);
     assert_eq!(proposal.quorum_cert().certified_block().id(), genesis.id());

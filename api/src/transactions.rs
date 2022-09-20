@@ -1212,16 +1212,29 @@ impl TransactionsApi {
             })?;
 
         let raw_message = match request.secondary_signers {
-            Some(secondary_signer_addresses) => {
-                signing_message(&RawTransactionWithData::new_multi_agent(
+            Some(secondary_signer_addresses) => signing_message(
+                &RawTransactionWithData::new_multi_agent(
                     raw_txn,
                     secondary_signer_addresses
                         .into_iter()
                         .map(|v| v.into())
                         .collect(),
-                ))
-            }
-            None => raw_txn.signing_message(),
+                ),
+            )
+            .context("Invalid transaction to generate signing message")
+            .map_err(|err| {
+                BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
+            })?,
+            None => raw_txn
+                .signing_message()
+                .context("Invalid transaction to generate signing message")
+                .map_err(|err| {
+                    BasicError::bad_request_with_code(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                        &ledger_info,
+                    )
+                })?,
         };
 
         BasicResponse::try_from_json((

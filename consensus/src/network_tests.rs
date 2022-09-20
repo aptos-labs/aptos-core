@@ -623,7 +623,8 @@ mod tests {
                 previous_qc.clone(),
                 &signers[0],
                 Vec::new(),
-            ),
+            )
+            .unwrap(),
             SyncInfo::new(previous_qc.clone(), previous_qc, None),
         );
         timed_block_on(&mut runtime, async {
