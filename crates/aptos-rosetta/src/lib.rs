@@ -120,13 +120,16 @@ pub async fn bootstrap_async(
         );
     }
 
-    let api = WebServer::from(api_config);
+    let api = WebServer::from(api_config.clone());
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
         let rest_client = rest_client.map(Arc::new);
-        let block_cache = rest_client
-            .as_ref()
-            .map(|rest_client| Arc::new(BlockRetriever::new(rest_client.clone())));
+        let block_cache = rest_client.as_ref().map(|rest_client| {
+            Arc::new(BlockRetriever::new(
+                api_config.max_transactions_page_size,
+                rest_client.clone(),
+            ))
+        });
 
         let context = RosettaContext {
             rest_client: rest_client.clone(),

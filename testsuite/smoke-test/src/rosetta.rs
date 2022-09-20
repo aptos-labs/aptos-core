@@ -37,6 +37,7 @@ use forge::{LocalSwarm, Node, NodeExt, Swarm};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{future::Future, time::Duration};
 use tokio::{task::JoinHandle, time::Instant};
@@ -89,6 +90,92 @@ pub async fn setup_test(
         .unwrap();
 
     (swarm, cli, faucet, rosetta_client)
+}
+
+#[tokio::test]
+async fn test_block_transactions() {
+    const NUM_TXNS_PER_PAGE: u16 = 2;
+
+    let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            // Only one transaction will show up in a block no matter what
+            config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE;
+        }))
+        .build_with_cli(2)
+        .await;
+    let validator = swarm.validators().next().unwrap();
+
+    // And the client
+    let rosetta_port = get_available_port();
+    let rosetta_socket_addr = format!("127.0.0.1:{}", rosetta_port);
+    let rosetta_url = format!("http://{}", rosetta_socket_addr.clone())
+        .parse()
+        .unwrap();
+    let rosetta_client = RosettaClient::new(rosetta_url);
+    let api_config = ApiConfig {
+        enabled: true,
+        address: rosetta_socket_addr.parse().unwrap(),
+        tls_cert_path: None,
+        tls_key_path: None,
+        content_length_limit: None,
+        max_transactions_page_size: NUM_TXNS_PER_PAGE,
+        ..Default::default()
+    };
+
+    // Start the server
+    let _rosetta = aptos_rosetta::bootstrap_async(
+        swarm.chain_id(),
+        api_config,
+        Some(aptos_rest_client::Client::new(
+            validator.rest_api_endpoint(),
+        )),
+    )
+    .await
+    .unwrap();
+
+    // Ensure rosetta can take requests
+    try_until_ok_default(|| rosetta_client.network_list())
+        .await
+        .unwrap();
+
+    let account_1 = cli.account_id(0);
+    let chain_id = swarm.chain_id();
+
+    // At time 0, there should be 0 balance
+    let response = get_balance(&rosetta_client, chain_id, account_1, Some(0))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.block_identifier,
+        BlockIdentifier {
+            index: 0,
+            hash: BlockHash::new(chain_id, 0).to_string()
+        }
+    );
+
+    // First fund account 1 with lots more gas
+    cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 10))
+        .await
+        .unwrap();
+    let response = cli.transfer_coins(0, 1, 100, None).await.unwrap();
+
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let height = rest_client
+        .get_block_by_version_bcs(response.version, false)
+        .await
+        .unwrap()
+        .into_inner()
+        .block_height;
+
+    let response = rosetta_client
+        .block(&BlockRequest::by_index(swarm.chain_id(), height))
+        .await
+        .unwrap();
+
+    // There is only one user transaction, so the other one should be dropped
+    assert_eq!(1, response.block.transactions.len());
 }
 
 #[tokio::test]
