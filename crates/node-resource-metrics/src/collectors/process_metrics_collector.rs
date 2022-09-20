@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::collectors::common::{MeasureLatency, NAMESPACE};
 use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
@@ -11,6 +10,8 @@ use prometheus::{
 };
 use std::sync::Arc;
 use sysinfo::{ProcessExt, System, SystemExt};
+
+use super::common::NAMESPACE;
 
 const PROCESS_METRICS_COUNT: usize = 3;
 const PROCESS_SUBSYSTEM: &str = "process";
@@ -40,7 +41,7 @@ impl ProcessMetricsCollector {
     fn new() -> Self {
         let system = Arc::new(Mutex::new(System::new()));
 
-        let memory = Opts::new(MEMORY, "Total memory usage (rss) in bytes.")
+        let memory = Opts::new(MEMORY, "Memory usage in bytes.")
             .namespace(NAMESPACE)
             .subsystem(PROCESS_SUBSYSTEM)
             .describe()
@@ -112,8 +113,6 @@ impl Collector for ProcessMetricsCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let _measure = MeasureLatency::new("process".into());
-
         let mut system = self.system.lock();
 
         let pid = if let Ok(pid) = sysinfo::get_current_pid() {
@@ -184,7 +183,7 @@ mod tests {
     use prometheus::Registry;
 
     #[test]
-    fn test_process_collector_register() {
+    fn test_cpu_collector_register() {
         let collector = ProcessMetricsCollector::default();
 
         let r = Registry::new();
