@@ -361,8 +361,10 @@ export class AptosClient {
    * for simulation.
    * @param rawTransaction The raw transaction to be simulated, likely created
    * by calling the `generateTransaction` function.
-   * @param query?.estimateGasUnitPrice If set to true, the gas unit price in the transaction will be ignored and the estimated value will be used.
-   * @param query?.estimateMaxGasAmount If set to true, the max gas value in the transaction will be ignored and the maximum possible gas will be used.
+   * @param query?.estimateGasUnitPrice If set to true, the gas unit price in the
+   * transaction will be ignored and the estimated value will be used.
+   * @param query?.estimateMaxGasAmount If set to true, the max gas value in the
+   * transaction will be ignored and the maximum possible gas will be used.
    * @returns The BCS encoded signed transaction, which you should then provide
    *
    */
@@ -395,8 +397,10 @@ export class AptosClient {
    * Submits the BCS serialization of a signed transaction to the simulation endpoint.
    *
    * @param signedTxn The output of `generateBCSSimulation`.
-   * @param query?.estimateGasUnitPrice If set to true, the gas unit price in the transaction will be ignored and the estimated value will be used.
-   * @param query?.estimateMaxGasAmount If set to true, the max gas value in the transaction will be ignored and the maximum possible gas will be used.
+   * @param query?.estimateGasUnitPrice If set to true, the gas unit price in the
+   * transaction will be ignored and the estimated value will be used.
+   * @param query?.estimateMaxGasAmount If set to true, the max gas value in the
+   * transaction will be ignored and the maximum possible gas will be used.
    * @returns Simulation result in the form of UserTransaction.
    */
   async submitBCSSimulation(
