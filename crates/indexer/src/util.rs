@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::U64;
-use bigdecimal::{FromPrimitive, Signed, ToPrimitive, Zero};
-use diesel::data_types::PgNumeric;
+use bigdecimal::{BigDecimal, FromPrimitive, Signed, ToPrimitive, Zero};
 use serde_json::Value;
 use sha2::Digest;
 
@@ -18,17 +17,12 @@ pub fn u64_to_bigdecimal(val: u64) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::from_u64(val).expect("Unable to convert u64 to big decimal")
 }
 
-pub fn u64_to_pgnumeric(val: u64) -> PgNumeric {
-    let big_decimal = bigdecimal::BigDecimal::from_u64(val).expect("Unable to convert u64 to big decimal");
-    PgNumeric::try_from(big_decimal).expect("Unable to convert to PgNumeric")
-}
-
-pub fn ensure_not_negative(val: PgNumeric) -> PgNumeric {
+pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
     let big_decimal = val.try_into();
     if val.is_negative() {
         return bigdecimal::BigDecimal::zero();
     }
-    val
+    big_decimal.unwrap()
 }
 
 pub fn parse_timestamp(ts: U64, version: i64) -> chrono::NaiveDateTime {

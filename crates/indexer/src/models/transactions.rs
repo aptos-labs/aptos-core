@@ -15,8 +15,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::PgPoolConnection;
 use aptos_api_types::{Transaction as APITransaction, TransactionInfo};
+use bigdecimal::BigDecimal;
 use diesel::{
-    BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl, data_types::PgNumeric,
+    BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
 };
 
 use super::{
@@ -36,7 +37,7 @@ pub struct Transaction {
     pub state_change_hash: String,
     pub event_root_hash: String,
     pub state_checkpoint_hash: Option<String>,
-    pub gas_used: PgNumeric,
+    pub gas_used: BigDecimal,
     pub success: bool,
     pub vm_status: String,
     pub accumulator_root_hash: String,
