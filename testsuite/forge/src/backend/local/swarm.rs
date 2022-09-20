@@ -249,7 +249,7 @@ impl LocalSwarm {
             validator.start()?;
         }
 
-        self.wait_all_alive(Duration::from_secs(60)).await?;
+        self.wait_all_alive(Duration::from_secs(90)).await?;
         info!("Swarm launched successfully.");
         Ok(())
     }
@@ -265,7 +265,7 @@ impl LocalSwarm {
     }
 
     async fn wait_for_startup(&mut self) -> Result<()> {
-        let num_attempts = 30;
+        let num_attempts = 60;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
             info!("Wait for startup attempt: {} of {}", i, num_attempts);
