@@ -183,7 +183,19 @@ export class AptosClient {
     return txnBuilder.sign(rawTxn);
   }
 
-  /** Generates a BCS transaction that can be submitted to the chain for simulation. */
+  /**
+   * Note: Unless you have a specific reason for using this, it'll probably be simpler
+   * to use `simulateTransaction`.
+   *
+   * Generates a BCS transaction that can be submitted to the chain for simulation.
+   *
+   * @param accountFrom The account that will be used to send the transaction
+   * for simulation.
+   * @param rawTxn The raw transaction to be simulated, likely created by calling
+   * the `generateTransaction` function.
+   * @returns The BCS encoded signed transaction, which you should then pass into
+   * the `submitBCSSimulation` function.
+   */
   static generateBCSSimulation(accountFrom: AptosAccount, rawTxn: TxnBuilderTypes.RawTransaction): Uint8Array {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const txnBuilder = new TransactionBuilderEd25519((_signingMessage: TxnBuilderTypes.SigningMessage) => {
@@ -333,17 +345,31 @@ export class AptosClient {
     return this.submitSignedBCSTransaction(signedTxn);
   }
 
-  /** Submits a transaction with fake signature to the transaction simulation endpoint. */
+  /**
+   * Generates and submits a transaction to the transaction simulation
+   * endpoint. For this we generate a transaction with a fake signature.
+   *
+   * @param accountFrom The account that will be used to send the transaction
+   * for simulation.
+   * @param rawTransaction The raw transaction to be simulated, likely created
+   * by calling the `generateTransaction` function.
+   * @param query.start The start transaction version of the page. Default is the latest ledger version
+   * @param query?.limit The max number of transactions should be returned for the page. Default is 25
+   * @returns The BCS encoded signed transaction, which you should then provide
+   *
+   */
   async simulateTransaction(
     accountFrom: AptosAccount,
     rawTransaction: TxnBuilderTypes.RawTransaction,
+    query?: { estimateGasUnitPrice?: boolean; estimateMaxGasAmount?: boolean },
   ): Promise<Gen.UserTransaction[]> {
     const signedTxn = AptosClient.generateBCSSimulation(accountFrom, rawTransaction);
-    return this.submitBCSSimulation(signedTxn);
+    return this.submitBCSSimulation(signedTxn, query);
   }
 
   /**
    * Submits a signed transaction to the the endpoint that takes BCS payload
+   *
    * @param signedTxn A BCS transaction representation
    * @returns Transaction that is accepted and submitted to mempool
    */
@@ -358,14 +384,23 @@ export class AptosClient {
   }
 
   /**
-   * Submits a signed transaction to the the endpoint that takes BCS payload
-   * @param signedTxn output of generateBCSSimulation()
-   * @returns Simulation result in the form of UserTransaction
+   * Submits the BCS serialization of a signed transaction to the simulation endpoint.
+   *
+   * @param signedTxn The output of `generateBCSSimulation`.
+   * @returns Simulation result in the form of UserTransaction.
    */
-  async submitBCSSimulation(bcsBody: Uint8Array): Promise<Gen.UserTransaction[]> {
-    // Need to construct a customized post request for transactions in BCS payload
+  async submitBCSSimulation(
+    bcsBody: Uint8Array,
+    query?: { estimateGasUnitPrice?: boolean; estimateMaxGasAmount?: boolean },
+  ): Promise<Gen.UserTransaction[]> {
+    // Need to construct a customized post request for transactions in BCS payload.
+    const queryParams = {
+      estimate_gas_unit_price: query?.estimateGasUnitPrice ?? false,
+      estimate_max_gas_amount: query?.estimateMaxGasAmount ?? false,
+    };
     return this.client.request.request<Gen.UserTransaction[]>({
       url: "/transactions/simulate",
+      query: queryParams,
       method: "POST",
       body: bcsBody,
       mediaType: "application/x.aptos.signed_transaction+bcs",

@@ -255,7 +255,9 @@ test(
       arguments: [account2.address().hex(), 100000],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
-    const transactionRes = (await client.simulateTransaction(account1, txnRequest))[0];
+    const transactionRes = (
+      await client.simulateTransaction(account1, txnRequest, { estimateGasUnitPrice: true, estimateMaxGasAmount: true })
+    )[0];
     expect(parseInt(transactionRes.gas_used, 10) > 0);
     expect(transactionRes.success);
     const account2AptosCoin = transactionRes.changes.filter((change) => {
