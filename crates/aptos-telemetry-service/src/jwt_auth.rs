@@ -1,14 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::error;
 use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, errors::Error, Algorithm, Header, Validation};
-use warp::{
-    http::header::{HeaderMap, HeaderValue, AUTHORIZATION},
-    reject, Rejection,
-};
+use tracing::error;
+use warp::{reject, Rejection};
 
 use crate::{context::Context, types::auth::Claims};
 use crate::{error::ServiceError, types::common::NodeType};
@@ -80,18 +77,14 @@ pub async fn authorize_jwt(
     }
 }
 
-pub async fn jwt_from_header(headers: HeaderMap<HeaderValue>) -> anyhow::Result<String, Rejection> {
-    let header = match headers.get(AUTHORIZATION) {
+pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<String, Rejection> {
+    let auth_header = match auth_header {
         Some(v) => v,
         None => {
             return Err(reject::custom(ServiceError::unauthorized(
-                "no authorization header present",
+                "no/invalid authorization header",
             )))
         }
-    };
-    let auth_header = match std::str::from_utf8(header.as_bytes()) {
-        Ok(v) => v,
-        Err(_) => return Err(reject::reject()),
     };
     let auth_header = auth_header.split(',').next().unwrap_or_default();
     if !auth_header
@@ -119,43 +112,37 @@ mod tests {
 
     #[tokio::test]
     async fn jwt_from_header_valid_bearer() {
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "Bearer token".parse().unwrap());
-        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+        assert_eq!(
+            jwt_from_header(Some("Bearer token".into())).await.unwrap(),
+            "token"
+        );
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "bearer token".parse().unwrap());
-        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+        assert_eq!(
+            jwt_from_header(Some("bearer token".into())).await.unwrap(),
+            "token"
+        );
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "BEARER token".parse().unwrap());
-        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+        assert_eq!(
+            jwt_from_header(Some("BEARER token".into())).await.unwrap(),
+            "token"
+        );
     }
 
     #[tokio::test]
     async fn jwt_from_header_invalid_bearer() {
-        let headers = HeaderMap::new();
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(None).await;
         assert!(jwt.is_err());
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "Bear token".parse().unwrap());
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(Some("Bear token".into())).await;
         assert!(jwt.is_err());
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "".parse().unwrap());
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(Some("".into())).await;
         assert!(jwt.is_err());
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "Bear".parse().unwrap());
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(Some("Bear".into())).await;
         assert!(jwt.is_err());
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "BEARER: token".parse().unwrap());
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(Some("BEARER: token".into())).await;
         assert!(jwt.is_err());
     }
 
