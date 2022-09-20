@@ -59,6 +59,14 @@ export function useFundAccount() {
             queryKeys.getAccountCoinResources,
             address,
           ]),
+          queryClient.invalidateQueries([
+            queryKeys.getAccountResources,
+            address,
+          ]),
+          queryClient.invalidateQueries([
+            queryKeys.getActivity,
+            address,
+          ]),
         ]);
       }
     },

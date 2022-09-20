@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
+import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   Circle,
   HStack,
@@ -25,6 +27,7 @@ import { useActiveAccount } from 'core/hooks/useAccounts';
 import { formatCoinName } from 'core/hooks/useTransactionDetails';
 import { APTOS_UNIT, formatCoin } from 'core/utils/coin';
 import numeral from 'numeral';
+import { BsArrowCounterclockwise } from '@react-icons/all-files/bs/BsArrowCounterclockwise';
 
 type EntryFunctionPayload = Types.EntryFunctionPayload;
 type UserTransaction = Types.UserTransaction;
@@ -80,31 +83,85 @@ function useRelativeTime(ts: number, updateIntervalMs = 5000) {
   return value;
 }
 
+enum ActivityType {
+  CoinReceived,
+  CoinSent,
+  ToSelf,
+  Faucet,
+}
+
+interface TransactionDetails {
+  recipient: string,
+  sender: string
+}
+
+const activityDetailsMap = Object.freeze({
+  [ActivityType.CoinReceived]: {
+    amountColor: 'green.500',
+    amountPrefix: '+',
+    icon: <HiDownload />,
+    text: ({ sender }: TransactionDetails) => `From ${collapseHexString(sender, 8)}`,
+  },
+  [ActivityType.CoinSent]: {
+    amountColor: 'red.500',
+    amountPrefix: '-',
+    icon: <BsArrowUpRight />,
+    text: ({ recipient }: TransactionDetails) => `To ${collapseHexString(recipient, 8)}`,
+  },
+  [ActivityType.ToSelf]: {
+    amountColor: 'gray.500',
+    amountPrefix: '',
+    icon: <BsArrowCounterclockwise />,
+    text: () => 'Sent to self',
+  },
+  [ActivityType.Faucet]: {
+    amountColor: 'green.500',
+    amountPrefix: '+',
+    icon: <FontAwesomeIcon icon={faFaucet} />,
+    text: () => 'Funded with Faucet',
+  },
+} as const);
+
+function parseActivityType(activeAccountAddress: string, txn: Types.UserTransaction) {
+  const payload = txn.payload as EntryFunctionPayload;
+  const recipient = payload.arguments[0];
+  if (txn.sender === recipient) {
+    return ActivityType.ToSelf;
+  }
+  if (payload.function === '0x1::aptos_coin::mint') {
+    return ActivityType.Faucet;
+  }
+  if (txn.sender === activeAccountAddress) {
+    return ActivityType.CoinSent;
+  }
+  return ActivityType.CoinReceived;
+}
+
 interface ActivityItemProps {
   transaction: UserTransaction,
 }
 
-export function ActivityItem({ transaction }: ActivityItemProps) {
+export function TransactionListItem({ transaction }: ActivityItemProps) {
   const { colorMode } = useColorMode();
   const { aptosAccount } = useActiveAccount();
 
-  const typedPayload = transaction.payload as EntryFunctionPayload;
-  const [recipient, amount]: string[] = typedPayload.arguments;
-  const coinName = typedPayload.type_arguments[0]?.split('::').pop();
-  const formattedCoinName = useMemo(() => formatCoinName(coinName), [coinName]);
+  const payload = transaction.payload as EntryFunctionPayload;
+  const { sender } = transaction;
+  const [recipient, amount]: string[] = payload.arguments;
+  const coinName = payload.type_arguments[0]?.split('::').pop();
+  const formattedCoinName = formatCoinName(coinName);
 
   const myAddress = aptosAccount.address().toShortString();
-  const isSent = myAddress === transaction.sender;
-  const otherAddress = isSent ? recipient : transaction.sender;
+  const activityType = parseActivityType(myAddress, transaction);
+  const details = activityDetailsMap[activityType];
 
   const timestampMs = Number(transaction.timestamp) / 1000;
   const absDateTime = getAbsoluteDateTime(timestampMs);
   const relTime = useRelativeTime(timestampMs);
 
-  const isSentPrefix = isSent ? '-' : '+';
   const amountString = (formattedCoinName === APTOS_UNIT)
-    ? `${isSentPrefix}${formatCoin(BigInt(amount), { decimals: 8 })}`
-    : `${isSentPrefix}${numeral(amount).format('0,0')}`;
+    ? `${details.amountPrefix}${formatCoin(BigInt(amount), { decimals: 8 })}`
+    : `${details.amountPrefix}${numeral(amount).format('0,0')}`;
 
   return (
     <ChakraLink to={`/transactions/${transaction.version}`} w="100%">
@@ -121,17 +178,16 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
         }}
       >
         <Circle size={8} border="1px" borderColor="blue.400" color="blue.400">
-          { isSent ? <BsArrowUpRight /> : <HiDownload /> }
+          { details.icon }
         </Circle>
         <VStack flexGrow={1} alignItems="start" spacing={0.5}>
           <HStack w="100%" fontSize="sm">
             <Text flexGrow={1}>
-              { `${isSent ? 'To' : 'From'} ` }
-              { collapseHexString(otherAddress, 8) }
+              { details.text({ recipient, sender }) }
             </Text>
             <Text
               maxWidth="45%"
-              color={isSent ? 'red.500' : 'green.500'}
+              color={details.amountColor}
               fontWeight={500}
               whiteSpace="nowrap"
               overflow="hidden"
@@ -149,4 +205,4 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
   );
 }
 
-export default ActivityItem;
+export default TransactionListItem;

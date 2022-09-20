@@ -1,20 +1,25 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { ChevronRightIcon } from '@chakra-ui/icons';
 import {
-  Box,
+  Box, Button,
   Center,
   Grid, Heading, Text, useColorMode, VStack,
 } from '@chakra-ui/react';
+import React, { useMemo } from 'react';
 import AvatarImage from 'core/AvatarImage';
 import { assetSecondaryBgColor, secondaryBorderColor, secondaryTextColor } from 'core/colors';
+import ChakraLink from 'core/components/ChakraLink';
 import { aptosCoinStoreStructTag } from 'core/constants';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useAccountCoinResources } from 'core/queries/account';
+import useActivity from 'core/queries/useActivity';
 import { formatCoin } from 'core/utils/coin';
-import React, { useMemo } from 'react';
 import { AptosLogo } from './AptosLogo';
 import { TransactionList } from './TransactionList';
+import { Routes } from '../routes';
 
 const CoinType = {
   APTOS_TOKEN: aptosCoinStoreStructTag,
@@ -114,6 +119,9 @@ export default function WalletAssets() {
     },
   );
 
+  const activity = useActivity({ pageSize: 5 });
+  const transactions = useMemo(() => activity.data?.pages[0]?.txns, [activity.data]);
+
   return (
     <VStack width="100%" alignItems="flex-start" px={4}>
       <Heading
@@ -140,7 +148,26 @@ export default function WalletAssets() {
       >
         RECENT TRANSACTIONS
       </Heading>
-      <TransactionList limit={5} />
+      <Box w="100%">
+        <TransactionList isLoading={activity.isLoading} transactions={transactions} />
+        {
+          activity.hasNextPage
+            ? (
+              <ChakraLink key="View more" w="100%" to={Routes.activity.path}>
+                <Button
+                  mt={3}
+                  py={6}
+                  width="100%"
+                  rightIcon={<ChevronRightIcon />}
+                  justifyContent="space-between"
+                >
+                  View more
+                </Button>
+              </ChakraLink>
+            )
+            : null
+        }
+      </Box>
     </VStack>
   );
 }

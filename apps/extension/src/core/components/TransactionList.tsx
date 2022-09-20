@@ -1,10 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   Box,
-  Button,
   Center,
   Spinner,
   Text,
@@ -13,12 +12,7 @@ import {
 } from '@chakra-ui/react';
 import { Types } from 'aptos';
 import { secondaryBorderColor } from 'core/colors';
-import ActivityItem from 'core/components/ActivityItem';
-import { useActiveAccount } from 'core/hooks/useAccounts';
-import { useCoinTransferTransactions } from 'core/queries/transaction';
-import { ChevronRightIcon } from '@chakra-ui/icons';
-import ChakraLink from './ChakraLink';
-import { Routes } from '../routes';
+import TransactionListItem from 'core/components/TransactionListItem';
 
 function NoActivity() {
   const { colorMode } = useColorMode();
@@ -33,61 +27,24 @@ function NoActivity() {
 
 interface TransactionListProps {
   isLoading?: boolean,
-  limit?: number;
   transactions?: Types.UserTransaction[]
 }
 
 export function TransactionList({
   isLoading,
-  limit,
   transactions,
 }: TransactionListProps) {
-  const { activeAccountAddress } = useActiveAccount();
-  const {
-    data: hookTransactions,
-    isLoading: hookIsLoading,
-  } = useCoinTransferTransactions(activeAccountAddress, {
-    enabled: !transactions, refetchInterval: 5000,
-  });
-
-  const masterIsLoading = (isLoading) || hookIsLoading;
-  const sortedTxns = (transactions) || hookTransactions?.sort(
-    (a, b) => Number(b.version) - Number(a.version),
-  );
-
-  const children = useMemo(
-    () => {
-      if (!(sortedTxns && sortedTxns.length > 0)) {
-        return <NoActivity />;
-      }
-      let result = sortedTxns.map((t) => <ActivityItem key={t.hash} transaction={t} />);
-      const prevResultLength = result.length;
-
-      if (limit) {
-        result = result.slice(0, limit);
-        if (limit < prevResultLength) {
-          result.push((
-            <ChakraLink key="View more" width="100%" to={Routes.activity.path}>
-              <Button
-                py={6}
-                width="100%"
-                rightIcon={<ChevronRightIcon />}
-                justifyContent="space-between"
-              >
-                View more
-              </Button>
-            </ChakraLink>
-          ));
-        }
-      }
-      return result;
-    },
-    [limit, sortedTxns],
-  );
+  const hasTransactions = transactions !== undefined && transactions.length > 0;
 
   return (
     <VStack w="100%" spacing={3}>
-      { masterIsLoading ? <Spinner /> : children }
+      { (!isLoading && !hasTransactions) ? <NoActivity /> : null }
+      {
+        hasTransactions
+          ? transactions.map((t) => <TransactionListItem key={t.version} transaction={t} />)
+          : null
+      }
+      { isLoading ? <Spinner /> : null }
     </VStack>
   );
 }

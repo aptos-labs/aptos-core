@@ -7,61 +7,36 @@ import {
   Heading,
   VStack,
 } from '@chakra-ui/react';
-import React from 'react';
-import WalletLayout from 'core/layouts/WalletLayout';
+import React, { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { useCoinTransferTransactions } from 'core/queries/transaction';
-import { MaybeHexString, Types } from 'aptos';
+import { Types } from 'aptos';
 import GraceHopperBoringAvatar from 'core/components/BoringAvatar';
 import Copyable from 'core/components/Copyable';
-import { collapseHexString } from 'core/utils/hex';
+import NextPageLoader from 'core/components/NextPageLoader';
 import TransactionList from 'core/components/TransactionList';
-import { useActiveAccount } from 'core/hooks/useAccounts';
+import useActivity from 'core/queries/useActivity';
+import WalletLayout from 'core/layouts/WalletLayout';
+import { collapseHexString } from 'core/utils/hex';
 
 type UserTransaction = Types.UserTransaction;
 type EntryFunctionPayload = Types.EntryFunctionPayload;
 
-function filterByRecipient(recipient: MaybeHexString) {
-  return (txn: UserTransaction) => {
-    const payload = txn.payload as EntryFunctionPayload;
-    return (payload.arguments[0] as string) === recipient;
-  };
-}
-
-function sortTxnsByVersionDescending(lhs: UserTransaction, rhs: UserTransaction) {
-  return Number(rhs.version) - Number(lhs.version);
-}
-
-function useOtherAccountTransactions(theirAddress: string) {
-  const { aptosAccount } = useActiveAccount();
-  const myAddress = aptosAccount.address().toShortString();
-
-  // TODO: manage paging (waiting for indexer)
-  const {
-    data: myTxns,
-    isFetching: areMyTxnsFetching,
-  } = useCoinTransferTransactions(myAddress);
-  const {
-    data: theirTxns,
-    isFetching: areTheirTxnsFetching,
-  } = useCoinTransferTransactions(theirAddress);
-
-  if (!myTxns || !theirTxns || areMyTxnsFetching || areTheirTxnsFetching) {
-    return undefined;
-  }
-
-  const myTxnsToThem = myTxns.filter(filterByRecipient(theirAddress));
-  const theirTxnsToMe = theirTxns.filter(filterByRecipient(myAddress));
-
-  return myTxnsToThem
-    .concat(theirTxnsToMe)
-    .sort(sortTxnsByVersionDescending)
-    .map((t) => ({ isSent: t.sender === myAddress, ...t }));
+function txnParties(txn: UserTransaction) {
+  const payload = txn.payload as EntryFunctionPayload;
+  const recipient = payload.arguments[0];
+  return [txn.sender, recipient];
 }
 
 function Account() {
   const { address } = useParams();
-  const transactions = useOtherAccountTransactions(address!);
+  const activity = useActivity();
+
+  const transactions = useMemo(
+    () => activity.data?.pages
+      .flatMap((page) => page.txns)
+      .filter((txn) => txnParties(txn).includes(address)),
+    [activity.data, address],
+  );
 
   return (
     <WalletLayout title="Account" showBackButton>
@@ -76,7 +51,11 @@ function Account() {
         </Heading>
         <Divider />
         <Heading fontSize="lg">Between you</Heading>
-        <TransactionList transactions={transactions} />
+        <TransactionList
+          isLoading={activity.isLoading || activity.isFetchingNextPage}
+          transactions={transactions}
+        />
+        <NextPageLoader query={activity} />
       </VStack>
     </WalletLayout>
   );

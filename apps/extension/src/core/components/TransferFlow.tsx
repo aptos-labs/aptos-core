@@ -4,13 +4,15 @@
 import {
   Button,
 } from '@chakra-ui/react';
-import React from 'react';
 import { IoIosSend } from '@react-icons/all-files/io/IoIosSend';
+import React from 'react';
+import { SubmitHandler } from 'react-hook-form';
+import { useQueryClient } from 'react-query';
+import { transferAptFormId, TransferFlowProvider, useTransferFlow } from 'core/hooks/useTransferFlow';
 import {
   useCoinTransferTransaction,
 } from 'core/mutations/transaction';
-import { transferAptFormId, TransferFlowProvider, useTransferFlow } from 'core/hooks/useTransferFlow';
-import { SubmitHandler } from 'react-hook-form';
+import queryKeys from 'core/queries/queryKeys';
 import { coinTransferAbortToast, coinTransferSuccessToast, transactionErrorToast } from './Toast';
 import TransferDrawer from './TransferDrawer';
 
@@ -52,6 +54,7 @@ function TransferFlow() {
     formMethods,
     validRecipientAddress,
   } = useTransferFlow();
+  const queryClient = useQueryClient();
 
   const { handleSubmit, reset: resetForm } = formMethods;
 
@@ -83,6 +86,12 @@ function TransferFlow() {
     } catch (err) {
       transactionErrorToast(err);
     }
+
+    Promise.all([
+      queryClient.invalidateQueries(queryKeys.getAccountOctaCoinBalance),
+      queryClient.invalidateQueries(queryKeys.getAccountResources),
+      queryClient.invalidateQueries(queryKeys.getActivity),
+    ]);
   };
 
   return (
