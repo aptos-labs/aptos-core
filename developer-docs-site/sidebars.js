@@ -84,10 +84,7 @@ const sidebars = {
           link: { type: "doc", id: "guides/move-guides/index" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "guides/move-guides/move-on-aptos",
-            "guides/move-guides/upgrading-move-code",
-          ],
+          items: ["guides/move-guides/move-on-aptos", "guides/move-guides/upgrading-move-code"],
         },
       ],
     },

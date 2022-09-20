@@ -23,7 +23,8 @@ use std::{convert::TryInto, fmt};
 
 /// const for max number of ed25519 keys allowed for multi-ed25519 keys
 pub const MAX_NUM_OF_KEYS: usize = 32;
-const BITMAP_NUM_OF_BYTES: usize = 4;
+/// Number of bytes used for the bitmap in a MultiEd25519 private key
+pub const BITMAP_NUM_OF_BYTES: usize = 4;
 
 /// Vector of private keys in the multi-key Ed25519 structure along with the threshold.
 #[derive(DeserializeKey, Eq, PartialEq, SilentDisplay, SilentDebug, SerializeKey)]

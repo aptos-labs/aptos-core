@@ -7,7 +7,7 @@ pub mod victoria_metrics_api {
 
     use anyhow::{anyhow, Result};
 
-    use reqwest::Client as ReqwestClient;
+    use reqwest::{header::CONTENT_ENCODING, Client as ReqwestClient};
     use url::Url;
     use warp::hyper::body::Bytes;
 
@@ -31,6 +31,7 @@ pub mod victoria_metrics_api {
             &self,
             raw_metrics_body: Bytes,
             extra_labels: Vec<String>,
+            encoding: String,
         ) -> Result<reqwest::Response, anyhow::Error> {
             let labels: Vec<(String, String)> = extra_labels
                 .iter()
@@ -40,7 +41,7 @@ pub mod victoria_metrics_api {
             self.inner
                 .post(format!("{}api/v1/import/prometheus", self.base_url))
                 .bearer_auth(self.auth_token.clone())
-                .header("Content-Encoding", "gzip")
+                .header(CONTENT_ENCODING, encoding)
                 .query(&labels)
                 .body(raw_metrics_body)
                 .send()
