@@ -302,6 +302,7 @@ async fn create_employee_vesting_accounts_file(
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1,
                 ],
                 vesting_schedule_denominator: 48,
+                beneficiary_resetter: admin_address,
             }
         })
         .collect();
