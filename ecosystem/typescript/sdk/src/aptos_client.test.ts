@@ -477,3 +477,26 @@ test(
   },
   30 * 1000,
 );
+
+test(
+  "gets block by height",
+  async () => {
+    const blockHeight = 100;
+    const client = new AptosClient(NODE_URL);
+    const block = await client.getBlockByHeight(blockHeight);
+    expect(block.block_height).toBe(blockHeight.toString());
+  },
+  30 * 1000,
+);
+
+test(
+  "gets block by version",
+  async () => {
+    const version = 100;
+    const client = new AptosClient(NODE_URL);
+    const block = await client.getBlockByVersion(version);
+    expect(parseInt(block.first_version, 10)).toBeLessThanOrEqual(version);
+    expect(parseInt(block.last_version, 10)).toBeGreaterThanOrEqual(version);
+  },
+  30 * 1000,
+);
