@@ -815,7 +815,7 @@ impl RoundManager {
             VoteReceptionResult::VoteAdded(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),
-            e @ _ => Err(anyhow::anyhow!("{:?}", e)),
+            e => Err(anyhow::anyhow!("{:?}", e)),
         }
     }
 
