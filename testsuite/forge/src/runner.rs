@@ -92,7 +92,7 @@ impl Default for Format {
 }
 
 pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
-    let forge = Forge::new(options, tests, Duration::from_secs(300), factory);
+    let forge = Forge::new(options, tests, Duration::from_secs(30), factory);
 
     if options.list {
         forge.list()?;
@@ -239,7 +239,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
         let forge_run_mode =
             std::env::var("FORGE_RUNNER_MODE").unwrap_or_else(|_| "k8s".to_string());
         let success_criteria = if forge_run_mode.eq("local") {
-            SuccessCriteria::new(600, 60000, true, None, None)
+            SuccessCriteria::new(600, 60000, true, None, None, None)
         } else {
             SuccessCriteria::new(
                 3500,
@@ -252,6 +252,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 )),
+                None,
             )
         };
         Self {

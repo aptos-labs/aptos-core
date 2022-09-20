@@ -48,19 +48,33 @@ groups:
       severity: error
       summary: "Mempool has no active upstream peers (unable to forward transactions to anyone!)"
     annotations:
-  - alert: Mempool is at >80% capacity
-    expr: aptos_core_mempool_index_size{index="system_ttl"} > 800000 # assumes default mempool size 1_000_000
+  - alert: Mempool is at >80% capacity (count)
+    expr: aptos_core_mempool_index_size{index="system_ttl"} > 1600000 # assumes default mempool size 2_000_000
     for: 5m
     labels:
       severity: warning
-      summary: "Mempool is at >80% capacity (it may soon become full!)"
+      summary: "Mempool count is at >80% capacity (it may soon become full!)"
     annotations:
-  - alert: Mempool is growing at a significant rate
-    expr: rate(aptos_core_mempool_index_size{index="system_ttl"}[1m]) > 30000
+  - alert: Mempool is at >80% capacity (bytes)
+    expr: aptos_core_mempool_index_size{index="size_bytes"} > 1717986918 # assumes default mempool size 2 * 1024 * 1024 * 1024
+    for: 5m
+    labels:
+      severity: warning
+      summary: "Mempool bytes is at >80% capacity (it may soon become full!)"
+    annotations:
+  - alert: Mempool is growing at a significant rate (count)
+    expr: rate(aptos_core_mempool_index_size{index="system_ttl"}[1m]) > 60000 # 3% growth per minute - assumes default mempool size 2_000_000
     for: 10m
     labels:
       severity: warning
-      summary: "Mempool is growing at a significant rate (it may soon become full!)"
+      summary: "Mempool count is growing at a significant rate (it may soon become full!)"
+    annotations:
+  - alert: Mempool is growing at a significant rate (bytes)
+    expr: rate(aptos_core_mempool_index_size{index="size_bytes"}[1m]) > 64424509 # 3% growth per minute - assumes default mempool size 2 * 1024 * 1024 * 1024
+    for: 10m
+    labels:
+      severity: warning
+      summary: "Mempool bytes is growing at a significant rate (it may soon become full!)"
     annotations:
 
   # Networking alerts

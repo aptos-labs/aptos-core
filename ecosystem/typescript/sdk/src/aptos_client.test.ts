@@ -255,7 +255,9 @@ test(
       arguments: [account2.address().hex(), 100000],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
-    const transactionRes = (await client.simulateTransaction(account1, txnRequest))[0];
+    const transactionRes = (
+      await client.simulateTransaction(account1, txnRequest, { estimateGasUnitPrice: true, estimateMaxGasAmount: true })
+    )[0];
     expect(parseInt(transactionRes.gas_used, 10) > 0);
     expect(transactionRes.success);
     const account2AptosCoin = transactionRes.changes.filter((change) => {
@@ -474,6 +476,29 @@ test(
     expect(HexString.fromUint8Array(bcsToBytes(origAddress)).hex()).toBe(
       HexString.fromUint8Array(bcsToBytes(aliceAddress)).hex(),
     );
+  },
+  30 * 1000,
+);
+
+test(
+  "gets block by height",
+  async () => {
+    const blockHeight = 100;
+    const client = new AptosClient(NODE_URL);
+    const block = await client.getBlockByHeight(blockHeight);
+    expect(block.block_height).toBe(blockHeight.toString());
+  },
+  30 * 1000,
+);
+
+test(
+  "gets block by version",
+  async () => {
+    const version = 100;
+    const client = new AptosClient(NODE_URL);
+    const block = await client.getBlockByVersion(version);
+    expect(parseInt(block.first_version, 10)).toBeLessThanOrEqual(version);
+    expect(parseInt(block.last_version, 10)).toBeGreaterThanOrEqual(version);
   },
   30 * 1000,
 );
