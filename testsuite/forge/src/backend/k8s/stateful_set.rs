@@ -278,7 +278,7 @@ pub async fn get_identity(sts_name: &str, kube_namespace: &str) -> Result<String
         .unwrap()
         .secret_name
         .unwrap();
-    Ok(secret_name.clone())
+    Ok(secret_name)
 }
 
 pub async fn check_for_container_restart(
