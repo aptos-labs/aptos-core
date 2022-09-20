@@ -131,6 +131,14 @@ impl QuorumStoreWrapper {
             "QS: remaining txns from last time len: {:?}",
             self.pulled_transactions.len()
         );
+        if pulled_txns.is_empty() {
+            counters::PULLED_EMPTY_TXNS_COUNT.inc();
+        } else {
+            counters::PULLED_TXNS_COUNT.inc();
+        }
+        if !self.pulled_transactions.is_empty() {
+            counters::PULLED_LEFTOVER_TXNS_COUNT.inc();
+        }
 
         // Add the pulled txns from last time
         let all_txns = [pulled_txns, self.pulled_transactions.clone()].concat();

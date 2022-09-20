@@ -73,6 +73,29 @@ pub static NUM_TXN_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
 
 /// Counters
 
+/// Count of the pulled txns.
+pub static PULLED_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!("quorum_store_pulled_txn_count", "Count of the pulled txns.").unwrap()
+});
+
+/// Count of the pulled empty txns.
+pub static PULLED_EMPTY_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_pulled_empty_txn_count",
+        "Count of the pulled empty txns."
+    )
+    .unwrap()
+});
+
+/// Count of the pulled txns that are leftover.
+pub static PULLED_LEFTOVER_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_pulled_leftover_txn_count",
+        "Count of the pulled leftover txns."
+    )
+    .unwrap()
+});
+
 /// Count of the created batches since last restart.
 pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
