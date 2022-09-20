@@ -51,7 +51,7 @@ use rand::rngs::StdRng;
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 100_000_000_000;
 const SEND_AMOUNT: u64 = 1;
-const GAS_AMOUNT: u64 = 1000;
+const GAS_AMOUNT: u64 = aptos_global_constants::MAX_GAS_AMOUNT;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -561,7 +561,7 @@ impl TxnEmitter {
         receiver: &AccountAddress,
         num_coins: u64,
     ) -> Result<Instant> {
-        let txn = gen_transfer_txn_request(sender, receiver, num_coins, &self.txn_factory, 1);
+        let txn = gen_transfer_txn_request(sender, receiver, num_coins, &self.txn_factory);
         client.submit(&txn).await?;
         let deadline = Instant::now() + Duration::from_secs(txn.expiration_timestamp_secs() + 30);
         Ok(deadline)
@@ -724,11 +724,8 @@ pub fn gen_transfer_txn_request(
     receiver: &AccountAddress,
     num_coins: u64,
     txn_factory: &TransactionFactory,
-    gas_price: u64,
 ) -> SignedTransaction {
     sender.sign_with_transaction_builder(
-        txn_factory
-            .payload(aptos_stdlib::aptos_coin_transfer(*receiver, num_coins))
-            .gas_unit_price(gas_price),
+        txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*receiver, num_coins)),
     )
 }

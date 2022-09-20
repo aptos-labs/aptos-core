@@ -42,13 +42,13 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
 
   // Derive the multisig account address and fund the address with 5000 AptosCoin.
   const mutisigAccountAddress = authKey.derivedAddress();
-  await faucetClient.fundAccount(mutisigAccountAddress, 100000);
+  await faucetClient.fundAccount(mutisigAccountAddress, 100_000_000);
 
   let resources = await client.getAccountResources(mutisigAccountAddress);
   let accountResource = resources.find((r) => r.type === aptosCoinStore);
   let balance = parseInt((accountResource?.data as any).coin.value);
-  assert(balance === 100000);
-  console.log(`multisig account coins: ${balance}. Should be 100000!`);
+  assert(balance === 100_000_000);
+  console.log(`multisig account coins: ${balance}. Should be 100_000_000!`);
 
   const account4 = new AptosAccount();
   // Creates a receiver account and fund the account with 0 AptosCoin
@@ -89,9 +89,9 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
     BigInt(sequenceNumber),
     entryFunctionPayload,
     // Max gas unit to spend
-    BigInt(2000),
+    BigInt(10000),
     // Gas price per unit
-    BigInt(1),
+    BigInt(100),
     // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.
     BigInt(Math.floor(Date.now() / 1000) + 10),
     new TxnBuilderTypes.ChainId(chainId),
