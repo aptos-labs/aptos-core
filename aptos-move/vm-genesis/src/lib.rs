@@ -977,7 +977,7 @@ pub fn test_mainnet_end_to_end() {
                 validator_commission_percentage: 10,
                 join_during_genesis: true,
             },
-            vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
+            vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
             vesting_schedule_denominator: 48,
         },
         EmployeeAccountMap {
@@ -987,7 +987,7 @@ pub fn test_mainnet_end_to_end() {
                 validator_commission_percentage: 10,
                 join_during_genesis: false,
             },
-            vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
+            vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
             vesting_schedule_denominator: 48,
         },
     ];
