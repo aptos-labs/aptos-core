@@ -1,7 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { ApiError, AptosClient, MaybeHexString } from 'aptos';
+import {
+  ApiError,
+  AptosClient,
+  MaybeHexString,
+} from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
 import {
   aptosCoinStoreStructTag,
@@ -25,31 +29,6 @@ export const accountQueryKeys = Object.freeze({
 } as const);
 
 // ------------------------------------------------------------------------- //
-export interface GetAccountResourcesProps {
-  address?: MaybeHexString;
-  nodeUrl: string;
-}
-
-export const getAccountResources = async ({
-  address,
-  nodeUrl,
-}: GetAccountResourcesProps) => {
-  const client = new AptosClient(nodeUrl);
-  return (address) ? (client.getAccountResources(address)) : undefined;
-};
-
-export const getAccountExists = async ({
-  address,
-  nodeUrl,
-}: GetAccountResourcesProps) => {
-  const client = new AptosClient(nodeUrl);
-  try {
-    const account = await client.getAccount(address!);
-    return !!(account);
-  } catch (err) {
-    return false;
-  }
-};
 
 interface UseAccountExistsProps {
   address?: MaybeHexString;

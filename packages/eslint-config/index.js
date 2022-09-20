@@ -34,6 +34,8 @@ module.exports = {
     "react-hooks/rules-of-hooks": "error",
     "sort-destructure-keys/sort-destructure-keys": 2,
     "sort-keys-fix/sort-keys-fix": "warn",
-    "sort-keys": ["error", "asc", { caseSensitive: true, minKeys: 2, natural: false }]
+    "sort-keys": ["error", "asc", { caseSensitive: true, minKeys: 2, natural: false }],
+    // Replacing airbnb rule with following, to re-enable "ForOfStatement"
+    "no-restricted-syntax": ["error", "ForInStatement", "LabeledStatement", "WithStatement"]
   }
 }
