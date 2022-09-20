@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import sha3 from "js-sha3";
+import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import {
   Ed25519PublicKey,
   Ed25519Signature,
@@ -31,9 +31,7 @@ import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder
 import * as Gen from "../generated/index";
 import { MemoizeExpiring } from "../utils";
 
-export { TypeTagParser } from "./builder_utils.js";
-
-const { sha3_256: sha3Hash } = sha3;
+export { TypeTagParser } from "./builder_utils";
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
@@ -78,7 +76,7 @@ export class TransactionBuilder<F extends SigningFn> {
       throw new Error("Unknown transaction type.");
     }
 
-    const prefix = new Uint8Array(hash.arrayBuffer());
+    const prefix = hash.digest();
 
     const body = bcsToBytes(rawTxn);
 

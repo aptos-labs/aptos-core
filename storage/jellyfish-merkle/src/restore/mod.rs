@@ -731,9 +731,7 @@ where
         }
     }
 
-    /// Finishes the restoration process. This tells the code that there is no more account,
-    /// otherwise we can not freeze the rightmost leaf and its ancestors.
-    pub fn finish_impl(mut self) -> Result<()> {
+    pub fn wait_for_async_commit(&self) -> Result<()> {
         if let Some((tx, rx)) = &self.async_commit_channel {
             // wait for the last commit to complete
             rx.recv()??;
@@ -742,6 +740,13 @@ where
             tx.try_send(Ok(()))
                 .expect("Always only one commit can be scheduled.");
         }
+        Ok(())
+    }
+
+    /// Finishes the restoration process. This tells the code that there is no more account,
+    /// otherwise we can not freeze the rightmost leaf and its ancestors.
+    pub fn finish_impl(mut self) -> Result<()> {
+        self.wait_for_async_commit()?;
         // Deal with the special case when the entire tree has a single leaf or null node.
         if self.partial_nodes.len() == 1 {
             let mut num_children = 0;

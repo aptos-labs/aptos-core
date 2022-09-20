@@ -161,12 +161,18 @@ impl EventsApi {
         /// If unspecified, defaults to default page size
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
-        event_handle.0.verify(0).map_err(|err| {
-            BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
-        })?;
-        verify_field_identifier(field_name.as_str()).map_err(|err| {
-            BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
-        })?;
+        event_handle
+            .0
+            .verify(0)
+            .context("'event_handle' invalid")
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+            })?;
+        verify_field_identifier(field_name.as_str())
+            .context("'field_name' invalid")
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+            })?;
         fail_point_poem("endpoint_get_events_by_event_handle")?;
         self.context
             .check_api_output_enabled("Get events by event handle", &accept_type)?;
