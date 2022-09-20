@@ -291,9 +291,14 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
-        data.verify().map_err(|err| {
-            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
-        })?;
+        data.verify()
+            .context("Submitted transaction invalid'")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code_no_info(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                )
+            })?;
         fail_point_poem("endpoint_submit_transaction")?;
         self.context
             .check_api_output_enabled("Submit transaction", &accept_type)?;
@@ -339,9 +344,14 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionsBatchPost,
     ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
-        data.verify().map_err(|err| {
-            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
-        })?;
+        data.verify()
+            .context("Submitted transactions invalid")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code_no_info(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                )
+            })?;
         fail_point_poem("endpoint_submit_batch_transactions")?;
         self.context
             .check_api_output_enabled("Submit batch transactions", &accept_type)?;
@@ -395,9 +405,14 @@ impl TransactionsApi {
         estimate_gas_unit_price: Query<Option<bool>>,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
-        data.verify().map_err(|err| {
-            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
-        })?;
+        data.verify()
+            .context("Simulated transaction invalid")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code_no_info(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                )
+            })?;
         fail_point_poem("endpoint_simulate_transaction")?;
         self.context
             .check_api_output_enabled("Simulate transaction", &accept_type)?;
@@ -516,9 +531,12 @@ impl TransactionsApi {
         data: Json<EncodeSubmissionRequest>,
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
-        data.0.verify().map_err(|err| {
-            BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
-        })?;
+        data.0
+            .verify()
+            .context("'UserTransactionRequest' invalid")
+            .map_err(|err| {
+                BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+            })?;
         fail_point_poem("endpoint_encode_submission")?;
         self.context
             .check_api_output_enabled("Encode submission", &accept_type)?;
@@ -800,34 +818,36 @@ impl TransactionsApi {
                 // Verify the signed transaction
                 match signed_transaction.payload() {
                     TransactionPayload::EntryFunction(entry_function) => {
-                        verify_module_identifier(entry_function.module().name().as_str()).map_err(
-                            |err| {
-                                SubmitTransactionError::bad_request_with_code(
-                                    err,
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                )
-                            },
-                        )?;
-
-                        verify_function_identifier(entry_function.function().as_str()).map_err(
-                            |err| {
-                                SubmitTransactionError::bad_request_with_code(
-                                    err,
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                )
-                            },
-                        )?;
-                        for arg in entry_function.ty_args() {
-                            let arg: MoveType = arg.into();
-                            arg.verify(0).map_err(|err| {
+                        verify_module_identifier(entry_function.module().name().as_str())
+                            .context("Transaction entry function module invalid")
+                            .map_err(|err| {
                                 SubmitTransactionError::bad_request_with_code(
                                     err,
                                     AptosErrorCode::InvalidInput,
                                     ledger_info,
                                 )
                             })?;
+
+                        verify_function_identifier(entry_function.function().as_str())
+                            .context("Transaction entry function name invalid")
+                            .map_err(|err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            })?;
+                        for arg in entry_function.ty_args() {
+                            let arg: MoveType = arg.into();
+                            arg.verify(0)
+                                .context("Transaction entry function type arg invalid")
+                                .map_err(|err| {
+                                    SubmitTransactionError::bad_request_with_code(
+                                        err,
+                                        AptosErrorCode::InvalidInput,
+                                        ledger_info,
+                                    )
+                                })?;
                         }
                     }
                     TransactionPayload::Script(script) => {
@@ -841,13 +861,15 @@ impl TransactionsApi {
 
                         for arg in script.ty_args() {
                             let arg = MoveType::from(arg);
-                            arg.verify(0).map_err(|err| {
-                                SubmitTransactionError::bad_request_with_code(
-                                    err,
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                )
-                            })?;
+                            arg.verify(0)
+                                .context("Transaction script function type arg invalid")
+                                .map_err(|err| {
+                                    SubmitTransactionError::bad_request_with_code(
+                                        err,
+                                        AptosErrorCode::InvalidInput,
+                                        ledger_info,
+                                    )
+                                })?;
                         }
                     }
                     TransactionPayload::ModuleBundle(_) => {}
