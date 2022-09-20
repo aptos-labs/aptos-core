@@ -298,9 +298,7 @@ async fn create_employee_vesting_accounts_file(
                     validator_commission_percentage: 10,
                     join_during_genesis: join_during_genesis[index],
                 },
-                vesting_schedule_numerators: vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1,
-                ],
+                vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
                 vesting_schedule_denominator: 48,
             }
         })
