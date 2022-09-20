@@ -6,8 +6,11 @@ use crate::{
     pending_votes::{PendingVotes, VoteReceptionResult},
     util::time_service::{SendTask, TimeService},
 };
+use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
-use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::{
+    ledger_info::LedgerInfoWithPartialSignatures, validator_verifier::ValidatorVerifier,
+};
 use consensus_types::{common::Round, sync_info::SyncInfo, vote::Vote};
 use futures::future::AbortHandle;
 use serde::Serialize;
@@ -38,6 +41,8 @@ pub struct NewRoundEvent {
     pub round: Round,
     pub reason: NewRoundReason,
     pub timeout: Duration,
+    pub prev_round: Round,
+    pub prev_round_votes: Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
 }
 
 impl fmt::Display for NewRoundEvent {
@@ -45,7 +50,7 @@ impl fmt::Display for NewRoundEvent {
         write!(
             f,
             "NewRoundEvent: [round: {}, reason: {}, timeout: {:?}]",
-            self.round, self.reason, self.timeout
+            self.round, self.reason, self.timeout,
         )
     }
 }
@@ -235,7 +240,8 @@ impl RoundState {
         }
         let new_round = sync_info.highest_round() + 1;
         if new_round > self.current_round {
-            self.pending_votes.log_voting_power_if_proposer();
+            let prev_round = self.current_round;
+            let prev_round_votes = self.pending_votes.drain_votes();
 
             // Start a new round.
             self.current_round = new_round;
@@ -253,6 +259,8 @@ impl RoundState {
                 round: self.current_round,
                 reason: new_round_reason,
                 timeout,
+                prev_round,
+                prev_round_votes,
             };
             info!(round = new_round, "Starting new round: {}", new_round_event);
             return Some(new_round_event);

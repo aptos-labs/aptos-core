@@ -2,11 +2,63 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_gauge, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge, Gauge, Histogram,
-    HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    op_counters::DurationHistogram, register_counter, register_gauge, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    Counter, Gauge, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
+
+// Simpler to Histogram - allows rate and average, without percentiles
+/// Track occurrences of an event via two counters, cumulative sum and count.
+/// Allows for having average metric
+pub struct Occurrences {
+    /// sum counter
+    sum: Counter,
+    // count counter
+    count: IntCounter,
+}
+
+impl Occurrences {
+    /// Register new occurrence counters
+    pub fn new(name: &str, desc: &str) -> Self {
+        Self {
+            sum: register_counter!(format!("{}_sum", name), desc).unwrap(),
+            count: register_int_counter!(format!("{}_count", name), desc).unwrap(),
+        }
+    }
+
+    /// record event occurrence
+    pub fn record(&self, value: f64) {
+        self.sum.inc_by(value);
+        self.count.inc();
+    }
+}
+
+// Simpler to Histogram - allows rate and average, without percentiles
+/// Track occurences of an event via two counters, cumulative sum and count.
+/// Allows for having average metric
+pub struct IntOccurrences {
+    /// sum counter
+    sum: IntCounter,
+    // count counter
+    count: IntCounter,
+}
+
+impl IntOccurrences {
+    /// Register new occurrence counters
+    pub fn new(name: &str, desc: &str) -> Self {
+        Self {
+            sum: register_int_counter!(format!("{}_sum", name), desc).unwrap(),
+            count: register_int_counter!(format!("{}_count", name), desc).unwrap(),
+        }
+    }
+
+    /// record event occurrence
+    pub fn record(&self, value: u64) {
+        self.sum.inc_by(value);
+        self.count.inc();
+    }
+}
 
 //////////////////////
 // HEALTH COUNTERS
@@ -82,41 +134,37 @@ pub static VOTE_NIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// Total voting power of all votes collected for the last round this node was proposer
-pub static COLLECTED_VOTING_POWER_FOR_LAST_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
-    register_gauge!(
-        "aptos_collected_voting_power_for_last_proposal",
-        "Total voting power of all votes collected for the last round this node was proposer",
+pub static COLLECTED_VOTING_POWER_FOR_PROPOSAL: Lazy<Occurrences> = Lazy::new(|| {
+    Occurrences::new(
+        "aptos_collected_voting_power_for_proposal",
+        "Total voting power of all votes collected for the round this node was proposer",
     )
-    .unwrap()
 });
 
 /// Total number of votes collected for the last round this node was proposer
-pub static COLLECTED_VOTES_FOR_LAST_PROPOSAL: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "aptos_collected_votes_for_last_proposal",
-        "Total number of votes collected for the last round this node was proposer",
+pub static COLLECTED_VOTES_FOR_PROPOSAL: Lazy<IntOccurrences> = Lazy::new(|| {
+    IntOccurrences::new(
+        "aptos_collected_votes_for_proposal",
+        "Total number of votes collected for the round this node was proposer",
     )
-    .unwrap()
 });
 
 /// Total voting power of all votes collected for the last round this node was proposer
-pub static COLLECTED_VOTING_POWER_FOR_LAST_PROPOSAL_INCLUDING_CONFLICTS: Lazy<Gauge> =
+pub static COLLECTED_VOTING_POWER_FOR_PROPOSAL_INCLUDING_CONFLICTS: Lazy<Occurrences> =
     Lazy::new(|| {
-        register_gauge!(
-            "aptos_collected_voting_power_for_last_proposal_including_conflicts",
-            "Total voting power of all votes collected for the last round this node was proposer",
+        Occurrences::new(
+            "aptos_collected_voting_power_for_proposal_including_conflicts",
+            "Total voting power of all votes collected for the round this node was proposer",
         )
-        .unwrap()
     });
 
 /// Total number of votes collected for the last round this node was proposer
-pub static COLLECTED_VOTES_FOR_LAST_PROPOSAL_INCLUDING_CONFLICTS: Lazy<IntGauge> =
+pub static COLLECTED_VOTES_FOR_PROPOSAL_INCLUDING_CONFLICTS: Lazy<IntOccurrences> =
     Lazy::new(|| {
-        register_int_gauge!(
+        IntOccurrences::new(
             "aptos_collected_votes_for_last_proposal_including_conflicts",
-            "Total number of votes collected for the last round this node was proposer",
+            "Total number of votes collected for the round this node was proposer",
         )
-        .unwrap()
     });
 
 /// Committed proposals map when using LeaderReputation as the ProposerElection

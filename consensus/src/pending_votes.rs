@@ -24,12 +24,6 @@ use std::{
     sync::Arc,
 };
 
-use crate::counters::{
-    COLLECTED_VOTES_FOR_LAST_PROPOSAL, COLLECTED_VOTES_FOR_LAST_PROPOSAL_INCLUDING_CONFLICTS,
-    COLLECTED_VOTING_POWER_FOR_LAST_PROPOSAL,
-    COLLECTED_VOTING_POWER_FOR_LAST_PROPOSAL_INCLUDING_CONFLICTS,
-};
-
 /// Result of the vote processing. The failure case (Verification error) is returned
 /// as the Error part of the result.
 #[derive(Debug, PartialEq, Eq)]
@@ -66,8 +60,8 @@ pub struct PendingVotes {
         HashMap<HashValue /* LedgerInfo digest */, LedgerInfoWithPartialSignatures>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
     maybe_partial_2chain_tc: Option<TwoChainTimeoutWithPartialSignatures>,
-    /// Map of Author to (vote, li_digest, voting_power). This is useful to discard multiple votes.
-    author_to_vote: HashMap<Author, (Vote, HashValue, u64)>,
+    /// Map of Author to (vote, li_digest). This is useful to discard multiple votes.
+    author_to_vote: HashMap<Author, (Vote, HashValue)>,
     /// Whether we have echoed timeout for this round.
     echo_timeout: bool,
 }
@@ -97,7 +91,7 @@ impl PendingVotes {
         // 1. Has the author already voted for this round?
         //
 
-        if let Some((previously_seen_vote, previous_li_digest, _)) =
+        if let Some((previously_seen_vote, previous_li_digest)) =
             self.author_to_vote.get(&vote.author())
         {
             // is it the same vote?
@@ -125,16 +119,8 @@ impl PendingVotes {
         // 2. Store new vote (or update, in case it's a new timeout vote)
         //
 
-        self.author_to_vote.insert(
-            vote.author(),
-            (
-                vote.clone(),
-                li_digest,
-                validator_verifier
-                    .get_voting_power(&vote.author())
-                    .unwrap_or(0),
-            ),
-        );
+        self.author_to_vote
+            .insert(vote.author(), (vote.clone(), li_digest));
 
         //
         // 3. Let's check if we can create a QC
@@ -229,40 +215,8 @@ impl PendingVotes {
         VoteReceptionResult::VoteAdded(voting_power)
     }
 
-    pub fn log_voting_power_if_proposer(&self) {
-        // If we don't have any votes, we are not the proposer
-        if self.li_digest_to_votes.is_empty() {
-            return;
-        }
-
-        let votes_for_li = self
-            .li_digest_to_votes
-            .values()
-            .map(|li_with_sig| {
-                let (voting_power, votes): (Vec<_>, Vec<_>) = li_with_sig
-                    .signatures()
-                    .keys()
-                    .map(|author| {
-                        self.author_to_vote
-                            .get(author)
-                            .map(|(_, _, voting_power)| (*voting_power as u128, 1))
-                            .unwrap_or((0u128, 0))
-                    })
-                    .unzip();
-                (voting_power.iter().sum(), votes.iter().sum())
-            })
-            .collect::<Vec<(u128, usize)>>();
-
-        if let Some((max_voting_power, max_num_votes)) = votes_for_li.iter().max() {
-            COLLECTED_VOTES_FOR_LAST_PROPOSAL.set(*max_num_votes as i64);
-            COLLECTED_VOTING_POWER_FOR_LAST_PROPOSAL.set(*max_voting_power as f64);
-        }
-
-        let (voting_powers, votes_counts): (Vec<_>, Vec<_>) = votes_for_li.into_iter().unzip();
-        COLLECTED_VOTES_FOR_LAST_PROPOSAL_INCLUDING_CONFLICTS
-            .set(votes_counts.into_iter().sum::<usize>() as i64);
-        COLLECTED_VOTING_POWER_FOR_LAST_PROPOSAL_INCLUDING_CONFLICTS
-            .set(voting_powers.into_iter().sum::<u128>() as f64);
+    pub fn drain_votes(&mut self) -> Vec<(HashValue, LedgerInfoWithPartialSignatures)> {
+        self.li_digest_to_votes.drain().collect()
     }
 }
 

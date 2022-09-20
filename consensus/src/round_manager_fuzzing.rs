@@ -48,6 +48,8 @@ pub fn generate_corpus_proposal() -> Vec<u8> {
                 round: 1,
                 reason: NewRoundReason::QCReady,
                 timeout: std::time::Duration::new(5, 0),
+                prev_round: 0,
+                prev_round_votes_for_li: Vec::new(),
             })
             .await;
         // serialize and return proposal
