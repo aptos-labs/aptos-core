@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::database::PgPoolConnection;
 use aptos_api_types::{Transaction as APITransaction, TransactionInfo};
 use diesel::{
-    BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
+    BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl, data_types::PgNumeric,
 };
 
 use super::{
@@ -36,7 +36,7 @@ pub struct Transaction {
     pub state_change_hash: String,
     pub event_root_hash: String,
     pub state_checkpoint_hash: Option<String>,
-    pub gas_used: bigdecimal::BigDecimal,
+    pub gas_used: PgNumeric,
     pub success: bool,
     pub vm_status: String,
     pub accumulator_root_hash: String,
@@ -276,7 +276,7 @@ impl Transaction {
 
     pub fn get_by_version(
         version: u64,
-        connection: &PgPoolConnection,
+        conn: &PgPoolConnection,
     ) -> diesel::QueryResult<(
         Transaction,
         Option<UserTransaction>,
@@ -286,10 +286,10 @@ impl Transaction {
     )> {
         let transaction = transactions::table
             .filter(transactions::version.eq(version as i64))
-            .first::<Transaction>(connection)?;
+            .first::<Transaction>(&mut conn)?;
 
         let (user_transaction, block_metadata_transaction, events, write_set_changes) =
-            transaction.get_details_for_transaction(connection)?;
+            transaction.get_details_for_transaction(conn)?;
 
         Ok((
             transaction,
@@ -302,7 +302,7 @@ impl Transaction {
 
     pub fn get_by_hash(
         transaction_hash: &str,
-        connection: &PgPoolConnection,
+        conn: &PgPoolConnection,
     ) -> diesel::QueryResult<(
         Transaction,
         Option<UserTransaction>,
@@ -312,10 +312,10 @@ impl Transaction {
     )> {
         let transaction = transactions::table
             .filter(transactions::hash.eq(&transaction_hash))
-            .first::<Transaction>(connection)?;
+            .first::<Transaction>(&mut conn)?;
 
         let (user_transaction, block_metadata_transaction, events, write_set_changes) =
-            transaction.get_details_for_transaction(connection)?;
+            transaction.get_details_for_transaction(&mut conn)?;
 
         Ok((
             transaction,
@@ -328,7 +328,7 @@ impl Transaction {
 
     fn get_details_for_transaction(
         &self,
-        connection: &PgPoolConnection,
+        conn: &PgPoolConnection,
     ) -> diesel::QueryResult<(
         Option<UserTransaction>,
         Option<BlockMetadataTransaction>,
@@ -340,23 +340,23 @@ impl Transaction {
 
         let events = crate::schema::events::table
             .filter(crate::schema::events::transaction_version.eq(&self.version))
-            .load::<EventModel>(connection)?;
+            .load::<EventModel>(&mut conn)?;
 
         let write_set_changes = crate::schema::write_set_changes::table
             .filter(crate::schema::write_set_changes::transaction_version.eq(&self.version))
-            .load::<WriteSetChangeModel>(connection)?;
+            .load::<WriteSetChangeModel>(&mut conn)?;
 
         match self.type_.as_str() {
             "user_transaction" => {
                 user_transaction = user_transactions::table
                     .filter(user_transactions::version.eq(&self.version))
-                    .first::<UserTransaction>(connection)
+                    .first::<UserTransaction>(&mut conn)
                     .optional()?;
             }
             "block_metadata_transaction" => {
                 block_metadata_transaction = block_metadata_transactions::table
                     .filter(block_metadata_transactions::version.eq(&self.version))
-                    .first::<BlockMetadataTransaction>(connection)
+                    .first::<BlockMetadataTransaction>(&mut conn)
                     .optional()?;
             }
             "genesis_transaction" => {}

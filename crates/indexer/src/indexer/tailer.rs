@@ -67,7 +67,7 @@ impl Tailer {
             processor_name = self.processor.name(),
             "Checking if chain id is correct"
         );
-        let conn = self
+        let mut conn = self
             .connection_pool
             .get()
             .expect("DB connection should be available at this stage");

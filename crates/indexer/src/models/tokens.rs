@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     schema::{token_ownerships, tokens},
-    util::{ensure_not_negative, hash_str, u64_to_bigdecimal},
+    util::{ensure_not_negative, hash_str, u64_to_bigdecimal, u64_to_pgnumeric},
 };
 use anyhow::Context;
 use aptos_api_types::{
@@ -23,6 +23,7 @@ use aptos_api_types::{
     WriteTableItem as APIWriteTableItem,
 };
 use bigdecimal::BigDecimal;
+use diesel::data_types::PgNumeric;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -41,7 +42,7 @@ pub struct Token {
     pub name_hash: String,
     pub collection_name: String,
     pub name: String,
-    pub property_version: bigdecimal::BigDecimal,
+    pub property_version: PgNumeric,
     pub transaction_version: i64,
     pub token_properties: serde_json::Value,
     // Default time columns
@@ -64,10 +65,10 @@ pub struct TokenOwnership {
     pub name_hash: String,
     pub collection_name: String,
     pub name: String,
-    pub property_version: bigdecimal::BigDecimal,
+    pub property_version: PgNumeric,
     pub transaction_version: i64,
     pub owner_address: Option<String>,
-    pub amount: bigdecimal::BigDecimal,
+    pub amount: PgNumeric,
     pub table_handle: String,
     pub table_type: Option<String>,
     // Default time columns
@@ -217,7 +218,7 @@ impl Token {
                     amount: value["amount"]
                         .as_str()
                         .map(|s| -> anyhow::Result<BigDecimal> {
-                            Ok(ensure_not_negative(u64_to_bigdecimal(s.parse::<u64>()?)))
+                            Ok(ensure_not_negative(u64_to_pgnumeric(s.parse::<u64>()?)))
                         })
                         .context(format!(
                             "version {} failed! amount missing from token {:?}",

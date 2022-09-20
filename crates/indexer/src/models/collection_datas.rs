@@ -12,6 +12,7 @@ use crate::{
 use anyhow::Context;
 use aptos_api_types::WriteTableItem as APIWriteTableItem;
 use bigdecimal::BigDecimal;
+use diesel::{pg::Pg, data_types::PgNumeric};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -27,8 +28,8 @@ pub struct CollectionData {
     pub description: String,
     pub transaction_version: i64,
     pub metadata_uri: String,
-    pub supply: BigDecimal,
-    pub maximum: BigDecimal,
+    pub supply: PgNumeric,
+    pub maximum: PgNumeric,
     pub maximum_mutable: bool,
     pub uri_mutable: bool,
     pub description_mutable: bool,

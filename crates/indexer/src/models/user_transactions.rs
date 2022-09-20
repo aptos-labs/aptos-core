@@ -11,6 +11,7 @@ use crate::{
     util::{parse_timestamp, parse_timestamp_secs, u64_to_bigdecimal},
 };
 use aptos_api_types::{TransactionPayload, UserTransaction as APIUserTransaction};
+use diesel::data_types::PgNumeric;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -34,9 +35,9 @@ pub struct UserTransaction {
     pub parent_signature_type: String,
     pub sender: String,
     pub sequence_number: i64,
-    pub max_gas_amount: bigdecimal::BigDecimal,
+    pub max_gas_amount: PgNumeric,
     pub expiration_timestamp_secs: chrono::NaiveDateTime,
-    pub gas_unit_price: bigdecimal::BigDecimal,
+    pub gas_unit_price: PgNumeric,
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
     pub inserted_at: chrono::NaiveDateTime,

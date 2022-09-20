@@ -23,6 +23,7 @@ chrono = { version = "0.4.19", default-features = false, features = [
 ] }
 clap = { version = "3.1.17", features = ["env", "suggestions"] }
 diesel = { version = "2.0.0", features = [
+  "bigdecimal",
   "chrono",
   "postgres",
   "r2d2",

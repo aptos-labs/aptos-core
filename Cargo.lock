@@ -1205,7 +1205,7 @@ dependencies = [
  "aptos-types",
  "async-stream",
  "async-trait",
- "bigdecimal 0.1.2",
+ "bigdecimal 0.3.0",
  "bytes 1.2.1",
  "chrono",
  "clap 3.2.17",
@@ -2040,7 +2040,6 @@ dependencies = [
  "num-bigint 0.2.3",
  "num-integer",
  "num-traits 0.2.15",
- "serde 1.0.144",
 ]
 
 [[package]]
@@ -3253,11 +3252,15 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01e2adfd0a7a81070ed7beec0c62636458926326c16fedb77796d41e447b282d"
 dependencies = [
+ "bigdecimal 0.1.2",
  "bitflags",
  "byteorder",
  "chrono",
  "diesel_derives 2.0.0",
  "itoa 1.0.3",
+ "num-bigint 0.2.3",
+ "num-integer",
+ "num-traits 0.2.15",
  "pq-sys",
  "r2d2",
  "serde_json",

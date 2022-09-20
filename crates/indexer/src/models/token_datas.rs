@@ -12,6 +12,7 @@ use crate::{
 use anyhow::Context;
 use aptos_api_types::WriteTableItem as APIWriteTableItem;
 use bigdecimal::BigDecimal;
+use diesel::data_types::PgNumeric;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -25,13 +26,13 @@ pub struct TokenData {
     pub collection_name: String,
     pub name: String,
     pub transaction_version: i64,
-    pub maximum: bigdecimal::BigDecimal,
-    pub supply: bigdecimal::BigDecimal,
-    pub largest_property_version: bigdecimal::BigDecimal,
+    pub maximum: BigDecimal,
+    pub supply: PgNumeric,
+    pub largest_property_version: PgNumeric,
     pub metadata_uri: String,
     pub payee_address: String,
-    pub royalty_points_numerator: bigdecimal::BigDecimal,
-    pub royalty_points_denominator: bigdecimal::BigDecimal,
+    pub royalty_points_numerator: PgNumeric,
+    pub royalty_points_denominator: PgNumeric,
     pub maximum_mutable: bool,
     pub uri_mutable: bool,
     pub description_mutable: bool,
