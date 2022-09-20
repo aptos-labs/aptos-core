@@ -159,6 +159,8 @@ spec:
         configMap:
           name: {{ include "aptos-validator.fullname" $ }}-{{$i}}
       - name: genesis-config
+        # Current implementation of `forge::backend::k8s::stateful_set::{set_identity, get_identity}`
+        # depends on the position of this volume item within the parent list.
         secret:
           secretName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
       - name: aptos-data
