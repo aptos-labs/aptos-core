@@ -11,6 +11,7 @@ use crate::{
     schema::ledger_infos::{self, dsl},
 };
 use aptos_api::context::Context as ApiContext;
+use diesel_migrations::EmbeddedMigrations;
 
 use crate::models::ledger_info::LedgerInfo;
 use anyhow::{ensure, Context, Result};
@@ -25,7 +26,7 @@ use diesel::{
 use std::{fmt::Debug, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
-diesel_migrations::embed_migrations!();
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(Clone)]
 pub struct Tailer {
@@ -52,14 +53,12 @@ impl Tailer {
     }
 
     pub fn run_migrations(&self) {
-        embedded_migrations::run_with_output(
-            &self
-                .connection_pool
-                .get()
-                .expect("Could not get connection for migrations"),
-            &mut std::io::stdout(),
-        )
-        .expect("migrations failed!");
+        &self
+            .connection_pool
+            .get()
+            .expect("Could not get connection for migrations")
+            .run_pending_migrations(MIGRATIONS)
+            .expect("migrations failed!");
     }
 
     /// If chain id doesn't exist, save it. Otherwise, make sure that we're indexing the same chain

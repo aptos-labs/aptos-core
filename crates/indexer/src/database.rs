@@ -65,7 +65,7 @@ where
 {
     let debug = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     aptos_logger::debug!("Executing query: {:?}", debug);
-    let res = query.execute(conn);
+    let res = query.execute(&mut conn);
     if let Err(ref e) = res {
         aptos_logger::warn!("Error running query: {:?}\n{}", e, debug);
     }
