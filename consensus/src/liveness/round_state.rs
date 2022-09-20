@@ -11,6 +11,7 @@ use aptos_logger::{prelude::*, Schema};
 use aptos_types::{
     ledger_info::LedgerInfoWithPartialSignatures, validator_verifier::ValidatorVerifier,
 };
+use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{common::Round, sync_info::SyncInfo, vote::Vote};
 use futures::future::AbortHandle;
 use serde::Serialize;
@@ -36,13 +37,13 @@ impl fmt::Display for NewRoundReason {
 /// NewRoundEvents are consumed by the rest of the system: they can cause sending new proposals
 /// or voting for some proposals that wouldn't have been voted otherwise.
 /// The duration is populated for debugging and testing
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct NewRoundEvent {
     pub round: Round,
     pub reason: NewRoundReason,
     pub timeout: Duration,
-    pub prev_round: Round,
     pub prev_round_votes: Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
+    pub prev_round_timeout_votes: Option<TwoChainTimeoutWithPartialSignatures>,
 }
 
 impl fmt::Display for NewRoundEvent {
@@ -240,8 +241,7 @@ impl RoundState {
         }
         let new_round = sync_info.highest_round() + 1;
         if new_round > self.current_round {
-            let prev_round = self.current_round;
-            let prev_round_votes = self.pending_votes.drain_votes();
+            let (prev_round_votes, prev_round_timeout_votes) = self.pending_votes.drain_votes();
 
             // Start a new round.
             self.current_round = new_round;
@@ -259,8 +259,8 @@ impl RoundState {
                 round: self.current_round,
                 reason: new_round_reason,
                 timeout,
-                prev_round,
                 prev_round_votes,
+                prev_round_timeout_votes,
             };
             info!(round = new_round, "Starting new round: {}", new_round_event);
             return Some(new_round_event);

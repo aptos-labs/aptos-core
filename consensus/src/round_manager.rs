@@ -243,45 +243,9 @@ impl RoundManager {
 
         if self
             .proposer_election
-            .is_valid_proposer(self.proposal_generator.author(), new_round_event.prev_round)
-        {
-            let prev_round_votes_for_li = new_round_event
-                .prev_round_votes
-                .iter()
-                .map(|(_, li_with_sig)| {
-                    let (voting_power, votes): (Vec<_>, Vec<_>) = li_with_sig
-                        .signatures()
-                        .keys()
-                        .map(|author| {
-                            self.epoch_state
-                                .verifier
-                                .get_voting_power(author)
-                                .map(|voting_power| (voting_power as u128, 1))
-                                .unwrap_or((0u128, 0))
-                        })
-                        .unzip();
-                    (voting_power.iter().sum(), votes.iter().sum())
-                })
-                .collect::<Vec<(u128, usize)>>();
-
-            let (max_voting_power, max_num_votes) =
-                prev_round_votes_for_li.iter().max().unwrap_or(&(0, 0));
-
-            counters::COLLECTED_VOTES_FOR_PROPOSAL.record(*max_num_votes as u64);
-            counters::COLLECTED_VOTING_POWER_FOR_PROPOSAL.record(*max_voting_power as f64);
-
-            let (voting_powers, votes_counts): (Vec<_>, Vec<_>) =
-                prev_round_votes_for_li.iter().cloned().unzip();
-            counters::COLLECTED_VOTES_FOR_PROPOSAL_INCLUDING_CONFLICTS
-                .record(votes_counts.into_iter().sum::<usize>() as u64);
-            counters::COLLECTED_VOTING_POWER_FOR_PROPOSAL_INCLUDING_CONFLICTS
-                .record(voting_powers.into_iter().sum::<u128>() as f64);
-        }
-
-        if self
-            .proposer_election
             .is_valid_proposer(self.proposal_generator.author(), new_round_event.round)
         {
+            self.log_collected_vote_stats(&new_round_event);
             self.round_state.setup_leader_timeout();
             let proposal_msg = self.generate_proposal(new_round_event).await?;
             let mut network = self.network.clone();
@@ -296,6 +260,75 @@ impl RoundManager {
             counters::PROPOSALS_COUNT.inc();
         }
         Ok(())
+    }
+
+    fn log_collected_vote_stats(&self, new_round_event: &NewRoundEvent) {
+        let prev_round_votes_for_li = new_round_event
+            .prev_round_votes
+            .iter()
+            .map(|(_, li_with_sig)| {
+                let (voting_power, votes): (Vec<_>, Vec<_>) = li_with_sig
+                    .signatures()
+                    .keys()
+                    .map(|author| {
+                        self.epoch_state
+                            .verifier
+                            .get_voting_power(author)
+                            .map(|voting_power| (voting_power as u128, 1))
+                            .unwrap_or((0u128, 0))
+                    })
+                    .unzip();
+                (voting_power.iter().sum(), votes.iter().sum())
+            })
+            .collect::<Vec<(u128, usize)>>();
+
+        let (max_voting_power, max_num_votes) = prev_round_votes_for_li
+            .iter()
+            .max()
+            .cloned()
+            .unwrap_or((0, 0));
+
+        let (voting_powers, votes_counts): (Vec<_>, Vec<_>) =
+            prev_round_votes_for_li.iter().cloned().unzip();
+        let conflicting_voting_power = voting_powers.into_iter().sum::<u128>() - max_voting_power;
+        let conflicting_num_votes = votes_counts.into_iter().sum::<usize>() - max_num_votes;
+
+        let (timeout_voting_power, timeout_num_votes) = new_round_event
+            .prev_round_timeout_votes
+            .as_ref()
+            .map(|timeout_votes| {
+                let (voting_power, votes): (Vec<_>, Vec<_>) = timeout_votes
+                    .signers()
+                    .map(|author| {
+                        self.epoch_state
+                            .verifier
+                            .get_voting_power(author)
+                            .map(|voting_power| (voting_power as u128, 1))
+                            .unwrap_or((0u128, 0))
+                    })
+                    .unzip();
+                (voting_power.iter().sum(), votes.iter().sum())
+            })
+            .unwrap_or((0, 0));
+
+        counters::PROPOSER_COLLECTED_ROUND_COUNT.inc();
+        counters::PROPOSER_COLLECTED_MOST_VOTING_POWER.inc_by(max_voting_power as f64);
+        counters::PROPOSER_COLLECTED_CONFLICTING_VOTING_POWER
+            .inc_by(conflicting_voting_power as f64);
+        counters::PROPOSER_COLLECTED_TIMEOUT_VOTING_POWER.inc_by(timeout_voting_power as f64);
+
+        info!(
+            epoch = self.epoch_state.epoch,
+            round = new_round_event.round,
+            total_voting_power = self.epoch_state.verifier.total_voting_power(),
+            max_voting_power = max_voting_power,
+            max_num_votes = max_num_votes,
+            conflicting_voting_power = conflicting_voting_power,
+            conflicting_num_votes = conflicting_num_votes,
+            timeout_voting_power = timeout_voting_power,
+            timeout_num_votes = timeout_num_votes,
+            "Preparing new proposal",
+        );
     }
 
     async fn generate_proposal(

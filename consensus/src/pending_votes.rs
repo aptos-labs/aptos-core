@@ -215,8 +215,16 @@ impl PendingVotes {
         VoteReceptionResult::VoteAdded(voting_power)
     }
 
-    pub fn drain_votes(&mut self) -> Vec<(HashValue, LedgerInfoWithPartialSignatures)> {
-        self.li_digest_to_votes.drain().collect()
+    pub fn drain_votes(
+        &mut self,
+    ) -> (
+        Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
+        Option<TwoChainTimeoutWithPartialSignatures>,
+    ) {
+        (
+            self.li_digest_to_votes.drain().collect(),
+            self.maybe_partial_2chain_tc.take(),
+        )
     }
 }
 

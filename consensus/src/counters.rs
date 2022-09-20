@@ -8,58 +8,6 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
-// Simpler to Histogram - allows rate and average, without percentiles
-/// Track occurrences of an event via two counters, cumulative sum and count.
-/// Allows for having average metric
-pub struct Occurrences {
-    /// sum counter
-    sum: Counter,
-    // count counter
-    count: IntCounter,
-}
-
-impl Occurrences {
-    /// Register new occurrence counters
-    pub fn new(name: &str, desc: &str) -> Self {
-        Self {
-            sum: register_counter!(format!("{}_sum", name), desc).unwrap(),
-            count: register_int_counter!(format!("{}_count", name), desc).unwrap(),
-        }
-    }
-
-    /// record event occurrence
-    pub fn record(&self, value: f64) {
-        self.sum.inc_by(value);
-        self.count.inc();
-    }
-}
-
-// Simpler to Histogram - allows rate and average, without percentiles
-/// Track occurences of an event via two counters, cumulative sum and count.
-/// Allows for having average metric
-pub struct IntOccurrences {
-    /// sum counter
-    sum: IntCounter,
-    // count counter
-    count: IntCounter,
-}
-
-impl IntOccurrences {
-    /// Register new occurrence counters
-    pub fn new(name: &str, desc: &str) -> Self {
-        Self {
-            sum: register_int_counter!(format!("{}_sum", name), desc).unwrap(),
-            count: register_int_counter!(format!("{}_count", name), desc).unwrap(),
-        }
-    }
-
-    /// record event occurrence
-    pub fn record(&self, value: u64) {
-        self.sum.inc_by(value);
-        self.count.inc();
-    }
-}
-
 //////////////////////
 // HEALTH COUNTERS
 //////////////////////
@@ -133,39 +81,54 @@ pub static VOTE_NIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Total voting power of all votes collected for the last round this node was proposer
-pub static COLLECTED_VOTING_POWER_FOR_PROPOSAL: Lazy<Occurrences> = Lazy::new(|| {
-    Occurrences::new(
-        "aptos_collected_voting_power_for_proposal",
+/// Total voting power of validators in validator set
+pub static TOTAL_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_total_voting_power",
+        "Total voting power of validators in validator set"
+    )
+    .unwrap()
+});
+
+/// Number of rounds we were collecting votes for proposer
+/// (similar to PROPOSALS_COUNT, but can be larger, if we failed in creating/sending of the proposal)
+pub static PROPOSER_COLLECTED_ROUND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_proposer_collecting_round_count",
         "Total voting power of all votes collected for the round this node was proposer",
     )
+    .unwrap()
 });
 
-/// Total number of votes collected for the last round this node was proposer
-pub static COLLECTED_VOTES_FOR_PROPOSAL: Lazy<IntOccurrences> = Lazy::new(|| {
-    IntOccurrences::new(
-        "aptos_collected_votes_for_proposal",
-        "Total number of votes collected for the round this node was proposer",
+/// Total voting power of all votes collected for the same ledger info
+/// for the rounds this node was a proposer (cumulative)
+pub static PROPOSER_COLLECTED_MOST_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_most_voting_power_sum",
+        "Total voting power of all votes collected for the same ledger info for the rounds this node was a proposer",
     )
+    .unwrap()
 });
 
-/// Total voting power of all votes collected for the last round this node was proposer
-pub static COLLECTED_VOTING_POWER_FOR_PROPOSAL_INCLUDING_CONFLICTS: Lazy<Occurrences> =
-    Lazy::new(|| {
-        Occurrences::new(
-            "aptos_collected_voting_power_for_proposal_including_conflicts",
-            "Total voting power of all votes collected for the round this node was proposer",
-        )
-    });
+/// Total voting power of all votes collected for all other ledger info
+/// for the rounds this node was a proposer
+pub static PROPOSER_COLLECTED_CONFLICTING_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_conflicting_voting_power_sum",
+        "Total voting power of all votes collected for all other ledger info for the rounds this node was a proposer",
+    )
+    .unwrap()
+});
 
-/// Total number of votes collected for the last round this node was proposer
-pub static COLLECTED_VOTES_FOR_PROPOSAL_INCLUDING_CONFLICTS: Lazy<IntOccurrences> =
-    Lazy::new(|| {
-        IntOccurrences::new(
-            "aptos_collected_votes_for_last_proposal_including_conflicts",
-            "Total number of votes collected for the round this node was proposer",
-        )
-    });
+/// Total voting power of all votes collected for all other ledger info
+/// for the rounds this node was a proposer
+pub static PROPOSER_COLLECTED_TIMEOUT_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_timeout_voting_power_sum",
+        "Total voting power of all votes collected for the same ledger info for the rounds this node was a proposer",
+    )
+    .unwrap()
+});
 
 /// Committed proposals map when using LeaderReputation as the ProposerElection
 pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
