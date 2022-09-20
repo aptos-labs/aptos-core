@@ -149,6 +149,7 @@ impl InitialGasSchedule for AptosGasParameters {
 pub struct AptosGasMeter {
     gas_params: AptosGasParameters,
     balance: InternalGas,
+    initial_balance: InternalGas,
 }
 
 impl AptosGasMeter {
@@ -156,6 +157,7 @@ impl AptosGasMeter {
         let balance = balance.into().to_unit_with_params(&gas_params.txn);
 
         Self {
+            initial_balance: balance.clone(),
             gas_params,
             balance,
         }
@@ -466,6 +468,13 @@ impl GasMeter for AptosGasMeter {
     #[inline]
     fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
         self.charge(self.gas_params.instr.vec_swap_base)
+    }
+
+    #[inline]
+    fn charged_already_total(&self) -> PartialVMResult<InternalGas> {
+        let used_gas = self.initial_balance.checked_sub(self.balance).unwrap();
+
+        Ok(used_gas)
     }
 }
 

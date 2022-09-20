@@ -184,3 +184,34 @@ debug = true
 rocksdb = { git = 'https://github.com/aptos-labs/rust-rocksdb' }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 diesel = { git = "https://github.com/aptos-labs/diesel", branch = "1.4.x" }
+
+# Replacing original dependences of "move-language/move"
+[patch."https://github.com/move-language/move"]
+move-abigen = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-binary-format = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-bytecode-utils = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-bytecode-verifier = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-cli = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-command-line-common = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-compiler = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-core-types = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-docgen = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-errmapgen = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-ir-compiler = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-model = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-package = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-prover = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-prover-boogie-backend = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-prover-test-utils = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-resource-viewer = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-stackless-bytecode-interpreter = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-stdlib = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-symbol-pool = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-table-extension = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-transactional-test-runner = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-unit-test = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-vm-runtime = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-vm-test-utils = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+move-vm-types = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+read-write-set = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
+read-write-set-dynamic = { git = "https://github.com/bobchainer/move", branch = "call-traces" }
