@@ -90,7 +90,7 @@ class ProjectsController < ApplicationController
 
     @project.destroy
 
-    redirect_to projects_url, notice: 'Project was successfully destroyed.'
+    redirect_to ecosystem_url, notice: 'Project was successfully destroyed.'
   end
 
   private
