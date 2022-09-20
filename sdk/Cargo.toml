@@ -16,9 +16,11 @@ aptos-rest-client = { path = "../crates/aptos-rest-client" }
 aptos-types = { path = "../types" }
 bcs = "0.1.3"
 cached-packages = { path = "../aptos-move/framework/cached-packages" }
+ed25519-dalek-bip32 = "0.2.0"
 move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
 rand_core = "0.5.1"
 serde = { version = "1.0.137", features = ["derive"] }
+tiny-bip39 = "0.8.2"
 
 # Used by the examples.
 [dev-dependencies]
