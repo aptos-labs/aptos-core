@@ -25,6 +25,8 @@ const FILE_SYSTEM_LABEL: &str = "file_system";
 
 const LINUX_DISK_SUBSYSTEM: &str = "linux_disk";
 
+/// The following are the fields as reported by `/proc/diskstats` in Linux.
+/// More details on each of these fields are here: https://www.kernel.org/doc/Documentation/iostats.txt
 const LINUX_NUM_READS: &str = "num_reads";
 const LINUX_NUM_MERGED_READS: &str = "num_merged_reads";
 const LINUX_NUM_SECTORS_READ: &str = "num_sectors_read";
@@ -158,16 +160,43 @@ impl LinuxDiskMetricsCollector {
         }
 
         Self {
-            num_reads: disk_desc!(LINUX_NUM_READS, "Number of reads"),
-            num_merged_reads: disk_desc!(LINUX_NUM_MERGED_READS, "Number of merged reads"),
-            num_sectors_read: disk_desc!(LINUX_NUM_SECTORS_READ, "Number of sectors read"),
-            time_reading_ms: disk_desc!(LINUX_TIME_READING_MS, "Time spent reading in ms"),
-            num_writes: disk_desc!(LINUX_NUM_WRITES, "Number of writes"),
-            num_merged_writes: disk_desc!(LINUX_NUM_MERGED_WRITES, "Number of merged writes"),
-            num_sectors_written: disk_desc!(LINUX_NUM_SECTORS_WRITTEN, "Number of sectors written"),
-            time_writing_ms: disk_desc!(LINUX_TIME_WRITING_MS, "Time spent writing in ms"),
-            io_in_progress: disk_desc!(LINUX_PROGRESS_IO, "Number of IO in progress"),
-            total_io_time_ms: disk_desc!(LINUX_TOTAL_IO_TIME_MS, "Total IO time in ms"),
+            num_reads: disk_desc!(
+                LINUX_NUM_READS,
+                "Total number of reads completed successfully"
+            ),
+            num_merged_reads: disk_desc!(
+                LINUX_NUM_MERGED_READS,
+                "Total number of adjacent merged reads"
+            ),
+            num_sectors_read: disk_desc!(
+                LINUX_NUM_SECTORS_READ,
+                "Total number of sectors read successfully"
+            ),
+            time_reading_ms: disk_desc!(
+                LINUX_TIME_READING_MS,
+                "Total number of milliseconds spent by all reads "
+            ),
+            num_writes: disk_desc!(
+                LINUX_NUM_WRITES,
+                "Total number of writes completed successfully"
+            ),
+            num_merged_writes: disk_desc!(
+                LINUX_NUM_MERGED_WRITES,
+                "Total number of adjacent merged writes"
+            ),
+            num_sectors_written: disk_desc!(
+                LINUX_NUM_SECTORS_WRITTEN,
+                "Total number of sectors written successfully"
+            ),
+            time_writing_ms: disk_desc!(
+                LINUX_TIME_WRITING_MS,
+                "Total number of milliseconds spend by all writes"
+            ),
+            io_in_progress: disk_desc!(LINUX_PROGRESS_IO, "Number of IOs in progress"),
+            total_io_time_ms: disk_desc!(
+                LINUX_TOTAL_IO_TIME_MS,
+                "Total number of milliseconds spent in IO"
+            ),
         }
     }
 }

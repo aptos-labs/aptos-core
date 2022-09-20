@@ -4,8 +4,7 @@
 use cfg_if::cfg_if;
 use collectors::{
     CpuMetricsCollector, DiskMetricsCollector, LinuxCpuMetricsCollector, LinuxDiskMetricsCollector,
-    LinuxProcessMetricsCollector, LoadAvgCollector, MemoryMetricsCollector,
-    NetworkMetricsCollector, ProcessMetricsCollector,
+    LoadAvgCollector, MemoryMetricsCollector, NetworkMetricsCollector, ProcessMetricsCollector,
 };
 
 use crate::collectors::CollectorLatencyCollector;
@@ -24,7 +23,6 @@ pub fn register_node_metrics_collector() {
         if #[cfg(all(target_os="linux"))] {
             prometheus::register(Box::new(LinuxCpuMetricsCollector::default())).unwrap();
             prometheus::register(Box::new(LinuxDiskMetricsCollector::default())).unwrap();
-            prometheus::register(Box::new(LinuxProcessMetricsCollector::default())).unwrap();
         }
     }
     prometheus::register(Box::new(CollectorLatencyCollector::default())).unwrap();
