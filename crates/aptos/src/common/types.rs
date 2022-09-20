@@ -20,6 +20,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
+use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
 use aptos_rest_client::error::RestError;
@@ -1260,18 +1261,18 @@ impl TransactionOptions {
             // TODO: Cleanup to use the gas price estimation here
             let simulated_txn = client
                 .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
-                .await?;
-            simulated_txn
-                .into_inner()
-                .transaction
-                .as_signed_user_txn()
-                .map_err(|err| {
-                    CliError::UnexpectedError(format!(
-                        "Transaction found was not a user transaction {}",
-                        err
-                    ))
-                })?
-                .max_gas_amount()
+                .await?
+                .into_inner();
+
+            // Take the gas used and use a headroom factor on it
+            adjust_gas_headroom(
+                simulated_txn.info.gas_used(),
+                simulated_txn
+                    .transaction
+                    .as_signed_user_txn()
+                    .expect("Should be signed user transaction")
+                    .max_gas_amount(),
+            )
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases
             aptos_global_constants::MAX_GAS_AMOUNT
