@@ -27,14 +27,14 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[primary_key(
+#[diesel(primary_key(
     creator_address,
     collection_name_hash,
     name_hash,
     property_version,
     transaction_version
-)]
-#[diesel(table_name = "tokens")]
+))]
+#[diesel(table_name = tokens)]
 pub struct Token {
     pub creator_address: String,
     pub collection_name_hash: String,
@@ -49,15 +49,15 @@ pub struct Token {
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[primary_key(
+#[diesel(primary_key(
     creator_address,
     collection_name_hash,
     name_hash,
     property_version,
     transaction_version,
     table_handle
-)]
-#[diesel(table_name = "token_ownership")]
+))]
+#[diesel(table_name = token_ownerships)]
 pub struct TokenOwnership {
     pub creator_address: String,
     pub collection_name_hash: String,

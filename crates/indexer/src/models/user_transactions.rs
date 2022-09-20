@@ -25,9 +25,9 @@ use serde::{Deserialize, Serialize};
     Queryable,
     Serialize,
 )]
-#[belongs_to(Transaction, foreign_key = "version")]
-#[primary_key(version)]
-#[diesel(table_name = "user_transactions")]
+#[diesel(belongs_to(Transaction, foreign_key = version))]
+#[diesel(primary_key(version))]
+#[diesel(table_name = user_transactions)]
 pub struct UserTransaction {
     pub version: i64,
     pub block_height: i64,

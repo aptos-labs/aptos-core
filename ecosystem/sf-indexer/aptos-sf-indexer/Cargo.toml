@@ -22,7 +22,7 @@ inspection-service = { path = "../../../crates/inspection-service" }
 
 async-stream = "0.3"
 async-trait = "0.1.53"
-bigdecimal = { version = "0.1.2", features = ["serde"] }
+bigdecimal = { version = "0.3.0", features = ["serde"] }
 bytes = "1.1.0"
 chrono = { version = "0.4.19", default-features = false, features = ["clock", "serde"] }
 clap = "3.1.17"

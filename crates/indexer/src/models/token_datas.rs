@@ -16,8 +16,8 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[primary_key(creator_address, collection_name_hash, name_hash, transaction_version)]
-#[diesel(table_name = "token_datas")]
+#[diesel(primary_key(creator_address, collection_name_hash, name_hash, transaction_version))]
+#[diesel(table_name = token_datas)]
 pub struct TokenData {
     pub creator_address: String,
     pub collection_name_hash: String,

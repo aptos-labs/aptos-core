@@ -25,13 +25,12 @@ use super::{
 };
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[primary_key(version)]
-#[diesel(table_name = "transactions")]
+#[diesel(primary_key(version))]
+#[diesel(table_name = transactions)]
 pub struct Transaction {
     pub version: i64,
     pub block_height: i64,
     pub hash: String,
-    #[diesel(column_name = type)]
     pub type_: String,
     pub payload: Option<serde_json::Value>,
     pub state_change_hash: String,

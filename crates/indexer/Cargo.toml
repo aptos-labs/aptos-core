@@ -26,7 +26,7 @@ diesel = { version = "2.0.0", features = [
   "chrono",
   "postgres",
   "r2d2",
-  # "numeric",
+  "numeric",
   "serde_json",
 ] }
 diesel_migrations = { version = "2.0.0", features = ["postgres"] }
