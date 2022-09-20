@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::collectors::common::{MeasureLatency, NAMESPACE};
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
     core::{Collector, Desc, Describer},
@@ -10,6 +9,8 @@ use prometheus::{
 };
 use std::vec;
 use sysinfo::{RefreshKind, System, SystemExt};
+
+use super::common::NAMESPACE;
 
 const LOAD_AVG_METRICS_COUNT: usize = 3;
 const LOAD_AVG_SUBSYSTEM: &str = "loadavg";
@@ -68,8 +69,6 @@ impl Collector for LoadAvgCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let _measure = MeasureLatency::new("load_avg".into());
-
         let load_avg = self.system.load_average();
 
         let load_one = ConstMetric::new_gauge(self.load_one.clone(), load_avg.one, None).unwrap();
