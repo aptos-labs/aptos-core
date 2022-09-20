@@ -16,9 +16,10 @@ move-stdlib = { git = "https://github.com/move-language/move", rev = "0fe2e6ce5a
 move-table-extension = { git = "https://github.com/move-language/move", rev = "0fe2e6ce5af811d68b8a995b7da3f4c4ecc485fa" }
 move-vm-types = { git = "https://github.com/move-language/move", rev = "0fe2e6ce5af811d68b8a995b7da3f4c4ecc485fa" }
 
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-types = { path = "../../types" }
 framework = { path = "../framework" }
 gas-algebra-ext = { path = "../gas-algebra-ext" }
 
 [features]
-testing = ["move-stdlib/testing"]
+testing = ["move-stdlib/testing", "aptos-global-constants/testing"]

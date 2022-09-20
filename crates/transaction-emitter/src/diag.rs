@@ -17,7 +17,8 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
     let client = cluster.random_instance().rest_client();
     let mut faucet_account = cluster.load_aptos_root_account(&client).await?;
     let emitter = TxnEmitter::new(
-        TransactionFactory::new(cluster.chain_id).with_gas_unit_price(1),
+        TransactionFactory::new(cluster.chain_id)
+            .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
         StdRng::from_seed(OsRng.gen()),
     );
     let faucet_account_address = faucet_account.address();

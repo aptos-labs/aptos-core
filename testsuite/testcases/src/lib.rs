@@ -70,7 +70,8 @@ pub fn create_emitter_and_request(
     let client_timeout = Duration::from_secs(30);
 
     let chain_info = swarm.chain_info();
-    let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
+    let transaction_factory = TransactionFactory::new(chain_info.chain_id)
+        .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE);
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
@@ -215,7 +216,7 @@ impl dyn NetworkLoadTest {
             ctx.swarm(),
             emit_job_request,
             &nodes_to_send_load_to,
-            1,
+            aptos_global_constants::GAS_UNIT_PRICE,
             rng,
         )?;
 
