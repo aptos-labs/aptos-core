@@ -14,6 +14,7 @@ use crate::round_manager::VerifiedEvent;
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::QuorumStoreRequest;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::PeerId;
 use channel::aptos_channel;
 use consensus_types::{
@@ -45,6 +46,7 @@ pub struct QuorumStoreWrapper {
     mempool_proxy: MempoolProxy,
     quorum_store_sender: TokioSender<QuorumStoreCommand>,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
+    pulled_transactions: Vec<SignedTransaction>,
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
@@ -87,6 +89,7 @@ impl QuorumStoreWrapper {
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             quorum_store_sender,
             batches_in_progress: HashMap::new(),
+            pulled_transactions: Vec::new(),
             batch_expirations: RoundExpirations::new(),
             batch_builder: BatchBuilder::new(batch_id, max_batch_bytes as usize),
             latest_logical_time: LogicalTime::new(epoch, 0),
@@ -124,12 +127,24 @@ impl QuorumStoreWrapper {
             .unwrap();
 
         debug!("QS: pulled_txns len: {:?}", pulled_txns.len());
+        debug!(
+            "QS: remaining txns from last time len: {:?}",
+            self.pulled_transactions.len()
+        );
 
-        for txn in pulled_txns {
+        // Add the pulled txns from last time
+        let all_txns = [pulled_txns, self.pulled_transactions.clone()].concat();
+        self.pulled_transactions.clear();
+
+        for txn in all_txns {
             // Daniel: remaining of the txn will be lost when hitting the limit, is it ok?
-            if !self.batch_builder.append_transaction(&txn) {
-                end_batch = true;
-                break;
+            // Daniel: making some fix to see if this causes txn expiration
+            if !end_batch {
+                if !self.batch_builder.append_transaction(&txn) {
+                    end_batch = true;
+                }
+            } else {
+                self.pulled_transactions.push(txn);
             }
         }
         let serialized_txns = self.batch_builder.take_serialized_txns();
