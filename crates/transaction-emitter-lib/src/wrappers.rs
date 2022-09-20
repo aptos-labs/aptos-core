@@ -38,7 +38,8 @@ pub async fn emit_transactions_with_cluster(
     let mut root_account = cluster.load_aptos_root_account(&client).await?;
     let mut emitter = TxnEmitter::new(
         TransactionFactory::new(cluster.chain_id)
-            .with_transaction_expiration_time(args.txn_expiration_time_secs),
+            .with_transaction_expiration_time(args.txn_expiration_time_secs)
+            .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
         StdRng::from_seed(OsRng.gen()),
     );
 
