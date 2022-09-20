@@ -112,7 +112,10 @@ module aptos_token::token {
     const ENO_BURN_TOKEN_WITH_ZERO_AMOUNT: u64 = 29;
 
     /// Withdraw proof expires
-    const EWITHDRAW_PROOF_EXPIRES: u64 = 29;
+    const EWITHDRAW_PROOF_EXPIRES: u64 = 30;
+
+    /// Collection maximum can not smaller than supply
+    const ECOLLECTION_MAXIMUM_SMALLER_THAN_SUPPLY: u64 = 31;
 
     //
     // Core data structures for holding tokens
@@ -378,52 +381,45 @@ module aptos_token::token {
 
     public entry fun mutate_collection_description(
         account: &signer,
-        creator: address,
         collection_name: String,
         description: String
     ) acquires Collections {
-        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
-        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
-        let collections = borrow_global_mut<Collections>(
-            creator
-        );
+        let creator = signer::address_of(account);
+        assert!(exists<Collections>(creator), error::permission_denied(ECOLLECTIONS_NOT_PUBLISHED));
+        let collections = borrow_global_mut<Collections>(creator);
         let collection_data = borrow_collection_data_mut(collections, collection_name);
-        // validate if the data is mutable
         assert!(collection_data.mutability_config.description, EFIELD_NOT_MUTABLE);
         collection_data.description = description;
     }
 
     public entry fun mutate_collection_uri(
         account: &signer,
-        creator: address,
         collection_name: String,
         uri: String
     ) acquires Collections {
-        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
-        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
-        let collections = borrow_global_mut<Collections>(
-            creator
-        );
+        let creator = signer::address_of(account);
+        assert!(exists<Collections>(creator), error::permission_denied(ECOLLECTIONS_NOT_PUBLISHED));
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+        let collections = borrow_global_mut<Collections>(creator);
         let collection_data = borrow_collection_data_mut(collections, collection_name);
-        // validate if the data is mutable
         assert!(collection_data.mutability_config.uri, EFIELD_NOT_MUTABLE);
         collection_data.uri = uri;
     }
 
     public entry fun mutate_collection_maximum(
         account: &signer,
-        creator: address,
         collection_name: String,
         maximum: u64
     ) acquires Collections {
-        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
-        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
-        let collections = borrow_global_mut<Collections>(
-            creator
-        );
+        let creator = signer::address_of(account);
+        assert!(exists<Collections>(creator), error::permission_denied(ECOLLECTIONS_NOT_PUBLISHED));
+        let collections = borrow_global_mut<Collections>(creator);
         let collection_data = borrow_collection_data_mut(collections, collection_name);
-        // validate if the data is mutable
         assert!(collection_data.mutability_config.maximum, EFIELD_NOT_MUTABLE);
+        assert!(
+            collection_data.supply <= maximum,
+            error::invalid_argument(ECOLLECTION_MAXIMUM_SMALLER_THAN_SUPPLY)
+        );
         collection_data.maximum = maximum;
     }
 
@@ -1222,7 +1218,7 @@ module aptos_token::token {
     ) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(&creator));
         account::create_account_for_test(signer::address_of(&owner));
-        let collection_mutate_setting = vector<bool>[false, false, false];
+        let collection_mutate_setting = vector[false, false, false];
         let token_id = create_collection_and_token(&creator, collection_mutate_setting, 1, 1, 1);
 
         let token = withdraw_token(&creator, token_id, 1);
@@ -1236,7 +1232,7 @@ module aptos_token::token {
     ) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(&creator));
         account::create_account_for_test(signer::address_of(&owner));
-        let collection_mutate_setting = vector<bool>[false, false, false];
+        let collection_mutate_setting = vector[false, false, false];
         let token_id = create_collection_and_token(&creator, collection_mutate_setting, 2, 5, 5);
 
         let token_0 = withdraw_token(&creator, token_id, 1);
@@ -1252,7 +1248,7 @@ module aptos_token::token {
     public entry fun test_collection_maximum(creator: signer) acquires Collections, TokenStore {
         use std::bcs;
         account::create_account_for_test(signer::address_of(&creator));
-        let collection_mutate_setting = vector<bool>[false, false, false];
+        let collection_mutate_setting = vector[false, false, false];
         let token_id = create_collection_and_token(&creator, collection_mutate_setting, 2, 2, 1);
         let default_keys = vector<String>[ string::utf8(b"attack"), string::utf8(b"num_of_use") ];
         let default_vals = vector<vector<u8>>[ bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5) ];
@@ -1284,7 +1280,7 @@ module aptos_token::token {
     ) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(&creator));
         account::create_account_for_test(signer::address_of(&owner));
-        let mutate_setting = vector<bool>[false, false, false];
+        let mutate_setting = vector[false, false, false];
 
         let token_id = create_collection_and_token(&creator, mutate_setting, 2, 2, 2);
         direct_transfer(&creator, &owner, token_id, 1);
@@ -1350,7 +1346,7 @@ module aptos_token::token {
     #[test(creator = @0xFF)]
     fun test_create_events_generation(creator: signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(&creator));
-        let mutate_setting = vector<bool>[false, false, false];
+        let mutate_setting = vector[false, false, false];
         create_collection_and_token(&creator, mutate_setting, 1, 2, 1);
         let collections = borrow_global<Collections>(signer::address_of(&creator));
         assert!(event::counter(&collections.create_collection_events) == 1, 1);
@@ -1359,7 +1355,7 @@ module aptos_token::token {
     #[test(creator = @0xAF)]
     fun test_create_token_from_tokendata(creator: &signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(creator));
-        let mutate_setting = vector<bool>[false, false, false];
+        let mutate_setting = vector[false, false, false];
 
         create_collection_and_token(creator, mutate_setting, 2, 4, 4);
         let token_data_id = create_token_data_id(
@@ -1382,7 +1378,7 @@ module aptos_token::token {
         account::create_account_for_test(signer::address_of(creator));
         account::create_account_for_test(signer::address_of(owner));
 
-        let mutate_setting = vector<bool>[false, false, false];
+        let mutate_setting = vector[false, false, false];
         // token owner mutate the token property
         let token_id = create_collection_and_token(creator, mutate_setting, 2, 4, 4);
         assert!(token_id.property_version == 0, 1);
@@ -1452,7 +1448,7 @@ module aptos_token::token {
         use std::bcs;
         account::create_account_for_test(signer::address_of(creator));
 
-        let mutate_setting = vector<bool>[false, false, false];
+        let mutate_setting = vector[false, false, false];
         // token owner mutate the token property
         let token_id = create_collection_and_token(creator, mutate_setting, 2, 4, 4);
         assert!(token_id.property_version == 0, 1);
@@ -1486,14 +1482,13 @@ module aptos_token::token {
     fun test_mutate_collection_description_fail(creator: &signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(creator));
 
-        let mutate_setting = vector<bool>[false, false, false];
+        let mutate_setting = vector[false, false, false];
         // token owner mutate the token property
         let token_id = create_collection_and_token(creator, mutate_setting, 2, 4, 4);
         assert!(token_id.property_version == 0, 1);
 
         mutate_collection_description(
             creator,
-            token_id.token_data_id.creator,
             token_id.token_data_id.collection,
             string::utf8(b"new_description")
         );
@@ -1503,14 +1498,13 @@ module aptos_token::token {
     fun test_mutate_collection_description_success(creator: &signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(creator));
 
-        let mutate_setting = vector<bool>[true, true, true];
+        let mutate_setting = vector[true, true, true];
         // token owner mutate the token property
         let token_id = create_collection_and_token(creator, mutate_setting, 2, 4, 4);
         assert!(token_id.property_version == 0, 1);
 
         mutate_collection_description(
             creator,
-            token_id.token_data_id.creator,
             token_id.token_data_id.collection,
             string::utf8(b"new_description")
         );
@@ -1526,7 +1520,7 @@ module aptos_token::token {
         account::create_account_for_test(signer::address_of(creator));
 
         // token owner mutate the token property
-        let mutate_setting = vector<bool>[true, true, true];
+        let mutate_setting = vector[true, true, true];
         let token_id = create_collection_and_token(creator, mutate_setting, 2, 4, 4);
         assert!(token_id.property_version == 0, 1);
         // only be able to mutate the attributed defined when creating the token
@@ -1566,7 +1560,7 @@ module aptos_token::token {
     fun test_withdraw_with_proof(creator: &signer, framework: &signer): Token acquires TokenStore, Collections {
         timestamp::set_time_has_started_for_testing(framework);
         account::create_account_for_test(signer::address_of(creator));
-        let mutate_setting = vector<bool>[true, true, true];
+        let mutate_setting = vector[true, true, true];
         let token_id = create_collection_and_token(creator, mutate_setting, 2, 4, 4);
 
         timestamp::update_global_time_for_test(1000000);
