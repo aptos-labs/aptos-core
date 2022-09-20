@@ -1,5 +1,5 @@
 {
-  "message": "invalid Move module name: coin::coin",
+  "message": "Transaction entry function module invalid: invalid Move module name: coin::coin",
   "error_code": "invalid_input",
   "vm_error_code": null
 }
