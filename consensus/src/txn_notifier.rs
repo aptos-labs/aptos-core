@@ -66,7 +66,7 @@ impl TxnNotifier for MempoolNotifier {
         let compute_status = compute_results.compute_status();
         if txns.len() + 2 != compute_status.len() {
             // reconfiguration suffix blocks don't have any transactions
-            if compute_status.len() == 0 {
+            if compute_status.is_empty() {
                 return Ok(());
             }
             return Err(format_err!(
