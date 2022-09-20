@@ -144,7 +144,6 @@ export const [AnalyticsProvider, useAnalytics] = constate(() => {
     params,
     value,
   }: AnalyticsEventParams) => {
-    console.log(eventType);
     if (
       isDevelopment
       || !analytics) {
