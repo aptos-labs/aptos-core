@@ -27,6 +27,7 @@ mod pruner;
 mod state_merkle_db;
 mod state_store;
 mod transaction_store;
+mod utils;
 mod versioned_node_cache;
 
 #[cfg(test)]
@@ -47,7 +48,7 @@ use crate::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::{pruner_manager::PrunerManager, utils},
+    pruner::{pruner_manager::PrunerManager, pruner_utils},
     schema::*,
     state_store::StateStore,
     transaction_store::TransactionStore,

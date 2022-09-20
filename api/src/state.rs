@@ -13,8 +13,9 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo, MoveModuleBytecode,
-    MoveResource, MoveStructTag, MoveValue, TableItemRequest, U64,
+    verify_module_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
+    MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, TableItemRequest, VerifyInput,
+    VerifyInputWithRecursion, U64,
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -63,6 +64,13 @@ impl StateApi {
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
+        resource_type
+            .0
+            .verify(0)
+            .context("'resource_type' invalid")
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+            })?;
         fail_point_poem("endpoint_get_account_resource")?;
         self.context
             .check_api_output_enabled("Get account resource", &accept_type)?;
@@ -99,6 +107,11 @@ impl StateApi {
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
+        verify_module_identifier(module_name.0.as_str())
+            .context("'module_name' invalid")
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+            })?;
         fail_point_poem("endpoint_get_account_module")?;
         self.context
             .check_api_output_enabled("Get account module", &accept_type)?;
@@ -135,6 +148,13 @@ impl StateApi {
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
+        table_item_request
+            .0
+            .verify()
+            .context("'table_item_request' invalid")
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+            })?;
         fail_point_poem("endpoint_get_table_item")?;
         self.context
             .check_api_output_enabled("Get table item", &accept_type)?;

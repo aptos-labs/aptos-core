@@ -118,6 +118,10 @@ pub struct SetValidatorConfiguration {
     #[clap(long, default_value_t = 0)]
     pub(crate) commission_percentage: u64,
 
+    /// Whether the validator will be joining the genesis validator set.
+    #[clap(long)]
+    pub(crate) join_during_genesis: bool,
+
     /// Path to private identity generated from GenerateKeys
     #[clap(long, parse(from_os_str))]
     pub(crate) owner_public_identity_file: Option<PathBuf>,
@@ -228,6 +232,7 @@ impl CliCommand<()> for SetValidatorConfiguration {
             operator_account_public_key: operator_identity.account_public_key,
             stake_amount: self.stake_amount,
             commission_percentage: self.commission_percentage,
+            join_during_genesis: self.join_during_genesis,
         };
 
         let directory = PathBuf::from(&self.username);

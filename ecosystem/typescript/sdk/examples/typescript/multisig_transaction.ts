@@ -57,7 +57,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
-  console.log(`multisig account coins: ${balance}. Should be 0!`);
+  console.log(`account4 coins: ${balance}. Should be 0!`);
 
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
@@ -123,9 +123,14 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
 
   await client.waitForTransaction(transactionRes.hash);
 
+  resources = await client.getAccountResources(mutisigAccountAddress);
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
+  balance = parseInt((accountResource?.data as any).coin.value);
+  console.log(`multisig account coins: ${balance}.`);
+
   resources = await client.getAccountResources(account4.address());
   accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 123);
-  console.log(`multisig account coins: ${balance}. Should be 123!`);
+  console.log(`account4 coins: ${balance}. Should be 123!`);
 })();

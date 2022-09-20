@@ -10,7 +10,7 @@ Rails.application.routes.draw do
   end
 
   # Redirect community.aptoslabs.com to aptoslabs.com
-  constraints host: /community.aptoslabs.com/ do
+  constraints host: /community\.aptoslabs\.com/ do
     match '/*path' => redirect { |params, _req| "https://aptoslabs.com/#{params[:path]}" }, via: %i[get post]
     match '/' => redirect { |_params, _req| 'https://aptoslabs.com/community' }, via: %i[get post]
   end

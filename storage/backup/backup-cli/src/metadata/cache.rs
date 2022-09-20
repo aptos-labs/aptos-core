@@ -38,9 +38,10 @@ pub struct MetadataCacheOpt {
     #[clap(
         long = "metadata-cache-dir",
         parse(from_os_str),
-        help = "[Defaults to temporary dir] Metadata cache dir. If specified and shared across runs, \
+        help = "Metadata cache dir. If specified and shared across runs, \
         metadata files in cache won't be downloaded again from backup source, speeding up tool \
-        boot up significantly."
+        boot up significantly. Cache content can be messed up if used across the devnet, the testnet\
+        and the mainnet, hence it [Defaults to temporary dir]."
     )]
     dir: Option<PathBuf>,
 }

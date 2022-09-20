@@ -550,7 +550,7 @@ fn spawn_committer<
                         notification.committed_transactions.len() as u64,
                     );
                     if notification.reconfiguration_occurred {
-                        utils::update_new_epoch_metrics(storage.clone());
+                        utils::update_new_epoch_metrics();
                     }
 
                     // Handle the committed transaction notification (e.g., notify mempool).

@@ -1,11 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::event::EventSchema;
+use crate::ledger_info::LedgerInfoSchema;
 use crate::transaction_by_account::TransactionByAccountSchema;
 use anyhow::{anyhow, ensure, Result};
 use aptos_types::account_address::AccountAddress;
+use aptos_types::contract_event::ContractEvent;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use aptos_types::transaction::Version;
 use schemadb::iterator::SchemaIterator;
+use std::iter::Peekable;
 use std::marker::PhantomData;
 
 pub struct ContinuousVersionIter<I, T> {
@@ -159,6 +164,107 @@ impl<'a> AccountTransactionVersionIter<'a> {
 
 impl<'a> Iterator for AccountTransactionVersionIter<'a> {
     type Item = Result<(u64, Version)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_impl().transpose()
+    }
+}
+
+pub struct EpochEndingLedgerInfoIter<'a> {
+    inner: SchemaIterator<'a, LedgerInfoSchema>,
+    next_epoch: u64,
+    end_epoch: u64,
+}
+
+impl<'a> EpochEndingLedgerInfoIter<'a> {
+    pub(crate) fn new(
+        inner: SchemaIterator<'a, LedgerInfoSchema>,
+        next_epoch: u64,
+        end_epoch: u64,
+    ) -> Self {
+        Self {
+            inner,
+            next_epoch,
+            end_epoch,
+        }
+    }
+
+    fn next_impl(&mut self) -> Result<Option<LedgerInfoWithSignatures>> {
+        if self.next_epoch >= self.end_epoch {
+            return Ok(None);
+        }
+
+        let ret = match self.inner.next().transpose()? {
+            Some((epoch, li)) => {
+                if !li.ledger_info().ends_epoch() {
+                    None
+                } else {
+                    ensure!(epoch == self.next_epoch, "Epochs are not consecutive.");
+                    self.next_epoch += 1;
+                    Some(li)
+                }
+            }
+            _ => None,
+        };
+
+        Ok(ret)
+    }
+}
+
+impl<'a> Iterator for EpochEndingLedgerInfoIter<'a> {
+    type Item = Result<LedgerInfoWithSignatures>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_impl().transpose()
+    }
+}
+
+pub struct EventsByVersionIter<'a> {
+    inner: Peekable<SchemaIterator<'a, EventSchema>>,
+    expected_next_version: Version,
+    end_version: Version,
+}
+
+impl<'a> EventsByVersionIter<'a> {
+    pub(crate) fn new(
+        inner: SchemaIterator<'a, EventSchema>,
+        expected_next_version: Version,
+        end_version: Version,
+    ) -> Self {
+        Self {
+            inner: inner.peekable(),
+            expected_next_version,
+            end_version,
+        }
+    }
+
+    fn next_impl(&mut self) -> Result<Option<Vec<ContractEvent>>> {
+        if self.expected_next_version >= self.end_version {
+            return Ok(None);
+        }
+
+        let mut ret = Vec::new();
+        while let Some(res) = self.inner.peek() {
+            let ((version, _index), _event) = res
+                .as_ref()
+                .map_err(|e| anyhow!("Hit error iterating events: {}", e))?;
+            if *version != self.expected_next_version {
+                break;
+            }
+            let ((_version, _index), event) =
+                self.inner.next().transpose()?.expect("Known to exist.");
+            ret.push(event);
+        }
+        self.expected_next_version = self
+            .expected_next_version
+            .checked_add(1)
+            .ok_or_else(|| anyhow!("expected version overflowed."))?;
+        Ok(Some(ret))
+    }
+}
+
+impl<'a> Iterator for EventsByVersionIter<'a> {
+    type Item = Result<Vec<ContractEvent>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_impl().transpose()

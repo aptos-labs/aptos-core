@@ -148,15 +148,15 @@ module aptos_framework::storage_gas {
 
         let item_config = UsageGasConfig {
             target_usage: 1000000000,  // 1 billion
-            read_curve: base_8192_exponential_curve(8000, 16000),
-            create_curve: base_8192_exponential_curve(1280000, 128000000),
-            write_curve: base_8192_exponential_curve(160000, 16000000),
+            read_curve: base_8192_exponential_curve(80000, 80000 * 100),
+            create_curve: base_8192_exponential_curve(2000000, 2000000 * 100),
+            write_curve: base_8192_exponential_curve(400000, 400000 * 100),
         };
         let byte_config = UsageGasConfig {
             target_usage: 500000000000, // 500 GB
-            read_curve: base_8192_exponential_curve(1000, 2000),
-            create_curve: base_8192_exponential_curve(10000, 1000000),
-            write_curve: base_8192_exponential_curve(10000, 1000000),
+            read_curve: base_8192_exponential_curve(40, 40 * 100),
+            create_curve: base_8192_exponential_curve(1000, 1000 * 100),
+            write_curve: base_8192_exponential_curve(200, 200 * 100),
         };
         validate_usage_config(&item_config);
         validate_usage_config(&item_config);
