@@ -3,7 +3,7 @@
 
 use std::{
     collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
-    path::PathBuf, sync::Arc,
+    path::PathBuf, sync::Arc, time::Duration,
 };
 
 use aptos_config::keys::ConfigKey;
@@ -91,7 +91,13 @@ impl AptosTelemetryServiceArgs {
             humio_client,
         );
 
-        PeerSetCacheUpdater::new(validators_cache, vfns_cache, &config).run();
+        PeerSetCacheUpdater::new(
+            validators_cache,
+            vfns_cache,
+            config.trusted_full_node_addresses.clone(),
+            Duration::from_secs(config.update_interval),
+        )
+        .run();
 
         Self::serve(&config, routes(context)).await;
     }

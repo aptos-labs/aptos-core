@@ -95,13 +95,14 @@ module aptos_framework::account {
     const ENO_CAPABILITY: u64 = 9;
     /// The caller does not have a valid rotation capability offer from the other account
     const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 10;
-    ///
+    /// Address to create is not a valid reserved address for Aptos framework
     const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
+    /// Specified scheme required to proceed with the smart contract operation - can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1)
     const EINVALID_SCHEME: u64 = 12;
+    /// Abort the transaction if the expected originating address is different from the originating addres on-chain
     const EINVALID_ORIGINATING_ADDRESS: u64 = 13;
-    const EINVALID_CAPABILITY_TYPE: u64 = 14;
-    const EINVALID_ACCEPT_SIGNER_CAPABILITY: u64 = 15;
-    const EINVALID_REVOKE_SIGNER_CAPABILITY: u64 = 16;
+    /// The signer capability doesn't exist at the given address
+    const ENO_SUCH_SIGNER_CAPABILITY: u64 = 14;
 
     native fun create_signer(addr: address): signer;
 
@@ -346,7 +347,7 @@ module aptos_framework::account {
         let addr = signer::address_of(account);
         assert!(exists_at(addr) && exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let account_resource = borrow_global_mut<Account>(addr);
-        assert!(option::contains(&account_resource.signer_capability_offer.for, &to_be_revoked_address), error::not_found(EINVALID_REVOKE_SIGNER_CAPABILITY));
+        assert!(option::contains(&account_resource.signer_capability_offer.for, &to_be_revoked_address), error::not_found(ENO_SUCH_SIGNER_CAPABILITY));
         option::extract(&mut account_resource.signer_capability_offer.for);
     }
 
@@ -357,7 +358,7 @@ module aptos_framework::account {
         // Check if there's an existing signer capability offer from the offerer
         let account_resource = borrow_global_mut<Account>(offerer_address);
         let addr = signer::address_of(account);
-        assert!(option::contains(&account_resource.signer_capability_offer.for, &addr), error::not_found(EINVALID_ACCEPT_SIGNER_CAPABILITY));
+        assert!(option::contains(&account_resource.signer_capability_offer.for, &addr), error::not_found(ENO_SUCH_SIGNER_CAPABILITY));
 
         create_signer(offerer_address)
     }
@@ -588,7 +589,7 @@ TODO bring back with generic rotation capability
     }
 
     #[test(bob = @0x345, charlie=@0x567)]
-    #[expected_failure(abort_code = 393231)]
+    #[expected_failure(abort_code = 393230)]
     public entry fun test_invalid_check_signer_capability_and_create_authorized_signer(bob: signer, charlie: signer) acquires Account {
         let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         let alice = create_account_from_ed25519_public_key(pk);
@@ -615,7 +616,7 @@ TODO bring back with generic rotation capability
     }
 
     #[test(bob = @0x345, charlie=@0x567)]
-    #[expected_failure(abort_code = 393232)]
+    #[expected_failure(abort_code = 393230)]
     public entry fun test_invalid_revoke_signer_capability(bob: signer, charlie: signer) acquires Account {
         let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         let alice = create_account_from_ed25519_public_key(pk);

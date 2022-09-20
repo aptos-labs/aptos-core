@@ -662,7 +662,7 @@ module aptos_framework::vesting {
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability) acquires AdminStore {
         let admin_store = borrow_global_mut<AdminStore>(signer::address_of(admin));
-        let seed = bcs::to_bytes(admin);
+        let seed = bcs::to_bytes(&signer::address_of(admin));
         vector::append(&mut seed, bcs::to_bytes(&admin_store.nonce));
         admin_store.nonce = admin_store.nonce + 1;
 

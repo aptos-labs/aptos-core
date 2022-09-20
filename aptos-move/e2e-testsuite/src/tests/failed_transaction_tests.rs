@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::{AptosGasMeter, AptosGasParameters};
+use aptos_gas::{AptosGasMeter, AptosGasParameters, StorageGasParameters};
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::ExecutionStatus,
@@ -40,7 +40,8 @@ fn failed_transaction_cleanup_test() {
         };
 
         let gas_params = AptosGasParameters::zeros();
-        let mut gas_meter = AptosGasMeter::new(gas_params, 10_000);
+        let storage_gas_params = StorageGasParameters::zeros();
+        let mut gas_meter = AptosGasMeter::new(vm_genesis::LATEST_GAS_FEATURE_VERSION, gas_params, Some(storage_gas_params), 10_000);
 
         // TYPE_MISMATCH should be kept and charged.
         let out1 = aptos_vm.failed_transaction_cleanup(

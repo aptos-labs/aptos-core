@@ -42,7 +42,8 @@ class DiscourseController < ApplicationController
 
   def set_post_login_redirect!
     cookies['FORUM-SSO'] = {
-      value: request.query_string
+      value: request.query_string,
+      httponly: true
     }
   end
 end

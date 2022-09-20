@@ -282,8 +282,14 @@ export class AptosClient {
   async getEventsByCreationNumber(
     address: MaybeHexString,
     creationNumber: number | bigint | string,
+    query?: { start?: BigInt | number; limit?: number },
   ): Promise<Gen.Event[]> {
-    return this.client.events.getEventsByCreationNumber(HexString.ensure(address).hex(), creationNumber.toString());
+    return this.client.events.getEventsByCreationNumber(
+      HexString.ensure(address).hex(),
+      creationNumber.toString(),
+      query?.start?.toString(),
+      query?.limit,
+    );
   }
 
   /**
@@ -584,7 +590,7 @@ export class AptosClient {
     extraArgs?: { maxGasAmount?: Uint64; gasUnitPrice?: Uint64; expireTimestamp?: Uint64 },
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
-      maxGasAmount: BigInt(2000),
+      maxGasAmount: BigInt(20000),
       gasUnitPrice: BigInt(1),
       expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 20),
       ...extraArgs,

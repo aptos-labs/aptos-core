@@ -33,10 +33,12 @@ async fn test_basic_client() {
 
     info.client().get_ledger_information().await.unwrap();
 
-    // TODO(Gas): double check if this is correct
-    let mut account1 = info.create_and_fund_user_account(10_000).await.unwrap();
-    // TODO(Gas): double check if this is correct
-    let account2 = info.create_and_fund_user_account(10_000).await.unwrap();
+    // NOTE(Gas): For some reason, there needs to be a lot of funds in the account in order for the
+    //            test to pass.
+    //            Is this caused by us increasing the default max gas amount in
+    //            testsuite/forge/src/interface/aptos.rs?
+    let mut account1 = info.create_and_fund_user_account(100_000).await.unwrap();
+    let account2 = info.create_and_fund_user_account(100_000).await.unwrap();
 
     let tx = account1.sign_with_transaction_builder(
         info.transaction_factory()

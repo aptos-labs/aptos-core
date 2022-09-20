@@ -13,7 +13,11 @@ module aptos_std::math128 {
 
     /// Return the average of two.
     public fun average(a: u128, b: u128): u128 {
-        (a + b) / 2
+        if (a < b) {
+            a + (b - a) / 2
+        } else {
+            b + (a - b) / 2
+        }
     }
 
     /// Return the value of n raised to power e

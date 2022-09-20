@@ -425,7 +425,7 @@ test(
     const account1 = new AptosAccount(
       new HexString("0x883fdd67576e5fdceb370ba665b8af8856d0cae63fd808b8d16077c6b008ea8c").toUint8Array(),
     );
-    await faucetClient.fundAccount(account1.address(), 50000);
+    await faucetClient.fundAccount(account1.address(), 500000);
 
     const txnHash = await client.publishPackage(
       account1,
@@ -458,7 +458,7 @@ test(
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     const alice = new AptosAccount();
-    await faucetClient.fundAccount(alice.address(), 50000);
+    await faucetClient.fundAccount(alice.address(), 500000);
 
     const helperAccount = new AptosAccount();
 

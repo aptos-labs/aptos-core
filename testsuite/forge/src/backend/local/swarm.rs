@@ -567,6 +567,10 @@ impl Swarm for LocalSwarm {
         todo!()
     }
 
+    fn remove_all_chaos(&mut self) -> Result<()> {
+        todo!()
+    }
+
     async fn ensure_no_validator_restart(&self) -> Result<()> {
         todo!()
     }
