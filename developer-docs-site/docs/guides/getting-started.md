@@ -8,9 +8,9 @@ import TabItem from '@theme/TabItem';
 
 # Getting Started
 
-To kick-start your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
+To kickstart your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
 
-### Clone the Aptos-core repo
+## Clone the Aptos-core repo
 
 Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
 
@@ -37,7 +37,7 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     ```
     source ~/.cargo/env
     ```
-5. Skip this step if you are not installing an Aptos node.
+5. Skip this below step if you are not installing an Aptos node.
 
     <Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
@@ -58,43 +58,8 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     </TabItem>
     </Tabs>
 
+## Install the CLI
+
+Install the Aptos CLI following the [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md) guide. 
 
 Now your basic Aptos development environment is ready.
-
-### Aptos Testnet
-
-- [REST API Open API Spec](https://fullnode.testnet.aptoslabs.com/v1/spec#/).
-- **REST service:** [https://fullnode.testnet.aptoslabs.com/v1](https://fullnode.testnet.aptoslabs.com/v1).
-- **Faucet service:** [https://faucet.testnet.aptoslabs.com](https://faucet.testnet.aptoslabs.com).
-- [Genesis](https://testnet.aptoslabs.com/genesis.blob).
-- [Genesis and waypoint](https://github.com/aptos-labs/aptos-genesis-waypoint/tree/main/testnet).
-- ChainID: 2 (TESTNET)
-
-### Aptos Devnet
-- [REST API Open API Spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
-- **REST service:** [https://fullnode.devnet.aptoslabs.com/v1](https://fullnode.devnet.aptoslabs.com/v1).
-- **Faucet service:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
-- [Genesis](https://devnet.aptoslabs.com/genesis.blob).
-- [Waypoint](https://devnet.aptoslabs.com/waypoint.txt).
-- [ChainID](http://fullnode.devnet.aptoslabs.com/v1).
-
-
-### IDE plugins for Move
-
-- [Syntax hightlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax).
-- [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer) - supports advanced code navigation and syntax highlighting.
-- [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language) - supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
-
-### Aptos CLI
-
-- [Aptos CLI releases](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
-- [Aptos CLI Documentation](/cli-tools/aptos-cli-tool/aptos-cli-index).
-
-### Aptos SDK
-
-- [Typescript](https://www.npmjs.com/package/aptos).
-- [Python](https://pypi.org/project/aptos-sdk/).
-
-### Aptos explorer
-
-- [Aptos Explorer](https://explorer.devnet.aptos.dev/). Use the top-right drop-down menu to select the network.
