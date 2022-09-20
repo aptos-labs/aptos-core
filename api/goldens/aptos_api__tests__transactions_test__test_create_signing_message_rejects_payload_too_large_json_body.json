@@ -1,0 +1,5 @@
+{
+  "message": "payload too large",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
+}

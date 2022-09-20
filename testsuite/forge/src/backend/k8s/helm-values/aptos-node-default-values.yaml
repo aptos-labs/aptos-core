@@ -9,17 +9,22 @@ fullnode:
     replicas: 1
   rust_log: debug,hyper=off
 
-# make all services internal ClusterIP and open all ports
+# Make all services internal NodePort and open all ports
+# NodePort is required for ChaosMesh to function correctly: https://github.com/chaos-mesh/chaos-mesh/issues/3278#issuecomment-1134248492
 service:
   validator:
     external:
-      type: "ClusterIP"
+      type: "NodePort"
+    internal:
+      type: "NodePort"
     enableRestApi: true
     enableMetricsPort: true
 
   fullnode:
     external:
-      type: "ClusterIP"
+      type: "NodePort"
+    internal:
+      type: "NodePort"
     enableRestApi: true
     enableMetricsPort: true
 

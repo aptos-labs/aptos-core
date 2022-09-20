@@ -9,15 +9,12 @@ use crate::types::common::NodeType;
 use anyhow::{anyhow, Result};
 use aptos_config::config::{PeerRole, RoleType};
 use aptos_crypto::{noise, x25519};
-use aptos_logger::{debug, error, warn};
 use aptos_types::chain_id::ChainId;
 use aptos_types::PeerId;
+use reqwest::header::AUTHORIZATION;
+use tracing::{debug, error, warn};
 use warp::filters::BoxedFilter;
-use warp::{
-    filters::header::headers_cloned,
-    http::header::{HeaderMap, HeaderValue},
-    reject, Filter, Rejection,
-};
+use warp::{reject, Filter, Rejection};
 use warp::{reply, Reply};
 
 pub fn auth(context: Context) -> BoxedFilter<(impl Reply,)> {
@@ -75,7 +72,8 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
                 Some(peer) => {
                     let remote_public_key = &remote_public_key;
                     if !peer.keys.contains(remote_public_key) {
-                        return Err(reject::custom(ServiceError::bad_request(
+                        warn!("peer found in peer set but public_key is not found. request body: {}, role_type: {}, peer_id: {}, received public_key: {}", body.chain_id, body.role_type, body.peer_id, remote_public_key);
+                        return Err(reject::custom(ServiceError::forbidden(
                             "public key not found in peer keys",
                         )));
                     }
@@ -86,7 +84,7 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
                     let derived_remote_peer_id =
                         aptos_types::account_address::from_identity_public_key(remote_public_key);
                     if derived_remote_peer_id != body.peer_id {
-                        return Err(reject::custom(ServiceError::bad_request(
+                        return Err(reject::custom(ServiceError::forbidden(
                             "public key does not match identity",
                         )));
                     } else {
@@ -162,8 +160,7 @@ pub fn with_auth(
     context: Context,
     roles: Vec<NodeType>,
 ) -> impl Filter<Extract = (Claims,), Error = Rejection> + Clone {
-    headers_cloned()
-        .map(move |headers: HeaderMap<HeaderValue>| headers)
+    warp::header::optional(AUTHORIZATION.as_str())
         .and_then(jwt_from_header)
         .and(warp::any().map(move || (context.clone(), roles.clone())))
         .and_then(authorize_jwt)

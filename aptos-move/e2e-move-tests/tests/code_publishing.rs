@@ -64,6 +64,8 @@ fn code_publishing_basic(#[case] features: Vec<FeatureFlag>) {
     assert_eq!(state.value, 42)
 }
 
+// Ignored because we've disabled incompatible upgrade policy.
+#[ignore]
 #[rstest]
 #[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
 fn code_publishing_upgrade_success_no_compat(#[case] features: Vec<FeatureFlag>) {
@@ -234,6 +236,8 @@ fn code_publishing_framework_upgrade_fail(#[case] features: Vec<FeatureFlag>) {
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
+// Ignored because we've disabled incompatible upgrade policy.
+#[ignore]
 #[rstest]
 #[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
 fn code_publishing_weak_dep_fail(#[case] features: Vec<FeatureFlag>) {
@@ -260,6 +264,8 @@ fn code_publishing_weak_dep_fail(#[case] features: Vec<FeatureFlag>) {
     assert_abort!(status, 0x10006 /*invalid_arhument(EDEP_WEAKER_POLICY)*/);
 }
 
+// Ignored because we've disabled incompatible upgrade policy.
+#[ignore]
 #[rstest]
 #[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
 fn code_publishing_arbitray_dep_different_address(#[case] features: Vec<FeatureFlag>) {
@@ -295,7 +301,7 @@ fn code_publishing_using_resource_account(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    let mut pack = PackageBuilder::new("Package1").with_policy(UpgradePolicy::arbitrary());
+    let mut pack = PackageBuilder::new("Package1").with_policy(UpgradePolicy::compat());
     pack.add_source("m", "module 0x0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a::m { public fun f() {} }");
     let pack_dir = pack.write_to_temp().unwrap();
     let package = framework::BuiltPackage::build(

@@ -79,6 +79,7 @@ pub trait Swarm: Sync {
     /// Injects all types of chaos
     fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
     fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+    fn remove_all_chaos(&mut self) -> Result<()>;
 
     async fn ensure_no_validator_restart(&self) -> Result<()>;
     async fn ensure_no_fullnode_restart(&self) -> Result<()>;
@@ -250,6 +251,13 @@ pub trait SwarmExt: Swarm {
     /// of this function are available at all the nodes in the swarm
     async fn wait_for_all_nodes_to_catchup(&self, timeout: Duration) -> Result<()> {
         wait_for_all_nodes_to_catchup(&self.get_all_nodes_clients_with_names(), timeout).await
+    }
+
+    async fn wait_for_all_nodes_to_catchup_to_next(&self, timeout: Duration) -> Result<()> {
+        let clients = self.get_all_nodes_clients_with_names();
+        let highest_synced_version = get_highest_synced_version(&clients).await?;
+        wait_for_all_nodes_to_catchup_to_version(&clients, highest_synced_version + 1, timeout)
+            .await
     }
 
     fn get_validator_clients_with_names(&self) -> Vec<(String, RestClient)> {

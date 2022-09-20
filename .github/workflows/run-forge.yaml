@@ -17,8 +17,6 @@ on:
         type: string
         description: The Forge k8s namespace to be used for test. This value should manage Forge test concurrency. It may be truncated.
       FORGE_CLUSTER_NAME:
-        # HACK: Undo this after decommission old clusters
-        default: aptos-forge-big-0
         required: false
         type: string
         description: The Forge k8s cluster to be used for test

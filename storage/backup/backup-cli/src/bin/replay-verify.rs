@@ -33,13 +33,13 @@ struct Opt {
     pub rocksdb_opt: RocksdbOpt,
     #[clap(
         long,
-        help = "[Defaults to 0] The first transaction version required to be replayed and verified."
+        help = "The first transaction version required to be replayed and verified. [Defaults to 0]"
     )]
     start_version: Option<Version>,
     #[clap(
         long,
-        help = "[Defaults to the latest version available] The last transaction version required \
-                to be replayed and verified (if present in the backup)."
+        help = "The last transaction version required to be replayed and verified (if present \
+        in the backup). [Defaults to the latest version available] "
     )]
     end_version: Option<Version>,
 }

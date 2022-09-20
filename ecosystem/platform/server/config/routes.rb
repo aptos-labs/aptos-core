@@ -10,7 +10,7 @@ Rails.application.routes.draw do
   end
 
   # Redirect community.aptoslabs.com to aptoslabs.com
-  constraints host: /community.aptoslabs.com/ do
+  constraints host: /community\.aptoslabs\.com/ do
     match '/*path' => redirect { |params, _req| "https://aptoslabs.com/#{params[:path]}" }, via: %i[get post]
     match '/' => redirect { |_params, _req| 'https://aptoslabs.com/community' }, via: %i[get post]
   end
@@ -88,7 +88,9 @@ Rails.application.routes.draw do
   get 'it2', to: 'leaderboard#it2'
 
   # Projects
-  resources :projects, except: %i[edit update]
+  get 'projects', to: redirect('/ecosystem')
+  get 'ecosystem', to: 'projects#index'
+  resources :projects, except: %i[index edit update]
 
   # User profiles
   resources :users, only: %i[show] do
