@@ -27,8 +27,14 @@ fn bls12381_sigshare_verify() {
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
     let key_pair_wrong = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
-    let signature = key_pair.private_key.sign_arbitrary_message(message);
-    let signature_wrong = key_pair_wrong.private_key.sign_arbitrary_message(message);
+    let signature = key_pair
+        .private_key
+        .sign_arbitrary_message(message)
+        .unwrap();
+    let signature_wrong = key_pair_wrong
+        .private_key
+        .sign_arbitrary_message(message)
+        .unwrap();
 
     // sig on message under key_pair should verify
     assert!(signature
@@ -129,7 +135,7 @@ fn bls12381_multisig_should_verify() {
 
     let good_step = 2;
     for keys in key_pairs.iter().step_by(good_step) {
-        let signature = keys.private_key.sign(&message);
+        let signature = keys.private_key.sign(&message).unwrap();
         signatures.push(signature);
         pubkeys.push(&keys.public_key);
     }
@@ -150,7 +156,10 @@ fn bls12381_serialize_sig() {
     let mut rng = OsRng;
     let message = b"Hello world";
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
-    let signature = key_pair.private_key.sign_arbitrary_message(message);
+    let signature = key_pair
+        .private_key
+        .sign_arbitrary_message(message)
+        .unwrap();
 
     let sig_bytes = signature.to_bytes();
 
@@ -177,7 +186,7 @@ fn bls12381_aggsig_should_verify() {
         let msg = &messages[i];
         let key = &key_pairs[i];
 
-        signatures.push(key.private_key.sign(msg));
+        signatures.push(key.private_key.sign(msg).unwrap());
         pubkeys.push(&key.public_key);
     }
 
@@ -201,7 +210,8 @@ fn bls12381_aggsig_zero_messages_or_pks_does_not_verify() {
 
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
-    let aggsig = bls12381::Signature::aggregate(vec![key_pair.private_key.sign(&message)]).unwrap();
+    let aggsig =
+        bls12381::Signature::aggregate(vec![key_pair.private_key.sign(&message).unwrap()]).unwrap();
 
     // aggsig should NOT verify on zero messages and zero PKs
     let pubkeys: Vec<&PublicKey> = vec![];
@@ -240,9 +250,9 @@ fn bls12381_multisig_wrong_messages_aggregated() {
 
     for (i, key_pair) in key_pairs.iter().enumerate() {
         let signature = if i % 2 == 0 {
-            key_pair.private_key.sign(&message)
+            key_pair.private_key.sign(&message).unwrap()
         } else {
-            key_pair.private_key.sign(&message_wrong)
+            key_pair.private_key.sign(&message_wrong).unwrap()
         };
         signatures.push(signature);
         pubkeys.push(&key_pair.public_key);
@@ -294,8 +304,8 @@ fn bls12381_multisig_wrong_pks_aggregated() {
     let mut pubkeys2 = vec![];
 
     for (i1, i2) in zip(signers1, signers2) {
-        signatures1.push(key_pairs[i1].private_key.sign(&message1));
-        signatures2.push(key_pairs[i2].private_key.sign(&message2));
+        signatures1.push(key_pairs[i1].private_key.sign(&message1).unwrap());
+        signatures2.push(key_pairs[i2].private_key.sign(&message2).unwrap());
 
         pubkeys1.push(&key_pairs[i1].public_key);
         pubkeys2.push(&key_pairs[i2].public_key);
@@ -330,7 +340,7 @@ fn bls12381_random_multisig_dont_verify_with_random_pk() {
     let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
     let keypair_junk = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
-    let signature = keypair.private_key.sign(&message);
+    let signature = keypair.private_key.sign(&message).unwrap();
 
     assert!(signature.verify(&message, &keypair.public_key).is_ok());
 
@@ -420,7 +430,7 @@ fn bls12381_sample_signature() {
     let pk = keypair.public_key;
 
     let message = b"Hello Aptos!";
-    let signature = sk.sign_arbitrary_message(message);
+    let signature = sk.sign_arbitrary_message(message).unwrap();
 
     println!("SK:        {}", hex::encode(&sk.to_bytes()));
     println!("PK:        {}", hex::encode(&pk.to_bytes()));
@@ -457,7 +467,7 @@ fn bls12381_sample_doc_test_for_normal_sigs() {
 
     // The signer computes a normal signature on a message.
     let message = TestAptosCrypto("test".to_owned());
-    let sig = kp.private_key.sign(&message);
+    let sig = kp.private_key.sign(&message).unwrap();
 
     // Any verifier who has the signer's public key can verify the `(message, sig)` pair as:
     assert!(sig.verify(&message, &kp.public_key).is_ok());
@@ -500,7 +510,8 @@ fn bls12381_sample_aggregate_pk_and_aggsig() {
         sigs.push(
             keypair
                 .private_key
-                .sign_arbitrary_message(messages.last().unwrap().as_bytes()),
+                .sign_arbitrary_message(messages.last().unwrap().as_bytes())
+                .unwrap(),
         );
 
         aggsigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
@@ -550,7 +561,7 @@ fn bls12381_sample_aggregate_pk_and_multisig() {
         let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
         pks.push(keypair.public_key);
-        sigs.push(keypair.private_key.sign_arbitrary_message(message));
+        sigs.push(keypair.private_key.sign_arbitrary_message(message).unwrap());
 
         multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
 
@@ -596,7 +607,7 @@ fn bls12381_sample_aggregate_sigs() {
     for _i in 1..=num {
         let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
-        sigs.push(keypair.private_key.sign_arbitrary_message(message));
+        sigs.push(keypair.private_key.sign_arbitrary_message(message).unwrap());
 
         multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
     }

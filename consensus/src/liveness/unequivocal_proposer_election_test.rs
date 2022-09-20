@@ -46,7 +46,8 @@ fn test_is_valid_proposal() {
         quorum_cert.clone(),
         &chosen_validator_signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let bad_author_proposal = Block::new_proposal(
         Payload::empty(),
         1,
@@ -54,7 +55,8 @@ fn test_is_valid_proposal() {
         quorum_cert.clone(),
         &another_validator_signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let bad_duplicate_proposal = Block::new_proposal(
         Payload::empty(),
         1,
@@ -62,7 +64,8 @@ fn test_is_valid_proposal() {
         quorum_cert.clone(),
         &chosen_validator_signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let next_good_proposal = Block::new_proposal(
         Payload::empty(),
         2,
@@ -70,7 +73,8 @@ fn test_is_valid_proposal() {
         quorum_cert.clone(),
         &chosen_validator_signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let next_bad_duplicate_proposal = Block::new_proposal(
         Payload::empty(),
         2,
@@ -78,7 +82,8 @@ fn test_is_valid_proposal() {
         quorum_cert,
         &chosen_validator_signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
 
     let pe =
         UnequivocalProposerElection::new(Box::new(MockProposerElection::new(HashMap::from([

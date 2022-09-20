@@ -377,7 +377,7 @@ mod tests {
 
         // submit the same vote but enhanced with a timeout -> VoteAdded
         let timeout = vote0_author_0.generate_2chain_timeout(certificate_for_genesis());
-        let signature = timeout.sign(&signers[0]);
+        let signature = timeout.sign(&signers[0]).unwrap();
         vote0_author_0.add_2chain_timeout(timeout, signature);
 
         assert_eq!(
@@ -396,7 +396,7 @@ mod tests {
 
         // if that vote is now enhanced with a timeout signature -> EchoTimeout.
         let timeout = vote1_author_1.generate_2chain_timeout(certificate_for_genesis());
-        let signature = timeout.sign(&signers[1]);
+        let signature = timeout.sign(&signers[1]).unwrap();
         vote1_author_1.add_2chain_timeout(timeout, signature);
         match pending_votes.insert_vote(&vote1_author_1, &validator) {
             VoteReceptionResult::EchoTimeout(voting_power) => {
@@ -413,7 +413,7 @@ mod tests {
 
         // if that vote is now enhanced with a timeout signature -> NewTimeoutCertificate.
         let timeout = vote2_author_2.generate_2chain_timeout(certificate_for_genesis());
-        let signature = timeout.sign(&signers[2]);
+        let signature = timeout.sign(&signers[2]).unwrap();
         vote2_author_2.add_2chain_timeout(timeout, signature);
 
         match pending_votes.insert_vote(&vote2_author_2, &validator) {

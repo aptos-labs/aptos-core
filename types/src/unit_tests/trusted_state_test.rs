@@ -80,7 +80,7 @@ fn sign_ledger_info(
     let partial_sig = PartialSignatures::new(
         signers
             .iter()
-            .map(|s| (s.author(), s.sign(ledger_info)))
+            .map(|s| (s.author(), s.sign(ledger_info).unwrap()))
             .collect(),
     );
     verifier.aggregate_signatures(&partial_sig).unwrap()

@@ -77,7 +77,8 @@ fn test_nil_block() {
         nil_block_qc,
         &signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     assert_eq!(nil_block_child.is_nil_block(), false);
     assert_eq!(nil_block_child.round(), 2);
     assert_eq!(nil_block_child.parent_id(), nil_block.id());
@@ -97,7 +98,8 @@ fn test_block_relation() {
         quorum_cert,
         &signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     assert_eq!(next_block.round(), 1);
     assert_eq!(genesis_block.is_parent_of(&next_block), true);
     assert_eq!(
@@ -127,9 +129,10 @@ fn test_same_qc_different_authors() {
         genesis_qc.clone(),
         signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
 
-    let signature = signer.sign(genesis_qc.ledger_info().ledger_info());
+    let signature = signer.sign(genesis_qc.ledger_info().ledger_info()).unwrap();
     let mut ledger_info_altered = LedgerInfoWithPartialSignatures::new(
         genesis_qc.ledger_info().ledger_info().clone(),
         PartialSignatures::empty(),
@@ -149,7 +152,8 @@ fn test_same_qc_different_authors() {
         genesis_qc_altered,
         signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
 
     let block_round_1_same = Block::new_proposal(
         payload,
@@ -158,7 +162,8 @@ fn test_same_qc_different_authors() {
         genesis_qc,
         signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
 
     assert_ne!(block_round_1.id(), block_round_1_altered.id());
     assert_eq!(block_round_1.id(), block_round_1_same.id());
@@ -188,7 +193,8 @@ fn test_block_metadata_bitvec() {
         genesis_qc,
         &signers[0],
         Vec::new(),
-    );
+    )
+    .unwrap();
     let block_metadata_1 = block_1.new_block_metadata(&validators);
     assert_eq!(signers[0].author(), block_metadata_1.proposer());
     assert_eq!(
@@ -202,9 +208,11 @@ fn test_block_metadata_bitvec() {
     votes_1
         .iter()
         .zip(
-            validators
-                .iter()
-                .zip(signers.iter().map(|signer| signer.sign(&ledger_info))),
+            validators.iter().zip(
+                signers
+                    .iter()
+                    .map(|signer| signer.sign(&ledger_info).unwrap()),
+            ),
         )
         .for_each(|(&voted, (&address, signature))| {
             if voted {
@@ -225,7 +233,8 @@ fn test_block_metadata_bitvec() {
         qc_1,
         &signers[1],
         Vec::new(),
-    );
+    )
+    .unwrap();
     let block_metadata_2 = block_2.new_block_metadata(&validators);
     assert_eq!(signers[1].author(), block_metadata_2.proposer());
     let raw_bytes: Vec<u8> = BitVec::from(votes_1).into();
@@ -258,6 +267,7 @@ fn test_failed_authors_well_formed() {
             &signer,
             failed_authors,
         )
+        .unwrap()
     };
 
     assert!(create_block(1, vec![]).verify_well_formed().is_ok());

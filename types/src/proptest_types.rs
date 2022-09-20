@@ -565,7 +565,7 @@ prop_compose! {
         account_keypair in ed25519::keypair_strategy(),
         consensus_keypair in bls12381_keys::keypair_strategy(),
     ) -> (AccountAddress, ValidatorConsensusInfo,  bls12381::Signature) {
-        let signature = consensus_keypair.private_key.sign(&ledger_info);
+        let signature = consensus_keypair.private_key.sign(&ledger_info).unwrap();
         let address = account_address::from_public_key(&account_keypair.public_key);
         (address, ValidatorConsensusInfo::new(address, consensus_keypair.public_key, 1), signature)
     }
