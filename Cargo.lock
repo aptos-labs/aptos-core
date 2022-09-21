@@ -6380,6 +6380,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-rest-client",
  "aptos-secure-storage",
  "aptos-temppath",
  "aptos-time-service",
@@ -6396,6 +6397,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "short-hex-str",
  "tokio",
+ "url",
 ]
 
 [[package]]

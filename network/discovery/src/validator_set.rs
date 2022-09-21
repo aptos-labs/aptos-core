@@ -105,7 +105,7 @@ impl Stream for ValidatorSetStream {
 }
 
 /// Extracts a set of ConnectivityRequests from a ValidatorSet which are appropriate for a network with type role.
-fn extract_validator_set_updates(
+pub(crate) fn extract_validator_set_updates(
     network_context: NetworkContext,
     node_set: ValidatorSet,
 ) -> PeerSet {
