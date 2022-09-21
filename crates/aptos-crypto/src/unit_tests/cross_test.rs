@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-/*
-TODO: Re-enable this test when the derives are fixed
 // This is necessary for the derive macros which rely on being used in a
 // context where the crypto crate is external
 use crate as aptos_crypto;
@@ -131,4 +129,3 @@ fn unsupported_sigs() {
     t.compile_fail("src/unit_tests/compilation/cross_test_trait_obj_sig.rs");
     t.compile_fail("src/unit_tests/compilation/cross_test_trait_obj_pub.rs");
 }
-*/
