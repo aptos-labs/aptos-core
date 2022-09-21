@@ -770,6 +770,7 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
+ "tokio",
  "tracing",
  "tracing-subscriber",
 ]
@@ -6456,7 +6457,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
- "cfg-if 1.0.0",
+ "cfg-if",
  "once_cell",
  "procfs",
  "prometheus",

@@ -39,4 +39,4 @@ pub(crate) const NODE_SYS_INFO_FREQ_SECS: u64 = 5 * 60; // 5 minutes
 // TODO: consider making this interval configurable
 pub(crate) const PROMETHEUS_PUSH_METRICS_FREQ_SECS: u64 = 15; // 15 seconds
 pub(crate) const CHAIN_ACCESS_CHECK_FREQ_SECS: u64 = 30 * 60; // 30 minutes
-pub(crate) const LOG_ENV_POLL_FREQ_SECS: u64 = 30; // 5 minutes
+pub(crate) const LOG_ENV_POLL_FREQ_SECS: u64 = 5 * 60; // 5 minutes
