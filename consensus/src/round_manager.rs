@@ -320,12 +320,12 @@ impl RoundManager {
         info!(
             epoch = self.epoch_state.epoch,
             round = new_round_event.round,
-            total_voting_power = self.epoch_state.verifier.total_voting_power(),
-            max_voting_power = max_voting_power,
+            total_voting_power = ?self.epoch_state.verifier.total_voting_power(),
+            max_voting_power = ?max_voting_power,
             max_num_votes = max_num_votes,
-            conflicting_voting_power = conflicting_voting_power,
+            conflicting_voting_power = ?conflicting_voting_power,
             conflicting_num_votes = conflicting_num_votes,
-            timeout_voting_power = timeout_voting_power,
+            timeout_voting_power = ?timeout_voting_power,
             timeout_num_votes = timeout_num_votes,
             "Preparing new proposal",
         );
