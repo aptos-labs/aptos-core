@@ -1229,12 +1229,14 @@ async def run_multiple(
     forge_pre_comment: Optional[str],
     forge_comment: Optional[str],
     forge_runner_mode: Optional[str],
+    github_step_summary: Optional[str],
 ) -> None:
     # Remove formatting environment variables
     os.environ["FORGE_OUTPUT"] = ""
     os.environ["FORGE_REPORT"] = ""
     os.environ["FORGE_PRE_COMMENT"] = ""
     os.environ["FORGE_COMMENT"] = ""
+    os.environ["GITHUB_STEP_SUMMARY"] = ""
 
     pending_results = []
     pending_suites = []
@@ -1281,9 +1283,15 @@ async def run_multiple(
         final_forge_comment.append(
             f"Run {'failed' if failed else 'succeeded'}"
         )
+        print("\n".join(final_forge_comment))
         if forge_comment:
             context.filesystem.write(
                 forge_comment,
+                "\n".join(final_forge_comment).encode()
+            )
+        if github_step_summary:
+            context.filesystem.write(
+                github_step_summary,
                 "\n".join(final_forge_comment).encode()
             )
 
@@ -1294,6 +1302,7 @@ async def run_multiple(
 @envoption("FORGE_REPORT")
 @envoption("FORGE_PRE_COMMENT")
 @envoption("FORGE_COMMENT")
+@envoption("GITHUB_STEP_SUMMARY")
 # cluster auth
 @envoption("AWS_REGION", "us-west-2")
 # forge test runner customization
@@ -1320,7 +1329,6 @@ async def run_multiple(
 @envoption("GITHUB_SERVER_URL")
 @envoption("GITHUB_REPOSITORY")
 @envoption("GITHUB_RUN_ID")
-@envoption("GITHUB_STEP_SUMMARY")
 @click.option(
     "--cargo-args",
     multiple=True,
@@ -1429,6 +1437,7 @@ def test(
                 forge_pre_comment,
                 forge_comment,
                 forge_runner_mode,
+                github_step_summary,
             )
         )
         return
