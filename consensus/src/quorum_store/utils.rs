@@ -25,7 +25,6 @@ pub(crate) struct BatchBuilder {
     data: Vec<SerializedTransaction>,
     num_bytes: usize,
     max_bytes: usize,
-    time_created: u64,
 }
 
 impl BatchBuilder {
@@ -36,7 +35,6 @@ impl BatchBuilder {
             data: Vec::new(),
             num_bytes: 0,
             max_bytes,
-            time_created: chrono::Utc::now().naive_utc().timestamp_micros() as u64,
         }
     }
 
@@ -81,10 +79,6 @@ impl BatchBuilder {
 
     pub(crate) fn summaries(&self) -> &Vec<TransactionSummary> {
         &self.summaries
-    }
-
-    pub(crate) fn time_created(&self) -> u64 {
-        self.time_created
     }
 }
 

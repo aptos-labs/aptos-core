@@ -141,15 +141,6 @@ impl QuorumStoreWrapper {
 
         if self.last_end_batch_time.elapsed().as_millis() > self.end_batch_ms {
             end_batch = true;
-            self.last_end_batch_time = Instant::now();
-
-            // Quorum store metrics
-            counters::CREATED_EMPTY_BATCHES_COUNT.inc();
-
-            let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
-                - self.batch_builder.time_created();
-            counters::EMPTY_BATCH_CREATION_DURATION
-                .observe_duration(Duration::from_micros(duration));
         }
 
         let batch_id = self.batch_builder.batch_id();
@@ -163,15 +154,21 @@ impl QuorumStoreWrapper {
             None
         } else {
             if self.batch_builder.is_empty() {
+                // Quorum store metrics
+                counters::CREATED_EMPTY_BATCHES_COUNT.inc();
+
+                let duration = self.last_end_batch_time.elapsed().as_secs_f64();
+                counters::EMPTY_BATCH_CREATION_DURATION
+                    .observe_duration(Duration::from_secs_f64(duration));
+
                 return None;
             }
 
             // Quorum store metrics
             counters::CREATED_BATCHES_COUNT.inc();
 
-            let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
-                - self.batch_builder.time_created();
-            counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_micros(duration));
+            let duration = self.last_end_batch_time.elapsed().as_secs_f64();
+            counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_secs_f64(duration));
 
             counters::NUM_TXN_PER_BATCH.observe(self.batch_builder.summaries().len() as f64);
 
@@ -196,6 +193,8 @@ impl QuorumStoreWrapper {
             self.batches_in_progress
                 .insert(batch_id, self.batch_builder.take_summaries());
             self.batch_expirations.add_item(batch_id, expiry_round);
+
+            self.last_end_batch_time = Instant::now();
 
             Some(proof_rx)
         }
@@ -353,7 +352,7 @@ impl QuorumStoreWrapper {
 
         // TODO: parameter? bring back back-off?
         let mut interval = time::interval(Duration::from_millis(
-            50, // 50 is currently the end batch timer
+            25, // 50 is currently the end batch timer
         ));
 
         loop {
