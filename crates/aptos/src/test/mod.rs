@@ -18,8 +18,8 @@ use crate::common::types::{
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
-    ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
-    PublishPackage, RunFunction, TestPackage,
+    ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
+    InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
@@ -706,7 +706,10 @@ impl CliTestFramework {
                 assume_yes: false,
                 assume_no: true,
             },
-            for_test_framework: framework_dir,
+            framework_package_args: FrameworkPackageArgs {
+                framework_git_rev: None,
+                framework_local_dir: framework_dir,
+            },
         }
         .execute()
         .await
