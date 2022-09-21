@@ -627,8 +627,8 @@ fn parse_failed_operations_from_txn_payload(
                     operations.push(Operation::set_operator(
                         operation_index,
                         Some(OperationStatusType::Failure),
-                        operator,
                         sender,
+                        operator,
                     ));
                 } else {
                     warn!("Failed to parse set operator {:?}", inner);
@@ -643,8 +643,8 @@ fn parse_failed_operations_from_txn_payload(
                     operations.push(Operation::set_voter(
                         operation_index,
                         Some(OperationStatusType::Failure),
-                        voter,
                         sender,
+                        voter,
                     ));
                 } else {
                     warn!("Failed to parse set voter {:?}", inner);
@@ -732,8 +732,8 @@ async fn parse_operations_from_write_set(
                 Ok(vec![Operation::set_voter(
                     operation_index,
                     Some(OperationStatusType::Success),
-                    voter,
                     sender,
+                    voter,
                 )])
             } else {
                 warn!("Failed to parse set voter {:?}", inner);
