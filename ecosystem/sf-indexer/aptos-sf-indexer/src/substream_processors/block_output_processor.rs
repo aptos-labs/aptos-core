@@ -59,7 +59,7 @@ impl Debug for BlockOutputSubstreamProcessor {
 
 /// This will insert all events within all transactions within a certain block
 fn handle_block(
-    conn: &PgPoolConnection,
+    conn: &mut PgPoolConnection,
     substream_name: &'static str,
     block_height: u64,
     txns: Vec<TransactionModel>,
@@ -85,7 +85,7 @@ fn handle_block(
 }
 
 /// This will insert all transactions within a certain block
-fn insert_transactions(conn: &PgPoolConnection, txns: &[TransactionModel]) {
+fn insert_transactions(conn: &mut PgPoolConnection, txns: &[TransactionModel]) {
     use schema::transactions::dsl::*;
     let chunks = get_chunks(txns.len(), TransactionModel::field_count());
     for (start_ind, end_ind) in chunks {
@@ -117,7 +117,7 @@ fn insert_transactions(conn: &PgPoolConnection, txns: &[TransactionModel]) {
 }
 
 /// This will insert all user transactions within a block
-fn insert_user_transactions_w_sigs(conn: &PgPoolConnection, txn_details: &[TransactionDetail]) {
+fn insert_user_transactions_w_sigs(conn: &mut PgPoolConnection, txn_details: &[TransactionDetail]) {
     use schema::{signatures::dsl as sig_schema, user_transactions::dsl as ut_schema};
     let mut all_signatures = vec![];
     let mut all_user_transactions = vec![];
@@ -180,7 +180,10 @@ fn insert_user_transactions_w_sigs(conn: &PgPoolConnection, txn_details: &[Trans
 }
 
 /// This will insert all block metadata transactions within a block
-fn insert_block_metadata_transactions(conn: &PgPoolConnection, txn_details: &[TransactionDetail]) {
+fn insert_block_metadata_transactions(
+    conn: &mut PgPoolConnection,
+    txn_details: &[TransactionDetail],
+) {
     use schema::block_metadata_transactions::dsl::*;
 
     let bmt = txn_details
@@ -216,7 +219,7 @@ fn insert_block_metadata_transactions(conn: &PgPoolConnection, txn_details: &[Tr
 }
 
 /// This will insert all events within each transaction within a block
-fn insert_events(conn: &PgPoolConnection, ev: &Vec<EventModel>) {
+fn insert_events(conn: &mut PgPoolConnection, ev: &Vec<EventModel>) {
     use schema::events::dsl::*;
 
     let chunks = get_chunks(ev.len(), EventModel::field_count());
@@ -243,7 +246,7 @@ fn insert_events(conn: &PgPoolConnection, ev: &Vec<EventModel>) {
 }
 
 /// This will insert all write set changes within each transaction within a block
-fn insert_write_set_changes(conn: &PgPoolConnection, wscs: &Vec<WriteSetChangeModel>) {
+fn insert_write_set_changes(conn: &mut PgPoolConnection, wscs: &Vec<WriteSetChangeModel>) {
     use schema::write_set_changes::dsl::*;
 
     let chunks = get_chunks(wscs.len(), WriteSetChangeModel::field_count());
@@ -267,7 +270,7 @@ fn insert_write_set_changes(conn: &PgPoolConnection, wscs: &Vec<WriteSetChangeMo
 }
 
 /// This will insert all move modules within each transaction within a block
-fn insert_move_modules(conn: &PgPoolConnection, wsc_details: &[WriteSetChangeDetail]) {
+fn insert_move_modules(conn: &mut PgPoolConnection, wsc_details: &[WriteSetChangeDetail]) {
     use schema::move_modules::dsl::*;
 
     let modules = wsc_details
@@ -303,7 +306,7 @@ fn insert_move_modules(conn: &PgPoolConnection, wsc_details: &[WriteSetChangeDet
 }
 
 /// This will insert all move resources within each transaction within a block
-fn insert_move_resources(conn: &PgPoolConnection, wsc_details: &[WriteSetChangeDetail]) {
+fn insert_move_resources(conn: &mut PgPoolConnection, wsc_details: &[WriteSetChangeDetail]) {
     use schema::move_resources::dsl::*;
 
     let resources = wsc_details
@@ -338,7 +341,7 @@ fn insert_move_resources(conn: &PgPoolConnection, wsc_details: &[WriteSetChangeD
 }
 
 /// This will insert all table data within each transaction within a block
-fn insert_table_data(conn: &PgPoolConnection, wsc_details: &[WriteSetChangeDetail]) {
+fn insert_table_data(conn: &mut PgPoolConnection, wsc_details: &[WriteSetChangeDetail]) {
     use schema::{table_items::dsl as ti, table_metadatas::dsl as tm};
 
     let (items, mut metadata): (Vec<TableItem>, Vec<TableMetadata>) = wsc_details

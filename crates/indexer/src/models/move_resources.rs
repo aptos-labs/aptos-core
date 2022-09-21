@@ -17,15 +17,14 @@ use serde::{Deserialize, Serialize};
     Queryable,
     Serialize,
 )]
-#[belongs_to(Transaction, foreign_key = "transaction_version")]
-#[primary_key(transaction_version, write_set_change_index)]
-#[diesel(table_name = "move_resources")]
+#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[diesel(primary_key(transaction_version, write_set_change_index))]
+#[diesel(table_name = move_resources)]
 pub struct MoveResource {
     pub transaction_version: i64,
     pub write_set_change_index: i64,
     pub transaction_block_height: i64,
     pub name: String,
-    #[diesel(column_name = type)]
     pub type_: String,
     pub address: String,
     pub module: String,

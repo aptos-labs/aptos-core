@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
-    },
+    database::{clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool},
     indexer::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
@@ -18,7 +16,7 @@ use crate::{
 };
 use aptos_api_types::Transaction;
 use async_trait::async_trait;
-use diesel::result::Error;
+use diesel::{result::Error, PgConnection};
 use field_count::FieldCount;
 use std::fmt::Debug;
 
@@ -45,7 +43,7 @@ impl Debug for TokenTransactionProcessor {
 }
 
 fn insert_to_db(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -63,34 +61,34 @@ fn insert_to_db(
     match conn
         .build_transaction()
         .read_write()
-        .run::<_, Error, _>(|| {
-            insert_tokens(conn, &tokens)?;
-            insert_token_datas(conn, &token_datas)?;
-            insert_token_ownerships(conn, &token_ownerships)?;
-            insert_collection_datas(conn, &collection_datas)?;
+        .run::<_, Error, _>(|pg_conn| {
+            insert_tokens(pg_conn, &tokens)?;
+            insert_token_datas(pg_conn, &token_datas)?;
+            insert_token_ownerships(pg_conn, &token_ownerships)?;
+            insert_collection_datas(pg_conn, &collection_datas)?;
             Ok(())
         }) {
         Ok(_) => Ok(()),
         Err(_) => conn
             .build_transaction()
             .read_write()
-            .run::<_, Error, _>(|| {
+            .run::<_, Error, _>(|pg_conn| {
                 let tokens = clean_data_for_db(tokens, true);
                 let token_datas = clean_data_for_db(token_datas, true);
                 let token_ownerships = clean_data_for_db(token_ownerships, true);
                 let collection_datas = clean_data_for_db(collection_datas, true);
 
-                insert_tokens(conn, &tokens)?;
-                insert_token_datas(conn, &token_datas)?;
-                insert_token_ownerships(conn, &token_ownerships)?;
-                insert_collection_datas(conn, &collection_datas)?;
+                insert_tokens(pg_conn, &tokens)?;
+                insert_token_datas(pg_conn, &token_datas)?;
+                insert_token_ownerships(pg_conn, &token_ownerships)?;
+                insert_collection_datas(pg_conn, &collection_datas)?;
                 Ok(())
             }),
     }
 }
 
 fn insert_tokens(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     tokens_to_insert: &[Token],
 ) -> Result<(), diesel::result::Error> {
     use schema::tokens::dsl::*;
@@ -120,7 +118,7 @@ fn insert_tokens(
 }
 
 fn insert_token_ownerships(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     token_ownerships_to_insert: &[TokenOwnership],
 ) -> Result<(), diesel::result::Error> {
     use schema::token_ownerships::dsl::*;
@@ -154,7 +152,7 @@ fn insert_token_ownerships(
 }
 
 fn insert_token_datas(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     token_datas_to_insert: &[TokenData],
 ) -> Result<(), diesel::result::Error> {
     use schema::token_datas::dsl::*;
@@ -183,7 +181,7 @@ fn insert_token_datas(
 }
 
 fn insert_collection_datas(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     collection_datas_to_insert: &[CollectionData],
 ) -> Result<(), diesel::result::Error> {
     use schema::collection_datas::dsl::*;
@@ -234,9 +232,9 @@ impl TransactionProcessor for TokenTransactionProcessor {
             all_collection_datas.append(&mut collection_datas);
         }
 
-        let conn = self.get_conn();
+        let mut conn = self.get_conn();
         let tx_result = insert_to_db(
-            &conn,
+            &mut conn,
             self.name(),
             start_version,
             end_version,
