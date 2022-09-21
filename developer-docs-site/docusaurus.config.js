@@ -310,6 +310,10 @@ const config = {
             to: "/tutorials/first-move-module",
             from: "/tutorials/first-move-module-cli",
           },
+          {
+            to: "/sdks/ts-sdk/index",
+            from: "/sdks/typescript-sdk",
+          },
         ],
       },
     ],
