@@ -24,6 +24,7 @@ import forge
 from forge import (
     Filesystem,
     ForgeCluster,
+    ForgeConfigBackend,
     ForgeContext,
     ForgeFormatter,
     ForgeJob,
@@ -52,17 +53,17 @@ from forge import (
     format_report,
     get_all_forge_jobs,
     get_dashboard_link,
+    get_humio_forge_link,
     get_humio_logs_link,
     get_testsuite_images,
     get_validator_logs_link,
     list_eks_clusters,
     main,
     sanitize_forge_resource_name,
+    validate_forge_config,
 )
 
 from click.testing import CliRunner
-
-from testsuite.forge import ForgeConfigBackend, ensure_forge_config, validate_forge_config
 
 
 class HasAssertMultiLineEqual(Protocol):
@@ -294,7 +295,7 @@ def fake_context(
             forge_num_validator_fullnodes="20",
             image_tag="asdf",
             upgrade_image_tag="upgrade_asdf",
-            forge_namespace="potato",
+            forge_namespace="forge-potato",
             forge_namespace_reuse="false",
             forge_namespace_keep="false",
             forge_enable_haproxy="false",
@@ -307,9 +308,9 @@ def fake_context(
         forge_image_tag="forge_asdf",
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
-        forge_namespace="potato",
+        forge_namespace="forge-potato",
         keep_port_forwards=False,
-        forge_cluster_name="tomato",
+        forge_cluster=ForgeCluster("tomato", "kubeconf"),
         forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",
@@ -334,7 +335,7 @@ class ForgeRunnerTests(unittest.TestCase):
             "test", "k8s-swarm",
             "--image-tag", "asdf",
             "--upgrade-image-tag", "upgrade_asdf",
-            "--namespace", "potato",
+            "--namespace", "forge-potato",
             "--port-forward",
             "--test-arg"
         ])
@@ -342,7 +343,7 @@ class ForgeRunnerTests(unittest.TestCase):
             OrderedDict(
                 [
                     (cargo_run, RunResult(0, b"orange"),),
-                    ("kubectl get pods -n potato", RunResult(0, b"Pods")),
+                    ("kubectl --kubeconfig kubeconf get pods -n forge-potato", RunResult(0, b"Pods")),
                 ]
             )
         )
@@ -361,27 +362,33 @@ class ForgeRunnerTests(unittest.TestCase):
             OrderedDict(
                 [
                     (
-                        "kubectl delete pod -n default -l forge-namespace=potato --force",
+                        "kubectl --kubeconfig kubeconf delete pod -n default -l forge-namespace=forge-potato --force",
                         RunResult(0, b""),
                     ),
                     (
-                        "kubectl wait -n default --for=delete pod -l forge-namespace=potato",
-                        RunResult(0, b""),
-                    ),
-                    ("kubectl apply -n default -f temp1", RunResult(0, b"")),
-                    (
-                        "kubectl wait -n default --timeout=5m --for=condition=Ready pod/potato-1659078000-asdf",
+                        "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
                         RunResult(0, b""),
                     ),
                     (
-                        "kubectl logs -n default -f potato-1659078000-asdf",
+                        "kubectl --kubeconfig kubeconf apply -n default -f temp1",
                         RunResult(0, b""),
                     ),
                     (
-                        "kubectl get pod -n default potato-1659078000-asdf -o jsonpath='{.status.phase}'",
+                        "kubectl --kubeconfig kubeconf wait -n default --timeout=5m --for=condition=Ready pod/forge-potato-1659078000-asdf",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "kubectl --kubeconfig kubeconf logs -n default -f forge-potato-1659078000-asdf",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "kubectl --kubeconfig kubeconf get pod -n default forge-potato-1659078000-asdf -o jsonpath='{.status.phase}'",
                         RunResult(0, b"Succeeded"),
                     ),
-                    ("kubectl get pods -n potato", RunResult(0, b"Pods")),
+                    (
+                        "kubectl --kubeconfig kubeconf get pods -n forge-potato",
+                        RunResult(0, b"Pods"),
+                    ),
                 ]
             )
         )
@@ -548,10 +555,26 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         filesystem.assert_reads(self)
         filesystem.assert_writes(self)
 
-    def testHumioLogLink(self) -> None:
+    def testGetHumioLogsLinkRelative(self) -> None:
         link = get_humio_logs_link("forge-pr-2983", True)
-        self.assertFixture(link, "testHumioLogLink.fixture")
+        self.assertFixture(link, "testGetHumioLogsLinkRelative.fixture")
         self.assertIn("forge-pr-2983", link)
+
+    def testGetHumioLogsLinkAbsolute(self) -> None:
+        time = FakeTime()
+        link = get_humio_logs_link("forge-pr-2984", (time.now(), time.now()))
+        self.assertFixture(link, "testGetHumioLogsLinkAbsolute.fixture")
+        self.assertIn("forge-pr-2984", link)
+
+    def testGetHumioForgeLinkRelative(self) -> None:
+        link = get_humio_forge_link("forge-pr-2985", True)
+        self.assertFixture(link, "testGetHumioForgeLinkRelative.fixture")
+        self.assertIn("forge-pr-2985", link)
+
+    def testGetHumioForgeLinkAbsolute(self) -> None:
+        link = get_humio_forge_link("forge-pr-2986", True)
+        self.assertFixture(link, "testGetHumioForgeLinkAbsolute.fixture")
+        self.assertIn("forge-pr-2986", link)
 
     def testValidatorLogsLink(self) -> None:
         self.assertFixture(
@@ -614,14 +637,17 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         )
 
     def testSanitizeForgeNamespaceSlashes(self) -> None:
-        namespace_with_slash = "banana/apple"
+        namespace_with_slash = "forge-banana/apple"
         namespace = sanitize_forge_resource_name(namespace_with_slash)
-        self.assertEqual(namespace, "banana-apple")
+        self.assertEqual(namespace, "forge-banana-apple")
 
     def testSanitizeForgeNamespaceTooLong(self) -> None:
-        namespace_too_long = "a" * 10000
+        namespace_too_long = "forge-" + "a" * 10000
         namespace = sanitize_forge_resource_name(namespace_too_long)
-        self.assertEqual(namespace, "a" * 64)
+        self.assertEqual(
+            namespace,
+            "forge-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
 
 
 class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
@@ -631,44 +657,46 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
         runner = CliRunner()
         shell = SpyShell(OrderedDict([
             ('aws sts get-caller-identity', RunResult(0, b'{"Account": "123456789012"}')),
-            ('kubectl config current-context', RunResult(0, b'aptos-banana')),
             ('git rev-parse HEAD~0', RunResult(0, b'banana')),
             (
                 'aws ecr describe-images --repository-name aptos/validator --im'
                 'age-ids imageTag=banana',
                 RunResult(0, b''),
             ),
-            ('aws eks update-kubeconfig --name forge-big-1', RunResult(0, b'')),
             (
-                'kubectl delete pod -n default -l forge-namespace=forge-perry-1659078000 '
+                'aws eks update-kubeconfig --name forge-big-1 --kubeconfig temp1',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl --kubeconfig temp1 delete pod -n default -l forge-namespace=forge-perry-1659078000 '
                 '--force',
                 RunResult(0, b''),
             ),
             (
-                'kubectl wait -n default --for=delete pod -l '
+                'kubectl --kubeconfig temp1 wait -n default --for=delete pod -l '
                 'forge-namespace=forge-perry-1659078000',
                 RunResult(0, b''),
             ),
             (
-                'kubectl apply -n default -f temp1',
+                'kubectl --kubeconfig temp1 apply -n default -f temp2',
                 RunResult(0, b''),
             ),
             (
-                'kubectl wait -n default --timeout=5m --for=condition=Ready '
+                'kubectl --kubeconfig temp1 wait -n default --timeout=5m --for=condition=Ready '
                 'pod/forge-perry-1659078000-1659078000-banana',
                 RunResult(0, b''),
             ),
             (
-                'kubectl logs -n default -f forge-perry-1659078000-1659078000-banana',
+                'kubectl --kubeconfig temp1 logs -n default -f forge-perry-1659078000-1659078000-banana',
                 RunResult(0, b''),
             ),
             (
-                'kubectl get pod -n default forge-perry-1659078000-1659078000-banana -o '
+                'kubectl --kubeconfig temp1 get pod -n default forge-perry-1659078000-1659078000-banana -o '
                 "jsonpath='{.status.phase}'",
                 RunResult(0, b''),
             ),
             (
-                'kubectl get pods -n forge-perry-1659078000',
+                'kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000',
                 RunResult(0, b''),
             )
         ]))
@@ -707,6 +735,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     lambda *_: FakeConfigBackend({
                         "enabled_clusters": ["forge-big-1"],
                         "all_clusters": ["forge-big-1", "banana"],
+                        "test_suites": {},
                     })
                 )
             )
@@ -729,6 +758,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     "--github-server-url", "None",
                     "--github-repository", "None",
                     "--github-run-id", "None",
+                    "banana-test",
                 ],
                 catch_exceptions=False,
             )
@@ -909,3 +939,49 @@ class ForgeConfigTests(unittest.TestCase):
             }),
             [],
         )
+
+    def testClusterDelete(self) -> None:
+        runner = CliRunner()
+        shell = SpyShell(OrderedDict([
+            (
+                'aws s3api get-object --bucket forge-wrapper-config --key '
+                'forge-wrapper-config.json temp1',
+                RunResult(0, b'')
+            ),
+            (
+                'aws s3api put-object --bucket forge-wrapper-config --key '
+                'forge-wrapper-config.json --body temp2',
+                RunResult(0, b'')
+            ),
+        ]))
+        clusters_before = {
+            "enabled_clusters": ["banana"],
+            "all_clusters": ["banana", "apple"],
+        }
+        clusters_after = {
+            **clusters_before,
+            "all_clusters": ["banana"],
+        }
+        filesystem = SpyFilesystem(
+            {
+                "temp2": json.dumps(clusters_after).encode(),
+            },
+            {
+                "temp1": json.dumps(clusters_before).encode(),
+            },
+        )
+        with ExitStack() as stack:
+            stack.enter_context(
+                patch.object(forge, "LocalShell", lambda: shell)
+            )
+            stack.enter_context(
+                patch.object(forge, "LocalFilesystem", lambda: filesystem)
+            )
+            runner.invoke(
+                main,
+                ["config", "cluster", "delete", "apple"],
+                catch_exceptions=False,
+            )
+            shell.assert_commands(self)
+            filesystem.assert_reads(self)
+            filesystem.assert_writes(self)
