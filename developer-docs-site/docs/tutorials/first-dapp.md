@@ -58,7 +58,7 @@ You will now have a basic React app up and running in your browser.
 
 ## Step 2: Integrate the Aptos Wallet Web3 API
 
-The Aptos Wallet provides a Web3 API for dapps at `window.aptos`. You can see how it works by opening up the browser console and running `await window.aptos.account()`. It will print out the address corresponding to the account you set up in the Aptos Wallet.
+The Aptos Wallet provides a Web3 API for dapps at `window.aptos`. You can see how it works by opening up the browser console and running `await window.aptos.connect()`. It will print out the address corresponding to the account you set up in the Aptos Wallet.
 
 Next we will update our app to use this API to display the Wallet account's address.
 
@@ -209,16 +209,16 @@ We will use the Aptos CLI to compile and publish the `HelloBlockchain` module.
 2. Next, use the `aptos move publish` command (replacing `/path/to/hello_blockchain/` and `<address>`):
 
 ```console
-$ aptos move publish --package-dir /path/to/hello_blockchain/ --named-addresses HelloBlockchain=<address>
+$ aptos move publish --package-dir /path/to/hello_blockchain/ --named-addresses hello_blockchain=<address>
 ```
 
 For example:
 
 ```console
-$ aptos move publish --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
+$ aptos move publish --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
 ```
 
-The `--named-addresses` replaces the named address `HelloBlockchain` in `HelloBlockchain.move` with the specified address. For example, if we specify `--named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
+The `--named-addresses` replaces the named address `HelloBlockchain` in `HelloBlockchain.move` with the specified address. For example, if we specify `--named-addresses hello_blockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
 
 ```move
 module HelloBlockchain::message {
@@ -319,19 +319,19 @@ function App() {
   // ...
 
   // Check for the module; show publish instructions if not present.
-  const [modules, setModules] = React.useState<Types.MoveModule[]>([]);
+  const [modules, setModules] = React.useState<Types.MoveModuleByteCode[]>([]);
   React.useEffect(() => {
     if (!address) return;
     client.getAccountModules(address).then(setModules);
   }, [address]);
 
-  const hasModule = modules.some((m) => m.abi?.name === 'Message');
+  const hasModule = modules.some((m) => m.abi?.name === 'message');
   const publishInstructions = (
     <pre>
       Run this command to publish the module:
       <br />
       aptos move publish --package-dir /path/to/hello_blockchain/
-      --named-addresses HelloBlockchain={address}
+      --named-addresses hello_blockchain={address}
     </pre>
   );
 
@@ -370,30 +370,6 @@ To call this function, we need to use the `window.aptos` API provided by the wal
 
 There is no need to provide the `account: signer` argument. Aptos provides it automatically.
 
-However, we do need to specify the `message_bytes` argument: this is the `"<hex encoded utf-8 message>"` in the transaction. We need a way to convert a JS string to this format. We can do so by using `TextEncoder` to convert to utf-8 bytes and then a one-liner to hex encode the bytes.
-
-Add this function to `src/App.tsx`:
-
-```typescript
-/** Convert string to hex-encoded utf-8 bytes. */
-function stringToHex(text: string) {
-  const encoder = new TextEncoder();
-  const encoded = encoder.encode(text);
-  return Array.from(encoded, (i) => i.toString(16).padStart(2, "0")).join("");
-}
-```
-
-Using this function, our transaction payload becomes:
-
-```javascript
-{
-  type: "entry_function_payload",
-  function: "<address>::message::set_message",
-  arguments: [stringToHex(message)],
-  type_arguments: []
-}
-```
-
 ### Use the `window.aptos` API to submit the `set_message` transaction
 
 Now that we understand how to use a transaction to call the `set_message` function, next we call this function from our app using `window.aptos.signAndSubmitTransaction()`.
@@ -420,7 +396,7 @@ function App() {
     const transaction = {
       type: "entry_function_payload",
       function: `${address}::message::set_message`,
-      arguments: [stringToHex(message)],
+      arguments: [message],
       type_arguments: [],
     };
 
@@ -480,7 +456,7 @@ function App() {
   // ...
 
   // Get the message from account resources.
-  const [resources, setResources] = React.useState<Types.AccountResource[]>([]);
+  const [resources, setResources] = React.useState<Types.MoveResource[]>([]);
   React.useEffect(() => {
     if (!address) return;
     client.getAccountResources(address).then(setResources);
