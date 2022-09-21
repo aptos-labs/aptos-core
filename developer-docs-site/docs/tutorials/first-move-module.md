@@ -208,7 +208,7 @@ where, after a call to set the message to `hello, blockchain, again`, the event 
 
 :::tip
 
-Other accounts can reuse the published module by calling the exact same function as in this example. It is left as an exercise to validate this.
+Other accounts can reuse the published module by calling the exact same function as in this example. It is left as an exercise to the reader.
 
 :::
 
