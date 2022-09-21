@@ -6,6 +6,7 @@
 use aptos_config::config::NodeConfig;
 use aptos_logger::{
     aptos_logger::RUST_LOG_TELEMETRY, prelude::*, telemetry_log_writer::TelemetryLog,
+    LoggerFilterUpdater,
 };
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
@@ -104,6 +105,7 @@ pub fn start_telemetry_service(
     chain_id: ChainId,
     build_info: BTreeMap<String, String>,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> Option<Runtime> {
     // Don't start the service if telemetry has been disabled
     if telemetry_is_disabled() {
@@ -128,6 +130,7 @@ pub fn start_telemetry_service(
         chain_id,
         build_info,
         remote_log_rx,
+        log_filter_updater_job,
     ));
 
     Some(telemetry_runtime)
@@ -138,6 +141,7 @@ async fn spawn_telemetry_service(
     chain_id: ChainId,
     build_info: BTreeMap<String, String>,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    log_filter_updater_job: Option<LoggerFilterUpdater>,
 ) {
     let telemetry_svc_url =
         env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
@@ -176,6 +180,11 @@ async fn spawn_telemetry_service(
     try_spawn_metrics_sender(telemetry_sender.clone());
     try_spawn_custom_event_sender(node_config, telemetry_sender.clone(), chain_id, build_info);
     try_spawn_log_env_poll_task(telemetry_sender);
+
+    // Run the logger filter update job within the telemetry runtime.
+    if let Some(job) = logger_filter_update_job {
+        tokio::spawn(job.run());
+    }
 
     info!("Telemetry service started!");
 }

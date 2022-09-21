@@ -34,6 +34,7 @@ use std::{
     thread,
 };
 use strum_macros::EnumString;
+use tokio::time;
 
 const RUST_LOG: &str = "RUST_LOG";
 const RUST_LOG_REMOTE: &str = "RUST_LOG_REMOTE";
@@ -44,7 +45,7 @@ pub const CHANNEL_SIZE: usize = 10000;
 const NUM_SEND_RETRIES: u8 = 1;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
 const FILTER_REFRESH_INTERVAL: Duration =
-    Duration::from_secs(15 /* minutes */ * 60 /* seconds */);
+    Duration::from_secs(5 /* minutes */ * 60 /* seconds */);
 
 #[derive(EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -780,14 +781,15 @@ impl LoggerFilterUpdater {
         }
     }
 
-    pub fn run(self) {
-        thread::spawn(move || loop {
-            thread::sleep(FILTER_REFRESH_INTERVAL);
+    pub async fn run(self) {
+        let mut interval = time::interval(FILTER_REFRESH_INTERVAL);
+        loop {
+            interval.tick().await;
 
             self.update_filter();
 
             info!("Logger filters rebuilt and reset.");
-        });
+        }
     }
 
     fn update_filter(&self) {
