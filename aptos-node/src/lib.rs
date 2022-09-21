@@ -19,7 +19,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
-use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level};
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -212,7 +212,7 @@ pub fn start(
         remote_log_rx = Some(rx);
     }
     let logger = logger_builder.build();
-    aptos_logger::LoggerFilterUpdater::new(logger, logger_builder).run();
+    let logger_filter_update_job = aptos_logger::LoggerFilterUpdater::new(logger, logger_builder);
 
     // Print out build information.
     log_build_information();
@@ -231,7 +231,7 @@ pub fn start(
         warn!("failpoints is set in config, but the binary doesn't compile with this feature");
     }
 
-    let _node_handle = setup_environment(config, remote_log_rx)?;
+    let _node_handle = setup_environment(config, remote_log_rx, Some(logger_filter_update_job))?;
 
     let term = Arc::new(AtomicBool::new(false));
 
@@ -581,6 +581,7 @@ fn bootstrap_indexer(
 pub fn setup_environment(
     node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
     // Start the node inspection service
     let node_config_clone = node_config.clone();
@@ -865,6 +866,7 @@ pub fn setup_environment(
         chain_id,
         build_info,
         remote_log_rx,
+        logger_filter_update_job,
     );
 
     Ok(AptosHandle {
@@ -901,6 +903,6 @@ mod tests {
         validator_network.mutual_authentication = false;
 
         // Starting the node should panic
-        setup_environment(node_config, None).unwrap();
+        setup_environment(node_config, None, None).unwrap();
     }
 }
