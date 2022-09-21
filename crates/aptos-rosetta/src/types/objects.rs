@@ -513,6 +513,7 @@ impl Transaction {
                     write_op,
                     &events,
                     maybe_user_txn.map(|inner| inner.sender()),
+                    maybe_user_txn.map(|inner| inner.payload()),
                     txn.version,
                     operation_index,
                 )
@@ -523,7 +524,7 @@ impl Transaction {
         } else {
             // Parse all failed operations from the payload
             if let Some(user_txn) = maybe_user_txn {
-                let mut ops = parse_operations_from_txn_payload(
+                let mut ops = parse_failed_operations_from_txn_payload(
                     coin_cache.clone(),
                     operation_index,
                     user_txn.sender(),
@@ -568,7 +569,7 @@ impl Transaction {
 ///
 /// This case only occurs if the transaction failed, and that's because it's less accurate
 /// than just following the state changes
-fn parse_operations_from_txn_payload(
+fn parse_failed_operations_from_txn_payload(
     coin_cache: Arc<CoinCache>,
     operation_index: u64,
     sender: AccountAddress,
@@ -706,10 +707,40 @@ async fn parse_operations_from_write_set(
     write_op: &WriteOp,
     events: &[ContractEvent],
     maybe_sender: Option<AccountAddress>,
+    maybe_payload: Option<&TransactionPayload>,
     version: u64,
     operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
     let operations = vec![];
+
+    // If we have any entry functions that don't provide proper event based changes, we have to
+    // pull the changes possibly from the payload.  This is more fragile, as it doesn't support
+    // move scripts and wrapper entry functions.
+    if let (Some(TransactionPayload::EntryFunction(inner)), Some(sender)) =
+        (maybe_payload, maybe_sender)
+    {
+        if let (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) = (
+            *inner.module().address(),
+            inner.module().name().as_str(),
+            inner.function().as_str(),
+        ) {
+            return if let Some(Ok(voter)) = inner
+                .args()
+                .get(0)
+                .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
+            {
+                Ok(vec![Operation::set_voter(
+                    operation_index,
+                    Some(OperationStatusType::Success),
+                    voter,
+                    sender,
+                )])
+            } else {
+                warn!("Failed to parse set voter {:?}", inner);
+                Ok(vec![])
+            };
+        }
+    }
 
     let (struct_tag, address) = match state_key {
         StateKey::AccessPath(path) => {
