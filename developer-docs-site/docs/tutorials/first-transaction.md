@@ -1,7 +1,6 @@
 ---
 title: "Your First Transaction"
 slug: "your-first-transaction"
-sidebar_position: 0
 ---
 
 import Tabs from '@theme/Tabs';
@@ -9,21 +8,22 @@ import TabItem from '@theme/TabItem';
 
 # Your First Transaction
 
-This tutorial introduces the Aptos SDKs and how to generate, submit, and verify transactions submitted to the Aptos blockchain. We will be running the `transfer-coin` example.
+This tutorial describes how to generate and submit transactions to the Aptos blockchain, and verify these submitted transactions. The `transfer-coin` example used in this tutorial is built with the Aptos SDKs.
 
 ## Step 1: Pick an SDK
 
-* [Official Aptos Typescript SDK][typescript-sdk]
-* [Official Aptos Python SDK][python-sdk]
-* [Official Aptos Rust SDK][rust-sdk]
+Install your preferred SDK from the below list:
 
-## Step 2: Run the Example
+* [Typescript SDK][typescript-sdk]
+* [Python SDK][python-sdk]
+* [Rust SDK][rust-sdk]
 
-Clone `aptos-core`:
+## Step 2: Run the example
+
+Clone the `aptos-core` repo:
 ```sh
 git clone https://github.com/aptos-labs/aptos-core.git
 ```
-
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -38,7 +38,8 @@ git clone https://github.com/aptos-labs/aptos-core.git
   yarn install
   ```
 
-  Run the `transfer_coin` example:
+  Run the [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) example:
+  
   ```sh
   yarn run transfer_coin
   ```
