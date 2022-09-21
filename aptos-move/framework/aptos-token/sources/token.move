@@ -365,6 +365,11 @@ module aptos_token::token {
         direct_transfer(sender, receiver, token_id, amount);
     }
 
+    /// Deprecated function call
+    public entry fun initialize_token_script(_account: &signer) {
+        abort 0
+    }
+
     public entry fun opt_in_direct_transfer(account: &signer, opt_in: bool) acquires TokenStore {
         let addr = signer::address_of(account);
         initialize_token_store(account);
@@ -531,6 +536,11 @@ module aptos_token::token {
     ) acquires TokenStore {
         let token = withdraw_token(sender, token_id, amount);
         deposit_token(receiver, token);
+    }
+
+    /// Deprecated function call
+    public fun initialize_token(_account: &signer, _token_id: TokenId) {
+        abort 0
     }
 
     public fun initialize_token_store(account: &signer) {
