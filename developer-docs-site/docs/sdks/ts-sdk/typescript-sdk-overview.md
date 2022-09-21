@@ -1,16 +1,16 @@
 ---
-title: "Aptos SDK Overview"
-slug: "aptos-sdk-overview"
+title: "Typescript SDK Overview"
+slug: "typescript-sdk-overview"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Aptos SDK Overview
+# Typescript SDK Overview
 
-This document describes the main features and components of the Aptos SDK.
+This document describes the main features and components of the Aptos Typescript SDK.
 
-The Aptos SDK provides APIs and interfaces you can use to interact with the Aptos blockchain by connecting to the Aptos REST API. The REST API is the means for sending your transaction to the Aptos blockchain and reading the blockchain's state.
+The Aptos Typescript SDK provides APIs and interfaces you can use to interact with the Aptos blockchain by connecting to the Aptos REST API. The REST API is the means for sending your transaction to the Aptos blockchain and reading the blockchain's state.
 
 See below a high-level architecture diagram of the Aptos Typescript SDK.
 

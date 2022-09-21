@@ -22,9 +22,9 @@ use serde::{Deserialize, Serialize};
     Queryable,
     Serialize,
 )]
-#[belongs_to(Transaction, foreign_key = "version")]
-#[primary_key("version")]
-#[diesel(table_name = "block_metadata_transactions")]
+#[diesel(belongs_to(Transaction, foreign_key = version))]
+#[diesel(primary_key(version))]
+#[diesel(table_name = block_metadata_transactions)]
 pub struct BlockMetadataTransaction {
     pub version: i64,
     pub block_height: i64,

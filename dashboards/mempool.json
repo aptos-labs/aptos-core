@@ -121,7 +121,6 @@
           },
           "custom": {
             "axisPlacement": "auto",
-            "axisSoftMax": 10,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -1668,7 +1667,6 @@
           },
           "custom": {
             "axisPlacement": "auto",
-            "axisSoftMax": 10,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -1725,7 +1723,6 @@
           },
           "custom": {
             "axisPlacement": "auto",
-            "axisSoftMax": 10,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -1782,7 +1779,6 @@
           },
           "custom": {
             "axisPlacement": "auto",
-            "axisSoftMax": 10,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -3443,7 +3439,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 39,
+  "version": 41,
   "links": [
     {
       "title": "Other Dashboards",

@@ -6,6 +6,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+N/A
+
+## 1.3.14 (2022-09-20)
+
 - Enable SDK axios client to carry cookies for both the browser and node environments.
 - Added new functions `getBlockByHeight` and `getBlockByVersion`.
 
