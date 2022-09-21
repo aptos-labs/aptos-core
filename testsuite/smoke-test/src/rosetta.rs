@@ -1180,6 +1180,7 @@ async fn parse_operations(
                     }
                 };
             }
+            operation_type => panic!("Unhandled operation type {}", operation_type),
         }
     }
 
