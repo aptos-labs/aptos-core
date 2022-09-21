@@ -84,8 +84,8 @@ async function main() {
   console.log(`Alice: ${alice.address()}`);
   console.log(`Bob: ${bob.address()}`);
 
-  await faucetClient.fundAccount(alice.address(), 20_000);
-  await faucetClient.fundAccount(bob.address(), 20_000);
+  await faucetClient.fundAccount(alice.address(), 100_000_000);
+  await faucetClient.fundAccount(bob.address(), 100_000_000);
 
   await new Promise<void>((resolve) => {
     readline.question("Update the module with Alice's address, compile, and press enter.", () => {
