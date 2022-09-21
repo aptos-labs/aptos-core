@@ -18,7 +18,6 @@ use aptos_config::config::{
 };
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
-    APTOS_JELLYFISH_STORAGE_READS,
 };
 use aptosdb::AptosDB;
 
@@ -178,10 +177,6 @@ fn add_accounts_impl(
     // Write metadata
     generator.write_meta(&output_dir, num_new_accounts);
 
-    println!(
-        "Total reads from storage: {}",
-        APTOS_JELLYFISH_STORAGE_READS.get()
-    );
     println!(
         "Total written internal nodes value size: {} bytes",
         APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES.get()

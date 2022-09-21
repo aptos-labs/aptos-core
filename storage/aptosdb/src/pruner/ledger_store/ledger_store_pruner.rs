@@ -20,7 +20,6 @@ use crate::{
     },
     EventStore, StateStore, TransactionStore,
 };
-
 use aptos_logger::warn;
 use aptos_types::transaction::{AtomicVersion, Version};
 use schemadb::{ReadOptions, SchemaBatch, DB};
