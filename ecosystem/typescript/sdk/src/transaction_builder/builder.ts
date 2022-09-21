@@ -29,7 +29,7 @@ import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArg
 import { HexString, MaybeHexString } from "../hex_string";
 import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 import * as Gen from "../generated/index";
-import { MemoizeExpiring } from "../utils";
+import { DEFAULT_TXN_EXP_SEC_FROM_NOW, DEFAULT_MAX_GAS_AMOUNT, MemoizeExpiring } from "../utils";
 
 export { TypeTagParser } from "./builder_utils";
 
@@ -192,8 +192,8 @@ export class TransactionBuilderABI {
     });
 
     this.builderConfig = {
-      maxGasAmount: BigInt(2000),
-      expSecFromNow: 20,
+      maxGasAmount: BigInt(DEFAULT_MAX_GAS_AMOUNT),
+      expSecFromNow: DEFAULT_TXN_EXP_SEC_FROM_NOW,
       ...builderConfig,
     };
   }
