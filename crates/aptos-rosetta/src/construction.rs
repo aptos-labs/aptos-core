@@ -402,6 +402,9 @@ async fn construction_parse(
                 (AccountAddress::ONE, STAKE_MODULE, SET_OPERATOR_FUNCTION) => {
                     parse_set_operator_operation(sender, &type_args, &args)?
                 }
+                (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) => {
+                    parse_set_voter_operation(sender, &type_args, &args)?
+                }
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
                         "Unsupported entry function type {:x}::{}::{}",
@@ -547,7 +550,6 @@ fn parse_set_operator_operation(
     type_args: &[TypeTag],
     args: &[Vec<u8>],
 ) -> ApiResult<Vec<Operation>> {
-    // There are no typeargs for create account
     if !type_args.is_empty() {
         return Err(ApiError::TransactionParseError(Some(format!(
             "Set operator should not have type arguments: {:?}",
@@ -562,7 +564,30 @@ fn parse_set_operator_operation(
         Ok(vec![Operation::set_operator(0, None, sender, operator)])
     } else {
         Err(ApiError::InvalidOperations(Some(
-            "Set operator doesn't have an address argument".to_string(),
+            "Set operator doesn't have a operator argument".to_string(),
+        )))
+    }
+}
+
+fn parse_set_voter_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Set voter should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    if let Some(encoded_operator) = args.first() {
+        let operator: AccountAddress = bcs::from_bytes(encoded_operator)?;
+
+        Ok(vec![Operation::set_voter(0, None, sender, operator)])
+    } else {
+        Err(ApiError::InvalidOperations(Some(
+            "Set voter doesn't have a voter argument".to_string(),
         )))
     }
 }
