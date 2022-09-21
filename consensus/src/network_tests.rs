@@ -611,7 +611,8 @@ mod tests {
                 peers[0],
                 placeholder_ledger_info(),
                 &signers[0],
-            ),
+            )
+            .unwrap(),
             test_utils::placeholder_sync_info(),
         );
         let previous_qc = certificate_for_genesis();
@@ -719,7 +720,8 @@ mod tests {
                 peers[0],
                 placeholder_ledger_info(),
                 &signers[0],
-            ),
+            )
+            .unwrap(),
             test_utils::placeholder_sync_info(),
         );
 

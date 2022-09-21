@@ -305,7 +305,8 @@ mod tests {
         // create random vote from validator[0]
         let li1 = random_ledger_info();
         let vote_data_1 = random_vote_data();
-        let vote_data_1_author_0 = Vote::new(vote_data_1, signers[0].author(), li1, &signers[0]);
+        let vote_data_1_author_0 =
+            Vote::new(vote_data_1, signers[0].author(), li1, &signers[0]).unwrap();
 
         // first time a new vote is added -> VoteAdded
         assert_eq!(
@@ -327,7 +328,8 @@ mod tests {
             signers[0].author(),
             li2.clone(),
             &signers[0],
-        );
+        )
+        .unwrap();
         assert_eq!(
             pending_votes.insert_vote(&vote_data_2_author_0, &validator),
             VoteReceptionResult::EquivocateVote
@@ -339,14 +341,16 @@ mod tests {
             signers[1].author(),
             li2.clone(),
             &signers[1],
-        );
+        )
+        .unwrap();
         assert_eq!(
             pending_votes.insert_vote(&vote_data_2_author_1, &validator),
             VoteReceptionResult::VoteAdded(1)
         );
 
         // two votes for the ledger info -> NewQuorumCertificate
-        let vote_data_2_author_2 = Vote::new(vote_data_2, signers[2].author(), li2, &signers[2]);
+        let vote_data_2_author_2 =
+            Vote::new(vote_data_2, signers[2].author(), li2, &signers[2]).unwrap();
         match pending_votes.insert_vote(&vote_data_2_author_2, &validator) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc.ledger_info().check_voting_power(&validator).is_ok());
@@ -368,7 +372,7 @@ mod tests {
         // submit a new vote from validator[0] -> VoteAdded
         let li0 = random_ledger_info();
         let vote0 = random_vote_data();
-        let mut vote0_author_0 = Vote::new(vote0, signers[0].author(), li0, &signers[0]);
+        let mut vote0_author_0 = Vote::new(vote0, signers[0].author(), li0, &signers[0]).unwrap();
 
         assert_eq!(
             pending_votes.insert_vote(&vote0_author_0, &validator),
@@ -388,7 +392,7 @@ mod tests {
         // another vote for a different block cannot form a TC if it doesn't have a timeout signature
         let li1 = random_ledger_info();
         let vote1 = random_vote_data();
-        let mut vote1_author_1 = Vote::new(vote1, signers[1].author(), li1, &signers[1]);
+        let mut vote1_author_1 = Vote::new(vote1, signers[1].author(), li1, &signers[1]).unwrap();
         assert_eq!(
             pending_votes.insert_vote(&vote1_author_1, &validator),
             VoteReceptionResult::VoteAdded(1)
@@ -409,7 +413,7 @@ mod tests {
 
         let li2 = random_ledger_info();
         let vote2 = random_vote_data();
-        let mut vote2_author_2 = Vote::new(vote2, signers[2].author(), li2, &signers[2]);
+        let mut vote2_author_2 = Vote::new(vote2, signers[2].author(), li2, &signers[2]).unwrap();
 
         // if that vote is now enhanced with a timeout signature -> NewTimeoutCertificate.
         let timeout = vote2_author_2.generate_2chain_timeout(certificate_for_genesis());
