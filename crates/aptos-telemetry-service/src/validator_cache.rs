@@ -12,13 +12,12 @@ use tokio::time;
 use tracing::{debug, error};
 use url::Url;
 
-pub type EpochNum = u64;
-pub type PeerSetCache = Arc<RwLock<HashMap<ChainId, (EpochNum, PeerSet)>>>;
+use crate::types::common::EpochedPeerStore;
 
 #[derive(Clone)]
 pub struct PeerSetCacheUpdater {
-    validators: PeerSetCache,
-    validator_fullnodes: PeerSetCache,
+    validators: Arc<RwLock<EpochedPeerStore>>,
+    validator_fullnodes: Arc<RwLock<EpochedPeerStore>>,
 
     query_addresses: Arc<HashMap<ChainId, String>>,
     update_interval: time::Duration,
@@ -26,8 +25,8 @@ pub struct PeerSetCacheUpdater {
 
 impl PeerSetCacheUpdater {
     pub fn new(
-        validators: PeerSetCache,
-        validator_fullnodes: PeerSetCache,
+        validators: Arc<RwLock<EpochedPeerStore>>,
+        validator_fullnodes: Arc<RwLock<EpochedPeerStore>>,
         trusted_full_node_addresses: HashMap<ChainId, String>,
         update_interval: Duration,
     ) -> Self {
