@@ -103,7 +103,7 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
 
   const isSentPrefix = isSent ? '-' : '+';
   const amountString = (formattedCoinName === APTOS_UNIT)
-    ? `${isSentPrefix}${formatCoin(Number(amount), { decimals: 8 })}`
+    ? `${isSentPrefix}${formatCoin(BigInt(amount), { decimals: 8 })}`
     : `${isSentPrefix}${numeral(amount).format('0,0')}`;
 
   return (

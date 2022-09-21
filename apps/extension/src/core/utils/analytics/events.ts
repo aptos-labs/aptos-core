@@ -188,7 +188,7 @@ export const coinEvents = eventSchemaTypeCheck({
 } as const);
 
 export interface CoinEventParams {
-  amount?: number;
+  amount?: bigint | number;
   coinType?: string;
   fromAddress?: MaybeHexString;
   toAddress?: MaybeHexString;
@@ -259,7 +259,7 @@ export const collectiblesEvents = eventSchemaTypeCheck({
 } as const);
 
 export interface CollectibleEventParams {
-  amount?: number;
+  amount?: bigint | number;
   collectionName?: string;
   description?: string;
   fromAddress?: MaybeHexString;
@@ -298,7 +298,7 @@ export const faucetEvents = eventSchemaTypeCheck({
 
 export interface FaucetEventParams {
   address?: MaybeHexString;
-  amount?: number;
+  amount?: bigint | number;
 }
 
 /**

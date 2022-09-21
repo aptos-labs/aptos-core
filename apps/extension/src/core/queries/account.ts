@@ -81,17 +81,17 @@ export const useAccountExists = ({
  */
 export function useAccountOctaCoinBalance(
   address: string | undefined,
-  options?: UseQueryOptions<number>,
+  options?: UseQueryOptions<bigint>,
 ) {
   const { aptosClient } = useNetworks();
 
-  return useQuery<number>(
+  return useQuery<bigint>(
     [accountQueryKeys.getAccountOctaCoinBalance, address],
     async () => aptosClient.getAccountResource(address!, aptosCoinStoreStructTag)
-      .then((res: any) => Number(res.data.coin.value))
+      .then((res: any) => BigInt(res.data.coin.value))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
-          return 0;
+          return 0n;
         }
         throw err;
       }),
@@ -172,7 +172,7 @@ type AccountCoinResource = {
   name: string;
   symbol: string;
   type: string;
-  value: number;
+  value: bigint;
 };
 
 /**
@@ -200,7 +200,7 @@ export function useAccountCoinResources(
               coinInfoAddress,
               coinInfoStructTag,
               type: item.type,
-              value: Number(item.data.coin.value),
+              value: BigInt(item.data.coin.value),
             });
           }
         });
@@ -242,17 +242,17 @@ export function useAccountCoinResources(
  */
 export function useAccountStakeBalance(
   address: string | undefined,
-  options?: UseQueryOptions<number>,
+  options?: UseQueryOptions<bigint>,
 ) {
   const { aptosClient } = useNetworks();
 
-  return useQuery<number>(
+  return useQuery<bigint>(
     [accountQueryKeys.getAccountStakeBalance, address],
     async () => aptosClient.getAccountResource(address!, aptosStakePoolStructTag)
-      .then((res: any) => Number(res.data.active.value))
+      .then((res: any) => BigInt(res.data.active.value))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
-          return 0;
+          return 0n;
         }
         throw err;
       }),
@@ -268,7 +268,7 @@ export interface StakeInfo {
   delegatedVoter: MaybeHexString;
   lockedUntilSecs: string;
   operatorAddress: MaybeHexString;
-  value: number;
+  value: bigint;
 }
 
 /**
@@ -292,7 +292,7 @@ export function useAccountStakeInfo(
             delegatedVoter: res.data.delegated_voter,
             lockedUntilSecs: res.data.locked_until_secs,
             operatorAddress: res.data.operator_address,
-            value: Number(res.data.active.value),
+            value: BigInt(res.data.active.value),
           } as StakeInfo));
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {

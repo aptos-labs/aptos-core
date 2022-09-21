@@ -24,7 +24,7 @@ interface AnalyticsGeneralEventParams {
   page: string;
   params?: CombinedEventParams;
   screen: string;
-  value?: number;
+  value?: bigint;
 }
 
 type AnalyticsPageEventParams = Omit<AnalyticsGeneralEventParams, 'screen' | 'eventType'>;

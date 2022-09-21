@@ -36,9 +36,9 @@ export default function useTransactionDetails(version?: number) {
   const defaultCoinName = payload.type_arguments[0]?.split('::').pop();
   const coinName = formatCoinName(defaultCoinName);
   const amount = (coinName === APTOS_UNIT)
-    ? formatCoin(Number(payload.arguments[1]), { decimals: 8 })
-    : `${numeral(Number(payload.arguments[1])).format('0,0')} ${coinName}`;
-  const gasUsed = formatCoin(Number(txn.gas_used), { decimals: 8 });
+    ? formatCoin(BigInt(payload.arguments[1]), { decimals: 8 })
+    : `${numeral(BigInt(payload.arguments[1])).format('0,0')} ${coinName}`;
+  const gasUsed = formatCoin(BigInt(txn.gas_used), { decimals: 8 });
 
   return {
     amount,

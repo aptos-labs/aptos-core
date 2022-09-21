@@ -178,7 +178,6 @@ export function useTransactionSimulation(
         const maxGasAmountEstimate = Math.floor(options.maxGasOctaAmount / gasUnitPriceEstimate);
         txnOptions.maxGasAmount = Math.min(maxGasAmountEstimate, maxNumberOfGasUnits);
       }
-
       const rawTxn = await buildRawTransaction(payload, txnOptions);
       try {
         return await simulateTransaction(rawTxn);

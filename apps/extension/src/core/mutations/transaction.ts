@@ -17,7 +17,7 @@ import { useAnalytics } from 'core/hooks/useAnalytics';
 
 export interface UseCoinTransferParams {
   doesRecipientExist: boolean | undefined,
-  octaAmount: number | undefined,
+  octaAmount: bigint | undefined,
   recipient: string | undefined,
 }
 
@@ -36,10 +36,10 @@ export function useCoinTransferSimulation(
 ) {
   const isReady = recipient !== undefined
     && octaAmount !== undefined
-    && octaAmount >= 0;
+    && octaAmount >= 0n;
 
   return useTransactionSimulation(
-    [queryKeys.getCoinTransferSimulation, recipient, octaAmount],
+    [queryKeys.getCoinTransferSimulation, recipient, octaAmount?.toString()],
     () => (doesRecipientExist
       ? buildCoinTransferPayload(recipient!, octaAmount!)
       : buildAccountTransferPayload(recipient!, octaAmount!)),
@@ -51,7 +51,7 @@ export function useCoinTransferSimulation(
 }
 
 export interface SubmitCoinTransferParams {
-  amount: number,
+  amount: bigint,
   doesRecipientExist: boolean,
   recipient: string,
 }

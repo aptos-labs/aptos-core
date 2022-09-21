@@ -14,7 +14,7 @@ interface GenerateUnitStringParams {
   isLowercase: boolean;
   unitType: string;
   usePlural: boolean;
-  value?: number;
+  value?: bigint;
 }
 
 /**
@@ -28,7 +28,7 @@ const generateUnitString = ({
   value,
 }: GenerateUnitStringParams) => {
   let result: GenerateUnitStringParams['unitType'] | typeof PLURAL_OCTA_UNIT = unitType;
-  if (usePlural && value !== 1 && value !== 0) {
+  if (usePlural && value !== 1n && value !== 0n) {
     switch (unitType) {
       case 'APT':
         result = unitType;
@@ -72,7 +72,12 @@ const generateNumeralFormat = (decimals: number) => {
 interface NumeralTransformerParams {
   format: ReturnType<typeof generateNumeralFormat>;
   multiplier: number;
-  value: number;
+  value: bigint;
+}
+
+function zeroPad(number: bigint, decimals: number) {
+  const zero = decimals - number.toString().length + 1;
+  return Array(+(zero > 0 && zero)).join('0') + number;
 }
 
 /**
@@ -85,16 +90,21 @@ const numeralTransformer = ({
   multiplier,
   value,
 }: NumeralTransformerParams) => {
-  const signMultiplier = (value < 0) ? -1 : 1;
-  const valByMultiplier = signMultiplier * value * multiplier;
+  const inverseMultiplier = multiplier ** -1;
+  const integral = value / BigInt(inverseMultiplier);
+  const fractional = value % BigInt(inverseMultiplier);
 
-  // the if condition should always be positive
-  if (value > 0 && valByMultiplier < 1e-6) {
-    return numeral(signMultiplier * valByMultiplier * 100)
+  // If number is < 1e-6, we need to workaround https://bit.ly/3Ry6S63
+  if (value > 0 && integral === 0n && fractional < 1e2) {
+    const newFractional = fractional * 100n;
+    const paddedFractional = zeroPad(newFractional, inverseMultiplier.toString().length - 1);
+    return numeral(`${integral}.${paddedFractional}`)
       .format(format)
       .replace('0.0', '0.000');
   }
-  return numeral(signMultiplier * valByMultiplier).format(format);
+
+  const paddedFractional = zeroPad(fractional, inverseMultiplier.toString().length - 1);
+  return numeral(`${integral}.${paddedFractional}`).format(format);
 };
 
 interface FormatCoinOptions {
@@ -116,10 +126,11 @@ export const aptToOcta = (octa: number) => octa * OCTA_POSITIVE_EXPONENT;
  * @param {Number} value The value that a coin has
  * @param {FormatCoinParams} opts Specify custom properties for formatting the coin
  */
-export const formatCoin = (value?: number, opts: FormatCoinOptions = {}) => {
+export const formatCoin = (value?: bigint | number, opts: FormatCoinOptions = {}) => {
   if (opts.isNonNegative && value && value < 0) {
     throw new Error('Value cannot be negative');
   }
+  const coinValue = (typeof value === 'bigint') ? value : BigInt(value ?? 0);
   const {
     decimals = 4,
     includeUnit = true,
@@ -137,13 +148,13 @@ export const formatCoin = (value?: number, opts: FormatCoinOptions = {}) => {
     transformedNumeral = numeralTransformer({
       format: numeralFormat,
       multiplier: 1,
-      value: value ?? 0,
+      value: coinValue,
     });
   } else {
     transformedNumeral = numeralTransformer({
       format: numeralFormat,
       multiplier,
-      value: value ?? 0,
+      value: coinValue,
     });
   }
 
@@ -154,7 +165,7 @@ export const formatCoin = (value?: number, opts: FormatCoinOptions = {}) => {
       isLowercase,
       unitType: returnUnitType,
       usePlural,
-      value,
+      value: coinValue,
     });
   }
 

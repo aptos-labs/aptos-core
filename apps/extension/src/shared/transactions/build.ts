@@ -12,14 +12,14 @@ import { accountNamespace, aptosCoinStructTag, coinNamespace } from 'core/consta
 
 export interface TransactionOptions {
   expirationSecondsFromNow?: number,
-  gasUnitPrice?: number | bigint,
-  maxGasAmount?: number | bigint,
+  gasUnitPrice?: number,
+  maxGasAmount?: number,
 }
 
 export const defaultTransactionOptions = {
   expirationSecondsFromNow: 20,
-  gasUnitPrice: 1n,
-  maxGasAmount: 10000n,
+  gasUnitPrice: 1,
+  maxGasAmount: 10000,
 };
 
 type TransactionPayload = TxnBuilderTypes.TransactionPayload;
@@ -99,7 +99,7 @@ export function buildCreateAccountPayload(address: MaybeHexString) {
  * @param recipient recipient address
  * @param amount amount of coins to transfer
  */
-export function buildCoinTransferPayload(recipient: MaybeHexString, amount: number) {
+export function buildCoinTransferPayload(recipient: MaybeHexString, amount: bigint) {
   const typeArgs = [
     new TypeTagStruct(StructTag.fromString(aptosCoinStructTag)),
   ];
@@ -120,7 +120,7 @@ export function buildCoinTransferPayload(recipient: MaybeHexString, amount: numb
  * @param recipient recipient address
  * @param amount amount of coins to transfer
  */
-export function buildAccountTransferPayload(recipient: MaybeHexString, amount: number) {
+export function buildAccountTransferPayload(recipient: MaybeHexString, amount: bigint) {
   const encodedArgs = [
     BCS.bcsToBytes(AccountAddress.fromHex(recipient)),
     BCS.bcsSerializeUint64(BigInt(amount)),

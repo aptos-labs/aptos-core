@@ -36,7 +36,7 @@ interface AssetListItemProps {
   name: string;
   symbol: string;
   type: string;
-  value: number;
+  value: bigint;
 }
 
 function AssetListItem({

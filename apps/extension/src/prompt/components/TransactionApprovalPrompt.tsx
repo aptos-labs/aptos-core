@@ -30,6 +30,7 @@ import { useAccountOctaCoinBalance } from 'core/queries/account';
 import { formatCoin } from 'core/utils/coin';
 import { maxGasFeeFromEstimated } from 'shared/transactions';
 import { parseMoveAbortDetails } from 'shared/move';
+import { bigIntMin } from 'core/utils/bigint';
 import { usePermissionRequestContext } from '../hooks';
 import { LoadableContent } from './LoadableContent';
 import { PermissionPromptLayout } from './PermissionPromptLayout';
@@ -77,18 +78,18 @@ function getEventKeyFromState(eventState: any) {
 function getCoinStoreChanges(coinStoreState: any, events: Types.Event[]) {
   // TODO: convert to bigint
   const newBalance = coinStoreState?.coin?.value !== undefined
-    ? Number(coinStoreState.coin.value)
+    ? BigInt(coinStoreState.coin.value)
     : undefined;
 
   const withdrawEventKey = getEventKeyFromState(coinStoreState.withdraw_events);
   const depositEventKey = getEventKeyFromState(coinStoreState.deposit_events);
 
-  let balanceChange = 0;
+  let balanceChange = 0n;
   events.forEach(({ data, key }) => {
     if (key === depositEventKey) {
-      balanceChange += Number(data.amount);
+      balanceChange += BigInt(data.amount);
     } else if (key === withdrawEventKey) {
-      balanceChange -= Number(data.amount);
+      balanceChange -= BigInt(data.amount);
     }
   });
 
@@ -104,7 +105,7 @@ function getCoinStoreChanges(coinStoreState: any, events: Types.Event[]) {
  */
 function getSimulationDetails(txn: Types.UserTransaction) {
   // No matter the type of transaction, the gas fee is always useful
-  const networkFee = Number(txn.gas_used) * Number(txn.gas_unit_price);
+  const networkFee = BigInt(txn.gas_used) * BigInt(txn.gas_unit_price);
 
   // Should always display changes in the user's resources
   const ownResourceWrites = txn.changes
@@ -207,10 +208,14 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
   const { data: coinBalance } = useAccountOctaCoinBalance(activeAccountAddress, {
     refetchInterval: simulationRefetchInterval,
   });
+
+  const maxGas = coinBalance
+    ? Number(bigIntMin(coinBalance, BigInt(Number.MAX_SAFE_INTEGER)))
+    : undefined;
   const simulation = useTransactionSimulation(simulationQueryKey, payload, {
     cacheTime: 0,
     enabled: coinBalance !== undefined,
-    maxGasOctaAmount: coinBalance,
+    maxGasOctaAmount: maxGas,
     refetchInterval: simulationRefetchInterval,
   });
   const { setApprovalState } = usePermissionRequestContext();

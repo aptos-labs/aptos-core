@@ -7,6 +7,7 @@ import { CoinTransferFormData } from 'core/components/TransferFlow';
 import { useCoinTransferSimulation } from 'core/mutations/transaction';
 import { useAccountExists, useAccountOctaCoinBalance } from 'core/queries/account';
 import { formatAddress, isAddressValid } from 'core/utils/address';
+import { bigIntMin } from 'core/utils/bigint';
 import { formatCoin, OCTA_POSITIVE_EXPONENT } from 'core/utils/coin';
 import { useCallback, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -49,8 +50,11 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
     address: validRecipientAddress,
   });
 
+  // todo: this could fail if the user passes a large enough amount to overflow number
   const amountAptNumber = parseFloat(amount?.replace(/[^0-9.]/g, '') || '0');
-  const amountOctaNumber = parseInt((amountAptNumber * OCTA_POSITIVE_EXPONENT).toString(), 10);
+  const amountOctaNumber = BigInt(
+    parseInt((amountAptNumber * OCTA_POSITIVE_EXPONENT).toString(), 10),
+  );
   const {
     debouncedValue: debouncedNumberAmountOcta,
     isLoading: debouncedAmountIsLoading,
@@ -59,6 +63,9 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
     ? debouncedNumberAmountOcta <= coinBalanceOcta
     : undefined;
 
+  const maxGas = coinBalanceOcta
+    ? Number(bigIntMin(coinBalanceOcta, BigInt(Number.MAX_SAFE_INTEGER)))
+    : 0;
   const {
     data: simulationResult,
     error: simulationError,
@@ -68,13 +75,14 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
     recipient: validRecipientAddress,
   }, {
     enabled: isDrawerOpen && isBalanceEnoughBeforeFee,
-    maxGasOctaAmount: coinBalanceOcta || 0,
+    maxGasOctaAmount: maxGas,
     refetchInterval: 5000,
   });
 
-  const estimatedGasFeeOcta = debouncedNumberAmountOcta
-   && simulationResult
-   && Number(simulationResult.gas_used) * Number(simulationResult.gas_unit_price);
+  const estimatedGasFeeOcta = debouncedNumberAmountOcta === 0n
+    ? 0
+    : (simulationResult
+      && Number(simulationResult.gas_used) * Number(simulationResult.gas_unit_price));
 
   const estimatedGasFeeApt = useMemo(
     () => formatCoin(estimatedGasFeeOcta, { decimals: 8 }),
