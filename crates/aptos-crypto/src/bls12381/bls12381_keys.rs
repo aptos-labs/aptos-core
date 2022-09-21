@@ -121,13 +121,10 @@ impl traits::SigningKey for PrivateKey {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    fn sign_arbitrary_message(
-        &self,
-        message: &[u8],
-    ) -> Result<bls12381::Signature, CryptoMaterialError> {
-        Ok(bls12381::Signature {
+    fn sign_arbitrary_message(&self, message: &[u8]) -> bls12381::Signature {
+        bls12381::Signature {
             sig: self.privkey.sign(message, DST_BLS_SIG_IN_G2_WITH_POP, &[]),
-        })
+        }
     }
 }
 

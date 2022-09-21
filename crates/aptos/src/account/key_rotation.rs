@@ -110,16 +110,10 @@ impl CliCommand<RotateSummary> for RotateKey {
             bcs::to_bytes(&rotation_proof).map_err(|err| CliError::BCS("rotation_proof", err))?;
 
         // Signs the struct using both the current private key and the next private key
-        let rotation_proof_signed_by_current_private_key = current_private_key
-            .sign_arbitrary_message(&rotation_msg.clone())
-            .map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to sign rotation proof {:?}", err))
-            })?;
-        let rotation_proof_signed_by_new_private_key = new_private_key
-            .sign_arbitrary_message(&rotation_msg)
-            .map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to sign rotation proof {:?}", err))
-            })?;
+        let rotation_proof_signed_by_current_private_key =
+            current_private_key.sign_arbitrary_message(&rotation_msg.clone());
+        let rotation_proof_signed_by_new_private_key =
+            new_private_key.sign_arbitrary_message(&rotation_msg);
 
         let txn_summary = self
             .txn_options

@@ -137,10 +137,7 @@ pub trait SigningKey:
 
     /// Signs a non-hash input message. For testing only.
     #[cfg(any(test, feature = "fuzzing"))]
-    fn sign_arbitrary_message(
-        &self,
-        message: &[u8],
-    ) -> Result<Self::SignatureMaterial, CryptoMaterialError>;
+    fn sign_arbitrary_message(&self, message: &[u8]) -> Self::SignatureMaterial;
 
     /// Returns the associated verifying key
     fn verifying_key(&self) -> Self::VerifyingKeyMaterial {

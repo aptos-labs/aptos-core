@@ -542,8 +542,7 @@ async fn test_signing_message_with_payload(
     let sig = context
         .root_account()
         .private_key()
-        .sign_arbitrary_message(signing_msg.inner())
-        .unwrap();
+        .sign_arbitrary_message(signing_msg.inner());
     let expected_sig = match txn.authenticator() {
         TransactionAuthenticator::Ed25519 {
             public_key: _,

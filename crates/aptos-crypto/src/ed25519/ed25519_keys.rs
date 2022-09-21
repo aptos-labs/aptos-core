@@ -148,11 +148,8 @@ impl SigningKey for Ed25519PrivateKey {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    fn sign_arbitrary_message(
-        &self,
-        message: &[u8],
-    ) -> Result<Ed25519Signature, CryptoMaterialError> {
-        Ok(Ed25519PrivateKey::sign_arbitrary_message(self, message))
+    fn sign_arbitrary_message(&self, message: &[u8]) -> Ed25519Signature {
+        Ed25519PrivateKey::sign_arbitrary_message(self, message)
     }
 }
 
