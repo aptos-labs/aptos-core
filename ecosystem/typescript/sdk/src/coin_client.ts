@@ -6,8 +6,7 @@ import { AptosClient, OptionalTransactionArgs } from "./aptos_client";
 import { HexString } from "./hex_string";
 import { TransactionBuilderABI } from "./transaction_builder";
 import { COIN_ABIS } from "./abis";
-
-export const APTOS_COIN = "0x1::aptos_coin::AptosCoin";
+import { APTOS_COIN } from "./utils";
 
 /**
  * Class for working with the coin module, such as transferring coins and

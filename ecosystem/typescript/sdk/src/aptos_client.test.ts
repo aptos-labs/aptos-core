@@ -502,3 +502,19 @@ test(
   },
   30 * 1000,
 );
+
+test(
+  "estimates max gas amount",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const alice = new AptosAccount();
+    await faucetClient.fundAccount(alice.address(), 10000000);
+
+    const maxGasAmount = await client.estimateMaxGasAmount(alice.address());
+
+    expect(maxGasAmount).toBeGreaterThan(BigInt(0));
+  },
+  30 * 1000,
+);

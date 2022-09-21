@@ -10,6 +10,7 @@ import {
   fixNodeUrl,
   Memoize,
   sleep,
+  APTOS_COIN,
 } from "./utils";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
@@ -740,6 +741,21 @@ export class AptosClient {
   })
   async estimateGasPrice(): Promise<Gen.GasEstimation> {
     return this.client.transactions.estimateGasPrice();
+  }
+
+  @parseApiError
+  async estimateMaxGasAmount(forAccount: MaybeHexString): Promise<Uint64> {
+    // Only Aptos utility coin is accepted as gas
+    const typeTag = `0x1::coin::CoinStore<${APTOS_COIN}>`;
+
+    const [{ gas_estimate: gasUnitPrice }, resources] = await Promise.all([
+      this.estimateGasPrice(),
+      this.getAccountResources(forAccount),
+    ]);
+
+    const accountResource = resources.find((r) => r.type === typeTag);
+    const balance = BigInt((accountResource!.data as any).coin.value);
+    return balance / BigInt(gasUnitPrice);
   }
 
   /**
