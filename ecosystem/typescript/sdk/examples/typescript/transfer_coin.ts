@@ -32,7 +32,7 @@ import { NODE_URL, FAUCET_URL } from "./common";
 
   // Fund accounts.
   // :!:>section_3
-  await faucetClient.fundAccount(alice.address(), 20_000);
+  await faucetClient.fundAccount(alice.address(), 100_000_000);
   await faucetClient.fundAccount(bob.address(), 0); // <:!:section_3
 
   // Print out initial balances.

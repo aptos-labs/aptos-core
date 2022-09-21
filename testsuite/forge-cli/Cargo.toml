@@ -16,6 +16,7 @@ structopt = "0.3.21"
 tokio = { version = "1.21.0", features = ["full"] }
 url = "2.2.2"
 
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
