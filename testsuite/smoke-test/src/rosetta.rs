@@ -34,7 +34,7 @@ use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cached_packages::aptos_stdlib;
 use forge::{LocalSwarm, Node, NodeExt, Swarm};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -691,8 +691,6 @@ async fn test_block() {
     let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;
 
     // TODO: Track total supply?
-    // TODO: Check no repeated block hashes
-    // TODO: Check no repeated txn hashes (in a block)
     // TODO: Check account balance block hashes?
     // TODO: Handle multiple coin types
 
@@ -713,6 +711,7 @@ async fn test_block() {
     // Now we have to watch all the changes
     let mut current_version = 0;
     let mut previous_block_index = 0;
+    let mut block_hashes = HashSet::new();
     for block_height in 0..final_block_height {
         let request = BlockRequest::by_index(chain_id, block_height);
         let response: BlockResponse = rosetta_client
@@ -743,6 +742,11 @@ async fn test_block() {
             block.parent_block_identifier.hash,
             BlockHash::new(chain_id, previous_block_index).to_string(),
             "Parent block hash should be previous block chain_id-block_height"
+        );
+        assert!(
+            block_hashes.insert(block.block_identifier.hash.clone()),
+            "Block hash was repeated {}",
+            block.block_identifier.hash
         );
 
         // It's only greater or equal because microseconds are cut off
@@ -780,6 +784,7 @@ async fn parse_block_transactions(
     actual_txns: &[TransactionOnChainData],
     current_version: &mut u64,
 ) {
+    let mut txn_hashes = HashSet::new();
     for transaction in block.transactions.iter() {
         let txn_metadata = &transaction.metadata;
         let txn_version = txn_metadata.version.0;
@@ -798,10 +803,17 @@ async fn parse_block_transactions(
         let actual_txn_info = &actual_txn.info;
 
         // Ensure transaction identifier is correct
+        let txn_hash = transaction.transaction_identifier.hash.clone();
         assert_eq!(
             format!("{:x}", actual_txn_info.transaction_hash()),
-            transaction.transaction_identifier.hash,
+            txn_hash,
             "Transaction hash should match the actual hash"
+        );
+
+        assert!(
+            txn_hashes.insert(txn_hash.clone()),
+            "Transaction hash was repeated {}",
+            txn_hash
         );
 
         // Ensure the status is correct
