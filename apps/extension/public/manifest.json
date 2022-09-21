@@ -1,7 +1,7 @@
 {
   "short_name": "Petra",
   "name": "Petra Aptos Wallet",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "manifest_version": 3,
   "description": "A crypto wallet on Aptos.",
   "action": {
