@@ -1,6 +1,6 @@
 name: "Prover Test"
 on:
-  # Stop running on PR / main until this is fixed
+  # TODO enable this when we have time
   # pull_request:
   # push:
   #   branches:
@@ -9,7 +9,12 @@ on:
   #     - testnet
   #     - auto
   #     - canary
+
+  # Allow triggering manually
   workflow_dispatch:
+  # Until enabled on PR, run continuously
+  schedule:
+    - cron: "0 */3 * * *"
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -24,6 +29,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # TODO add determinator step to only run on move files
   prover-test:
     runs-on: high-perf-docker
     steps:

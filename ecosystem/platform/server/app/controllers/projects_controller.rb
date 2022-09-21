@@ -12,12 +12,13 @@ class ProjectsController < ApplicationController
   # GET /projects
   def index
     @categories = Category.all.index_by(&:id)
-    @projects = params[:s] ? Project.search(params[:s]) : Project
+    @projects = params[:s].blank? ? Project : Project.search(params[:s])
     @projects = @projects.where(public: true, verified: true)
                          .includes(:project_categories)
                          .with_attached_thumbnail
 
-    selected_category = params[:category]&.to_i
+    selected_category = params[:category].to_i
+    selected_category = nil if params[:category].blank?
     @projects = @projects.filter_by_category(selected_category) if selected_category
 
     @groups = @projects.each_with_object({}) do |project, groups|
@@ -31,8 +32,11 @@ class ProjectsController < ApplicationController
   # GET /projects/1
   def show
     @project = Project.find(params[:id])
-    head :not_found unless @project.verified
-    head :forbidden if @project.user_id != current_user&.id && !@project.public
+
+    if @project.user_id != current_user&.id && !current_user&.is_root
+      return head :not_found unless @project.verified
+      return head :forbidden unless @project.public
+    end
   end
 
   # GET /projects/new
@@ -58,7 +62,8 @@ class ProjectsController < ApplicationController
 
     if @project.save
       redirect_to project_url(@project),
-                  notice: 'Project was successfully created. It will not be visible until approved by a moderator.'
+                  notice: 'Project was successfully created. ' \
+                          'It will not be publicly visible until approved by a moderator.'
     else
       render :new, status: :unprocessable_entity
     end
@@ -85,19 +90,25 @@ class ProjectsController < ApplicationController
 
     @project.destroy
 
-    redirect_to projects_url, notice: 'Project was successfully destroyed.'
+    redirect_to ecosystem_url, notice: 'Project was successfully destroyed.'
   end
 
   private
 
   # Only allow a list of trusted parameters through.
   def project_params
-    params.require(:project).permit(:title, :short_description, :full_description, :website_url, :github_url,
-                                    :discord_url, :twitter_url, :telegram_url, :linkedin_url, :thumbnail,
-                                    :youtube_url, :public,
-                                    category_ids: [],
-                                    project_members_attributes: %i[id user_id role public],
-                                    screenshots: [])
+    result = params.require(:project).permit(:title, :short_description, :full_description, :website_url, :github_url,
+                                             :discord_url, :twitter_url, :telegram_url, :linkedin_url, :thumbnail,
+                                             :youtube_url, :public,
+                                             category_ids: [],
+                                             project_members_attributes: %i[id user_id role public],
+                                             screenshots: [])
+
+    result.each_key do |key|
+      result[key] = nil if key.to_s.ends_with?('_url') && result[key].blank?
+    end
+
+    result
   end
 
   def check_recaptcha

@@ -9,7 +9,7 @@ use aptos_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::mem::size_of;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 /// Estimated per-txn size minus the raw transaction
 pub const TXN_FIXED_ESTIMATED_BYTES: usize = size_of::<MempoolTransaction>();
@@ -22,6 +22,7 @@ pub struct MempoolTransaction {
     pub ranking_score: u64,
     pub timeline_state: TimelineState,
     pub sequence_info: SequenceInfo,
+    pub insertion_time: SystemTime,
 }
 
 impl MempoolTransaction {
@@ -31,6 +32,7 @@ impl MempoolTransaction {
         ranking_score: u64,
         timeline_state: TimelineState,
         seqno_type: AccountSequenceInfo,
+        insertion_time: SystemTime,
     ) -> Self {
         Self {
             sequence_info: SequenceInfo {
@@ -41,6 +43,7 @@ impl MempoolTransaction {
             expiration_time,
             ranking_score,
             timeline_state,
+            insertion_time,
         }
     }
     pub(crate) fn get_sender(&self) -> AccountAddress {
@@ -86,7 +89,7 @@ mod test {
     use aptos_types::account_config::AccountSequenceInfo;
     use aptos_types::chain_id::ChainId;
     use aptos_types::transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload};
-    use std::time::Duration;
+    use std::time::{Duration, SystemTime};
 
     #[test]
     fn test_estimated_bytes() {
@@ -105,6 +108,7 @@ mod test {
             1,
             TimelineState::NotReady,
             AccountSequenceInfo::Sequential(0),
+            SystemTime::now(),
         )
     }
 

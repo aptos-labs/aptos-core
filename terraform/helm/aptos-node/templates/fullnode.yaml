@@ -14,6 +14,7 @@ spec:
     app.kubernetes.io/name: fullnode
     app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
+  type: {{ $.Values.service.fullnode.internal.type }}
   ports:
   - name: aptosnet
     port: 6182
@@ -63,6 +64,8 @@ spec:
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/fullnode.yaml: {{ tpl ($.Files.Get "files/configs/fullnode.yaml") $ | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
       containers:
@@ -100,7 +103,9 @@ spec:
         - containerPort: 6181
         - containerPort: 6182
         - containerPort: 8080
+          name: api
         - containerPort: 9101
+          name: metrics
         livenessProbe:
           tcpSocket:
             port: 9101

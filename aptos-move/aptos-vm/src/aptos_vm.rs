@@ -30,12 +30,11 @@ use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::account_config::new_block_event_key;
-use aptos_types::on_chain_config::Features;
 use aptos_types::vm_status::AbortLocation;
 use aptos_types::{
     account_config,
     block_metadata::BlockMetadata,
-    on_chain_config::{new_epoch_event_key, GasSchedule, Version},
+    on_chain_config::new_epoch_event_key,
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -97,19 +96,6 @@ impl AptosVM {
             "Adapter created for Validation"
         );
         Self::new(state)
-    }
-
-    pub fn init_with_config(
-        version: Version,
-        gas_schedule: GasSchedule,
-        features: Features,
-    ) -> Self {
-        info!("Adapter restarted for Validation");
-        AptosVM(AptosVMImpl::init_with_config(
-            version,
-            gas_schedule,
-            features,
-        ))
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -642,9 +628,24 @@ impl AptosVM {
             return discard_error_vm_status(err);
         };
 
+        if self.0.get_gas_feature_version() >= 1 {
+            // Create a new session so that the data cache is flushed.
+            // This is to ensure we correctly charge for loading certain resources, even if they
+            // have been previously cached in the prologue.
+            //
+            // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
+            session = self.0.new_session(storage, SessionId::txn(txn));
+        }
+
         let gas_params = unwrap_or_discard!(self.0.get_gas_parameters(log_context));
+        let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
         let txn_data = TransactionMetadata::new(txn);
-        let mut gas_meter = AptosGasMeter::new(gas_params.clone(), txn_data.max_gas_amount());
+        let mut gas_meter = AptosGasMeter::new(
+            self.0.get_gas_feature_version(),
+            gas_params.clone(),
+            storage_gas_params.cloned(),
+            txn_data.max_gas_amount(),
+        );
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
@@ -1136,7 +1137,17 @@ impl AptosSimulationVM {
             Err(err) => return discard_error_vm_status(err),
             Ok(s) => s,
         };
-        let mut gas_meter = AptosGasMeter::new(gas_params.clone(), txn_data.max_gas_amount());
+        let storage_gas_params = match self.0 .0.get_storage_gas_parameters(log_context) {
+            Err(err) => return discard_error_vm_status(err),
+            Ok(s) => s,
+        };
+
+        let mut gas_meter = AptosGasMeter::new(
+            self.0 .0.get_gas_feature_version(),
+            gas_params.clone(),
+            storage_gas_params.cloned(),
+            txn_data.max_gas_amount(),
+        );
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)

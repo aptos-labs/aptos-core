@@ -50,7 +50,7 @@ Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c
 
 There are many example Move modules in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory.
 
-Load a terminal and change directories into the `hello_blockchain` directory: `cd aptos-core/aptos-move/move-examples`.
+Load a terminal and change directories into the `hello_blockchain` directory: `cd aptos-core/aptos-move/move-examples/hello_blockchain`.
 
 To compile the module run: `aptos move compile --named-addresses hello_blockchain=default`.
 To test the module run: `aptos move test --named-addresses hello_blockchain=default`.

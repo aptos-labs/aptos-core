@@ -8,7 +8,7 @@ class ProjectCardComponent < ViewComponent::Base
     @project = project
     @rest = rest
     @rest[:class] = [
-      'rounded-lg overflow-hidden cursor-pointer hover:brightness-105',
+      'rounded-lg overflow-hidden cursor-pointer hover:brightness-105 active:translate-y-0.5',
       @rest[:class]
     ]
     @rest[:onclick] = 'this.querySelector("a").click()'

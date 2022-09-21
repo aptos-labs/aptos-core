@@ -8,7 +8,6 @@ use crate::{
             TimelineIndex,
         },
         transaction::{MempoolTransaction, TimelineState},
-        ttl_cache::TtlCache,
     },
     counters,
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
@@ -122,6 +121,23 @@ impl TransactionStore {
             Some((address, seq)) => self.get(address, *seq),
             None => None,
         }
+    }
+
+    pub(crate) fn get_insertion_time(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<&SystemTime> {
+        if let Some(txn) = self
+            .transactions
+            .get(address)
+            .and_then(|txns| txns.get(&sequence_number))
+        {
+            if txn.timeline_state != TimelineState::NonQualified {
+                return Some(&txn.insertion_time);
+            }
+        }
+        None
     }
 
     pub(crate) fn remove(
@@ -518,29 +534,16 @@ impl TransactionStore {
     }
 
     /// Garbage collect old transactions.
-    pub(crate) fn gc_by_system_ttl(
-        &mut self,
-        metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
-        gc_time: Duration,
-    ) {
-        self.gc(gc_time, true, metrics_cache);
+    pub(crate) fn gc_by_system_ttl(&mut self, gc_time: Duration) {
+        self.gc(gc_time, true);
     }
 
     /// Garbage collect old transactions based on client-specified expiration time.
-    pub(crate) fn gc_by_expiration_time(
-        &mut self,
-        block_time: Duration,
-        metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
-    ) {
-        self.gc(block_time, false, metrics_cache);
+    pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
+        self.gc(block_time, false);
     }
 
-    fn gc(
-        &mut self,
-        now: Duration,
-        by_system_ttl: bool,
-        metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
-    ) {
+    fn gc(&mut self, now: Duration, by_system_ttl: bool) {
         let (metric_label, index, log_event) = if by_system_ttl {
             (
                 counters::GC_SYSTEM_TTL_LABEL,
@@ -595,7 +598,8 @@ impl TransactionStore {
                     let account = txn.get_sender();
                     let txn_sequence_number = txn.sequence_info.transaction_sequence_number;
                     gc_txns_log.add_with_status(account, txn_sequence_number, status);
-                    if let Some(&creation_time) = metrics_cache.get(&(account, txn_sequence_number))
+                    if let Some(&creation_time) =
+                        self.get_insertion_time(&account, txn_sequence_number)
                     {
                         if let Ok(time_delta) = SystemTime::now().duration_since(creation_time) {
                             counters::CORE_MEMPOOL_GC_LATENCY
@@ -610,7 +614,11 @@ impl TransactionStore {
             }
         }
 
-        debug!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        if !gc_txns_log.is_empty() {
+            debug!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        } else {
+            trace!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        }
         self.track_indices();
     }
 
@@ -618,10 +626,7 @@ impl TransactionStore {
         self.priority_index.iter()
     }
 
-    pub(crate) fn gen_snapshot(
-        &self,
-        metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
-    ) -> TxnsLog {
+    pub(crate) fn gen_snapshot(&self) -> TxnsLog {
         let mut txns_log = TxnsLog::new();
         for (account, txns) in self.transactions.iter() {
             for (seq_num, _txn) in txns.iter() {
@@ -630,7 +635,7 @@ impl TransactionStore {
                 } else {
                     "ready"
                 };
-                let timestamp = metrics_cache.get(&(*account, *seq_num)).cloned();
+                let timestamp = self.get_insertion_time(account, *seq_num).copied();
                 txns_log.add_full_metadata(*account, *seq_num, status, timestamp);
             }
         }

@@ -20,7 +20,7 @@ if __name__ == "__main__":
     print(f"Bob: {bob.address()}")
 
     #:!:>section_3
-    faucet_client.fund_account(alice.address(), 20_000)
+    faucet_client.fund_account(alice.address(), 100_000_000)
     faucet_client.fund_account(bob.address(), 0)  # <:!:section_3
 
     print("\n=== Initial Balances ===")

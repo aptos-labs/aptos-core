@@ -28,7 +28,13 @@ impl NetworkLoadTest for NetworkPartitionTest {
         );
         println!("{}", msg);
         ctx.report.report_text(msg);
-        Ok(LoadDestination::AllNodes)
+        // Just send the load to last validator which is not included in the partition
+        Ok(LoadDestination::Peers(vec![ctx
+            .swarm()
+            .validators()
+            .last()
+            .map(|v| v.peer_id())
+            .unwrap()]))
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {

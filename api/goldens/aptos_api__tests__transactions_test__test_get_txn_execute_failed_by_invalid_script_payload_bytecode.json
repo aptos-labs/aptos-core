@@ -4,7 +4,7 @@
   "state_change_hash": "",
   "event_root_hash": "",
   "state_checkpoint_hash": null,
-  "gas_used": "1",
+  "gas_used": "150",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error CODE_DESERIALIZATION_ERROR",
   "accumulator_root_hash": "",
@@ -53,7 +53,7 @@
   ],
   "sender": "0xa550c18",
   "sequence_number": "0",
-  "max_gas_amount": "2000",
+  "max_gas_amount": "100000",
   "gas_unit_price": "0",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
@@ -67,7 +67,7 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0xd4c6e21c199229d6524acef25a4a0c9b1062ccab62276d53009f27b3835452ed6db33afc6b19ef10396583166b21755464a611d6517e7c1ce8af25cfb7cfb004",
+    "signature": "0x786e894229614ff3049adf3b406ee8b7035c249ae32a2704573477aee7a33c4f0e339f450b0f7bdf711aaa936bf04abfc920f5c04951d18c71e1d6da190db30f",
     "type": "ed25519_signature"
   },
   "events": [],

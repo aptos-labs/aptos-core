@@ -75,3 +75,6 @@ Deleting their workflow runs now...`,
 
   core.info(`Deleted ${totalDeleted} workflow runs`);
 }
+
+// Run the function above.
+pruneGithubWorkflowRuns()

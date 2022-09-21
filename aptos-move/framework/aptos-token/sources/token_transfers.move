@@ -8,7 +8,11 @@ module aptos_token::token_transfers {
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
 
+    //
+    // Errors.
+    //
 
+    /// Token offer doesn't exist
     const ETOKEN_OFFER_NOT_EXIST: u64 = 1;
 
     struct PendingClaims has key {

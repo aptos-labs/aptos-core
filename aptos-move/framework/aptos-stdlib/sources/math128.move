@@ -13,24 +13,27 @@ module aptos_std::math128 {
 
     /// Return the average of two.
     public fun average(a: u128, b: u128): u128 {
-        (a + b) / 2
+        if (a < b) {
+            a + (b - a) / 2
+        } else {
+            b + (a - b) / 2
+        }
     }
 
     /// Return the value of n raised to power e
     public fun pow(n: u128, e: u128): u128 {
         if (e == 0) {
             1
-        } else if (e == 1) {
-            n
         } else {
-            let p = pow(n, e / 2);
-            p = p * p;
-            if (e % 2 == 1) {
-                p = p * n;
-                p
-            } else {
-                p
-            }
+            let p = 1;
+            while(e > 1) {
+                if (e % 2 == 1) {
+                    p = p * n;
+                };
+                e = e / 2;
+                n = n * n;
+            };
+            p * n
         }
     }
 

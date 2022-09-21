@@ -11,9 +11,11 @@ use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{AptosErrorCode, AsConverter, BcsBlock, LedgerInfo, TransactionOnChainData};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
+use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
 use aptos_types::account_config::NewBlockEvent;
+use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
 use aptos_types::transaction::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
@@ -25,7 +27,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapterOwned};
+use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
 use futures::{channel::oneshot, SinkExt};
 use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -33,8 +35,6 @@ use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order,
 };
-
-const MIN_GAS_PRICE: u64 = 1;
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -65,8 +65,9 @@ impl Context {
             mp_sender,
             node_config,
             gas_estimation: Arc::new(RwLock::new(GasEstimationCache {
-                last_updated_version: 0,
-                median_gas_price: MIN_GAS_PRICE,
+                last_updated_version: None,
+                min_gas_price: 0,
+                median_gas_price: 0,
             })),
         }
     }
@@ -228,15 +229,22 @@ impl Context {
             .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
     }
 
-    pub fn get_account_state(
+    pub fn get_account_state<E: InternalError>(
         &self,
         address: AccountAddress,
         version: u64,
-    ) -> Result<Option<AccountState>> {
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<Option<AccountState>, E> {
         AccountState::from_access_paths_and_values(
             address,
-            &self.get_state_values(address, version)?,
+            &self.get_state_values(address, version).map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+            })?,
         )
+        .context("Failed to read account state at requested version")
+        .map_err(|err| {
+            E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+        })
     }
 
     pub fn get_block_timestamp<E: InternalError>(
@@ -581,7 +589,9 @@ impl Context {
         {
             let gas_estimation = self.gas_estimation.read().unwrap();
 
-            if gas_estimation.last_updated_version > oldest_search_version {
+            if gas_estimation.last_updated_version.is_some()
+                && gas_estimation.last_updated_version.unwrap() > oldest_search_version
+            {
                 return Ok(gas_estimation.median_gas_price);
             }
         }
@@ -591,7 +601,9 @@ impl Context {
             let mut gas_estimation = self.gas_estimation.write().unwrap();
 
             // If this has been updated by a different thread, use that instead
-            if gas_estimation.last_updated_version > oldest_search_version {
+            if gas_estimation.last_updated_version.is_some()
+                && gas_estimation.last_updated_version.unwrap() > oldest_search_version
+            {
                 return Ok(gas_estimation.median_gas_price);
             }
             let mut gas_prices: Vec<u64> = self
@@ -608,7 +620,10 @@ impl Context {
             // When there's no gas prices in the last 100k transactions, we're going to set it to
             // the lowest gas price because the transaction should get through with any amount
             gas_estimation.median_gas_price = if gas_prices.is_empty() {
-                MIN_GAS_PRICE
+                // Pull the min gas price
+                let gas_schedule = self.get_gas_schedule(ledger_info)?;
+                gas_estimation.min_gas_price = gas_schedule.txn.min_price_per_gas_unit.into();
+                gas_estimation.min_gas_price
             } else {
                 gas_prices.sort();
                 let mid = gas_prices.len() / 2;
@@ -616,6 +631,36 @@ impl Context {
             };
 
             Ok(gas_estimation.median_gas_price)
+        }
+    }
+
+    pub fn get_gas_schedule<E: InternalError>(
+        &self,
+        ledger_info: &LedgerInfo,
+    ) -> Result<AptosGasParameters, E> {
+        let state_view = self
+            .db
+            .state_view_at_version(Some(ledger_info.version()))
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))?;
+        let storage_adapter = StorageAdapter::new(&state_view);
+
+        match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+            let gas_schedule = gas_schedule.to_btree_map();
+            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+        }) {
+            Some(gas_schedule) => Ok(gas_schedule),
+            None => GasSchedule::fetch_config(&storage_adapter)
+                .and_then(|gas_schedule| {
+                    let gas_schedule = gas_schedule.to_btree_map();
+                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                })
+                .ok_or_else(|| {
+                    E::internal_with_code(
+                        "Failed to retrieve gas schedule",
+                        AptosErrorCode::InternalError,
+                        ledger_info,
+                    )
+                }),
         }
     }
 
@@ -641,6 +686,7 @@ impl Context {
 }
 
 pub struct GasEstimationCache {
-    last_updated_version: u64,
+    last_updated_version: Option<u64>,
+    min_gas_price: u64,
     median_gas_price: u64,
 }

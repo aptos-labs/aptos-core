@@ -5,10 +5,7 @@ mod index;
 mod mempool;
 mod transaction;
 mod transaction_store;
-mod ttl_cache;
 
-#[cfg(test)]
-pub use self::ttl_cache::TtlCache;
 pub use self::{
     index::TxnPointer, mempool::Mempool as CoreMempool, transaction::MempoolTransaction,
     transaction::TimelineState, transaction_store::TXN_INDEX_ESTIMATED_BYTES,

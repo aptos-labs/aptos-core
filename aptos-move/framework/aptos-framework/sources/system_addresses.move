@@ -31,28 +31,48 @@ module aptos_framework::system_addresses {
     }
 
     public fun assert_framework_reserved_address(account: &signer) {
-        let addr = signer::address_of(account);
         assert!(
-            addr == @aptos_framework ||
-            addr == @0x2 ||
-            addr == @0x3 ||
-            addr == @0x4 ||
-            addr == @0x5 ||
-            addr == @0x6 ||
-            addr == @0x7 ||
-            addr == @0x8 ||
-            addr == @0x9 ||
-            addr == @0xa,
+            is_framework_reserved_address(signer::address_of(account)),
             error::permission_denied(ENOT_FRAMEWORK_RESERVED_ADDRESS),
         )
     }
 
+    /// Return true if `addr` is 0x0 or under the on chain governance's control.
+    public fun is_framework_reserved_address(addr: address): bool {
+        is_aptos_framework_address(addr) ||
+        addr == @0x2 ||
+        addr == @0x3 ||
+        addr == @0x4 ||
+        addr == @0x5 ||
+        addr == @0x6 ||
+        addr == @0x7 ||
+        addr == @0x8 ||
+        addr == @0x9 ||
+        addr == @0xa
+    }
+
+    /// Return true if `addr` is 0x1.
     public fun is_aptos_framework_address(addr: address): bool {
         addr == @aptos_framework
     }
 
     /// Assert that the signer has the VM reserved address.
     public fun assert_vm(account: &signer) {
-        assert!(signer::address_of(account) == @vm_reserved, error::permission_denied(EVM))
+        assert!(is_vm(account), error::permission_denied(EVM))
+    }
+
+    /// Return true if `addr` is a reserved address for the VM to call system modules.
+    public fun is_vm(account: &signer): bool {
+        is_vm_address(signer::address_of(account))
+    }
+
+    /// Return true if `addr` is a reserved address for the VM to call system modules.
+    public fun is_vm_address(addr: address): bool {
+        addr == @vm_reserved
+    }
+
+    /// Return true if `addr` is either the VM address or an Aptos Framework address.
+    public fun is_reserved_address(addr: address): bool {
+        is_aptos_framework_address(addr) || is_vm_address(addr)
     }
 }

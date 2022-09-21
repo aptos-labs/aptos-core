@@ -19,7 +19,7 @@ const sidebars = {
     "index",
     "whats-new-in-docs",
     "guides/getting-started",
-
+    "aptos-developer-resources",
     {
       type: "category",
       label: "Developer Tutorials",
@@ -77,17 +77,14 @@ const sidebars = {
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
+        "guides/running-a-local-multi-node-network",
         {
           type: "category",
           label: "Move Guides",
           link: { type: "doc", id: "guides/move-guides/index" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "guides/move-guides/move-on-aptos",
-            "guides/move-guides/upgrading-move-code",
-            "guides/move-guides/guide-move-transactional-testing",
-          ],
+          items: ["guides/move-guides/move-on-aptos", "guides/move-guides/upgrading-move-code"],
         },
       ],
     },

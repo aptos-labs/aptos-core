@@ -9,7 +9,6 @@ use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{account_address::AccountAddress, PeerId},
 };
-use aptos_secure_storage::SECURE_STORAGE_DB_NAME;
 use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
@@ -265,19 +264,27 @@ impl Node for LocalNode {
         Ok(())
     }
 
+    async fn get_identity(&mut self) -> Result<String> {
+        todo!()
+    }
+
+    async fn set_identity(&mut self, _k8s_secret_name: String) -> Result<()> {
+        todo!()
+    }
+
     async fn clear_storage(&mut self) -> Result<()> {
         // Remove all storage files (i.e., blockchain data, consensus data and state sync data)
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
         let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-        let secure_storage_db_path = node_config.base.data_dir.join(SECURE_STORAGE_DB_NAME);
+        let secure_storage_path = node_config.base.data_dir.join("secure_storage.json");
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
 
         debug!(
             "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}) for node {:?}",
             ledger_db_path.as_path(),
             state_db_path.as_path(),
-            secure_storage_db_path.as_path(),
+            secure_storage_path.as_path(),
             state_sync_db_path.as_path(),
             self.name
         );
@@ -286,7 +293,7 @@ impl Node for LocalNode {
         assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
         assert!(state_sync_db_path.as_path().exists());
         if self.config.base.role.is_validator() {
-            assert!(secure_storage_db_path.as_path().exists());
+            assert!(secure_storage_path.as_path().exists(),);
         }
 
         // Remove the files
@@ -300,7 +307,7 @@ impl Node for LocalNode {
             .map_err(anyhow::Error::from)
             .context("Failed to delete state_sync_db_path")?;
         if self.config.base.role.is_validator() {
-            fs::remove_dir_all(secure_storage_db_path)
+            fs::remove_file(secure_storage_path)
                 .map_err(anyhow::Error::from)
                 .context("Failed to delete secure_storage_db_path")?;
         }

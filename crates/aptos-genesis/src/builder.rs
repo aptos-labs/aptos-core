@@ -1,21 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::keys::PublicIdentity;
 use crate::{
     config::ValidatorConfiguration,
-    keys::{generate_key_objects, PrivateIdentity},
+    keys::{generate_key_objects, PrivateIdentity, PublicIdentity},
     GenesisInfo,
 };
 use anyhow::ensure;
-use aptos_config::config::RocksDbStorageConfig;
-use aptos_config::keys::ConfigKey;
 use aptos_config::{
     config::{
         DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
-        NodeConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend, WaypointConfig,
+        NodeConfig, OnDiskStorageConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend,
+        WaypointConfig,
     },
     generator::build_seed_for_network,
+    keys::ConfigKey,
     network_id::NetworkId,
 };
 use aptos_crypto::{
@@ -54,6 +53,7 @@ pub struct ValidatorNodeConfig {
     pub dir: PathBuf,
     pub account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
     pub genesis_stake_amount: u64,
+    pub commission_percentage: u64,
 }
 
 impl ValidatorNodeConfig {
@@ -64,6 +64,7 @@ impl ValidatorNodeConfig {
         base_dir: &Path,
         mut config: NodeConfig,
         genesis_stake_amount: u64,
+        commission_percentage: u64,
     ) -> anyhow::Result<ValidatorNodeConfig> {
         // Create the data dir and set it appropriately
         let dir = base_dir.join(&name);
@@ -77,6 +78,7 @@ impl ValidatorNodeConfig {
             dir,
             account_private_key: None,
             genesis_stake_amount,
+            commission_percentage,
         })
     }
 
@@ -206,6 +208,9 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
             ),
             full_node_host,
             stake_amount: config.genesis_stake_amount,
+            commission_percentage: config.commission_percentage,
+            // Default to joining the genesis validator set.
+            join_during_genesis: true,
         })
     }
 }
@@ -513,6 +518,8 @@ impl Builder {
             self.config_dir.as_path(),
             config,
             genesis_stake_amount,
+            // Default to 0% commission for local node building.
+            0,
         )?;
 
         validator.init_keys(Some(rng.gen()))?;
@@ -551,10 +558,10 @@ impl Builder {
         // Ensure safety rules runs in a thread
         config.consensus.safety_rules.service = SafetyRulesService::Thread;
 
-        // Use a rocksdb storage backend for safety rules
-        let mut storage = RocksDbStorageConfig::default();
+        // Use a file based storage backend for safety rules
+        let mut storage = OnDiskStorageConfig::default();
         storage.set_data_dir(validator.dir.clone());
-        config.consensus.safety_rules.backend = SecureBackend::RocksDbStorage(storage);
+        config.consensus.safety_rules.backend = SecureBackend::OnDiskStorage(storage);
 
         if index > 0 || self.randomize_first_validator_ports {
             config.randomize_ports();

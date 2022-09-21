@@ -3,50 +3,55 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::transactions::Transaction, schema::events};
 use aptos_api_types::Event as APIEvent;
-use bigdecimal::{BigDecimal, FromPrimitive};
 use field_count::FieldCount;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize,
+)]
 #[diesel(table_name = "events")]
-#[belongs_to(Transaction, foreign_key = "transaction_hash")]
-#[primary_key(key, sequence_number)]
+#[belongs_to(Transaction, foreign_key = "transaction_version")]
+#[primary_key(account_address, creation_number, sequence_number)]
 pub struct Event {
-    pub transaction_hash: String,
-    pub key: String,
-    pub sequence_number: bigdecimal::BigDecimal,
+    pub sequence_number: i64,
+    pub creation_number: i64,
+    pub account_address: String,
+    pub transaction_version: i64,
+    pub transaction_block_height: i64,
     #[diesel(column_name = type)]
     pub type_: String,
     pub data: serde_json::Value,
-
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl Event {
-    pub fn from_event(transaction_hash: String, event: &APIEvent) -> Self {
-        let event_key: aptos_types::event::EventKey = event.guid.into();
+    pub fn from_event(
+        event: &APIEvent,
+        transaction_version: i64,
+        transaction_block_height: i64,
+    ) -> Self {
         Event {
-            transaction_hash,
-            key: event_key.to_string(),
-            sequence_number: BigDecimal::from_u64(event.sequence_number.0)
-                .expect("Should be able to convert U64 to big decimal"),
+            account_address: event.key.0.get_creator_address().to_string(),
+            creation_number: event.key.0.get_creation_number() as i64,
+            sequence_number: event.sequence_number.0 as i64,
+            transaction_version,
+            transaction_block_height,
             type_: event.typ.to_string(),
             data: event.data.clone(),
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
-    pub fn from_events(transaction_hash: String, events: &[APIEvent]) -> Option<Vec<Self>> {
-        if events.is_empty() {
-            return None;
-        }
-        Some(
-            events
-                .iter()
-                .map(|event| Self::from_event(transaction_hash.clone(), event))
-                .collect::<Vec<EventModel>>(),
-        )
+    pub fn from_events(
+        events: &[APIEvent],
+        transaction_version: i64,
+        transaction_block_height: i64,
+    ) -> Vec<Self> {
+        events
+            .iter()
+            .map(|event| Self::from_event(event, transaction_version, transaction_block_height))
+            .collect::<Vec<EventModel>>()
     }
 }
 

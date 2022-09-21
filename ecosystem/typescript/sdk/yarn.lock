@@ -2720,11 +2720,6 @@ joycon@^3.0.1:
   resolved "https://registry.yarnpkg.com/joycon/-/joycon-3.1.1.tgz#bce8596d6ae808f8b68168f5fc69280996894f03"
   integrity sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==
 
-js-sha3@0.8.0:
-  version "0.8.0"
-  resolved "https://registry.yarnpkg.com/js-sha3/-/js-sha3-0.8.0.tgz#b9b7a5da73afad7dedd0f8c463954cbde6818840"
-  integrity sha512-gF1cRrHhIzNfToc802P800N8PpXS+evLLXfsVpowqmAFR9uwbi89WvXg2QspOmXL8QL86J4T1EpFu+yUkwJY3Q==
-
 js-tokens@^4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/js-tokens/-/js-tokens-4.0.0.tgz#19203fb59991df98e3a287050d4647cdeaf32499"
@@ -3041,9 +3036,9 @@ onetime@^5.1.2:
   dependencies:
     mimic-fn "^2.1.0"
 
-"openapi-typescript-codegen@https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p2/openapi-typescript-codegen-v0.23.0-p2.tgz":
-  version "0.23.0-p2"
-  resolved "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p2/openapi-typescript-codegen-v0.23.0-p2.tgz#273123a28737f2e099fcddf2d76f1011374e6855"
+"openapi-typescript-codegen@https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p4/openapi-typescript-codegen-v0.23.0-p4.tgz":
+  version "0.23.0-p4"
+  resolved "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p4/openapi-typescript-codegen-v0.23.0-p4.tgz#8c463437cc4c8c933e6107899de64e7265f11487"
   dependencies:
     camelcase "^6.3.0"
     commander "^9.3.0"

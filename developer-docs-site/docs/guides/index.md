@@ -16,6 +16,5 @@ Start here to get into the core concepts of the Aptos blockchain.
 - ### [Building the Wallet Extension](building-wallet-extension.md)
 - ### [System Integrators Guide](system-integrators-guide.md)
 - ### [Local testnet development flow](local-testnet-dev-flow.md)
+- ### [Running a Local Multi-node Network](running-a-local-multi-node-network)
 - ### [Move Guides >](./move-guides/index.md)
-
-

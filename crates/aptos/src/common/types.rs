@@ -1149,8 +1149,6 @@ pub struct GasOptions {
     pub max_gas: Option<u64>,
 }
 
-const DEFAULT_MAX_GAS: u64 = 50000;
-
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
@@ -1222,7 +1220,6 @@ impl TransactionOptions {
     pub async fn submit_transaction(
         &self,
         payload: TransactionPayload,
-        amount_transfer: Option<u64>,
     ) -> CliTypedResult<Transaction> {
         let client = self.rest_client()?;
         let (sender_key, sender_address) = self.get_key_and_address()?;
@@ -1239,26 +1236,45 @@ impl TransactionOptions {
         } else {
             let gas_unit_price = client.estimate_gas_price().await?.into_inner().gas_estimate;
 
-            ask_to_confirm_price = gas_unit_price > 1;
+            ask_to_confirm_price = true;
             gas_unit_price
         };
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             max_gas
         } else if self.estimate_max_gas {
-            let simulated_txn = self
-                .simulate_transaction(payload.clone(), Some(gas_unit_price), amount_transfer)
+            let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+                .with_gas_unit_price(gas_unit_price);
+
+            let unsigned_transaction = transaction_factory
+                .payload(payload.clone())
+                .sender(sender_address)
+                .sequence_number(sequence_number)
+                .build();
+
+            let signed_transaction = SignedTransaction::new(
+                unsigned_transaction,
+                sender_key.public_key(),
+                Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+            );
+            // TODO: Cleanup to use the gas price estimation here
+            let simulated_txn = client
+                .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
                 .await?;
-            if !simulated_txn.info.success {
-                return Err(CliError::ApiError(format!(
-                    "Simulated transaction failed with status {}",
-                    simulated_txn.info.vm_status
-                )));
-            }
-            simulated_txn.info.gas_used.0
+            simulated_txn
+                .into_inner()
+                .transaction
+                .as_signed_user_txn()
+                .map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Transaction found was not a user transaction {}",
+                        err
+                    ))
+                })?
+                .max_gas_amount()
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases
-            DEFAULT_MAX_GAS
+            aptos_global_constants::MAX_GAS_AMOUNT
         };
 
         if ask_to_confirm_price {

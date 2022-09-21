@@ -17,8 +17,6 @@ on:
         type: string
         description: The Forge k8s namespace to be used for test. This value should manage Forge test concurrency. It may be truncated.
       FORGE_CLUSTER_NAME:
-        # HACK: Undo this after decommission old clusters
-        default: aptos-forge-big-0
         required: false
         type: string
         description: The Forge k8s cluster to be used for test
@@ -50,6 +48,11 @@ on:
         required: false
         type: string
         description: Whether to use performance images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
+      COMMENT_HEADER:
+        required: false
+        type: string
+        default: forge
+        description: A unique ID for Forge sticky comment on your PR. See https://github.com/marocchino/sticky-pull-request-comment#keep-more-than-one-comment
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -69,6 +72,7 @@ env:
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
   FORGE_ENABLE_FAILPOINTS: ${{ inputs.FORGE_ENABLE_FAILPOINTS }}
+  COMMENT_HEADER: ${{ inputs.COMMENT_HEADER }}
   VERBOSE: true
 
 jobs:
@@ -96,7 +100,9 @@ jobs:
         if: github.event.number != null
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          append: true
+          header: ${{ env.COMMENT_HEADER }}
+          hide_and_recreate: true # Hide the previous comment and add a comment at the end
+          hide_classify: "OUTDATED"
           path: ${{ env.FORGE_PRE_COMMENT }}
 
       - name: Run Forge
@@ -111,12 +117,13 @@ jobs:
         if: github.event.number != null && !cancelled()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          append: true
-          recreate: true
+          header: ${{ env.COMMENT_HEADER }}
+          hide_and_recreate: true
+          hide_classify: "OUTDATED"
           path: ${{ env.FORGE_COMMENT }}
-      - name: Post to a Slack channel
+      - name: Post to a Slack channel on failure
         # Post a Slack comment if the run has not been cancelled and the envs are set
-        if: env.POST_TO_SLACK == 'true' && !cancelled()
+        if: env.POST_TO_SLACK == 'true' && failure()
         id: slack
         uses: slackapi/slack-github-action@v1.21.0
         with:

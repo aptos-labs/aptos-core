@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
-
+use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
 use aptos_types::transaction::{
     authenticator::AuthenticationKeyPreimage, EntryFunction, ModuleBundle, Script,
 };
@@ -35,8 +35,9 @@ impl TransactionBuilder {
             payload,
             chain_id,
             expiration_timestamp_secs,
-            max_gas_amount: 4000,
-            gas_unit_price: 1,
+            // TODO(Gas): double check this
+            max_gas_amount: MAX_GAS_AMOUNT,
+            gas_unit_price: std::cmp::max(GAS_UNIT_PRICE, 1),
             sender: None,
             sequence_number: None,
         }
@@ -98,8 +99,8 @@ impl TransactionFactory {
     pub fn new(chain_id: ChainId) -> Self {
         Self {
             // TODO(Gas): double check if this right
-            max_gas_amount: 2_000,
-            gas_unit_price: 0,
+            max_gas_amount: MAX_GAS_AMOUNT,
+            gas_unit_price: GAS_UNIT_PRICE,
             transaction_expiration_time: 30,
             chain_id,
         }

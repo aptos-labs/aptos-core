@@ -19,8 +19,11 @@ async fn test_mint_transfer() {
         .await
         .unwrap();
 
-    // TODO(Gas): double check this
-    info.mint(account1.address(), 10_000).await.unwrap();
+    // NOTE(Gas): For some reason, there needs to be a lot of funds in the account in order for the
+    //            test to pass.
+    //            Is this caused by us increasing the default max gas amount in
+    //            testsuite/forge/src/interface/aptos.rs?
+    info.mint(account1.address(), 1_000_000).await.unwrap();
 
     let transfer_txn = account1.sign_with_transaction_builder(
         info.transaction_factory()

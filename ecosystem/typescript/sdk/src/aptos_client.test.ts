@@ -255,7 +255,9 @@ test(
       arguments: [account2.address().hex(), 100000],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
-    const transactionRes = (await client.simulateTransaction(account1, txnRequest))[0];
+    const transactionRes = (
+      await client.simulateTransaction(account1, txnRequest, { estimateGasUnitPrice: true, estimateMaxGasAmount: true })
+    )[0];
     expect(parseInt(transactionRes.gas_used, 10) > 0);
     expect(transactionRes.success);
     const account2AptosCoin = transactionRes.changes.filter((change) => {
@@ -425,7 +427,7 @@ test(
     const account1 = new AptosAccount(
       new HexString("0x883fdd67576e5fdceb370ba665b8af8856d0cae63fd808b8d16077c6b008ea8c").toUint8Array(),
     );
-    await faucetClient.fundAccount(account1.address(), 50000);
+    await faucetClient.fundAccount(account1.address(), 500000);
 
     const txnHash = await client.publishPackage(
       account1,
@@ -458,7 +460,7 @@ test(
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     const alice = new AptosAccount();
-    await faucetClient.fundAccount(alice.address(), 50000);
+    await faucetClient.fundAccount(alice.address(), 500000);
 
     const helperAccount = new AptosAccount();
 
@@ -474,6 +476,29 @@ test(
     expect(HexString.fromUint8Array(bcsToBytes(origAddress)).hex()).toBe(
       HexString.fromUint8Array(bcsToBytes(aliceAddress)).hex(),
     );
+  },
+  30 * 1000,
+);
+
+test(
+  "gets block by height",
+  async () => {
+    const blockHeight = 100;
+    const client = new AptosClient(NODE_URL);
+    const block = await client.getBlockByHeight(blockHeight);
+    expect(block.block_height).toBe(blockHeight.toString());
+  },
+  30 * 1000,
+);
+
+test(
+  "gets block by version",
+  async () => {
+    const version = 100;
+    const client = new AptosClient(NODE_URL);
+    const block = await client.getBlockByVersion(version);
+    expect(parseInt(block.first_version, 10)).toBeLessThanOrEqual(version);
+    expect(parseInt(block.last_version, 10)).toBeGreaterThanOrEqual(version);
   },
   30 * 1000,
 );

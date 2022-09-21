@@ -5,9 +5,9 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  workspace  = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
-  aws_tags   = "Terraform=testnet,Workspace=${local.workspace}"
-  chain_name = var.chain_name != "" ? var.chain_name : "${local.workspace}net"
+  workspace_name = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
+  aws_tags       = "Terraform=testnet,Workspace=${local.workspace_name}"
+  chain_name     = var.chain_name != "" ? var.chain_name : "${local.workspace_name}net"
 }
 
 # Forge testing overrides

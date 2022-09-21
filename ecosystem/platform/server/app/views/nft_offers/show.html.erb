@@ -76,7 +76,7 @@
                 <% elsif step.name == :connect_wallet %>
                   <%= render(ConnectWalletButtonComponent.new(wallet: @wallet, required_network: @nft_offer.network, turbo_frame: dom_id(@nft_offer), scheme: :primary, size: :large, class: 'inline-flex')) %>
                 <% elsif step.name == :claim_nft %>
-                  <%= render(ClaimNftButtonComponent.new(nft_offer: @nft_offer, wallet: @wallet, scheme: :primary, size: :large, class: 'inline-flex')) %>
+                  <%= render(ClaimNftButtonComponent.new(nft_offer: @nft_offer, wallet: @wallet, recaptcha_v2: !params[:captcha2].blank?, scheme: :primary, size: :large, class: 'inline-flex')) %>
                 <% end %>
               <% end %>
             <% end %>

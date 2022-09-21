@@ -18,7 +18,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use vm_genesis::Validator;
+use vm_genesis::{Validator, ValidatorWithCommissionRate};
 
 /// Template for setting up Github for Genesis
 ///
@@ -119,6 +119,26 @@ pub struct ValidatorConfiguration {
     pub full_node_host: Option<HostAndPort>,
     /// Stake amount for consensus
     pub stake_amount: u64,
+    /// Commission percentage for validator
+    pub commission_percentage: u64,
+    /// Whether the validator should be joining the validator set during genesis.
+    /// If set to false, the validator will be fully initialized but won't be added to the
+    /// validator set.
+    pub join_during_genesis: bool,
+}
+
+impl TryFrom<ValidatorConfiguration> for ValidatorWithCommissionRate {
+    type Error = anyhow::Error;
+
+    fn try_from(config: ValidatorConfiguration) -> Result<Self, Self::Error> {
+        let validator_commission_percentage = config.commission_percentage;
+        let join_during_genesis = config.join_during_genesis;
+        Ok(ValidatorWithCommissionRate {
+            validator: config.try_into()?,
+            validator_commission_percentage,
+            join_during_genesis,
+        })
+    }
 }
 
 impl TryFrom<ValidatorConfiguration> for Validator {
@@ -259,6 +279,8 @@ pub struct OwnerConfiguration {
     pub operator_account_address: AccountAddress,
     pub operator_account_public_key: Ed25519PublicKey,
     pub stake_amount: u64,
+    pub commission_percentage: u64,
+    pub join_during_genesis: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -282,6 +304,8 @@ pub struct StringOwnerConfiguration {
     pub operator_account_address: Option<String>,
     pub operator_account_public_key: Option<String>,
     pub stake_amount: Option<String>,
+    pub commission_percentage: Option<String>,
+    pub join_during_genesis: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

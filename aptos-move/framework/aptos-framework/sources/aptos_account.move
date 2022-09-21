@@ -1,10 +1,17 @@
 module aptos_framework::aptos_account {
+    use std::error;
+
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
 
     friend aptos_framework::genesis;
     friend aptos_framework::resource_account;
+
+    /// Account does not exist.
+    const EACCOUNT_NOT_FOUND: u64 = 1;
+    /// Account is not registered to receive APT.
+    const EACCOUNT_NOT_REGISTERED_FOR_APT: u64 = 2;
 
     ///////////////////////////////////////////////////////////////////////////
     /// Basic account creation methods.
@@ -20,6 +27,15 @@ module aptos_framework::aptos_account {
             create_account(to)
         };
         coin::transfer<AptosCoin>(source, to, amount)
+    }
+
+    public fun assert_account_exists(addr: address) {
+        assert!(account::exists_at(addr), error::not_found(EACCOUNT_NOT_FOUND));
+    }
+
+    public fun assert_account_is_registered_for_apt(addr: address) {
+        assert_account_exists(addr);
+        assert!(coin::is_account_registered<AptosCoin>(addr), error::not_found(EACCOUNT_NOT_REGISTERED_FOR_APT));
     }
 
     #[test(alice = @0xa11ce, core = @0x1)]

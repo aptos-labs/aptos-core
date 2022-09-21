@@ -27,6 +27,7 @@ pub struct NewBlockEvent {
     previous_block_votes_bitvec: Vec<u8>,
     proposer: AccountAddress,
     failed_proposer_indices: Vec<u64>,
+    // usecs (microseconds)
     timestamp: u64,
 }
 

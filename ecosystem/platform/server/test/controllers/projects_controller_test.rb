@@ -21,7 +21,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
       FactoryBot.create(:project, user: @user, verified: true)
     end
     sign_out @user
-    get projects_path
+    get ecosystem_path
     assert_response :success
   end
 
@@ -32,7 +32,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     c = FactoryBot.create(:project, user: @user, verified: true,
                                     full_description: 'The fnords decide to seek membership on the Greek Council ' * 10)
     d = FactoryBot.create(:project, user: @user, verified: true, title: 'Episode V')
-    get projects_path(s: 'fnord')
+    get ecosystem_path(s: 'fnord')
     assert_response :success
     assert_select "[data-project-id=#{a.id}]"
     assert_select "[data-project-id=#{b.id}]"
@@ -57,6 +57,22 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     project = FactoryBot.create(:project, user: FactoryBot.create(:user), public: true, verified: false)
     get project_path(project)
     assert_response :not_found
+  end
+
+  test 'view unverified project succeeds if it belongs to the current user' do
+    user = FactoryBot.create(:user)
+    sign_in user
+    project = FactoryBot.create(:project, user:, verified: false)
+    get project_path(project)
+    assert_response :success
+  end
+
+  test 'view private, unverified project succeeds if user is admin' do
+    user = FactoryBot.create(:user, is_root: true)
+    sign_in user
+    project = FactoryBot.create(:project, user:, public: false, verified: false)
+    get project_path(project)
+    assert_response :success
   end
 
   test 'new project page' do
@@ -137,7 +153,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
       delete project_path(project)
     end
 
-    assert_redirected_to projects_path
+    assert_redirected_to ecosystem_path
   end
 
   test 'delete existing project fails if current user is not the creator' do

@@ -3,7 +3,6 @@
 
 pub mod auth;
 pub mod telemetry;
-pub mod validator_set;
 
 pub mod common {
 
@@ -62,6 +61,16 @@ pub mod common {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{}", self.as_str())
         }
+    }
+}
+
+pub mod index {
+    use aptos_crypto::x25519;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    pub struct IndexResponse {
+        pub public_key: x25519::PublicKey,
     }
 }
 
