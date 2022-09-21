@@ -41,6 +41,7 @@ use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
 
 use aptos_netcore::transport::tcp::TCPBufferCfg;
 use aptos_network_discovery::DiscoveryChangeListener;
+use std::time::Duration;
 use std::{
     clone::Clone,
     collections::{HashMap, HashSet},
@@ -403,11 +404,18 @@ impl NetworkBuilder {
                     reconfig_events,
                 )
             }
-            DiscoveryMethod::File(path, interval_duration) => DiscoveryChangeListener::file(
+            DiscoveryMethod::File(file_discovery) => DiscoveryChangeListener::file(
                 self.network_context,
                 conn_mgr_reqs_tx,
-                path,
-                *interval_duration,
+                file_discovery.path.as_path(),
+                Duration::from_secs(file_discovery.interval_secs),
+                self.time_service.clone(),
+            ),
+            DiscoveryMethod::Rest(rest_discovery) => DiscoveryChangeListener::rest(
+                self.network_context,
+                conn_mgr_reqs_tx,
+                &rest_discovery.url,
+                Duration::from_secs(rest_discovery.interval_secs),
                 self.time_service.clone(),
             ),
             DiscoveryMethod::None => return,
