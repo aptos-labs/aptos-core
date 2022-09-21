@@ -36,7 +36,7 @@ async fn test_proof_builder_basic() {
         .is_ok());
     for i in 0..arc_signers.len() {
         let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone());
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone()).unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await
@@ -76,7 +76,7 @@ async fn test_proof_builder_basic() {
         .is_ok());
     for i in 0..arc_signers.len() {
         let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone());
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone()).unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await
@@ -99,7 +99,7 @@ async fn test_proof_builder_basic() {
         .is_ok());
     for _ in 0..arc_signers.len() {
         let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[1].clone());
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[1].clone()).unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await

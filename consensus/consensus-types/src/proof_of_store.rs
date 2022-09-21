@@ -3,7 +3,7 @@
 
 use crate::common::Round;
 use anyhow::Context;
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::account_address::AccountAddress as PeerId;
 use aptos_types::aggregate_signature::AggregateSignature;
@@ -62,16 +62,16 @@ impl SignedDigest {
         digest: HashValue,
         expiration: LogicalTime,
         validator_signer: Arc<ValidatorSigner>,
-    ) -> Self {
+    ) -> Result<Self, CryptoMaterialError> {
         let info = SignedDigestInfo::new(digest, expiration);
-        let signature = validator_signer.sign(&info);
+        let signature = validator_signer.sign(&info)?;
 
-        Self {
+        Ok(Self {
             epoch,
             peer_id: validator_signer.author(),
             info,
             signature,
-        }
+        })
     }
 
     pub fn epoch(&self) -> u64 {

@@ -156,7 +156,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     persist_request.digest,
                     expiration,
                     self.validator_signer.clone(),
-                ))
+                ).unwrap())
             }
 
             Err(e) => {
