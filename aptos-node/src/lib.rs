@@ -278,6 +278,34 @@ where
         // Build a single validator network with a generated config
         let mut template = NodeConfig::default_for_validator();
 
+        // Adjust some fields in the default template to lower the overhead of running on a
+        // local machine
+        template.state_sync.storage_service.max_concurrent_requests = 2;
+        template
+            .state_sync
+            .aptos_data_client
+            .max_num_in_flight_priority_polls = 2;
+        template
+            .state_sync
+            .aptos_data_client
+            .max_num_in_flight_regular_polls = 2;
+        template
+            .state_sync
+            .aptos_data_client
+            .summary_poll_interval_ms = 1000;
+        template
+            .state_sync
+            .storage_service
+            .storage_summary_refresh_interval_ms = 1000;
+        template
+            .state_sync
+            .state_sync_driver
+            .max_consecutive_stream_notifications = 2;
+        template.execution.concurrency_level = 2;
+        template.peer_monitoring_service.max_concurrent_requests = 2;
+        let validator_network = template.validator_network.as_mut().unwrap();
+        validator_network.max_concurrent_network_reqs = 2;
+
         // If a config path was provided, use that as the template
         if let Some(config_path) = config_path {
             if let Ok(config) = NodeConfig::load_config(config_path) {
