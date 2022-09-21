@@ -21,7 +21,7 @@ Install your preferred SDK from the below list:
 ## Step 2: Run the example
 
 Clone the `aptos-core` repo:
-```sh
+```bash
 git clone https://github.com/aptos-labs/aptos-core.git
 ```
 
@@ -29,54 +29,54 @@ git clone https://github.com/aptos-labs/aptos-core.git
   <TabItem value="typescript" label="Typescript">
 
   Navigate to the Typescript SDK examples directory:
-  ```sh
+  ```bash
   cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
   ```
 
   Install the necessary dependencies:
-  ```
+  ```bash
   yarn install
   ```
 
   Run the [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) example:
-  
-  ```sh
+
+  ```bash
   yarn run transfer_coin
   ```
   </TabItem>
   <TabItem value="python" label="Python">
 
   Navigate to the Python SDK directory:
-  ```sh
+  ```bash
   cd ~/aptos-core/ecosystem/python/sdk
   ```
 
   Install the necessary dependencies:
-  ```
+  ```bash
   curl -sSL https://install.python-poetry.org | python3
   poetry update
   ```
 
-  Run the `transfer-coin` example:
-  ```sh
+  Run the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) example:
+  ```bash
   poetry run python -m examples.transfer-coin
   ```
   </TabItem>
   <TabItem value="rust" label="Rust">
 
   Navigate to the Rust SDK directory:
-  ```sh
+  ```bash
   cd ~/aptos-core/sdk
   ```
 
-  Run the `transfer-coin` example:
-  ```sh
+  Run the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/sdk/examples/transfer-coin.rs) example:
+  ```bash
   cargo run --example transfer-coin
   ```
   </TabItem>
 </Tabs>
 
-## Step 3: Understand the Output
+## Step 3: Understand the output
 
 An output very similar to the following will appear after executing the above command:
 
@@ -109,9 +109,9 @@ The above output demonstrates that the `transfer-coin` example executes the foll
 * Another transfer of 1000 coins from Alice to Bob.
 * The additional 4 coins of gas paid for by Alice to make that transfer.
 
-Next, see below a walk-through of the Python SDK functions that are used to accomplish the above steps.
+Next, see below a walk-through of the SDK functions that are used to accomplish the above steps.
 
-## Step 4: The SDK in Depth
+## Step 4: The SDK in depth
 
 The `transfer-coin` example code uses helper functions to interact with the [REST API][rest_spec]. This section reviews each of the calls and gives insights into functionality.
 
@@ -119,24 +119,24 @@ The `transfer-coin` example code uses helper functions to interact with the [RES
   <TabItem value="typescript" label="Typescript">
 
 :::tip See the full example
-See [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
+See the Typescript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="python" label="Python">
 
 :::tip See the full example
-See [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) for the complete code as you follow the below steps.
+See the Python [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 :::tip See the full example
-See [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/sdk/examples/transfer-coin.rs) for the complete code as you follow the below steps.
+See the Rust [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/sdk/examples/transfer-coin.rs) for the complete code as you follow the below steps.
 :::
   </TabItem>
 </Tabs>
 
-### Step 4.1: Initializing the Clients
+### Step 4.1: Initializing the clients
 
 In the first step, the `transfer-coin` example initializes both the REST and faucet clients.
 
@@ -249,7 +249,7 @@ In Aptos, each account must have an on-chain representation in order to support 
 
 ### Step 4.4: Reading balances
 
-In this step, the Python SDK translates a single call into the process of querying a resource and reading a field from that resource.
+In this step, the SDK translates a single call into the process of querying a resource and reading a field from that resource.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
