@@ -4,7 +4,7 @@
 use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
 use aptos::common::types::EncodingType;
 use aptos::test::CliTestFramework;
-use aptos_config::config::Peer;
+use aptos_config::config::{FileDiscovery, Peer};
 use aptos_config::{
     config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, PeerSet},
     network_id::NetworkId,
@@ -38,10 +38,10 @@ async fn test_connection_limiting() {
         network.discovery_method = DiscoveryMethod::None;
         network.discovery_methods = vec![
             DiscoveryMethod::Onchain,
-            DiscoveryMethod::File(
-                discovery_file.as_ref().to_path_buf(),
-                Duration::from_secs(1),
-            ),
+            DiscoveryMethod::File(FileDiscovery {
+                path: discovery_file.path().to_path_buf(),
+                interval_secs: 1,
+            }),
         ];
         network.max_inbound_connections = 0;
     });
@@ -149,10 +149,10 @@ async fn test_file_discovery() {
                 network.discovery_method = DiscoveryMethod::None;
                 network.discovery_methods = vec![
                     DiscoveryMethod::Onchain,
-                    DiscoveryMethod::File(
-                        (*discovery_file_for_closure2).as_ref().to_path_buf(),
-                        Duration::from_millis(100),
-                    ),
+                    DiscoveryMethod::File(FileDiscovery {
+                        path: discovery_file_for_closure2.path().to_path_buf(),
+                        interval_secs: 1,
+                    }),
                 ];
             });
         }))
