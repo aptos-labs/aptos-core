@@ -190,7 +190,7 @@ pub fn start(
             .expect("Failed to build rayon global thread _pool.");
     }
 
-    let mut logger_builder = aptos_logger::Logger::new();
+    let mut logger_builder = aptos_logger::Logger::builder();
     logger_builder
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)

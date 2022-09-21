@@ -4,7 +4,6 @@
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
-use crate::info;
 use crate::telemetry_log_writer::{TelemetryLog, TelemetryLogWriter};
 use crate::{
     counters::{
@@ -788,8 +787,6 @@ impl LoggerFilterUpdater {
             interval.tick().await;
 
             self.update_filter();
-
-            info!("Logger filters rebuilt and reset.");
         }
     }
 
@@ -802,7 +799,7 @@ impl LoggerFilterUpdater {
 
 #[cfg(test)]
 mod tests {
-    use super::LogEntry;
+    use super::{AptosData, LogEntry};
     use crate::{
         aptos_logger::{json_format, RUST_LOG_TELEMETRY},
         debug, error, info,
@@ -1024,11 +1021,19 @@ mod tests {
         }
     }
 
+    fn new_async_logger() -> (AptosDataBuilder, Arc<AptosData>) {
+        let mut logger_builder = AptosDataBuilder::new();
+        let (remote_log_tx, _) = futures::channel::mpsc::channel(10);
+        let logger = logger_builder
+            .remote_log_tx(remote_log_tx)
+            .is_async(true)
+            .build_logger();
+        (logger_builder, logger)
+    }
+
     #[test]
     fn test_logger_filter_updater() {
-        let mut logger_builder = AptosDataBuilder::new();
-        let logger = logger_builder.build_logger();
-
+        let (logger_builder, logger) = new_async_logger();
         let debug_metadata = &Metadata::new(Level::Debug, "target", "module_path", "source_path");
 
         assert!(!logger
@@ -1042,10 +1047,54 @@ mod tests {
         let updater = LoggerFilterUpdater::new(logger.clone(), logger_builder);
         updater.update_filter();
 
+        assert!(logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+    }
+
+    #[test]
+    fn test_logger_filter_updater_invalid_value() {
+        let (logger_builder, logger) = new_async_logger();
+
+        let debug_metadata = &Metadata::new(Level::Debug, "target", "module_path", "source_path");
+
         assert!(!logger
             .filter
             .read()
             .telemetry_filter
             .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug;hyper=off"); // log values should be separated by commas not semicolons.
+
+        let updater = LoggerFilterUpdater::new(logger.clone(), logger_builder);
+        updater.update_filter();
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug,hyper=off"); // log values should be separated by commas not semicolons.
+        updater.update_filter();
+
+        assert!(logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(&Metadata::new(
+                Level::Error,
+                "target",
+                "hyper",
+                "source_path"
+            )));
     }
 }

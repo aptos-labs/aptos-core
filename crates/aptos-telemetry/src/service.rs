@@ -171,6 +171,7 @@ async fn spawn_telemetry_service(
             interval.tick().await;
             if telemetry_sender.check_chain_access(chain_id).await {
                 handle.abort();
+                info!("Aptos telemetry service is now configured for Chain ID {}. Starting telemetry service...", chain_id);
                 break;
             }
         }
