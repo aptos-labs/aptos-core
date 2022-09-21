@@ -35,3 +35,14 @@ pub const GAS_UNIT_PRICE: u64 = 100;
 
 pub const INITIAL_BALANCE: u64 = 100_000_000;
 pub const MAX_GAS_AMOUNT: u64 = 100_000;
+pub const GAS_HEADROOM_NUMERATOR: u64 = 3;
+pub const GAS_HEADROOM_DENOMINATOR: u64 = 2;
+
+/// Gas costs are dynamic based on storage, so the simulation values need some headroom applied by
+/// the user if using it to estimate gas
+pub fn adjust_gas_headroom(gas_used: u64, max_possible_gas: u64) -> u64 {
+    std::cmp::min(
+        max_possible_gas,
+        (gas_used.saturating_mul(GAS_HEADROOM_NUMERATOR)).saturating_div(GAS_HEADROOM_DENOMINATOR),
+    )
+}

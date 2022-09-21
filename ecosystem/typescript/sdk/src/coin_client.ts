@@ -33,7 +33,7 @@ export class CoinClient {
    * transfer AptosCoin from one account to another.
    *
    * @param from Account sending the coins
-   * @param from Account to receive the coins
+   * @param to Account to receive the coins
    * @param amount Number of coins to transfer
    * @param extraArgs Extra args for building the transaction or configuring how
    * the client should submit and wait for the transaction
