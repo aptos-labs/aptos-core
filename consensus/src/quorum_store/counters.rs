@@ -87,15 +87,6 @@ pub static PULLED_EMPTY_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the pulled txns that are leftover.
-pub static PULLED_LEFTOVER_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "quorum_store_pulled_leftover_txn_count",
-        "Count of the pulled leftover txns."
-    )
-    .unwrap()
-});
-
 /// Count of the created batches since last restart.
 pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -164,6 +155,15 @@ pub static MISSED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_missed_batch_fragments_count",
         "Count of the missed batch fragments at the receiver side."
+    )
+    .unwrap()
+});
+
+/// Count of the exceeded storage quota.
+pub static EXCEEDED_STORAGE_QUOTA_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_exceeded_storage_quota_count",
+        "Count of the exceeded storage quota."
     )
     .unwrap()
 });

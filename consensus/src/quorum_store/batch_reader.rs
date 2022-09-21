@@ -4,6 +4,7 @@
 use crate::network::QuorumStoreSender;
 use crate::quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand};
 use crate::quorum_store::{
+    counters,
     types::{Batch, PersistedValue},
     utils::RoundExpirations,
 };
@@ -78,6 +79,7 @@ impl QuotaManager {
             self.db_balance = self.db_balance + num_bytes;
             Ok(StorageMode::PersistedOnly)
         } else {
+            counters::EXCEEDED_STORAGE_QUOTA_COUNT.inc();
             bail!("Storage quota exceeded ");
         }
     }

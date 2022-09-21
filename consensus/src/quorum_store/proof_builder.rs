@@ -118,7 +118,7 @@ impl ProofBuilder {
         );
         self.digest_to_time
             .entry(info.digest)
-            .or_insert(chrono::Utc::now().naive_utc().timestamp_millis() as u64);
+            .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
         Ok(())
     }
 
@@ -153,12 +153,12 @@ impl ProofBuilder {
                 .take(validator_verifier);
 
             // quorum store measurements
-            let duration = chrono::Utc::now().naive_utc().timestamp_millis() as u64
+            let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
                 - self
                     .digest_to_time
                     .get(&digest)
                     .expect("Batch created without recording the time!");
-            counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_millis(duration));
+            counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
 
             tx.send(Ok((proof, batch_id)))
                 .expect("Unable to send the proof of store");

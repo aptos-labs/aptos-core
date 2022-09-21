@@ -14,7 +14,6 @@ use crate::round_manager::VerifiedEvent;
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::transaction::SignedTransaction;
 use aptos_types::PeerId;
 use channel::aptos_channel;
 use consensus_types::{
@@ -46,7 +45,6 @@ pub struct QuorumStoreWrapper {
     mempool_proxy: MempoolProxy,
     quorum_store_sender: TokioSender<QuorumStoreCommand>,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
-    pulled_transactions: Vec<SignedTransaction>,
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
@@ -89,7 +87,6 @@ impl QuorumStoreWrapper {
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             quorum_store_sender,
             batches_in_progress: HashMap::new(),
-            pulled_transactions: Vec::new(),
             batch_expirations: RoundExpirations::new(),
             batch_builder: BatchBuilder::new(batch_id, max_batch_bytes as usize),
             latest_logical_time: LogicalTime::new(epoch, 0),
@@ -127,39 +124,32 @@ impl QuorumStoreWrapper {
             .unwrap();
 
         debug!("QS: pulled_txns len: {:?}", pulled_txns.len());
-        debug!(
-            "QS: remaining txns from last time len: {:?}",
-            self.pulled_transactions.len()
-        );
         if pulled_txns.is_empty() {
             counters::PULLED_EMPTY_TXNS_COUNT.inc();
         } else {
             counters::PULLED_TXNS_COUNT.inc();
         }
-        if !self.pulled_transactions.is_empty() {
-            counters::PULLED_LEFTOVER_TXNS_COUNT.inc();
-        }
 
-        // Add the pulled txns from last time
-        let all_txns = [pulled_txns, self.pulled_transactions.clone()].concat();
-        self.pulled_transactions.clear();
-
-        for txn in all_txns {
-            // Daniel: remaining of the txn will be lost when hitting the limit, is it ok?
-            // Daniel: making some fix to see if this causes txn expiration
-            if !end_batch {
-                if !self.batch_builder.append_transaction(&txn) {
-                    end_batch = true;
-                }
-            } else {
-                self.pulled_transactions.push(txn);
+        for txn in pulled_txns {
+            if !self.batch_builder.append_transaction(&txn) {
+                end_batch = true;
+                break;
             }
         }
+
         let serialized_txns = self.batch_builder.take_serialized_txns();
 
         if self.last_end_batch_time.elapsed().as_millis() > self.end_batch_ms {
             end_batch = true;
             self.last_end_batch_time = Instant::now();
+
+            // Quorum store metrics
+            counters::CREATED_EMPTY_BATCHES_COUNT.inc();
+
+            let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
+                - self.batch_builder.time_created();
+            counters::EMPTY_BATCH_CREATION_DURATION
+                .observe_duration(Duration::from_micros(duration));
         }
 
         let batch_id = self.batch_builder.batch_id();
@@ -173,23 +163,15 @@ impl QuorumStoreWrapper {
             None
         } else {
             if self.batch_builder.is_empty() {
-                // Quorum store metrics
-                counters::CREATED_EMPTY_BATCHES_COUNT.inc();
-
-                let duration = chrono::Utc::now().naive_utc().timestamp_millis() as u64
-                    - self.batch_builder.time_created();
-                counters::EMPTY_BATCH_CREATION_DURATION
-                    .observe_duration(Duration::from_millis(duration));
-
                 return None;
             }
 
             // Quorum store metrics
             counters::CREATED_BATCHES_COUNT.inc();
 
-            let duration = chrono::Utc::now().naive_utc().timestamp_millis() as u64
+            let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
                 - self.batch_builder.time_created();
-            counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_millis(duration));
+            counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_micros(duration));
 
             counters::NUM_TXN_PER_BATCH.observe(self.batch_builder.summaries().len() as f64);
 

@@ -36,7 +36,7 @@ impl BatchBuilder {
             data: Vec::new(),
             num_bytes: 0,
             max_bytes,
-            time_created: chrono::Utc::now().naive_utc().timestamp_millis() as u64,
+            time_created: chrono::Utc::now().naive_utc().timestamp_micros() as u64,
         }
     }
 
