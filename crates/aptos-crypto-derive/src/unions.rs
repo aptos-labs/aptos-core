@@ -225,7 +225,7 @@ pub fn impl_enum_signingkey(
             }
 
             #[cfg(test)]
-            fn sign_arbitrary_message(&self, message: &[u8]) -> Result<Self::SignatureMaterial, CryptoMaterialError> {
+            fn sign_arbitrary_message(&self, message: &[u8]) -> Self::SignatureMaterial {
                 match self {
                     #match_arms_arbitrary
                 }

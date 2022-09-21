@@ -163,10 +163,7 @@ impl SigningKey for MultiEd25519PrivateKey {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    fn sign_arbitrary_message(
-        &self,
-        message: &[u8],
-    ) -> Result<MultiEd25519Signature, CryptoMaterialError> {
+    fn sign_arbitrary_message(&self, message: &[u8]) -> MultiEd25519Signature {
         let mut signatures: Vec<Ed25519Signature> = Vec::with_capacity(self.threshold as usize);
         let mut bitmap = [0u8; BITMAP_NUM_OF_BYTES];
         for (i, private_key) in self
@@ -176,10 +173,10 @@ impl SigningKey for MultiEd25519PrivateKey {
             .enumerate()
         {
             bitmap_set_bit(&mut bitmap, i);
-            signatures.push(private_key.sign_arbitrary_message(message)?);
+            signatures.push(private_key.sign_arbitrary_message(message));
         }
 
-        Ok(MultiEd25519Signature { signatures, bitmap })
+        MultiEd25519Signature { signatures, bitmap }
     }
 }
 

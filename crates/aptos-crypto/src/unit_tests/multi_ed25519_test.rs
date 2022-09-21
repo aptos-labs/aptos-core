@@ -511,7 +511,7 @@ fn test_sample_multisig() {
         let multi_private_key =
             MultiEd25519PrivateKey::new(private_keys.to_vec(), k as u8).unwrap();
         let multi_public_key = MultiEd25519PublicKey::from(&multi_private_key);
-        let multi_signature = multi_private_key.sign_arbitrary_message(msg).unwrap();
+        let multi_signature = multi_private_key.sign_arbitrary_message(msg);
 
         ks.push(k);
         ns.push(n);

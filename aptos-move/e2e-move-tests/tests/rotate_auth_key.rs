@@ -123,16 +123,13 @@ pub fn assert_successful_payload_key_rotation<
         new_public_key: new_public_key.to_bytes().to_vec(),
     };
 
-    let rotation_msg = bcs::to_bytes(&rotation_proof);
+    let rotation_msg = bcs::to_bytes(&rotation_proof).unwrap();
 
     // sign the rotation message by the current private key and the new private key
     let signature_by_curr_privkey = current_account
         .privkey
-        .sign_arbitrary_message(&rotation_msg.clone().unwrap())
-        .unwrap();
-    let signature_by_new_privkey = new_private_key
-        .sign_arbitrary_message(&rotation_msg.unwrap())
-        .unwrap();
+        .sign_arbitrary_message(&rotation_msg);
+    let signature_by_new_privkey = new_private_key.sign_arbitrary_message(&rotation_msg);
 
     assert_success!(harness.run_transaction_payload(
         &current_account,

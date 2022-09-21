@@ -27,14 +27,8 @@ fn bls12381_sigshare_verify() {
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
     let key_pair_wrong = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
-    let signature = key_pair
-        .private_key
-        .sign_arbitrary_message(message)
-        .unwrap();
-    let signature_wrong = key_pair_wrong
-        .private_key
-        .sign_arbitrary_message(message)
-        .unwrap();
+    let signature = key_pair.private_key.sign_arbitrary_message(message);
+    let signature_wrong = key_pair_wrong.private_key.sign_arbitrary_message(message);
 
     // sig on message under key_pair should verify
     assert!(signature
@@ -156,10 +150,7 @@ fn bls12381_serialize_sig() {
     let mut rng = OsRng;
     let message = b"Hello world";
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
-    let signature = key_pair
-        .private_key
-        .sign_arbitrary_message(message)
-        .unwrap();
+    let signature = key_pair.private_key.sign_arbitrary_message(message);
 
     let sig_bytes = signature.to_bytes();
 
@@ -430,7 +421,7 @@ fn bls12381_sample_signature() {
     let pk = keypair.public_key;
 
     let message = b"Hello Aptos!";
-    let signature = sk.sign_arbitrary_message(message).unwrap();
+    let signature = sk.sign_arbitrary_message(message);
 
     println!("SK:        {}", hex::encode(&sk.to_bytes()));
     println!("PK:        {}", hex::encode(&pk.to_bytes()));
@@ -510,8 +501,7 @@ fn bls12381_sample_aggregate_pk_and_aggsig() {
         sigs.push(
             keypair
                 .private_key
-                .sign_arbitrary_message(messages.last().unwrap().as_bytes())
-                .unwrap(),
+                .sign_arbitrary_message(messages.last().unwrap().as_bytes()),
         );
 
         aggsigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
@@ -561,7 +551,7 @@ fn bls12381_sample_aggregate_pk_and_multisig() {
         let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
         pks.push(keypair.public_key);
-        sigs.push(keypair.private_key.sign_arbitrary_message(message).unwrap());
+        sigs.push(keypair.private_key.sign_arbitrary_message(message));
 
         multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
 
@@ -607,7 +597,7 @@ fn bls12381_sample_aggregate_sigs() {
     for _i in 1..=num {
         let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
-        sigs.push(keypair.private_key.sign_arbitrary_message(message).unwrap());
+        sigs.push(keypair.private_key.sign_arbitrary_message(message));
 
         multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
     }

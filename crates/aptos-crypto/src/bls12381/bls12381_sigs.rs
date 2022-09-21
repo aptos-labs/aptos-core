@@ -127,7 +127,7 @@ impl Signature {
         let private_key = PrivateKey::genesis();
 
         let msg = b"hello foo";
-        private_key.sign_arbitrary_message(msg).unwrap()
+        private_key.sign_arbitrary_message(msg)
     }
 }
 

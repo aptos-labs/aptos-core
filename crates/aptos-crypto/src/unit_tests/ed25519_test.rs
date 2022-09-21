@@ -360,7 +360,7 @@ proptest! {
         msg in vec(proptest::num::u8::ANY, 1..128),
         keypair in uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>()
     ) {
-        let signature = keypair.private_key.sign_arbitrary_message(&msg).unwrap();
+        let signature = keypair.private_key.sign_arbitrary_message(&msg);
         let serialized: &[u8] = &(signature.to_bytes());
         prop_assert_eq!(ED25519_SIGNATURE_LENGTH, serialized.len());
         let deserialized = Ed25519Signature::try_from(serialized).unwrap();
