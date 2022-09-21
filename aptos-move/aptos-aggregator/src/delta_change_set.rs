@@ -432,7 +432,7 @@ mod tests {
         // Case 6: updating value with changing the sign. Note that we do not
         // test history here and onwards, because that code is shared by
         // plus-plus and plus-minus cases.
-        // Explanation: +23-24 = -1
+        // Explanation: +24-23 = +1
         let mut a = delta_add(24, 100);
         let d = delta_sub(23, 100);
         assert_ok!(a.merge_with(d));
