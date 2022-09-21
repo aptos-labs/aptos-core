@@ -21,4 +21,18 @@ module aptos_framework::chain_id {
     public fun get(): u8 acquires ChainId {
         borrow_global<ChainId>(@aptos_framework).id
     }
+
+    #[test_only]
+    fun change_id(value: u8) acquires ChainId {
+        let id = &mut borrow_global_mut<ChainId>(@aptos_framework).id;
+        *id = value;
+    }
+
+    #[test(aptos_framework = @0x1)]
+    fun test_get(aptos_framework: &signer) acquires ChainId {
+        initialize(aptos_framework, 1u8);
+        assert!(get() == 1u8, 1);
+        change_id(2u8);
+        assert!(get() == 2u8, 1);
+    }
 }
