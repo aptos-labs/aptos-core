@@ -157,7 +157,8 @@ pub fn make_proposal_with_parent_and_overrides(
         validator_signer.author(),
         ledger_info,
         validator_signer,
-    );
+    )
+    .unwrap();
 
     let mut ledger_info_with_signatures = LedgerInfoWithPartialSignatures::new(
         vote.ledger_info().clone(),
