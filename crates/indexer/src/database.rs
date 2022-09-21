@@ -53,11 +53,12 @@ pub fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
 }
 
 pub fn execute_with_better_error<
-    T: diesel::Table + diesel::QuerySource,
+    T: diesel::Table + diesel::QuerySource + diesel::query_builder::QueryId + 'static,
     U: diesel::query_builder::QueryFragment<diesel::pg::Pg>
+        + diesel::query_builder::QueryId
         + diesel::insertable::CanInsertInSingleQuery<diesel::pg::Pg>,
 >(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     query: diesel::query_builder::InsertStatement<T, U>,
 ) -> diesel::QueryResult<usize>
 where

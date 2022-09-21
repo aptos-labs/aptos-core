@@ -48,7 +48,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   let accountResource = resources.find((r) => r.type === aptosCoinStore);
   let balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 100_000_000);
-  console.log(`multisig account coins: ${balance}. Should be 100_000_000!`);
+  console.log(`multisig account coins: ${balance}. Should be 100000000!`);
 
   const account4 = new AptosAccount();
   // Creates a receiver account and fund the account with 0 AptosCoin
