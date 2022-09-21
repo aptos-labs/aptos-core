@@ -76,20 +76,22 @@ impl DeltaOp {
         }
     }
 
-    /// Aggregates another delta into `self`.
-    pub fn merge_with(&mut self, other: DeltaOp) -> PartialVMResult<()> {
+    /// Applies self on top of previous delta, merging them together. Note
+    /// that the strict ordering here is crucial for catching overflows
+    /// correctly.
+    pub fn merge_onto(&mut self, previous_delta: DeltaOp) -> PartialVMResult<()> {
         use DeltaUpdate::*;
 
-        Ok(match self.update {
+        Ok(match previous_delta.update {
             Plus(value) => {
                 // Before we proceed to merging deltas, make sure we verify that
-                // `other` delta did not overflow when shifted by +value. At the
-                // same time, we can compute new history values for `other` delta.
-                let other_max_positive = addition(value, other.max_positive, other.limit)?;
-                let other_min_negative = subtraction(other.min_negative, value).or(Ok(0))?;
+                // `self` delta did not overflow when shifted by +value. At the
+                // same time, we can compute new history values for `self` delta.
+                let other_max_positive = addition(value, self.max_positive, self.limit)?;
+                let other_min_negative = subtraction(self.min_negative, value).or(Ok(0))?;
 
                 // If check has passed, update the value.
-                match other.update {
+                match self.update {
                     Plus(other_value) => {
                         let new_value = addition(value, other_value, self.limit)?;
                         self.update = Plus(new_value);
@@ -106,18 +108,18 @@ impl DeltaOp {
                 }
 
                 // Lastly, update the history.
-                self.max_positive = self.max_positive.max(other_max_positive);
-                self.min_negative = self.min_negative.max(other_min_negative);
+                self.max_positive = previous_delta.max_positive.max(other_max_positive);
+                self.min_negative = previous_delta.min_negative.max(other_min_negative);
             }
             Minus(value) => {
                 // Again, first we verify that the merging makes sense at all.
                 // Now, we can underflow if the minimum value of `other` drops
                 // too much.
-                let other_min_negative = addition(value, other.min_negative, other.limit)?;
-                let other_max_positive = subtraction(other.max_positive, value).or(Ok(0))?;
+                let other_min_negative = addition(value, self.min_negative, self.limit)?;
+                let other_max_positive = subtraction(self.max_positive, value).or(Ok(0))?;
 
                 // Update the value and history.
-                match other.update {
+                match self.update {
                     Plus(other_value) => {
                         if other_value >= value {
                             let new_value = subtraction(other_value, value)?;
@@ -132,8 +134,8 @@ impl DeltaOp {
                         self.update = Minus(new_value);
                     }
                 }
-                self.max_positive = self.max_positive.max(other_max_positive);
-                self.min_negative = self.min_negative.max(other_min_negative);
+                self.max_positive = previous_delta.max_positive.max(other_max_positive);
+                self.min_negative = previous_delta.min_negative.max(other_min_negative);
             }
         })
     }
@@ -388,62 +390,62 @@ mod tests {
         // Case 1: preserving old history and updating the value.
         // Explanation: value becomes +2+1 = +3, history remains unchanged
         // because +4 > +2+1 and -3 < 0.
-        let mut a = delta_add_with_history(2, 100, 4, 3);
-        let d = delta_add(1, 100);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Plus(3));
-        assert_eq!(a.max_positive, 4);
-        assert_eq!(a.min_negative, 3);
+        let a = delta_add_with_history(2, 100, 4, 3);
+        let mut d = delta_add(1, 100);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Plus(3));
+        assert_eq!(d.max_positive, 4);
+        assert_eq!(d.min_negative, 3);
 
         // Case 2: updating history upper bound.
         // Explanation: again, value is clearly +3, but this time the upper bound
         // in history is updated with +3+4 > +4, but lower bound is preserved
         // with -3 < +3-4.
-        let mut a = delta_add_with_history(2, 100, 4, 3);
-        let d = delta_add_with_history(3, 100, 4, 4);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Plus(5));
-        assert_eq!(a.max_positive, 6);
-        assert_eq!(a.min_negative, 3);
+        let a = delta_add_with_history(2, 100, 4, 3);
+        let mut d = delta_add_with_history(3, 100, 4, 4);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Plus(5));
+        assert_eq!(d.max_positive, 6);
+        assert_eq!(d.min_negative, 3);
 
         // Case 3: updating history lower bound.
         // Explanation: clearly, upper bound remains at +90, but lower bound
         // has to be updated with +5-10 < -3.
-        let mut a = delta_add_with_history(5, 100, 90, 3);
-        let d = delta_add_with_history(10, 100, 4, 10);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Plus(15));
-        assert_eq!(a.max_positive, 90);
-        assert_eq!(a.min_negative, 5);
+        let a = delta_add_with_history(5, 100, 90, 3);
+        let mut d = delta_add_with_history(10, 100, 4, 10);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Plus(15));
+        assert_eq!(d.max_positive, 90);
+        assert_eq!(d.min_negative, 5);
 
         // Case 4: overflow on value.
         // Explanation: value overflows because +51+50 > 100.
-        let mut a = delta_add(51, 100);
-        let d = delta_add(50, 100);
-        assert_err!(a.merge_with(d));
+        let a = delta_add(51, 100);
+        let mut d = delta_add(50, 100);
+        assert_err!(d.merge_onto(a));
 
         // Case 5: overflow on upper bound in the history.
         // Explanation: the new upper bound would be +5+96 > 100 and should not
         // have happened.
-        let mut a = delta_add_with_history(5, 100, 90, 3);
-        let d = delta_add_with_history(10, 100, 96, 0);
-        assert_err!(a.merge_with(d));
+        let a = delta_add_with_history(5, 100, 90, 3);
+        let mut d = delta_add_with_history(10, 100, 96, 0);
+        assert_err!(d.merge_onto(a));
 
         // Case 6: updating value with changing the sign. Note that we do not
         // test history here and onwards, because that code is shared by
         // plus-plus and plus-minus cases.
         // Explanation: +24-23 = +1
-        let mut a = delta_add(24, 100);
-        let d = delta_sub(23, 100);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Plus(1));
+        let a = delta_add(24, 100);
+        let mut d = delta_sub(23, 100);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Plus(1));
 
         // Case 7: updating value with changing the sign.
         // Explanation: +23-24 = -1
-        let mut a = delta_add(23, 100);
-        let d = delta_sub_with_history(24, 100, 20, 20);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Minus(1));
+        let a = delta_add(23, 100);
+        let mut d = delta_sub_with_history(24, 100, 20, 20);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Minus(1));
     }
 
     #[test]
@@ -453,59 +455,59 @@ mod tests {
         // Case 1: preserving old history and updating the value.
         // Explanation: value becomes -20-20 = -40, history remains unchanged
         // because +1 > 0 and -40 <= -20-0.
-        let mut a = delta_sub_with_history(20, 100, 1, 40);
-        let d = delta_sub(20, 100);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Minus(40));
-        assert_eq!(a.max_positive, 1);
-        assert_eq!(a.min_negative, 40);
+        let a = delta_sub_with_history(20, 100, 1, 40);
+        let mut d = delta_sub(20, 100);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Minus(40));
+        assert_eq!(d.max_positive, 1);
+        assert_eq!(d.min_negative, 40);
 
         // Case 2: updating history upper bound.
         // Explanation: upper bound is changed because -2+7 > 4. Lower bound
         // remains unchanged because -2-7 > -10.
-        let mut a = delta_sub_with_history(2, 100, 4, 10);
-        let d = delta_sub_with_history(3, 100, 7, 7);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Minus(5));
-        assert_eq!(a.max_positive, 5);
-        assert_eq!(a.min_negative, 10);
+        let a = delta_sub_with_history(2, 100, 4, 10);
+        let mut d = delta_sub_with_history(3, 100, 7, 7);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Minus(5));
+        assert_eq!(d.max_positive, 5);
+        assert_eq!(d.min_negative, 10);
 
         // Case 3: updating history lower bound.
         // Explanation: +90 > -5+95 and therefore upper bound remains the same.
         // For lower bound, we have to update it because -5-4 < -5.
-        let mut a = delta_sub_with_history(5, 100, 90, 5);
-        let d = delta_sub_with_history(10, 100, 95, 4);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Minus(15));
-        assert_eq!(a.max_positive, 90);
-        assert_eq!(a.min_negative, 9);
+        let a = delta_sub_with_history(5, 100, 90, 5);
+        let mut d = delta_sub_with_history(10, 100, 95, 4);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Minus(15));
+        assert_eq!(d.max_positive, 90);
+        assert_eq!(d.min_negative, 9);
 
         // Case 4: underflow on value.
         // Explanation: value underflows because -50-51 clearly should have
         // never happened.
-        let mut a = delta_sub(50, 100);
-        let d = delta_sub(51, 100);
-        assert_err!(a.merge_with(d));
+        let a = delta_sub(50, 100);
+        let mut d = delta_sub(51, 100);
+        assert_err!(d.merge_onto(a));
 
         // Case 5: underflow on lower bound in the history.
         // Explanation: the new lower bound would be -5-96 which clearly underflows.
-        let mut a = delta_sub_with_history(5, 100, 0, 3);
-        let d = delta_sub_with_history(10, 100, 0, 96);
-        assert_err!(a.merge_with(d));
+        let a = delta_sub_with_history(5, 100, 0, 3);
+        let mut d = delta_sub_with_history(10, 100, 0, 96);
+        assert_err!(d.merge_onto(a));
 
         // Case 6: updating value with changing the sign.
         // Explanation: -24+23 = -1.
-        let mut a = delta_sub(24, 100);
-        let d = delta_add(23, 100);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Minus(1));
+        let a = delta_sub(24, 100);
+        let mut d = delta_add(23, 100);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Minus(1));
 
         // Case 7: updating value with changing the sign.
         // Explanation: -23+24 = +1.
-        let d = delta_sub_with_history(23, 100, 20, 20);
-        let mut a = delta_add(24, 100);
-        assert_ok!(a.merge_with(d));
-        assert_eq!(a.update, Plus(1));
+        let mut d = delta_sub_with_history(23, 100, 20, 20);
+        let a = delta_add(24, 100);
+        assert_ok!(d.merge_onto(a));
+        assert_eq!(d.update, Plus(1));
     }
 
     #[derive(Default)]
