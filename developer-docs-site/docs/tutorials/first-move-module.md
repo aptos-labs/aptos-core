@@ -105,7 +105,7 @@ aptos move publish --named-addresses hello_blockchain=default
 
 You will see the output similar to the below:
 
-```json
+```bash
 package size 1631 bytes
 {
   "Result": {
