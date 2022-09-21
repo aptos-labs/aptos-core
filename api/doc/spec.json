@@ -1909,7 +1909,7 @@
           "Blocks"
         ],
         "summary": "Get blocks by height",
-        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information.\n\nIf the block is pruned, it will return a 410",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information.\n\nTransactions are limited by max default transactions size.  If not all transactions\nare present, the user will need to query for the rest of the transactions via the\nget transactions API.\n\nIf the block is pruned, it will return a 410",
         "parameters": [
           {
             "name": "block_height",
@@ -2438,7 +2438,7 @@
           "Blocks"
         ],
         "summary": "Get blocks by version",
-        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information given a version in the block.\n\nIf the block has been pruned, it will return a 410",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information given a version in the block.\n\nTransactions are limited by max default transactions size.  If not all transactions\nare present, the user will need to query for the rest of the transactions via the\nget transactions API.\n\nIf the block has been pruned, it will return a 410",
         "parameters": [
           {
             "name": "version",

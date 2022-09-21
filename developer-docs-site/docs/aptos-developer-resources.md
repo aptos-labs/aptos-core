@@ -41,7 +41,7 @@ This page contains links to frequently referred Aptos developer resources.
 
 ## Aptos explorer
 
-- [Aptos Exporer](https://explorer.devnet.aptos.dev/): Use the top-right drop-down menu to select the network.
+- [Aptos Exporer](https://explorer.aptoslabs.com/): Use the top-right drop-down menu to select the network.
 - [Aptos Community](https://aptoslabs.com/community): Links to discussion forum, Discord and AIT.
 
 ## IDE plugins for Move language
