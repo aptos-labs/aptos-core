@@ -124,7 +124,7 @@ impl AggregatorChangeSet {
                         }
                         (Merge(mut delta1), Merge(delta2)) => {
                             delta1
-                                .merge_with(delta2)
+                                .merge_onto(delta2)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Merge(delta1)
                         }
