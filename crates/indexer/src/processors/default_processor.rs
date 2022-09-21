@@ -118,6 +118,7 @@ fn insert_transactions(
                 .values(&txns[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -165,6 +166,7 @@ fn insert_user_transactions_w_sigs(
                     ut_schema::entry_function_id_str.eq(excluded(ut_schema::entry_function_id_str)),
                     ut_schema::inserted_at.eq(excluded(ut_schema::inserted_at)),
                 )),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -185,6 +187,7 @@ fn insert_user_transactions_w_sigs(
                     sig_schema::is_sender_primary,
                 ))
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -217,6 +220,7 @@ fn insert_block_metadata_transactions(
                 .values(&bmt[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -239,6 +243,7 @@ fn insert_events(conn: &mut PgConnection, ev: &[EventModel]) -> Result<(), diese
                 .values(&ev[start_ind..end_ind])
                 .on_conflict((account_address, creation_number, sequence_number))
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -264,6 +269,7 @@ fn insert_write_set_changes(
                 .values(&wscs[start_ind..end_ind])
                 .on_conflict((transaction_version, index))
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -296,6 +302,7 @@ fn insert_move_modules(
                 .values(&modules[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -328,6 +335,7 @@ fn insert_move_resources(
                 .values(&resources[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -371,6 +379,7 @@ fn insert_table_data(
                 .values(&items[start_ind..end_ind])
                 .on_conflict((ti::transaction_version, ti::write_set_change_index))
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -386,6 +395,7 @@ fn insert_table_data(
                 .values(&metadata_nonnull[start_ind..end_ind])
                 .on_conflict(tm::handle)
                 .do_nothing(),
+            None,
         ) {
             Ok(_) => {}
             Err(e) => {

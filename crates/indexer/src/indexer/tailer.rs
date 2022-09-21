@@ -105,6 +105,7 @@ impl Tailer {
                     diesel::insert_into(ledger_infos::table).values(LedgerInfo {
                         chain_id: new_chain_id,
                     }),
+                    None,
                 )
                 .context(r#"Error updating chain_id!"#)
                 .map(|_| new_chain_id as u64)
