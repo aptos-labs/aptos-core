@@ -4624,16 +4624,15 @@ anymatch@^3.0.3, anymatch@~3.1.2:
     normalize-path "^3.0.0"
     picomatch "^2.0.4"
 
-aptos@1.3.13:
-  version "1.3.13"
-  resolved "https://registry.yarnpkg.com/aptos/-/aptos-1.3.13.tgz#cbf12431b6ee66a3d1952b1d1ce6520005170da0"
-  integrity sha512-rhpG9ibIWZxMLsUY91bSCeN75H68onvms/gTDaWRKkryOAVdzPUmvWd34TQN8uFjNZRFlXloIICm/8Ri+yBRNw==
+aptos@1.3.14:
+  version "1.3.14"
+  resolved "https://registry.yarnpkg.com/aptos/-/aptos-1.3.14.tgz#7487b4fd783dd5dfb49419f6e907a95c8ca7ce22"
+  integrity sha512-9AZ7fKgOwLoOITnw3nz2Nzon/HjKrHDU6n893S4MhsmHXK85R4NG4UyTyIczhWGWVdytJiPCkEZufhzsH4eZCw==
   dependencies:
     "@noble/hashes" "1.1.2"
     "@scure/bip39" "1.1.0"
     axios "0.27.2"
     form-data "4.0.0"
-    js-sha3 "0.8.0"
     tweetnacl "1.0.3"
 
 arg@^5.0.2:
