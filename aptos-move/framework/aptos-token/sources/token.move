@@ -881,6 +881,11 @@ module aptos_token::token {
         table::borrow(all_token_data, token_data_id).largest_property_version
     }
 
+    /// return the TokenId for a given Token
+    public fun get_id_of_token(token: &Token): TokenId {
+        token.id
+    }
+
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
         TokenMutabilityConfig{
             maximum: *vector::borrow(mutate_setting, TOKEN_MAX_MUTABLE_IND),
