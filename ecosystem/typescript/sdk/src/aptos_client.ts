@@ -383,6 +383,7 @@ export class AptosClient {
    * @param signedTxn A BCS transaction representation
    * @returns Transaction that is accepted and submitted to mempool
    */
+  @parseApiError
   async submitSignedBCSTransaction(signedTxn: Uint8Array): Promise<Gen.PendingTransaction> {
     // Need to construct a customized post request for transactions in BCS payload
     return this.client.request.request<Gen.PendingTransaction>({
@@ -403,6 +404,7 @@ export class AptosClient {
    * transaction will be ignored and the maximum possible gas will be used.
    * @returns Simulation result in the form of UserTransaction.
    */
+  @parseApiError
   async submitBCSSimulation(
     bcsBody: Uint8Array,
     query?: { estimateGasUnitPrice?: boolean; estimateMaxGasAmount?: boolean },
