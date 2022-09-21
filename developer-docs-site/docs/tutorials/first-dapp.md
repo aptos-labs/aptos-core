@@ -234,7 +234,7 @@ This makes it possible to publish the module for the given account (in this case
 
 Assuming that your account has enough funds to execute the transaction, you can now publish the `HelloBlockchain` module in your account. If you refresh the app, you will see that the account sequence number has increased from 0 to 1.
 
-You can also verify that the module was published by going to the [Aptos Explorer](https://explorer.devnet.aptos.dev/) and looking up your account. If you scroll down to the Account Modules section, you should see something like the following:
+You can also verify that the module was published by going to the [Aptos Explorer](https://explorer.aptoslabs.com/) and looking up your account. If you scroll down to the Account Modules section, you should see something like the following:
 
 ```json
 {
@@ -449,7 +449,7 @@ function App() {
 To test it:
 
 - Type something in the `<textarea>` and submit the form.
-- Find your account in the [Aptos Explorer](https://explorer.devnet.aptos.dev/) and you will now see a `MessageHolder` resource under Account Resources with the `message` you wrote.
+- Find your account in the [Aptos Explorer](https://explorer.aptoslabs.com/) and you will now see a `MessageHolder` resource under Account Resources with the `message` you wrote.
 
 If you don't see it, try a shorter message. Long messages may cause the transaction to fail because longer messages take more gas.
 
