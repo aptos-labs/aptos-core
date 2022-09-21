@@ -11,7 +11,28 @@ import {
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
 } from "./transaction_builder";
-import { bcsSerializeBytes, bcsSerializeU8, bcsToBytes, Bytes, Seq, Serializer, serializeVector, Uint64 } from "./bcs";
+import {
+  bcsSerializeBytes,
+  bcsSerializeU8,
+  bcsToBytes,
+  Bytes,
+  Seq,
+  Serializer,
+  serializeVector,
+  Uint64,
+  AnyNumber,
+} from "./bcs";
+
+export interface OptionalTransactionArgs {
+  maxGasAmount?: Uint64;
+  gasUnitPrice?: Uint64;
+  expireTimestamp?: Uint64;
+}
+
+interface PaginationArgs {
+  start?: AnyNumber;
+  limit?: number;
+}
 
 /**
  * Provides methods for retrieving data from Aptos node.
@@ -77,10 +98,7 @@ export class AptosClient {
    * @returns An array of on-chain transactions, sent by account
    */
   @parseApiError
-  async getAccountTransactions(
-    accountAddress: MaybeHexString,
-    query?: { start?: BigInt | number; limit?: number },
-  ): Promise<Gen.Transaction[]> {
+  async getAccountTransactions(accountAddress: MaybeHexString, query?: PaginationArgs): Promise<Gen.Transaction[]> {
     return this.client.transactions.getAccountTransactions(
       HexString.ensure(accountAddress).hex(),
       query?.start?.toString(),
@@ -99,7 +117,7 @@ export class AptosClient {
   @parseApiError
   async getAccountModules(
     accountAddress: MaybeHexString,
-    query?: { ledgerVersion?: BigInt | number },
+    query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveModuleBytecode[]> {
     return this.client.accounts.getAccountModules(
       HexString.ensure(accountAddress).hex(),
@@ -120,7 +138,7 @@ export class AptosClient {
   async getAccountModule(
     accountAddress: MaybeHexString,
     moduleName: string,
-    query?: { ledgerVersion?: BigInt | number },
+    query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveModuleBytecode> {
     return this.client.accounts.getAccountModule(
       HexString.ensure(accountAddress).hex(),
@@ -145,7 +163,7 @@ export class AptosClient {
   @parseApiError
   async getAccountResources(
     accountAddress: MaybeHexString,
-    query?: { ledgerVersion?: BigInt | number },
+    query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveResource[]> {
     return this.client.accounts.getAccountResources(
       HexString.ensure(accountAddress).hex(),
@@ -171,7 +189,7 @@ export class AptosClient {
   async getAccountResource(
     accountAddress: MaybeHexString,
     resourceType: Gen.MoveStructTag,
-    query?: { ledgerVersion?: BigInt | number },
+    query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveResource> {
     return this.client.accounts.getAccountResource(
       HexString.ensure(accountAddress).hex(),
@@ -301,8 +319,8 @@ export class AptosClient {
   @parseApiError
   async getEventsByCreationNumber(
     address: MaybeHexString,
-    creationNumber: number | bigint | string,
-    query?: { start?: BigInt | number; limit?: number },
+    creationNumber: AnyNumber | string,
+    query?: PaginationArgs,
   ): Promise<Gen.Event[]> {
     return this.client.events.getEventsByCreationNumber(
       HexString.ensure(address).hex(),
@@ -333,7 +351,7 @@ export class AptosClient {
     address: MaybeHexString,
     eventHandleStruct: Gen.MoveStructTag,
     fieldName: string,
-    query?: { start?: BigInt | number; limit?: number },
+    query?: PaginationArgs,
   ): Promise<Gen.Event[]> {
     return this.client.events.getEventsByEventHandle(
       HexString.ensure(address).hex(),
@@ -429,7 +447,7 @@ export class AptosClient {
    * @returns Array of on-chain transactions
    */
   @parseApiError
-  async getTransactions(query?: { start?: BigInt | number; limit?: number }): Promise<Gen.Transaction[]> {
+  async getTransactions(query?: PaginationArgs): Promise<Gen.Transaction[]> {
     return this.client.transactions.getTransactions(query?.start?.toString(), query?.limit);
   }
 
@@ -617,11 +635,7 @@ export class AptosClient {
    * @returns Table item value rendered in JSON
    */
   @parseApiError
-  async getTableItem(
-    handle: string,
-    data: Gen.TableItemRequest,
-    query?: { ledgerVersion?: BigInt | number },
-  ): Promise<any> {
+  async getTableItem(handle: string, data: Gen.TableItemRequest, query?: { ledgerVersion?: AnyNumber }): Promise<any> {
     const tableItem = await this.client.tables.getTableItem(handle, data, query?.ledgerVersion?.toString());
     return tableItem;
   }
@@ -636,7 +650,7 @@ export class AptosClient {
   async generateRawTransaction(
     accountFrom: HexString,
     payload: TxnBuilderTypes.TransactionPayload,
-    extraArgs?: { maxGasAmount?: Uint64; gasUnitPrice?: Uint64; expireTimestamp?: Uint64 },
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasEstimate }] = await Promise.all([
       this.getAccount(accountFrom),
@@ -673,11 +687,7 @@ export class AptosClient {
   async generateSignSubmitTransaction(
     sender: AptosAccount,
     payload: TxnBuilderTypes.TransactionPayload,
-    extraArgs?: {
-      maxGasAmount?: Uint64;
-      gasUnitPrice?: Uint64;
-      expireTimestamp?: Uint64;
-    },
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     // :!:>generateSignSubmitTransactionInner
     const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
@@ -700,11 +710,7 @@ export class AptosClient {
     sender: AptosAccount,
     packageMetadata: Bytes,
     modules: Seq<TxnBuilderTypes.Module>,
-    extraArgs?: {
-      maxGasAmount?: Uint64;
-      gasUnitPrice?: Uint64;
-      expireTimestamp?: Uint64;
-    },
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const codeSerializer = new Serializer();
     serializeVector(modules, codeSerializer);
@@ -730,10 +736,7 @@ export class AptosClient {
   async generateSignSubmitWaitForTransaction(
     sender: AptosAccount,
     payload: TxnBuilderTypes.TransactionPayload,
-    extraArgs?: {
-      maxGasAmount?: Uint64;
-      gasUnitPrice?: Uint64;
-      expireTimestamp?: Uint64;
+    extraArgs?: OptionalTransactionArgs & {
       checkSuccess?: boolean;
       timeoutSecs?: number;
     },
@@ -763,11 +766,7 @@ export class AptosClient {
   async rotateAuthKeyEd25519(
     forAccount: AptosAccount,
     toPrivateKeyBytes: Uint8Array,
-    extraArgs?: {
-      maxGasAmount?: Uint64;
-      gasUnitPrice?: Uint64;
-      expireTimestamp?: Uint64;
-    },
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<Gen.PendingTransaction> {
     const { sequence_number: sequenceNumber, authentication_key: authKey } = await this.getAccount(
       forAccount.address(),
