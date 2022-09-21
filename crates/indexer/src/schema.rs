@@ -17,18 +17,74 @@ table! {
 }
 
 table! {
-    collection_datas (creator_address, collection_name_hash, transaction_version) {
-        creator_address -> Varchar,
-        collection_name_hash -> Varchar,
-        collection_name -> Text,
-        description -> Text,
+    collection_datas (collection_data_id_hash, transaction_version) {
+        collection_data_id_hash -> Varchar,
         transaction_version -> Int8,
-        metadata_uri -> Text,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        description -> Text,
+        metadata_uri -> Varchar,
         supply -> Numeric,
         maximum -> Numeric,
         maximum_mutable -> Bool,
         uri_mutable -> Bool,
         description_mutable -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    current_collection_datas (collection_data_id_hash) {
+        collection_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        description -> Text,
+        metadata_uri -> Varchar,
+        supply -> Numeric,
+        maximum -> Numeric,
+        maximum_mutable -> Bool,
+        uri_mutable -> Bool,
+        description_mutable -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    current_token_datas (token_data_id_hash) {
+        token_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        maximum -> Numeric,
+        supply -> Numeric,
+        largest_property_version -> Numeric,
+        metadata_uri -> Varchar,
+        payee_address -> Varchar,
+        royalty_points_numerator -> Numeric,
+        royalty_points_denominator -> Numeric,
+        maximum_mutable -> Bool,
+        uri_mutable -> Bool,
+        description_mutable -> Bool,
+        properties_mutable -> Bool,
+        royalty_mutable -> Bool,
+        default_properties -> Jsonb,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    current_token_ownerships (token_data_id_hash, property_version, owner_address) {
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        owner_address -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        amount -> Numeric,
+        token_properties -> Jsonb,
+        last_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }
 }
@@ -138,17 +194,16 @@ table! {
 }
 
 table! {
-    token_datas (creator_address, collection_name_hash, name_hash, transaction_version) {
-        creator_address -> Varchar,
-        collection_name_hash -> Varchar,
-        name_hash -> Varchar,
-        collection_name -> Text,
-        name -> Text,
+    token_datas (token_data_id_hash, transaction_version) {
+        token_data_id_hash -> Varchar,
         transaction_version -> Int8,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
         maximum -> Numeric,
         supply -> Numeric,
         largest_property_version -> Numeric,
-        metadata_uri -> Text,
+        metadata_uri -> Varchar,
         payee_address -> Varchar,
         royalty_points_numerator -> Numeric,
         royalty_points_denominator -> Numeric,
@@ -163,31 +218,29 @@ table! {
 }
 
 table! {
-    token_ownerships (creator_address, collection_name_hash, name_hash, property_version, transaction_version, table_handle) {
-        creator_address -> Varchar,
-        collection_name_hash -> Varchar,
-        name_hash -> Varchar,
-        collection_name -> Text,
-        name -> Text,
+    token_ownerships (token_data_id_hash, property_version, transaction_version, table_handle) {
+        token_data_id_hash -> Varchar,
         property_version -> Numeric,
         transaction_version -> Int8,
+        table_handle -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
         owner_address -> Nullable<Varchar>,
         amount -> Numeric,
-        table_handle -> Varchar,
         table_type -> Nullable<Text>,
         inserted_at -> Timestamp,
     }
 }
 
 table! {
-    tokens (creator_address, collection_name_hash, name_hash, property_version, transaction_version) {
-        creator_address -> Varchar,
-        collection_name_hash -> Varchar,
-        name_hash -> Varchar,
-        collection_name -> Text,
-        name -> Text,
+    tokens (token_data_id_hash, property_version, transaction_version) {
+        token_data_id_hash -> Varchar,
         property_version -> Numeric,
         transaction_version -> Int8,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
         token_properties -> Jsonb,
         inserted_at -> Timestamp,
     }
@@ -246,6 +299,9 @@ table! {
 allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
     collection_datas,
+    current_collection_datas,
+    current_token_datas,
+    current_token_ownerships,
     events,
     ledger_infos,
     move_modules,

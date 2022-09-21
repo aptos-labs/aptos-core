@@ -5,9 +5,10 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
+use super::token_utils::TokenWriteSet;
 use crate::{
-    schema::token_datas,
-    util::{hash_str, u64_to_bigdecimal},
+    schema::{current_token_datas, token_datas},
+    util::{hash_str, truncate_str},
 };
 use anyhow::Context;
 use aptos_api_types::WriteTableItem as APIWriteTableItem;
@@ -16,15 +17,14 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[diesel(primary_key(creator_address, collection_name_hash, name_hash, transaction_version))]
+#[diesel(primary_key(token_data_id_hash, transaction_version))]
 #[diesel(table_name = token_datas)]
 pub struct TokenData {
+    pub token_data_id_hash: String,
+    pub transaction_version: i64,
     pub creator_address: String,
-    pub collection_name_hash: String,
-    pub name_hash: String,
     pub collection_name: String,
     pub name: String,
-    pub transaction_version: i64,
     pub maximum: BigDecimal,
     pub supply: BigDecimal,
     pub largest_property_version: BigDecimal,
@@ -42,165 +42,115 @@ pub struct TokenData {
     pub inserted_at: chrono::NaiveDateTime,
 }
 
-pub struct TokenDataId {
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[diesel(primary_key(token_data_id_hash))]
+#[diesel(table_name = current_token_datas)]
+pub struct CurrentTokenData {
+    pub token_data_id_hash: String,
     pub creator_address: String,
     pub collection_name: String,
     pub name: String,
+    pub maximum: bigdecimal::BigDecimal,
+    pub supply: bigdecimal::BigDecimal,
+    pub largest_property_version: bigdecimal::BigDecimal,
+    pub metadata_uri: String,
+    pub payee_address: String,
+    pub royalty_points_numerator: bigdecimal::BigDecimal,
+    pub royalty_points_denominator: bigdecimal::BigDecimal,
+    pub maximum_mutable: bool,
+    pub uri_mutable: bool,
+    pub description_mutable: bool,
+    pub properties_mutable: bool,
+    pub royalty_mutable: bool,
+    pub default_properties: serde_json::Value,
+    pub last_transaction_version: i64,
+    // Default time columns
+    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl TokenData {
     pub fn from_write_table_item(
         table_item: &APIWriteTableItem,
         txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> anyhow::Result<Option<(Self, CurrentTokenData)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
-        if table_item_data.value_type != "0x3::token::TokenData" {
-            return Ok(None);
+
+        let maybe_token_data = match TokenWriteSet::from_table_item_type(
+            table_item_data.value_type.as_str(),
+            &table_item_data.value,
+            txn_version,
+        )? {
+            Some(TokenWriteSet::TokenData(inner)) => Some(inner),
+            _ => None,
+        };
+
+        if let Some(token_data) = maybe_token_data {
+            let token_data_id = match TokenWriteSet::from_table_item_type(
+                table_item_data.key_type.as_str(),
+                &table_item_data.key,
+                txn_version,
+            )? {
+                Some(TokenWriteSet::TokenDataId(inner)) => Some(inner),
+                _ => None,
+            }
+            .context(format!(
+                "Could not get token data id from table item key_type: {}, key: {:?} version: {}",
+                table_item_data.key_type, table_item_data.key, txn_version
+            ))?;
+            let token_data_id_hash = hash_str(&token_data_id.to_string());
+            let collection_name = truncate_str(&token_data_id.collection, 128);
+            let name = truncate_str(&token_data_id.name, 128);
+            let metadata_uri = truncate_str(&token_data.uri, 512);
+
+            Ok(Some((
+                Self {
+                    token_data_id_hash: token_data_id_hash.clone(),
+                    creator_address: token_data_id.creator.clone(),
+                    collection_name: collection_name.clone(),
+                    name: name.clone(),
+                    transaction_version: txn_version,
+                    maximum: token_data.maximum.clone(),
+                    supply: token_data.supply.clone(),
+                    largest_property_version: token_data.largest_property_version.clone(),
+                    metadata_uri: metadata_uri.clone(),
+                    payee_address: token_data.royalty.payee_address.clone(),
+                    royalty_points_numerator: token_data.royalty.royalty_points_numerator.clone(),
+                    royalty_points_denominator: token_data
+                        .royalty
+                        .royalty_points_denominator
+                        .clone(),
+                    maximum_mutable: token_data.mutability_config.maximum,
+                    uri_mutable: token_data.mutability_config.uri,
+                    description_mutable: token_data.mutability_config.description,
+                    properties_mutable: token_data.mutability_config.properties,
+                    royalty_mutable: token_data.mutability_config.royalty,
+                    default_properties: token_data.default_properties.clone(),
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                },
+                CurrentTokenData {
+                    token_data_id_hash,
+                    creator_address: token_data_id.creator,
+                    collection_name,
+                    name,
+                    maximum: token_data.maximum,
+                    supply: token_data.supply,
+                    largest_property_version: token_data.largest_property_version,
+                    metadata_uri,
+                    payee_address: token_data.royalty.payee_address,
+                    royalty_points_numerator: token_data.royalty.royalty_points_numerator,
+                    royalty_points_denominator: token_data.royalty.royalty_points_denominator,
+                    maximum_mutable: token_data.mutability_config.maximum,
+                    uri_mutable: token_data.mutability_config.uri,
+                    description_mutable: token_data.mutability_config.description,
+                    properties_mutable: token_data.mutability_config.properties,
+                    royalty_mutable: token_data.mutability_config.royalty,
+                    default_properties: token_data.default_properties,
+                    last_transaction_version: txn_version,
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                },
+            )))
+        } else {
+            Ok(None)
         }
-        let key = &table_item_data.key;
-        let value = &table_item_data.value;
-        let token_data_id = Self::get_token_data_id_from_table_item_key(key, txn_version)?;
-
-        let collection_name_hash = hash_str(&token_data_id.collection_name);
-        let name_hash = hash_str(&token_data_id.name);
-
-        Ok(Some(Self {
-            creator_address: token_data_id.creator_address,
-            collection_name_hash,
-            name_hash,
-            collection_name: token_data_id.collection_name,
-            name: token_data_id.name,
-            transaction_version: txn_version,
-            maximum: value["maximum"]
-                .as_str()
-                .map(|s| -> anyhow::Result<BigDecimal> { Ok(u64_to_bigdecimal(s.parse::<u64>()?)) })
-                .context(format!(
-                    "version {} failed! maximum missing from token data {:?}",
-                    txn_version, value
-                ))?
-                .context(format!(
-                    "version {} failed! failed to parse maximum {:?}",
-                    txn_version, value["maximum"]
-                ))?,
-            supply: value["supply"]
-                .as_str()
-                .map(|s| -> anyhow::Result<BigDecimal> { Ok(u64_to_bigdecimal(s.parse::<u64>()?)) })
-                .context(format!(
-                    "version {} failed! supply missing from token data {:?}",
-                    txn_version, value
-                ))?
-                .context(format!(
-                    "version {} failed! failed to parse supply {:?}",
-                    txn_version, value["maximum"]
-                ))?,
-            largest_property_version: value["largest_property_version"]
-                .as_str()
-                .map(|s| -> anyhow::Result<BigDecimal> { Ok(u64_to_bigdecimal(s.parse::<u64>()?)) })
-                .context(format!(
-                    "version {} failed! largest_property_version missing from token data {:?}",
-                    txn_version, value
-                ))?
-                .context(format!(
-                    "version {} failed! failed to parse largest_property_version {:?}",
-                    txn_version, value["maximum"]
-                ))?,
-            metadata_uri: value["uri"]
-                .as_str()
-                .map(|s| s.to_string())
-                .context(format!(
-                    "version {} failed! uri missing from token data {:?}",
-                    txn_version, value
-                ))?,
-            payee_address: value["royalty"]["payee_address"]
-                .as_str()
-                .map(|s| s.to_string())
-                .context(format!(
-                    "version {} failed! royalty.payee_address missing {:?}",
-                    txn_version, value
-                ))?,
-            royalty_points_numerator: value["royalty"]["royalty_points_numerator"]
-                .as_str()
-                .map(|s| -> anyhow::Result<BigDecimal> { Ok(u64_to_bigdecimal(s.parse::<u64>()?)) })
-                .context(format!(
-                    "version {} failed! royalty.royalty_points_numerator missing {:?}",
-                    txn_version, value
-                ))?
-                .context(format!(
-                    "version {} failed! failed to parse royalty_points_numerator {:?}",
-                    txn_version, value["royalty"]["royalty_points_numerator"]
-                ))?,
-            royalty_points_denominator: value["royalty"]["royalty_points_denominator"]
-                .as_str()
-                .map(|s| -> anyhow::Result<BigDecimal> { Ok(u64_to_bigdecimal(s.parse::<u64>()?)) })
-                .context(format!(
-                    "version {} failed! royalty.royalty_points_denominator missing {:?}",
-                    txn_version, value
-                ))?
-                .context(format!(
-                    "version {} failed! failed to parse royalty_points_denominator {:?}",
-                    txn_version, value["royalty"]["royalty_points_denominator"]
-                ))?,
-            maximum_mutable: value["mutability_config"]["maximum"]
-                .as_bool()
-                .context(format!(
-                    "version {} failed! mutability_config.maximum missing {:?}",
-                    txn_version, value
-                ))?,
-            uri_mutable: value["mutability_config"]["uri"]
-                .as_bool()
-                .context(format!(
-                    "version {} failed! mutability_config.uri missing {:?}",
-                    txn_version, value
-                ))?,
-            description_mutable: value["mutability_config"]["description"]
-                .as_bool()
-                .context(format!(
-                    "version {} failed! mutability_config.description missing {:?}",
-                    txn_version, value
-                ))?,
-            properties_mutable: value["mutability_config"]["properties"].as_bool().context(
-                format!(
-                    "version {} failed! mutability_config.properties missing {:?}",
-                    txn_version, value
-                ),
-            )?,
-            royalty_mutable: value["mutability_config"]["royalty"]
-                .as_bool()
-                .context(format!(
-                    "version {} failed! mutability_config.royalty missing {:?}",
-                    txn_version, value
-                ))?,
-            default_properties: value["default_properties"].clone(),
-            inserted_at: chrono::Utc::now().naive_utc(),
-        }))
-    }
-
-    fn get_token_data_id_from_table_item_key(
-        key: &serde_json::Value,
-        txn_version: i64,
-    ) -> anyhow::Result<TokenDataId> {
-        Ok(TokenDataId {
-            creator_address: key["creator"]
-                .as_str()
-                .map(|s| s.to_string())
-                .context(format!(
-                    "version {} failed! creator missing from key {:?}",
-                    txn_version, key
-                ))?,
-            collection_name: key["collection"]
-                .as_str()
-                .map(|s| s.to_string())
-                .context(format!(
-                    "version {} failed! collection missing from key {:?}",
-                    txn_version, key
-                ))?,
-            name: key["name"]
-                .as_str()
-                .map(|s| s.to_string())
-                .context(format!(
-                    "version {} failed! name missing from key {:?}",
-                    txn_version, key
-                ))?,
-        })
     }
 }
