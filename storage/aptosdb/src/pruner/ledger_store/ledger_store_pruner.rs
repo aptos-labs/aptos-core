@@ -173,7 +173,7 @@ impl LedgerPruner {
 
         // Current target version might be less than the target version to ensure we don't prune
         // more than max_version in one go.
-        let current_target_version = self.get_currrent_batch_target(max_versions as Version);
+        let current_target_version = self.get_current_batch_target(max_versions as Version);
 
         self.transaction_store_pruner.prune(
             db_batch,

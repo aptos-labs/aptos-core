@@ -147,7 +147,7 @@ fn test_get_latest_executed_trees() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
-    // entirely emtpy db
+    // entirely empty db
     let empty = db.get_latest_executed_trees().unwrap();
     assert!(empty.is_same_view(&ExecutedTrees::new_empty()));
 
