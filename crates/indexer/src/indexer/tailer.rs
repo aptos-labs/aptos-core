@@ -105,6 +105,7 @@ impl Tailer {
                     diesel::insert_into(ledger_infos::table).values(LedgerInfo {
                         chain_id: new_chain_id,
                     }),
+                    None,
                 )
                 .context(r#"Error updating chain_id!"#)
                 .map(|_| new_chain_id as u64)
@@ -316,28 +317,13 @@ mod test {
     }
 
     pub fn wipe_database(conn: &mut PgPoolConnection) {
-        for table in [
-            "collection_datas",
-            "tokens",
-            "token_datas",
-            "token_ownerships",
-            "signatures",
-            "move_modules",
-            "move_resources",
-            "table_items",
-            "table_metadatas",
-            "write_set_changes",
-            "events",
-            "user_transactions",
-            "block_metadata_transactions",
-            "transactions",
-            "processor_statuses",
-            "ledger_infos",
-            "__diesel_schema_migrations",
+        for command in [
+            "DROP SCHEMA public CASCADE",
+            "CREATE SCHEMA public",
+            "GRANT ALL ON SCHEMA public TO postgres",
+            "GRANT ALL ON SCHEMA public TO public",
         ] {
-            diesel::sql_query(format!("DROP TABLE IF EXISTS {} CASCADE", table))
-                .execute(conn)
-                .unwrap();
+            diesel::sql_query(command).execute(conn).unwrap();
         }
     }
 
