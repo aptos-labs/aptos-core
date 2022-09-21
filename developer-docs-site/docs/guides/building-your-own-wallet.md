@@ -142,9 +142,9 @@ export interface SignMessagePayload {
 }
 
 export interface SignMessageResponse {
-  address: string;
-  application: string;
-  chainId: number;
+  address?: string;
+  application?: string;
+  chainId?: number;
   fullMessage: string; // The message that was generated to sign
   message: string; // The message passed in by the user
   nonce: string,
