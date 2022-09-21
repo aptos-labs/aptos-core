@@ -5,9 +5,10 @@
 extern crate criterion;
 
 use criterion::{
-    measurement::Measurement, BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
+    measurement::Measurement, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
+    PlotConfiguration, Throughput,
 };
-use rand::{distributions::Alphanumeric, rngs::ThreadRng, thread_rng, Rng};
+use rand::{distributions, rngs::ThreadRng, thread_rng, Rng};
 
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,7 @@ use aptos_crypto::{
     bls12381::ProofOfPossession,
     test_utils::{random_keypairs, random_subset, KeyPair},
     traits::{Signature, SigningKey, Uniform},
+    PrivateKey,
 };
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
@@ -24,7 +26,7 @@ struct TestAptosCrypto(String);
 
 fn random_message(rng: &mut ThreadRng) -> TestAptosCrypto {
     TestAptosCrypto(
-        rng.sample_iter(&Alphanumeric)
+        rng.sample_iter(&distributions::Alphanumeric)
             .take(256)
             .map(char::from)
             .collect::<String>(),
@@ -34,8 +36,17 @@ fn random_message(rng: &mut ThreadRng) -> TestAptosCrypto {
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("bls12381");
 
+    let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+
+    group.sample_size(1000);
+    group.plot_config(plot_config);
+
+    pk_deserialize(&mut group);
+    sig_deserialize(&mut group);
     pk_subgroup_membership(&mut group);
     sig_subgroup_membership(&mut group);
+    aggregate_one_sigshare(&mut group);
+    aggregate_one_pk(&mut group);
 
     pop_create(&mut group);
     pop_create_with_pubkey(&mut group);
@@ -46,14 +57,107 @@ fn bench_group(c: &mut Criterion) {
 
     let mut size = 128;
     for _ in 1..=4 {
+        // Even single-threaded, this function has higher throughput that `aggregate_one_sigshare`
         aggregate_sigshare(&mut group, size);
+
+        // Even single-threaded, this function has higher throughput than `aggregate_one_pk`. Seems
+        // to be due to only making a single call to blst::PublicKey::from_aggregate (which calls a
+        // $pk_to_aff function) for the entire batch.
         aggregate_pks(&mut group, size);
+
         verify_multisig(&mut group, size);
         verify_aggsig(&mut group, size);
         size *= 2;
     }
 
     group.finish();
+}
+
+/// Benchmarks the time to deserialize a BLS12-381 point representing a PK in G1. (Does not test for
+/// prime-order subgroup membership.)
+fn pk_deserialize<M: Measurement>(g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(1));
+
+    g.bench_function("pk_deserialize", move |b| {
+        b.iter_with_setup(
+            || {
+                bls12381::PrivateKey::generate(&mut rng)
+                    .public_key()
+                    .to_bytes()
+            },
+            |pk_bytes| bls12381::PublicKey::try_from(&pk_bytes[..]),
+        )
+    });
+}
+
+/// Benchmarks the time to aggregate a BLS PK in G1. (Does not test for prime-order subgroup
+/// membership.)
+fn aggregate_one_pk<M: Measurement>(g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(1));
+
+    g.bench_function("aggregate_one_pk", move |b| {
+        b.iter_with_setup(
+            || {
+                (
+                    bls12381::PrivateKey::generate(&mut rng).public_key(),
+                    bls12381::PrivateKey::generate(&mut rng).public_key(),
+                )
+            },
+            |(pk1, pk2)| {
+                bls12381::PublicKey::aggregate(vec![&pk1, &pk2]).unwrap();
+            },
+        )
+    });
+}
+
+/// Benchmarks the time to deserialize a BLS12-381 point representing a signature in G2. (Does not test for
+/// prime-order subgroup membership.)
+fn sig_deserialize<M: Measurement>(g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(1));
+
+    g.bench_function("sig_deserialize", move |b| {
+        b.iter_with_setup(
+            || {
+                let sk = bls12381::PrivateKey::generate(&mut rng);
+                sk.sign(&TestAptosCrypto("Hello Aptos!".to_owned()))
+                    .unwrap()
+                    .to_bytes()
+            },
+            |sig_bytes| bls12381::Signature::try_from(&sig_bytes[..]),
+        )
+    });
+}
+
+/// Benchmarks the time to aggregate a BLS signature in G2. (Does not test for prime-order subgroup
+/// membership.)
+fn aggregate_one_sigshare<M: Measurement>(g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(1));
+
+    g.bench_function("aggregate_one_sigshare", move |b| {
+        b.iter_with_setup(
+            || {
+                (
+                    bls12381::PrivateKey::generate(&mut rng)
+                        .sign(&TestAptosCrypto("Hello Aptos!".to_owned()))
+                        .unwrap(),
+                    bls12381::PrivateKey::generate(&mut rng)
+                        .sign(&TestAptosCrypto("Hello Aptos!".to_owned()))
+                        .unwrap(),
+                )
+            },
+            |(sig1, sig2)| {
+                bls12381::Signature::aggregate(vec![sig1, sig2]).unwrap();
+            },
+        )
+    });
 }
 
 fn pk_subgroup_membership<M: Measurement>(g: &mut BenchmarkGroup<M>) {
@@ -313,5 +417,8 @@ fn verify_aggsig<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
     });
 }
 
-criterion_group!(bls12381_benches, bench_group);
+criterion_group!(
+    name = bls12381_benches;
+    config = Criterion::default(); //.measurement_time(Duration::from_secs(100));
+    targets = bench_group);
 criterion_main!(bls12381_benches);

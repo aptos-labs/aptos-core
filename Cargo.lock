@@ -388,6 +388,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "hkdf 0.10.0",
+ "libsecp256k1",
  "more-asserts",
  "once_cell",
  "proptest",

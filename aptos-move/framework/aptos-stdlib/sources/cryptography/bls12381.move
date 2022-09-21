@@ -16,6 +16,9 @@ module aptos_std::bls12381 {
     /// The caller was supposed to input one or more public keys.
     const EZERO_PUBKEYS: u64 = 1;
 
+    /// One of the given inputs has the wrong size.s
+    const EWRONG_SIZE: u64 = 2;
+
     // TODO: Performance would increase if structs in this module are implemented natively via handles (similar to Table and
     // RistrettoPoint). This will avoid unnecessary (de)serialization. We would need to allow storage of these structs too.
 
@@ -128,6 +131,8 @@ module aptos_std::bls12381 {
     }
 
     /// Checks that the group element that defines a signature is in the prime-order subgroup.
+    /// This check is implicitly performed when verifying any signature via this module, but we expose this functionality
+    /// in case it might be useful for applications to easily dismiss invalid signatures early on.
     public fun signature_subgroup_check(signature: &Signature): bool {
         signature_subgroup_check_internal(signature.bytes)
     }
@@ -169,6 +174,16 @@ module aptos_std::bls12381 {
     public fun aggr_or_multi_signature_to_bytes(sig: &AggrOrMultiSignature): vector<u8> {
         sig.bytes
     }
+
+    /// Deserializes an aggregate-or-multi-signature from 96 bytes.
+    public fun aggr_or_multi_signature_from_bytes(bytes: vector<u8>): AggrOrMultiSignature {
+        assert!(std::vector::length(&bytes) == SIGNATURE_SIZE, std::error::invalid_argument(EWRONG_SIZE));
+
+        AggrOrMultiSignature {
+            bytes
+        }
+    }
+
 
     /// Checks that the group element that defines an aggregate-or-multi-signature is in the prime-order subgroup.
     public fun aggr_or_multi_signature_subgroup_check(signature: &AggrOrMultiSignature): bool {
@@ -487,6 +502,8 @@ module aptos_std::bls12381 {
 
     #[test]
     fun test_verify_aggsig() {
+        assert!(aggr_or_multi_signature_to_bytes(&aggr_or_multi_signature_from_bytes(RANDOM_SIGNATURE)) == RANDOM_SIGNATURE, 1);
+
         // First, make sure verification returns None when no inputs are given or |pks| != |msgs|
         assert!(verify_aggregate_signature(&get_random_aggsig(), vector[], vector[]) == false, 1);
 

@@ -21,7 +21,7 @@ use std::{convert::TryFrom, fmt};
 
 /// Domain separation tag (DST) for hashing a public key before computing its proof-of-possesion (PoP),
 /// which is also just a signature.
-const DST_BLS_POP_IN_G2: &[u8] = b"BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+pub const DST_BLS_POP_IN_G2: &[u8] = b"BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
 
 #[derive(Clone, SerializeKey, DeserializeKey)]
 /// A proof-of-possesion (PoP) of a BLS12381 private key.
