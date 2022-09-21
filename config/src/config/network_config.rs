@@ -25,7 +25,6 @@ use std::{
     fmt,
     path::PathBuf,
     string::ToString,
-    time::Duration,
 };
 
 // TODO: We could possibly move these constants somewhere else, but since they are defaults for the
@@ -336,8 +335,23 @@ impl Default for PeerMonitoringServiceConfig {
 #[serde(rename_all = "snake_case")]
 pub enum DiscoveryMethod {
     Onchain,
-    File(PathBuf, Duration),
+    File(FileDiscovery),
+    Rest(RestDiscovery),
     None,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct FileDiscovery {
+    pub path: PathBuf,
+    pub interval_secs: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct RestDiscovery {
+    pub url: String,
+    pub interval_secs: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

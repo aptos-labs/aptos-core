@@ -127,6 +127,7 @@ pub struct ConnectivityManager<TBackoff> {
 pub enum DiscoverySource {
     OnChainValidatorSet,
     File,
+    Rest,
     Config,
 }
 
@@ -145,6 +146,7 @@ impl fmt::Display for DiscoverySource {
                 DiscoverySource::OnChainValidatorSet => "OnChainValidatorSet",
                 DiscoverySource::File => "File",
                 DiscoverySource::Config => "Config",
+                DiscoverySource::Rest => "Rest",
             }
         )
     }

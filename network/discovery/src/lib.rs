@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::rest::RestStream;
 use crate::{counters::DISCOVERY_COUNTS, file::FileStream, validator_set::ValidatorSetStream};
 use aptos_config::{config::PeerSet, network_id::NetworkContext};
 use aptos_crypto::x25519;
@@ -23,12 +24,14 @@ use tokio::runtime::Handle;
 
 mod counters;
 mod file;
+mod rest;
 mod validator_set;
 
 #[derive(Debug)]
 pub enum DiscoveryError {
     IO(std::io::Error),
     Parsing(String),
+    Rest(aptos_rest_client::error::RestError),
 }
 
 /// A union type for all implementations of `DiscoveryChangeListenerTrait`
@@ -42,6 +45,7 @@ pub struct DiscoveryChangeListener {
 enum DiscoveryChangeStream {
     ValidatorSet(ValidatorSetStream),
     File(FileStream),
+    Rest(RestStream),
 }
 
 impl Stream for DiscoveryChangeStream {
@@ -51,6 +55,7 @@ impl Stream for DiscoveryChangeStream {
         match self.get_mut() {
             Self::ValidatorSet(stream) => Pin::new(stream).poll_next(cx),
             Self::File(stream) => Pin::new(stream).poll_next(cx),
+            Self::Rest(stream) => Pin::new(stream).poll_next(cx),
         }
     }
 }
@@ -89,6 +94,27 @@ impl DiscoveryChangeListener {
         ));
         DiscoveryChangeListener {
             discovery_source: DiscoverySource::File,
+            network_context,
+            update_channel,
+            source_stream,
+        }
+    }
+
+    pub fn rest(
+        network_context: NetworkContext,
+        update_channel: channel::Sender<ConnectivityRequest>,
+        rest_url: &str,
+        interval_duration: Duration,
+        time_service: TimeService,
+    ) -> Self {
+        let source_stream = DiscoveryChangeStream::Rest(RestStream::new(
+            network_context,
+            url::Url::parse(rest_url).expect("REST discovery URL is invalid"),
+            interval_duration,
+            time_service,
+        ));
+        DiscoveryChangeListener {
+            discovery_source: DiscoverySource::Rest,
             network_context,
             update_channel,
             source_stream,
