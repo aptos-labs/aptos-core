@@ -77,10 +77,10 @@ test(
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     const account1 = new AptosAccount();
-    await faucetClient.fundAccount(account1.address(), 50000);
+    await faucetClient.fundAccount(account1.address(), 100_000_000);
     let resources = await client.getAccountResources(account1.address());
     let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("50000");
+    expect((accountResource!.data as any).coin.value).toBe("100000000");
 
     const account2 = new AptosAccount();
     await faucetClient.fundAccount(account2.address(), 0);
@@ -120,10 +120,10 @@ test(
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     const account1 = new AptosAccount();
-    await faucetClient.fundAccount(account1.address(), 50000);
+    await faucetClient.fundAccount(account1.address(), 100_000_000);
     let resources = await client.getAccountResources(account1.address());
     let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("50000");
+    expect((accountResource!.data as any).coin.value).toBe("100000000");
 
     const account2 = new AptosAccount();
     await faucetClient.fundAccount(account2.address(), 0);
@@ -286,8 +286,8 @@ test(
 
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
-    const txns1 = await faucetClient.fundAccount(account1.address(), 50000);
-    const txns2 = await faucetClient.fundAccount(account2.address(), 10000);
+    const txns1 = await faucetClient.fundAccount(account1.address(), 500_000_000);
+    const txns2 = await faucetClient.fundAccount(account2.address(), 100_000_000);
     const tx1 = await client.getTransactionByHash(txns1[1]);
     const tx2 = await client.getTransactionByHash(txns2[1]);
     expect(tx1.type).toBe("user_transaction");
@@ -297,8 +297,8 @@ test(
       const resources2 = await client.getAccountResources(account2.address());
       const account1Resource = resources1.find((r) => r.type === aptosCoin);
       const account2Resource = resources2.find((r) => r.type === aptosCoin);
-      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("50000");
-      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("10000");
+      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("500000000");
+      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("100000000");
     };
     await checkAptosCoin();
 
@@ -327,7 +327,7 @@ test(
       return (
         write.address === account2.address().toShortString() &&
         write.data.type === aptosCoin &&
-        (write.data.data as { coin: { value: string } }).coin.value === "11000"
+        (write.data.data as { coin: { value: string } }).coin.value === "100001000"
       );
     });
     expect(account2AptosCoin).toHaveLength(1);
@@ -427,7 +427,7 @@ test(
     const account1 = new AptosAccount(
       new HexString("0x883fdd67576e5fdceb370ba665b8af8856d0cae63fd808b8d16077c6b008ea8c").toUint8Array(),
     );
-    await faucetClient.fundAccount(account1.address(), 500000);
+    await faucetClient.fundAccount(account1.address(), 100_000_000);
 
     const txnHash = await client.publishPackage(
       account1,
@@ -460,7 +460,7 @@ test(
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     const alice = new AptosAccount();
-    await faucetClient.fundAccount(alice.address(), 500000);
+    await faucetClient.fundAccount(alice.address(), 100_000_000);
 
     const helperAccount = new AptosAccount();
 

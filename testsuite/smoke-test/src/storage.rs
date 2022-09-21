@@ -36,6 +36,7 @@ async fn test_db_restore() {
     info!("---------- 1. pre-building finished.");
 
     let mut swarm = new_local_swarm_with_aptos(4).await;
+    info!("---------- 1.1 swarm built, sending some transactions.");
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let client_1 = swarm
         .validator(validator_peer_ids[1])
@@ -47,12 +48,14 @@ async fn test_db_restore() {
     let mut account_0 = create_and_fund_account(&mut swarm, 1000000).await;
     let account_1 = create_and_fund_account(&mut swarm, 1000000).await;
 
+    info!("---------- 1.2 wait for nodes to catch up.");
     // we need to wait for all nodes to see it, as client_1 is different node from the
     // one creating accounts above
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
+    info!("---------- 1.3 caught up.");
 
     assert_balance(&client_1, &account_0, 1000000).await;
     assert_balance(&client_1, &account_1, 1000000).await;

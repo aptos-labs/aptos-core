@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "backup.labels" . | nindent 4 }}
 data:
-{{ (.Files.Glob "files/backup/*.toml").AsConfig | indent 2 }}
+{{ (.Files.Glob "files/backup/*.yaml").AsConfig | indent 2 }}
 
 ---
 
@@ -54,7 +54,7 @@ spec:
         - "{{ int .config.transaction_batch_size }}"
         - "command-adapter"
         - "--config"
-        - "/opt/aptos/etc/{{ .config.location }}.toml"
+        - "/opt/aptos/etc/{{ .config.location }}.yaml"
         env:
         - name: RUST_LOG
           value: "debug"

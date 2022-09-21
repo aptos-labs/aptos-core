@@ -24,7 +24,7 @@ use crate::{
 };
 use aptos_api_types::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
 use std::fmt::Debug;
 
@@ -51,7 +51,7 @@ impl Debug for DefaultTransactionProcessor {
 }
 
 fn insert_to_db(
-    conn: &PgPoolConnection,
+    conn: &mut PgPoolConnection,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -70,43 +70,43 @@ fn insert_to_db(
     match conn
         .build_transaction()
         .read_write()
-        .run::<_, Error, _>(|| {
-            insert_transactions(conn, &txns)?;
-            insert_user_transactions_w_sigs(conn, &txn_details)?;
-            insert_block_metadata_transactions(conn, &txn_details)?;
-            insert_events(conn, &events)?;
-            insert_write_set_changes(conn, &wscs)?;
-            insert_move_modules(conn, &wsc_details)?;
-            insert_move_resources(conn, &wsc_details)?;
-            insert_table_data(conn, &wsc_details)?;
+        .run::<_, Error, _>(|pg_conn| {
+            insert_transactions(pg_conn, &txns)?;
+            insert_user_transactions_w_sigs(pg_conn, &txn_details)?;
+            insert_block_metadata_transactions(pg_conn, &txn_details)?;
+            insert_events(pg_conn, &events)?;
+            insert_write_set_changes(pg_conn, &wscs)?;
+            insert_move_modules(pg_conn, &wsc_details)?;
+            insert_move_resources(pg_conn, &wsc_details)?;
+            insert_table_data(pg_conn, &wsc_details)?;
             Ok(())
         }) {
         Ok(_) => Ok(()),
         Err(_) => conn
             .build_transaction()
             .read_write()
-            .run::<_, Error, _>(|| {
+            .run::<_, Error, _>(|pg_conn| {
                 let txns = clean_data_for_db(txns, true);
                 let txn_details = clean_data_for_db(txn_details, true);
                 let events = clean_data_for_db(events, true);
                 let wscs = clean_data_for_db(wscs, true);
                 let wsc_details = clean_data_for_db(wsc_details, true);
 
-                insert_transactions(conn, &txns)?;
-                insert_user_transactions_w_sigs(conn, &txn_details)?;
-                insert_block_metadata_transactions(conn, &txn_details)?;
-                insert_events(conn, &events)?;
-                insert_write_set_changes(conn, &wscs)?;
-                insert_move_modules(conn, &wsc_details)?;
-                insert_move_resources(conn, &wsc_details)?;
-                insert_table_data(conn, &wsc_details)?;
+                insert_transactions(pg_conn, &txns)?;
+                insert_user_transactions_w_sigs(pg_conn, &txn_details)?;
+                insert_block_metadata_transactions(pg_conn, &txn_details)?;
+                insert_events(pg_conn, &events)?;
+                insert_write_set_changes(pg_conn, &wscs)?;
+                insert_move_modules(pg_conn, &wsc_details)?;
+                insert_move_resources(pg_conn, &wsc_details)?;
+                insert_table_data(pg_conn, &wsc_details)?;
                 Ok(())
             }),
     }
 }
 
 fn insert_transactions(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     txns: &[TransactionModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::transactions::dsl::*;
@@ -129,7 +129,7 @@ fn insert_transactions(
 }
 
 fn insert_user_transactions_w_sigs(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     txn_details: &[TransactionDetail],
 ) -> Result<(), diesel::result::Error> {
     use schema::{signatures::dsl as sig_schema, user_transactions::dsl as ut_schema};
@@ -196,7 +196,7 @@ fn insert_user_transactions_w_sigs(
 }
 
 fn insert_block_metadata_transactions(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     txn_details: &[TransactionDetail],
 ) -> Result<(), diesel::result::Error> {
     use schema::block_metadata_transactions::dsl::*;
@@ -227,7 +227,7 @@ fn insert_block_metadata_transactions(
     Ok(())
 }
 
-fn insert_events(conn: &PgPoolConnection, ev: &[EventModel]) -> Result<(), diesel::result::Error> {
+fn insert_events(conn: &mut PgConnection, ev: &[EventModel]) -> Result<(), diesel::result::Error> {
     use schema::events::dsl::*;
 
     let chunks = get_chunks(ev.len(), EventModel::field_count());
@@ -250,7 +250,7 @@ fn insert_events(conn: &PgPoolConnection, ev: &[EventModel]) -> Result<(), diese
 }
 
 fn insert_write_set_changes(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     wscs: &[WriteSetChangeModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::write_set_changes::dsl::*;
@@ -275,7 +275,7 @@ fn insert_write_set_changes(
 }
 
 fn insert_move_modules(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     wsc_details: &[WriteSetChangeDetail],
 ) -> Result<(), diesel::result::Error> {
     use schema::move_modules::dsl::*;
@@ -307,7 +307,7 @@ fn insert_move_modules(
 }
 
 fn insert_move_resources(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     wsc_details: &[WriteSetChangeDetail],
 ) -> Result<(), diesel::result::Error> {
     use schema::move_resources::dsl::*;
@@ -340,7 +340,7 @@ fn insert_move_resources(
 
 /// This will insert all table data within each transaction within a block
 fn insert_table_data(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     wsc_details: &[WriteSetChangeDetail],
 ) -> Result<(), diesel::result::Error> {
     use schema::{table_items::dsl as ti, table_metadatas::dsl as tm};
@@ -411,9 +411,9 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         let (txns, user_txns, bm_txns, events, write_set_changes) =
             TransactionModel::from_transactions(&transactions);
 
-        let conn = self.get_conn();
+        let mut conn = self.get_conn();
         let tx_result = insert_to_db(
-            &conn,
+            &mut conn,
             self.name(),
             start_version,
             end_version,

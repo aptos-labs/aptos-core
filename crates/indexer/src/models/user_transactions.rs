@@ -11,6 +11,7 @@ use crate::{
     util::{parse_timestamp, parse_timestamp_secs, u64_to_bigdecimal},
 };
 use aptos_api_types::{TransactionPayload, UserTransaction as APIUserTransaction};
+use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -25,18 +26,18 @@ use serde::{Deserialize, Serialize};
     Queryable,
     Serialize,
 )]
-#[belongs_to(Transaction, foreign_key = "version")]
-#[primary_key(version)]
-#[diesel(table_name = "user_transactions")]
+#[diesel(belongs_to(Transaction, foreign_key = version))]
+#[diesel(primary_key(version))]
+#[diesel(table_name = user_transactions)]
 pub struct UserTransaction {
     pub version: i64,
     pub block_height: i64,
     pub parent_signature_type: String,
     pub sender: String,
     pub sequence_number: i64,
-    pub max_gas_amount: bigdecimal::BigDecimal,
+    pub max_gas_amount: BigDecimal,
     pub expiration_timestamp_secs: chrono::NaiveDateTime,
-    pub gas_unit_price: bigdecimal::BigDecimal,
+    pub gas_unit_price: BigDecimal,
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
     pub inserted_at: chrono::NaiveDateTime,
