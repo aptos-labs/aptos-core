@@ -263,6 +263,29 @@ module aptos_framework::vesting {
         get_beneficiary(borrow_global<VestingContract>(vesting_contract_address), shareholder)
     }
 
+    public fun operator_commission_percentage(vesting_contract_address: address): u64 acquires VestingContract {
+        assert_vesting_contract_exists(vesting_contract_address);
+        borrow_global<VestingContract>(vesting_contract_address).staking.commission_percentage
+    }
+
+    public fun vesting_contracts(admin: address): vector<address> acquires AdminStore {
+        if (!exists<AdminStore>(admin)) {
+            vector::empty<address>()
+        } else {
+            borrow_global<AdminStore>(admin).vesting_contracts
+        }
+    }
+
+    public fun operator(vesting_contract_address: address): address acquires VestingContract {
+        assert_vesting_contract_exists(vesting_contract_address);
+        borrow_global<VestingContract>(vesting_contract_address).staking.operator
+    }
+
+    public fun voter(vesting_contract_address: address): address acquires VestingContract {
+        assert_vesting_contract_exists(vesting_contract_address);
+        borrow_global<VestingContract>(vesting_contract_address).staking.voter
+    }
+
     /// Create a vesting schedule with the given schedule of distributions, a vesting start time and period duration.
     public fun create_vesting_schedule(
         schedule: vector<FixedPoint32>,
@@ -826,7 +849,10 @@ module aptos_framework::vesting {
         let len = vector::length(accounts);
         let i = 0;
         while (i < len) {
-            create_account(*vector::borrow(accounts, i));
+            let addr = *vector::borrow(accounts, i);
+            if (!account::exists_at(addr)) {
+                create_account(addr);
+            };
             i = i + 1;
         };
     }

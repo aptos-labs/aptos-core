@@ -350,6 +350,10 @@ module aptos_framework::stake {
         (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
     }
 
+    public fun stake_pool_exists(addr: address): bool {
+        exists<StakePool>(addr)
+    }
+
     /// Initialize validator set to the core resource account.
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -469,7 +473,7 @@ module aptos_framework::stake {
     fun initialize_owner(owner: &signer) acquires AllowedValidators {
         let owner_address = signer::address_of(owner);
         assert!(is_allowed(owner_address), error::not_found(EINELIGIBLE_VALIDATOR));
-        assert!(!exists<StakePool>(owner_address), error::already_exists(EALREADY_REGISTERED));
+        assert!(!stake_pool_exists(owner_address), error::already_exists(EALREADY_REGISTERED));
 
         move_to(owner, StakePool {
             active: coin::zero<AptosCoin>(),
@@ -1262,7 +1266,7 @@ module aptos_framework::stake {
     }
 
     fun assert_stake_pool_exists(pool_address: address) {
-        assert!(exists<StakePool>(pool_address), error::invalid_argument(ESTAKE_POOL_DOES_NOT_EXIST));
+        assert!(stake_pool_exists(pool_address), error::invalid_argument(ESTAKE_POOL_DOES_NOT_EXIST));
     }
 
     /// This provides an ACL for Testnet purposes. In testnet, everyone is a whale, a whale can be a validator.
@@ -1355,7 +1359,9 @@ module aptos_framework::stake {
         voting_power_increase_limit: u64,
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        initialize(aptos_framework);
+        if (!exists<ValidatorSet>(@aptos_framework)) {
+            initialize(aptos_framework);
+        };
         staking_config::initialize_for_test(
             aptos_framework,
             minimum_stake,
@@ -1367,9 +1373,11 @@ module aptos_framework::stake {
             voting_power_increase_limit,
         );
 
-        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
-        store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+        if (!exists<AptosCoinCapabilities>(@aptos_framework)) {
+            let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
+            store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+            coin::destroy_burn_cap<AptosCoin>(burn_cap);
+        };
     }
 
     // This function assumes the stake module already the capability to mint aptos coins.
