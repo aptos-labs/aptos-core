@@ -35,7 +35,7 @@ fn verify<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     let pub_key: Ed25519PublicKey = (&priv_key).into();
 
     let msg = TestAptosCrypto("".to_string());
-    let sig: Ed25519Signature = priv_key.sign(&msg);
+    let sig: Ed25519Signature = priv_key.sign(&msg).unwrap();
 
     g.throughput(Throughput::Elements(1));
     g.bench_function("Ed25519 signature verification", move |b| {

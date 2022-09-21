@@ -436,7 +436,7 @@ impl RosettaClient {
         let unsigned_transaction: RawTransaction = bcs::from_bytes(&hex::decode(
             unsigned_response.unsigned_transaction.clone(),
         )?)?;
-        let signing_message = hex::encode(unsigned_transaction.signing_message());
+        let signing_message = hex::encode(unsigned_transaction.signing_message().unwrap());
 
         // Sign the payload if it matches the unsigned transaction
         for payload in unsigned_response.payloads.into_iter() {
@@ -447,7 +447,7 @@ impl RosettaClient {
             signers.push(account.clone());
 
             assert_eq!(signing_message, payload.hex_bytes);
-            let txn_signature = private_key.sign(&unsigned_transaction);
+            let txn_signature = private_key.sign(&unsigned_transaction).unwrap();
             signatures.push(Signature {
                 signing_payload: payload,
                 public_key: private_key.public_key().try_into()?,

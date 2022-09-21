@@ -48,7 +48,7 @@ prop_compose! {
             parent_qc,
             &signer,
             Vec::new(),
-        )
+        ).unwrap()
     }
 }
 

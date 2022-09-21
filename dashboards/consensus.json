@@ -141,6 +141,64 @@
       }
     },
     {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "id": 133,
+      "isNew": false,
+      "span": 0,
+      "title": "Participating voting power in last 100 rounds",
+      "description": "Global statistics from the chain, all nodes that are caught up should have the same value.\n\nIf value goes below 80 it is concerning. if it goes below 72 it is a very bad.\n\nIt cannot go below 67%, because chain stops otherwise, and there is no data to show then.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 0.6 },
+              { "color": "orange", "value": 0.72 },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "green", "value": 0.9 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "area" }
+          }
+        }
+      }
+    },
+    {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
@@ -4433,6 +4491,184 @@
           }
         }
       }
+    },
+    {
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 232 },
+      "id": 137,
+      "isNew": false,
+      "span": 0,
+      "title": "Collected votes",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 233 },
+      "id": 135,
+      "isNew": false,
+      "span": 0,
+      "title": "collected voting power for proposal",
+      "description": "Voting power of all votes for the same ledger info collected by a proposer",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_proposer_collected_most_voting_power_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/rate(aptos_proposer_collecting_round_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 233 },
+      "id": 138,
+      "isNew": false,
+      "span": 0,
+      "title": "collected voting power for conflicting",
+      "description": "Voting power of all votes for all other (conflicting) ledger infos collected by a proposer",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_proposer_collected_conflicting_voting_power_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/rate(aptos_proposer_collecting_round_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 233 },
+      "id": 139,
+      "isNew": false,
+      "span": 0,
+      "title": "collected voting power for timeout votes",
+      "description": "Voting power of timeout votes collected by a proposer",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_proposer_collected_timeout_voting_power_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/rate(aptos_proposer_collecting_round_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
     }
   ],
   "rows": null,
@@ -4610,7 +4846,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 45,
+  "version": 47,
   "links": [
     {
       "title": "Other Dashboards",

@@ -2,6 +2,9 @@ name: "Prover Test"
 on:
   # TODO enable this when we have time
   # pull_request:
+  #   paths:
+  #     - '**.move'
+  #     - 'aptos-move/move-deps/Cargo.toml'
   # push:
   #   branches:
   #     - main
@@ -9,12 +12,14 @@ on:
   #     - testnet
   #     - auto
   #     - canary
-
+  #   paths:
+  #     - '**.move'
+  #     - 'aptos-move/move-deps/Cargo.toml'
   # Allow triggering manually
   workflow_dispatch:
-  # Until enabled on PR, run continuously
+  # Until enabled on all PRs, run continuously at the beginning of each hour
   schedule:
-    - cron: "0 */3 * * *"
+    - cron: "0 * * * *"
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}

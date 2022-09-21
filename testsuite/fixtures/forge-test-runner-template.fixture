@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: potato-1659078000-asdf
+  name: forge-potato-1659078000-asdf
   labels:
     app.kubernetes.io/name: forge
-    forge-namespace: potato
+    forge-namespace: forge-potato
     forge-image-tag: forge_asdf
 spec:
   restartPolicy: Never
@@ -18,7 +18,7 @@ spec:
     - -c
     - |
       ulimit -n 1048576
-      forge --suite banana --duration-secs 123 --num-validators 10 --num-validator-fullnodes 20 --forge-cli-arg test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --test-arg
+      forge --suite banana --duration-secs 123 --num-validators 10 --num-validator-fullnodes 20 --forge-cli-arg test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace forge-potato --test-arg
 
     env:
     - name: FORGE_TRIGGERED_BY

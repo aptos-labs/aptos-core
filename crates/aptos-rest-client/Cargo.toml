@@ -28,7 +28,6 @@ url = "2.2.2"
 
 aptos-api-types = { path = "../../api/types" }
 aptos-crypto = { path = "../aptos-crypto" }
-aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-types = { path = "../../types" }
 

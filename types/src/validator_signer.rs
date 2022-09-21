@@ -3,7 +3,8 @@
 
 use crate::account_address::AccountAddress;
 use aptos_crypto::{
-    bls12381, hash::CryptoHash, test_utils::TEST_SEED, PrivateKey, SigningKey, Uniform,
+    bls12381, hash::CryptoHash, test_utils::TEST_SEED, CryptoMaterialError, PrivateKey, SigningKey,
+    Uniform,
 };
 use rand::{rngs::StdRng, SeedableRng};
 use serde::ser::Serialize;
@@ -28,7 +29,10 @@ impl ValidatorSigner {
     }
 
     /// Constructs a signature for `message` using `private_key`.
-    pub fn sign<T: Serialize + CryptoHash>(&self, message: &T) -> bls12381::Signature {
+    pub fn sign<T: Serialize + CryptoHash>(
+        &self,
+        message: &T,
+    ) -> Result<bls12381::Signature, CryptoMaterialError> {
         self.private_key.sign(message)
     }
 

@@ -343,7 +343,8 @@ fn vote_on_successful_proposal() {
             genesis_qc.clone(),
             &node.signer,
             Vec::new(),
-        );
+        )
+        .unwrap();
         let proposal_id = proposal.id();
         node.round_manager.process_proposal(proposal).await.unwrap();
         let vote_msg = node.next_vote().await;
@@ -383,7 +384,8 @@ fn delay_proposal_processing_in_sync_only() {
             genesis_qc.clone(),
             &node.signer,
             Vec::new(),
-        );
+        )
+        .unwrap();
         let proposal_id = proposal.id();
         node.round_manager
             .process_proposal(proposal.clone())
@@ -434,10 +436,11 @@ fn no_vote_on_old_proposal() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let new_block_id = new_block.id();
     let old_block =
-        Block::new_proposal(Payload::empty(), 1, 2, genesis_qc, &node.signer, Vec::new());
+        Block::new_proposal(Payload::empty(), 1, 2, genesis_qc, &node.signer, Vec::new()).unwrap();
     timed_block_on(&mut runtime, async {
         // clear the message queue
         node.next_proposal().await;
@@ -476,7 +479,8 @@ fn no_vote_on_mismatch_round() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let block_skip_round = Block::new_proposal(
         Payload::empty(),
         2,
@@ -484,7 +488,8 @@ fn no_vote_on_mismatch_round() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     timed_block_on(&mut runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_skip_round,
@@ -578,7 +583,8 @@ fn no_vote_on_invalid_proposer() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let block_incorrect_proposer = Block::new_proposal(
         Payload::empty(),
         1,
@@ -586,7 +592,8 @@ fn no_vote_on_invalid_proposer() {
         genesis_qc.clone(),
         &incorrect_proposer.signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     timed_block_on(&mut runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_incorrect_proposer,
@@ -627,7 +634,8 @@ fn new_round_on_timeout_certificate() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let block_skip_round = Block::new_proposal(
         Payload::empty(),
         2,
@@ -635,9 +643,10 @@ fn new_round_on_timeout_certificate() {
         genesis_qc.clone(),
         &node.signer,
         vec![(1, node.signer.author())],
-    );
+    )
+    .unwrap();
     let timeout = TwoChainTimeout::new(1, 1, genesis_qc.clone());
-    let timeout_signature = timeout.sign(&node.signer);
+    let timeout_signature = timeout.sign(&node.signer).unwrap();
 
     let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
     tc_partial.add(node.signer.author(), timeout, timeout_signature);
@@ -680,7 +689,7 @@ fn reject_invalid_failed_authors() {
 
     let create_timeout = |round: Round| {
         let timeout = TwoChainTimeout::new(1, round, genesis_qc.clone());
-        let timeout_signature = timeout.sign(&node.signer);
+        let timeout_signature = timeout.sign(&node.signer).unwrap();
         let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
         tc_partial.add(node.signer.author(), timeout, timeout_signature);
 
@@ -697,7 +706,8 @@ fn reject_invalid_failed_authors() {
             genesis_qc.clone(),
             &node.signer,
             failed_authors,
-        );
+        )
+        .unwrap();
         ProposalMsg::new(
             block,
             SyncInfo::new(
@@ -771,7 +781,8 @@ fn response_on_block_retrieval() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let block_id = block.id();
     let proposal = ProposalMsg::new(block, SyncInfo::new(genesis_qc.clone(), genesis_qc, None));
 
@@ -886,7 +897,7 @@ fn recover_on_restart() {
         tc_partial.add(
             inserter.signer().author(),
             timeout.clone(),
-            timeout.sign(inserter.signer()),
+            timeout.sign(inserter.signer()).unwrap(),
         );
 
         let tc = tc_partial

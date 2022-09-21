@@ -5,7 +5,7 @@ use crate::{
     common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeout, vote_data::VoteData,
 };
 use anyhow::{ensure, Context};
-use aptos_crypto::{bls12381, hash::CryptoHash};
+use aptos_crypto::{bls12381, hash::CryptoHash, CryptoMaterialError};
 use aptos_types::{
     ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -60,10 +60,15 @@ impl Vote {
         author: Author,
         mut ledger_info_placeholder: LedgerInfo,
         validator_signer: &ValidatorSigner,
-    ) -> Self {
+    ) -> Result<Self, CryptoMaterialError> {
         ledger_info_placeholder.set_consensus_data_hash(vote_data.hash());
-        let signature = validator_signer.sign(&ledger_info_placeholder);
-        Self::new_with_signature(vote_data, author, ledger_info_placeholder, signature)
+        let signature = validator_signer.sign(&ledger_info_placeholder)?;
+        Ok(Self::new_with_signature(
+            vote_data,
+            author,
+            ledger_info_placeholder,
+            signature,
+        ))
     }
 
     /// Generates a new Vote using a signature over the specified ledger_info
