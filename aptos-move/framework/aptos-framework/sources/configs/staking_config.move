@@ -286,14 +286,16 @@ module aptos_framework::staking_config {
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
     ) {
-        move_to(aptos_framework, StakingConfig {
-            minimum_stake,
-            maximum_stake,
-            recurring_lockup_duration_secs,
-            allow_validator_set_change,
-            rewards_rate,
-            rewards_rate_denominator,
-            voting_power_increase_limit,
-        });
+        if (!exists<StakingConfig>(@aptos_framework)) {
+            move_to(aptos_framework, StakingConfig{
+                minimum_stake,
+                maximum_stake,
+                recurring_lockup_duration_secs,
+                allow_validator_set_change,
+                rewards_rate,
+                rewards_rate_denominator,
+                voting_power_increase_limit,
+            });
+        };
     }
 }
