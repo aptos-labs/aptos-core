@@ -20,6 +20,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
+use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
 use aptos_rest_client::error::RestError;
@@ -1260,26 +1261,30 @@ impl TransactionOptions {
             // TODO: Cleanup to use the gas price estimation here
             let simulated_txn = client
                 .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
-                .await?;
-            simulated_txn
-                .into_inner()
-                .transaction
-                .as_signed_user_txn()
-                .map_err(|err| {
-                    CliError::UnexpectedError(format!(
-                        "Transaction found was not a user transaction {}",
-                        err
-                    ))
-                })?
-                .max_gas_amount()
+                .await?
+                .into_inner();
+
+            // Take the gas used and use a headroom factor on it
+            let adjusted_max_gas = adjust_gas_headroom(
+                simulated_txn.info.gas_used(),
+                simulated_txn
+                    .transaction
+                    .as_signed_user_txn()
+                    .expect("Should be signed user transaction")
+                    .max_gas_amount(),
+            );
+
+            // Ask if you want to
+            prompt_yes_with_override(&format!("Do you want to execute a transaction for a maximum of {} coins at a gas unit price of {}?",  adjusted_max_gas * gas_unit_price, gas_unit_price), self.prompt_options)?;
+            adjusted_max_gas
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases
-            aptos_global_constants::MAX_GAS_AMOUNT
+            let max_gas = aptos_global_constants::MAX_GAS_AMOUNT;
+            if ask_to_confirm_price {
+                prompt_yes_with_override(&format!("Do you want to execute a transaction for a maximum of {} coins at a gas unit price of {}?",  max_gas * gas_unit_price, gas_unit_price), self.prompt_options)?;
+            }
+            max_gas
         };
-
-        if ask_to_confirm_price {
-            prompt_yes_with_override(&format!("Estimated gas price is currently {}, do you want to execute a transaction for a total of {} coins?", gas_unit_price, max_gas * gas_unit_price), self.prompt_options)?;
-        }
 
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)

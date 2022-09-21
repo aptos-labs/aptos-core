@@ -38,6 +38,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     signing_message, ValidCryptoMaterialStringExt,
 };
+use aptos_global_constants::adjust_gas_headroom;
 use aptos_logger::debug;
 use aptos_sdk::{
     move_types::language_storage::{StructTag, TypeTag},
@@ -247,97 +248,99 @@ async fn construction_metadata(
     };
 
     // If both are present, we skip simulation
-    let (suggested_fee, gas_unit_price, max_gas_amount) = if let (
-        Some(gas_unit_price),
-        Some(max_gas_amount),
-    ) = (
-        request.options.gas_price_per_unit,
-        request.options.max_gas_amount,
-    ) {
-        let suggested_fee = Amount::suggested_gas_fee(gas_unit_price.0, max_gas_amount.0);
-        (suggested_fee, gas_unit_price.0, max_gas_amount.0)
-    } else {
-        // If we have any missing fields, let's simulate!
-        let mut transaction_factory = TransactionFactory::new(server_context.chain_id);
-
-        // If there's a gas unit price we're using it, max gas doesn't matter the API will overwrite it
-        if let Some(gas_unit_price) = request.options.gas_price_per_unit {
-            transaction_factory = transaction_factory.with_gas_unit_price(gas_unit_price.0)
-        }
-
-        // Build up the transaction
-        let (txn_payload, sender) = request.options.internal_operation.payload()?;
-        let unsigned_transaction = transaction_factory
-            .payload(txn_payload)
-            .sender(sender)
-            .sequence_number(sequence_number)
-            .build();
-
-        let public_key = if let Some(public_key) = request
-            .options
-            .public_keys
-            .as_ref()
-            .and_then(|inner| inner.first())
-        {
-            Ed25519PublicKey::from_encoded_string(&public_key.hex_bytes).map_err(|err| {
-                ApiError::InvalidInput(Some(format!(
-                    "Public key provided is not parsable {:?}",
-                    err
-                )))
-            })?
+    let (suggested_fee, gas_unit_price, max_gas_amount) =
+        if let (Some(gas_unit_price), Some(max_gas_amount)) = (
+            request.options.gas_price_per_unit,
+            request.options.max_gas_amount,
+        ) {
+            let suggested_fee = Amount::suggested_gas_fee(gas_unit_price.0, max_gas_amount.0);
+            (suggested_fee, gas_unit_price.0, max_gas_amount.0)
         } else {
-            return Err(ApiError::InvalidInput(Some(
-                "Must provide public_keys with max_gas_amount".to_string(),
-            )));
+            // If we have any missing fields, let's simulate!
+            let mut transaction_factory = TransactionFactory::new(server_context.chain_id);
+
+            // If there's a gas unit price we're using it, max gas doesn't matter the API will overwrite it
+            if let Some(gas_unit_price) = request.options.gas_price_per_unit {
+                transaction_factory = transaction_factory.with_gas_unit_price(gas_unit_price.0)
+            }
+
+            // Build up the transaction
+            let (txn_payload, sender) = request.options.internal_operation.payload()?;
+            let unsigned_transaction = transaction_factory
+                .payload(txn_payload)
+                .sender(sender)
+                .sequence_number(sequence_number)
+                .build();
+
+            let public_key = if let Some(public_key) = request
+                .options
+                .public_keys
+                .as_ref()
+                .and_then(|inner| inner.first())
+            {
+                Ed25519PublicKey::from_encoded_string(&public_key.hex_bytes).map_err(|err| {
+                    ApiError::InvalidInput(Some(format!(
+                        "Public key provided is not parsable {:?}",
+                        err
+                    )))
+                })?
+            } else {
+                return Err(ApiError::InvalidInput(Some(
+                    "Must provide public_keys with max_gas_amount".to_string(),
+                )));
+            };
+            let signed_transaction = SignedTransaction::new(
+                unsigned_transaction,
+                public_key,
+                Ed25519Signature::try_from([0u8; 64].as_ref())
+                    .expect("Zero signature should always work"),
+            );
+
+            let response = rest_client
+                .simulate_bcs_with_gas_estimation(
+                    &signed_transaction,
+                    true,
+                    request.options.gas_price_per_unit.is_none(),
+                )
+                .await?;
+
+            let simulated_txn = response.inner();
+
+            let simulation_status = simulated_txn.info.status();
+
+            if !simulation_status.is_success() {
+                // TODO: Fix case for not enough gas to be a better message
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Transaction failed to execute with status: {:?}",
+                    simulation_status
+                ))));
+            }
+
+            if let Ok(user_txn) = simulated_txn.transaction.as_signed_user_txn() {
+                let estimated_gas_unit_price = user_txn.gas_unit_price();
+                let adjusted_gas_used =
+                    adjust_gas_headroom(simulated_txn.info.gas_used(), user_txn.max_gas_amount());
+
+                let suggested_fee =
+                    Amount::suggested_gas_fee(estimated_gas_unit_price, adjusted_gas_used);
+                let gas_unit_price = request
+                    .options
+                    .gas_price_per_unit
+                    .map(|inner| inner.0)
+                    .unwrap_or(estimated_gas_unit_price);
+                let max_gas_amount = request
+                    .options
+                    .max_gas_amount
+                    .map(|inner| inner.0)
+                    .unwrap_or(adjusted_gas_used);
+                (suggested_fee, gas_unit_price, max_gas_amount)
+            } else {
+                return Err(ApiError::InternalError(Some(format!(
+                    "Transaction returned by API was not a user transaction: {:?}",
+                    simulated_txn.transaction
+                ))));
+            }
         };
-        let signed_transaction = SignedTransaction::new(
-            unsigned_transaction,
-            public_key,
-            Ed25519Signature::try_from([0u8; 64].as_ref())
-                .expect("Zero signature should always work"),
-        );
-
-        let simulated_txn = rest_client
-            .simulate_bcs_with_gas_estimation(
-                &signed_transaction,
-                true,
-                request.options.gas_price_per_unit.is_none(),
-            )
-            .await?
-            .into_inner();
-
-        let simulation_status = simulated_txn.info.status();
-
-        if !simulation_status.is_success() {
-            // TODO: Fix case for not enough gas to be a better message
-            return Err(ApiError::InvalidInput(Some(format!(
-                "Transaction failed to execute with status: {:?}",
-                simulation_status
-            ))));
-        }
-
-        if let Ok(user_txn) = simulated_txn.transaction.as_signed_user_txn() {
-            let estimated_gas_unit_price = user_txn.gas_unit_price();
-            let suggested_fee =
-                Amount::suggested_gas_fee(estimated_gas_unit_price, simulated_txn.info.gas_used());
-            let gas_unit_price = request
-                .options
-                .gas_price_per_unit
-                .map(|inner| inner.0)
-                .unwrap_or(estimated_gas_unit_price);
-            let max_gas_amount = request
-                .options
-                .max_gas_amount
-                .map(|inner| inner.0)
-                .unwrap_or_else(|| simulated_txn.info.gas_used());
-            (suggested_fee, gas_unit_price, max_gas_amount)
-        } else {
-            return Err(ApiError::InternalError(Some(format!(
-                "Transaction returned by API was not a user transaction: {:?}",
-                simulated_txn.transaction
-            ))));
-        }
-    };
 
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
