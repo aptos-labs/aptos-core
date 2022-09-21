@@ -94,7 +94,7 @@ export class AptosClient {
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query Optional pagination object
    * @param query.start The start transaction version of the page. Default is the latest ledger version
-   * @param query?.limit The max number of transactions should be returned for the page. Default is 25.
+   * @param query.limit The max number of transactions should be returned for the page. Default is 25.
    * @returns An array of on-chain transactions, sent by account
    */
   @parseApiError
@@ -109,7 +109,7 @@ export class AptosClient {
   /**
    * Queries modules associated with given account
    * @param accountAddress Hex-encoded 32 byte Aptos account address
-   * @param query.version Specifies ledger version of transactions. By default latest version will be used
+   * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account modules array for a specific ledger version.
    * Module is represented by MoveModule interface. It contains module `bytecode` and `abi`,
    * which is JSON representation of a module
@@ -129,7 +129,7 @@ export class AptosClient {
    * Queries module associated with given account by module name
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param moduleName The name of the module
-   * @param query.version Specifies ledger version of transactions. By default latest version will be used
+   * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Specified module.
    * Module is represented by MoveModule interface. It contains module `bytecode` and `abi`,
    * which JSON representation of a module
@@ -150,15 +150,8 @@ export class AptosClient {
   /**
    * Queries all resources associated with given account
    * @param accountAddress Hex-encoded 32 byte Aptos account address
-   * @param query.version Specifies ledger version of transactions. By default latest version will be used
+   * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account resources for a specific ledger version
-   * @example An example of an account resource
-   * ```
-   * {
-   *    type: "0x1::AptosAccount::Coin",
-   *    data: { value: 6 }
-   * }
-   * ```
    */
   @parseApiError
   async getAccountResources(
@@ -175,7 +168,7 @@ export class AptosClient {
    * Queries resource associated with given account by resource type
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param resourceType String representation of an on-chain Move struct type
-   * @param query.version Specifies ledger version of transactions. By default latest version will be used
+   * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account resource of specified type and ledger version
    * @example An example of an account resource
    * ```
@@ -238,17 +231,6 @@ export class AptosClient {
    * @param sender Hex-encoded 32 byte Aptos account address of transaction sender
    * @param payload Transaction payload. It depends on transaction type you want to send
    * @param options Options allow to overwrite default transaction options.
-   * Defaults are:
-   * ```bash
-   *   {
-   *     sender: senderAddress.hex(),
-   *     sequence_number: account.sequence_number,
-   *     max_gas_amount: "1000",
-   *     gas_unit_price: "1",
-   *     // Unix timestamp, in seconds + 10 seconds
-   *     expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),
-   *   }
-   * ```
    * @returns A transaction object
    */
   async generateTransaction(
@@ -343,7 +325,7 @@ export class AptosClient {
    * @param query Optional query object
    * @param query.start The start sequence number in the EVENT STREAM, defaulting to the latest event.
    * The events are returned in the reverse order of sequence number
-   * @param query?.limit The number of events to be returned for the page default is 5
+   * @param query.limit The number of events to be returned for the page default is 5
    * @returns Array of events
    */
   @parseApiError
@@ -379,9 +361,9 @@ export class AptosClient {
    * for simulation.
    * @param rawTransaction The raw transaction to be simulated, likely created
    * by calling the `generateTransaction` function.
-   * @param query?.estimateGasUnitPrice If set to true, the gas unit price in the
+   * @param query.estimateGasUnitPrice If set to true, the gas unit price in the
    * transaction will be ignored and the estimated value will be used.
-   * @param query?.estimateMaxGasAmount If set to true, the max gas value in the
+   * @param query.estimateMaxGasAmount If set to true, the max gas value in the
    * transaction will be ignored and the maximum possible gas will be used.
    * @returns The BCS encoded signed transaction, which you should then provide
    *
@@ -414,7 +396,7 @@ export class AptosClient {
   /**
    * Submits the BCS serialization of a signed transaction to the simulation endpoint.
    *
-   * @param signedTxn The output of `generateBCSSimulation`.
+   * @param bcsBody The output of `generateBCSSimulation`.
    * @param query?.estimateGasUnitPrice If set to true, the gas unit price in the
    * transaction will be ignored and the estimated value will be used.
    * @param query?.estimateMaxGasAmount If set to true, the max gas value in the
@@ -443,7 +425,7 @@ export class AptosClient {
    * Queries on-chain transactions
    * @param query Optional pagination object
    * @param query.start The start transaction version of the page. Default is the latest ledger version
-   * @param query?.limit The max number of transactions should be returned for the page. Default is 25
+   * @param query.limit The max number of transactions should be returned for the page. Default is 25
    * @returns Array of on-chain transactions
    */
   @parseApiError
@@ -452,8 +434,7 @@ export class AptosClient {
   }
 
   /**
-   * @param txnHashOrVersion - Transaction hash should be hex-encoded bytes string with 0x prefix.
-   * Transaction version is an uint64 number.
+   * @param txnHash - Transaction hash should be hex-encoded bytes string with 0x prefix.
    * @returns Transaction from mempool or on-chain transaction
    */
   @parseApiError
@@ -462,12 +443,11 @@ export class AptosClient {
   }
 
   /**
-   * @param txnHashOrVersion - Transaction hash should be hex-encoded bytes string with 0x prefix.
-   * Transaction version is an uint64 number.
+   * @param txnVersion - Transaction version is an uint64 number.
    * @returns Transaction from mempool or on-chain transaction
    */
   @parseApiError
-  async getTransactionByVersion(txnVersion: BigInt | number): Promise<Gen.Transaction> {
+  async getTransactionByVersion(txnVersion: AnyNumber): Promise<Gen.Transaction> {
     return this.client.transactions.getTransactionByVersion(txnVersion.toString());
   }
 
@@ -520,8 +500,8 @@ export class AptosClient {
    * In case 4, this function throws a WaitForTransactionError.
    *
    * @param txnHash The hash of a transaction previously submitted to the blockchain.
-   * @param timeoutSecs Timeout in seconds. Defaults to 10 seconds.
-   * @param checkSuccess See above. Defaults to false.
+   * @param extraArgs.timeoutSecs Timeout in seconds. Defaults to 20 seconds.
+   * @param extraArgs.checkSuccess See above. Defaults to false.
    * @returns See above.
    *
    * @example
@@ -597,7 +577,6 @@ export class AptosClient {
 
   /**
    * Queries the latest ledger information
-   * @param params Request params
    * @returns Latest ledger information
    * @example Example of returned data
    * ```
@@ -631,7 +610,6 @@ export class AptosClient {
    * @param data.key_type Move type of table key (e.g. `vector<u8>`)
    * @param data.value_type Move type of table value (e.g. `u64`)
    * @param data.key Value of table key
-   * @param params Request params
    * @returns Table item value rendered in JSON
    */
   @parseApiError
