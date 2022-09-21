@@ -1265,22 +1265,26 @@ impl TransactionOptions {
                 .into_inner();
 
             // Take the gas used and use a headroom factor on it
-            adjust_gas_headroom(
+            let adjusted_max_gas = adjust_gas_headroom(
                 simulated_txn.info.gas_used(),
                 simulated_txn
                     .transaction
                     .as_signed_user_txn()
                     .expect("Should be signed user transaction")
                     .max_gas_amount(),
-            )
+            );
+
+            // Ask if you want to
+            prompt_yes_with_override(&format!("Do you want to execute a transaction for a maximum of {} coins at a gas unit price of {}?",  adjusted_max_gas * gas_unit_price, gas_unit_price), self.prompt_options)?;
+            adjusted_max_gas
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases
-            aptos_global_constants::MAX_GAS_AMOUNT
+            let max_gas = aptos_global_constants::MAX_GAS_AMOUNT;
+            if ask_to_confirm_price {
+                prompt_yes_with_override(&format!("Do you want to execute a transaction for a maximum of {} coins at a gas unit price of {}?",  max_gas * gas_unit_price, gas_unit_price), self.prompt_options)?;
+            }
+            max_gas
         };
-
-        if ask_to_confirm_price {
-            prompt_yes_with_override(&format!("Estimated gas price is currently {}, do you want to execute a transaction for a total of {} coins?", gas_unit_price, max_gas * gas_unit_price), self.prompt_options)?;
-        }
 
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
