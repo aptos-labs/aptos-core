@@ -6454,7 +6454,9 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "cfg-if 1.0.0",
  "once_cell",
+ "procfs",
  "prometheus",
  "sysinfo",
 ]
@@ -7369,6 +7371,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0a2ca2c61bc9f3d74d2886294ab7b9853abd9c1ad903a3ac7815c58989bb7bab"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "procfs"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dfb6451c91904606a1abe93e83a8ec851f45827fa84273f256ade45dc095818"
+dependencies = [
+ "bitflags",
+ "byteorder",
+ "chrono",
+ "flate2",
+ "hex",
+ "lazy_static 1.4.0",
+ "rustix",
 ]
 
 [[package]]
