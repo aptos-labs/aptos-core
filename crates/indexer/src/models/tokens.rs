@@ -27,21 +27,21 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[primary_key(
+#[diesel(primary_key(
     creator_address,
     collection_name_hash,
     name_hash,
     property_version,
     transaction_version
-)]
-#[diesel(table_name = "tokens")]
+))]
+#[diesel(table_name = tokens)]
 pub struct Token {
     pub creator_address: String,
     pub collection_name_hash: String,
     pub name_hash: String,
     pub collection_name: String,
     pub name: String,
-    pub property_version: bigdecimal::BigDecimal,
+    pub property_version: BigDecimal,
     pub transaction_version: i64,
     pub token_properties: serde_json::Value,
     // Default time columns
@@ -49,25 +49,25 @@ pub struct Token {
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[primary_key(
+#[diesel(primary_key(
     creator_address,
     collection_name_hash,
     name_hash,
     property_version,
     transaction_version,
     table_handle
-)]
-#[diesel(table_name = "token_ownership")]
+))]
+#[diesel(table_name = token_ownerships)]
 pub struct TokenOwnership {
     pub creator_address: String,
     pub collection_name_hash: String,
     pub name_hash: String,
     pub collection_name: String,
     pub name: String,
-    pub property_version: bigdecimal::BigDecimal,
+    pub property_version: BigDecimal,
     pub transaction_version: i64,
     pub owner_address: Option<String>,
-    pub amount: bigdecimal::BigDecimal,
+    pub amount: BigDecimal,
     pub table_handle: String,
     pub table_type: Option<String>,
     // Default time columns

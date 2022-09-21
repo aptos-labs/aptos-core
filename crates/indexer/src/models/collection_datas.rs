@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use super::tokens::{TableHandleToOwner, TableMetadataForToken};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[primary_key(creator_address, collection_name_hash, transaction_version)]
-#[diesel(table_name = "collection_datas")]
+#[diesel(primary_key(creator_address, collection_name_hash, transaction_version))]
+#[diesel(table_name = collection_datas)]
 pub struct CollectionData {
     pub creator_address: String,
     pub collection_name_hash: String,
@@ -27,8 +27,8 @@ pub struct CollectionData {
     pub description: String,
     pub transaction_version: i64,
     pub metadata_uri: String,
-    pub supply: bigdecimal::BigDecimal,
-    pub maximum: bigdecimal::BigDecimal,
+    pub supply: BigDecimal,
+    pub maximum: BigDecimal,
     pub maximum_mutable: bool,
     pub uri_mutable: bool,
     pub description_mutable: bool,

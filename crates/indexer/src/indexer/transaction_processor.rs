@@ -146,11 +146,11 @@ pub trait TransactionProcessor: Send + Sync + Debug {
 
     /// Actually performs the write for a `ProcessorStatusModel` changeset
     fn apply_processor_status(&self, psms: &[ProcessorStatusModel]) {
-        let conn = self.get_conn();
+        let mut conn = self.get_conn();
         let chunks = get_chunks(psms.len(), ProcessorStatusModel::field_count());
         for (start_ind, end_ind) in chunks {
             execute_with_better_error(
-                &conn,
+                &mut conn,
                 diesel::insert_into(processor_statuses::table)
                     .values(&psms[start_ind..end_ind])
                     .on_conflict((dsl::name, dsl::version))

@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
     Queryable,
     Serialize,
 )]
-#[belongs_to(Transaction, foreign_key = "transaction_version")]
-#[primary_key(transaction_version, write_set_change_index)]
-#[diesel(table_name = "table_items")]
+#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[diesel(primary_key(transaction_version, write_set_change_index))]
+#[diesel(table_name = table_items)]
 pub struct TableItem {
     pub transaction_version: i64,
     pub write_set_change_index: i64,
@@ -32,6 +32,17 @@ pub struct TableItem {
     pub decoded_key: serde_json::Value,
     pub decoded_value: Option<serde_json::Value>,
     pub is_deleted: bool,
+    // Default time columns
+    pub inserted_at: chrono::NaiveDateTime,
+}
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[diesel(primary_key(handle))]
+#[diesel(table_name = table_metadatas)]
+pub struct TableMetadata {
+    pub handle: String,
+    pub key_type: String,
+    pub value_type: String,
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
 }
@@ -84,27 +95,6 @@ impl TableItem {
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
-}
-
-#[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Queryable,
-    Serialize,
-)]
-#[primary_key(handle)]
-#[diesel(table_name = "table_metadatas")]
-pub struct TableMetadata {
-    pub handle: String,
-    pub key_type: String,
-    pub value_type: String,
-    // Default time columns
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl TableMetadata {
