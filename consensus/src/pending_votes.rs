@@ -60,8 +60,8 @@ pub struct PendingVotes {
         HashMap<HashValue /* LedgerInfo digest */, LedgerInfoWithPartialSignatures>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
     maybe_partial_2chain_tc: Option<TwoChainTimeoutWithPartialSignatures>,
-    /// Map of Author to vote. This is useful to discard multiple votes.
-    author_to_vote: HashMap<Author, Vote>,
+    /// Map of Author to (vote, li_digest). This is useful to discard multiple votes.
+    author_to_vote: HashMap<Author, (Vote, HashValue)>,
     /// Whether we have echoed timeout for this round.
     echo_timeout: bool,
 }
@@ -91,9 +91,11 @@ impl PendingVotes {
         // 1. Has the author already voted for this round?
         //
 
-        if let Some(previously_seen_vote) = self.author_to_vote.get(&vote.author()) {
+        if let Some((previously_seen_vote, previous_li_digest)) =
+            self.author_to_vote.get(&vote.author())
+        {
             // is it the same vote?
-            if li_digest == previously_seen_vote.ledger_info().hash() {
+            if &li_digest == previous_li_digest {
                 // we've already seen an equivalent vote before
                 let new_timeout_vote = vote.is_timeout() && !previously_seen_vote.is_timeout();
                 if !new_timeout_vote {
@@ -117,7 +119,8 @@ impl PendingVotes {
         // 2. Store new vote (or update, in case it's a new timeout vote)
         //
 
-        self.author_to_vote.insert(vote.author(), vote.clone());
+        self.author_to_vote
+            .insert(vote.author(), (vote.clone(), li_digest));
 
         //
         // 3. Let's check if we can create a QC
@@ -210,6 +213,18 @@ impl PendingVotes {
         //
 
         VoteReceptionResult::VoteAdded(voting_power)
+    }
+
+    pub fn drain_votes(
+        &mut self,
+    ) -> (
+        Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
+        Option<TwoChainTimeoutWithPartialSignatures>,
+    ) {
+        (
+            self.li_digest_to_votes.drain().collect(),
+            self.maybe_partial_2chain_tc.take(),
+        )
     }
 }
 

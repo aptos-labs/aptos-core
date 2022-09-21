@@ -24,3 +24,14 @@ pub const WAYPOINT: &str = "waypoint";
 pub const GENESIS_WAYPOINT: &str = "genesis-waypoint";
 pub const MOVE_MODULES: &str = "move_modules";
 pub const MIN_PRICE_PER_GAS_UNIT: &str = "min_price_per_gas_unit";
+
+// TODO(Gas): double check if this right
+/// Definitions of global gas constants
+
+#[cfg(any(test, feature = "testing"))]
+pub const GAS_UNIT_PRICE: u64 = 0;
+#[cfg(not(any(test, feature = "testing")))]
+pub const GAS_UNIT_PRICE: u64 = 100;
+
+pub const INITIAL_BALANCE: u64 = 100_000_000;
+pub const MAX_GAS_AMOUNT: u64 = 100_000;

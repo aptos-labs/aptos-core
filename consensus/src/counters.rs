@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_gauge, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge, Gauge, Histogram,
-    HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    op_counters::DurationHistogram, register_counter, register_gauge, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    Counter, Gauge, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -77,6 +77,55 @@ pub static VOTE_NIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_vote_nil_count",
         "Count the number of times a validator voted for a nil block since last restart."
+    )
+    .unwrap()
+});
+
+/// Total voting power of validators in validator set
+pub static TOTAL_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_total_voting_power",
+        "Total voting power of validators in validator set"
+    )
+    .unwrap()
+});
+
+/// Number of rounds we were collecting votes for proposer
+/// (similar to PROPOSALS_COUNT, but can be larger, if we failed in creating/sending of the proposal)
+pub static PROPOSER_COLLECTED_ROUND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_proposer_collecting_round_count",
+        "Total voting power of all votes collected for the round this node was proposer",
+    )
+    .unwrap()
+});
+
+/// Total voting power of all votes collected for the same ledger info
+/// for the rounds this node was a proposer (cumulative)
+pub static PROPOSER_COLLECTED_MOST_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_most_voting_power_sum",
+        "Total voting power of all votes collected for the same ledger info for the rounds this node was a proposer",
+    )
+    .unwrap()
+});
+
+/// Total voting power of all votes collected for all other ledger info
+/// for the rounds this node was a proposer
+pub static PROPOSER_COLLECTED_CONFLICTING_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_conflicting_voting_power_sum",
+        "Total voting power of all votes collected for all other ledger info for the rounds this node was a proposer",
+    )
+    .unwrap()
+});
+
+/// Total voting power of all votes collected for all other ledger info
+/// for the rounds this node was a proposer
+pub static PROPOSER_COLLECTED_TIMEOUT_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_timeout_voting_power_sum",
+        "Total voting power of all votes collected for the same ledger info for the rounds this node was a proposer",
     )
     .unwrap()
 });

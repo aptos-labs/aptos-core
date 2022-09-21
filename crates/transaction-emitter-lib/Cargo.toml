@@ -26,6 +26,7 @@ url = { version = "2.2.2", features = ["serde"] }
 aptos = { path = "../aptos" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../aptos-rest-client" }

@@ -150,6 +150,7 @@ dependencies = [
  "aptos-gas",
  "aptos-genesis",
  "aptos-github-client",
+ "aptos-global-constants",
  "aptos-keygen",
  "aptos-logger",
  "aptos-module-verifier",
@@ -454,6 +455,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-keygen",
  "aptos-logger",
@@ -608,6 +610,7 @@ dependencies = [
 name = "aptos-gas"
 version = "0.1.0"
 dependencies = [
+ "aptos-global-constants",
  "aptos-types",
  "framework",
  "gas-algebra-ext",
@@ -1121,6 +1124,7 @@ version = "0.0.3"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-global-constants",
  "aptos-rest-client",
  "aptos-types",
  "bcs",
@@ -3824,6 +3828,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-genesis",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
  "aptos-rest-client",
@@ -3870,6 +3875,7 @@ name = "forge-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-global-constants",
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
@@ -6466,7 +6472,9 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "cfg-if 1.0.0",
  "once_cell",
+ "procfs",
  "prometheus",
  "sysinfo",
 ]
@@ -7381,6 +7389,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0a2ca2c61bc9f3d74d2886294ab7b9853abd9c1ad903a3ac7815c58989bb7bab"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "procfs"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dfb6451c91904606a1abe93e83a8ec851f45827fa84273f256ade45dc095818"
+dependencies = [
+ "bitflags",
+ "byteorder",
+ "chrono",
+ "flate2",
+ "hex",
+ "lazy_static 1.4.0",
+ "rustix",
 ]
 
 [[package]]
@@ -9229,6 +9252,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-global-constants",
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
@@ -9751,6 +9775,7 @@ name = "transaction-emitter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-global-constants",
  "aptos-logger",
  "aptos-sdk",
  "clap 3.2.17",
@@ -9771,6 +9796,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
  "aptos-rest-client",

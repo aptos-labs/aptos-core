@@ -810,6 +810,8 @@ impl EpochManager {
 
         self.round_manager_tx = Some(round_manager_tx.clone());
 
+        counters::TOTAL_VOTING_POWER.set(epoch_state.verifier.total_voting_power() as f64);
+
         let mut round_manager = RoundManager::new(
             epoch_state,
             block_store.clone(),

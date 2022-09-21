@@ -1035,7 +1035,13 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration, 1).unwrap();
+        let stats = generate_traffic(
+            ctx,
+            &all_validators,
+            duration,
+            aptos_global_constants::GAS_UNIT_PRICE,
+        )
+        .unwrap();
         ctx.report
             .report_txn_stats(self.name().to_string(), &stats, duration);
 

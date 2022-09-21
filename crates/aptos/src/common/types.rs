@@ -1149,8 +1149,6 @@ pub struct GasOptions {
     pub max_gas: Option<u64>,
 }
 
-const DEFAULT_MAX_GAS: u64 = 50000;
-
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
@@ -1276,7 +1274,7 @@ impl TransactionOptions {
                 .max_gas_amount()
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases
-            DEFAULT_MAX_GAS
+            aptos_global_constants::MAX_GAS_AMOUNT
         };
 
         if ask_to_confirm_price {
