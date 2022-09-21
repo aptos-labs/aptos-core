@@ -83,6 +83,7 @@ pub enum OperationType {
     Withdraw,
     Deposit,
     SetOperator,
+    SetVoter,
     // Fee must always be last for ordering
     Fee,
 }
@@ -93,6 +94,7 @@ impl OperationType {
     const WITHDRAW: &'static str = "withdraw";
     const FEE: &'static str = "fee";
     const SET_OPERATOR: &'static str = "set_operator";
+    const SET_VOTER: &'static str = "set_voter";
 
     pub fn all() -> Vec<OperationType> {
         vec![
@@ -101,6 +103,7 @@ impl OperationType {
             OperationType::Deposit,
             OperationType::Fee,
             OperationType::SetOperator,
+            OperationType::SetVoter,
         ]
     }
 }
@@ -115,6 +118,7 @@ impl FromStr for OperationType {
             Self::WITHDRAW => Ok(OperationType::Withdraw),
             Self::FEE => Ok(OperationType::Fee),
             Self::SET_OPERATOR => Ok(OperationType::SetOperator),
+            Self::SET_VOTER => Ok(OperationType::SetVoter),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
@@ -130,6 +134,7 @@ impl Display for OperationType {
             OperationType::Deposit => Self::DEPOSIT,
             OperationType::Withdraw => Self::WITHDRAW,
             OperationType::SetOperator => Self::SET_OPERATOR,
+            OperationType::SetVoter => Self::SET_VOTER,
             OperationType::Fee => Self::FEE,
         })
     }
