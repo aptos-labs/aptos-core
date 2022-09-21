@@ -61,9 +61,9 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
         })?;
 
     let cache = if body.role_type == RoleType::Validator {
-        context.validator_cache()
+        context.peers().validators()
     } else {
-        context.vfn_cache()
+        context.peers().validator_fullnodes()
     };
 
     let (epoch, peer_role) = match cache.read().get(&body.chain_id) {
@@ -109,8 +109,8 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
         PeerRole::Validator => NodeType::Validator,
         PeerRole::ValidatorFullNode => NodeType::ValidatorFullNode,
         PeerRole::Unknown => context
-            .pfn_cache()
-            .read()
+            .peers()
+            .public_fullnodes()
             .get(&body.chain_id)
             .map(|peer_set| {
                 if peer_set.contains_key(&body.peer_id) {
@@ -124,7 +124,7 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
     };
 
     let token = create_jwt_token(
-        context.clone(),
+        context.jwt_service(),
         body.chain_id,
         body.peer_id,
         node_type,
@@ -162,7 +162,11 @@ pub fn with_auth(
 ) -> impl Filter<Extract = (Claims,), Error = Rejection> + Clone {
     warp::header::optional(AUTHORIZATION.as_str())
         .and_then(jwt_from_header)
-        .and(warp::any().map(move || (context.clone(), roles.clone())))
+        .and(
+            warp::any()
+                .map(move || (context.clone(), roles.clone()))
+                .untuple_one(),
+        )
         .and_then(authorize_jwt)
 }
 
@@ -178,6 +182,6 @@ async fn handle_check_chain_access(
     chain_id: ChainId,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    let present = context.configured_chains().contains(&chain_id);
+    let present = context.chain_set().contains(&chain_id);
     Ok(reply::json(&present))
 }

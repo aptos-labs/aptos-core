@@ -1241,6 +1241,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-types",
+ "base64 0.13.0",
  "bcs",
  "chrono",
  "clap 3.2.17",

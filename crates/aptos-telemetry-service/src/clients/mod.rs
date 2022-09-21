@@ -50,3 +50,53 @@ pub mod victoria_metrics_api {
         }
     }
 }
+
+pub mod big_query {
+    use gcp_bigquery_client::{
+        error::BQError,
+        model::{
+            table_data_insert_all_request::TableDataInsertAllRequest,
+            table_data_insert_all_response::TableDataInsertAllResponse,
+        },
+        Client as BigQueryClient,
+    };
+
+    #[derive(Clone)]
+    pub struct TableWriteClient {
+        client: BigQueryClient,
+        project_id: String,
+        dataset_id: String,
+        table_id: String,
+    }
+
+    impl TableWriteClient {
+        pub fn new(
+            client: BigQueryClient,
+            project_id: String,
+            dataset_id: String,
+            table_id: String,
+        ) -> Self {
+            Self {
+                client,
+                project_id,
+                dataset_id,
+                table_id,
+            }
+        }
+
+        pub async fn insert_all(
+            &self,
+            insert_request: TableDataInsertAllRequest,
+        ) -> Result<TableDataInsertAllResponse, BQError> {
+            self.client
+                .tabledata()
+                .insert_all(
+                    &self.project_id,
+                    &self.dataset_id,
+                    &self.table_id,
+                    insert_request,
+                )
+                .await
+        }
+    }
+}

@@ -1,22 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use crate::clients::humio;
-use crate::GCPBigQueryConfig;
-use crate::{context::Context, index, validator_cache::PeerSetCache, TelemetryServiceConfig};
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::{x25519, Uniform};
-use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
-use reqwest::Url;
 use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 use warp::http::header::CONTENT_TYPE;
 use warp::http::Response;
 use warp::hyper::body::Bytes;
+
+use crate::context::{JsonWebTokenService, PeerStoreTuple};
+use crate::CustomEventConfig;
+use crate::{context::Context, index, TelemetryServiceConfig};
+
+use aptos_crypto::{x25519, Uniform};
+use aptos_rest_client::aptos_api_types::mime_types;
 
 pub async fn new_test_context() -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
@@ -27,42 +25,23 @@ pub async fn new_test_context() -> TestContext {
         tls_cert_path: None,
         tls_key_path: None,
         trusted_full_node_addresses: HashMap::new(),
-        server_private_key: ConfigKey::new(server_private_key),
-        jwt_signing_key: "jwt_signing_key".into(),
         update_interval: 60,
-        gcp_bq_config: GCPBigQueryConfig {
+        custom_event_config: CustomEventConfig {
             project_id: String::from("1"),
             dataset_id: String::from("2"),
             table_id: String::from("3"),
         },
         victoria_metrics_base_url: "".into(),
-        victoria_metrics_token: "".into(),
         humio_url: "".into(),
-        humio_auth_token: "".into(),
         pfn_allowlist: HashMap::new(),
     };
-    let humio_client = humio::IngestClient::new(
-        Url::parse("http://localhost/").unwrap(),
-        config.humio_auth_token.clone(),
-    );
-    let gcp_bigquery_client = gcp_bigquery_client::Client::with_workload_identity(false)
-        .await
-        .unwrap();
-    let validator_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
-    let vfn_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
-    let pfn_cache = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
+
+    let peers = PeerStoreTuple::default();
+    let jwt_service = JsonWebTokenService::from_base64_secret(&base64::encode("jwt_secret_key"));
 
     TestContext::new(
-        config.clone(),
-        Context::new(
-            &config,
-            validator_cache,
-            vfn_cache,
-            pfn_cache,
-            Some(gcp_bigquery_client),
-            None,
-            humio_client,
-        ),
+        config,
+        Context::new(server_private_key, peers, None, HashSet::new(), jwt_service),
     )
 }
 
