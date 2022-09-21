@@ -18,6 +18,8 @@ Install your preferred SDK from the below list:
 * [Python SDK][python-sdk]
 * [Rust SDK][rust-sdk]
 
+---
+
 ## Step 2: Run the example
 
 Clone the `aptos-core` repo:
@@ -76,11 +78,13 @@ git clone https://github.com/aptos-labs/aptos-core.git
   </TabItem>
 </Tabs>
 
+---
+
 ## Step 3: Understand the output
 
 An output very similar to the following will appear after executing the above command:
 
-```
+```yaml
 === Addresses ===
 Alice: 0x0baec07bfc42f8018ea304ddc307a359c1c6ab20fbce598065b6cb19acff7043
 Bob: 0xc98ceafadaa32e50d06d181842406dbbf518b6586ab67cfa2b736aaddeb7c74f
@@ -111,6 +115,8 @@ The above output demonstrates that the `transfer-coin` example executes the foll
 
 Next, see below a walk-through of the SDK functions that are used to accomplish the above steps.
 
+---
+
 ## Step 4: The SDK in depth
 
 The `transfer-coin` example code uses helper functions to interact with the [REST API][rest_spec]. This section reviews each of the calls and gives insights into functionality.
@@ -118,23 +124,25 @@ The `transfer-coin` example code uses helper functions to interact with the [RES
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-:::tip See the full example
+:::tip See the full code
 See the Typescript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="python" label="Python">
 
-:::tip See the full example
+:::tip See the full code
 See the Python [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-:::tip See the full example
+:::tip See the full code
 See the Rust [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/sdk/examples/transfer-coin.rs) for the complete code as you follow the below steps.
 :::
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.1: Initializing the clients
 
@@ -197,6 +205,8 @@ By default the URLs for both the services point to Aptos devnet services. Howeve
   - `APTOS_FAUCET_URL`
 :::
 
+---
+
 ### Step 4.2: Creating local accounts
 
 The next step is to create two accounts locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
@@ -222,6 +232,8 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
   </TabItem>
 </Tabs>
 
+---
+
 ### Step 4.3: Creating blockchain accounts
 
 In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to only create Bob's account:
@@ -246,6 +258,8 @@ In Aptos, each account must have an on-chain representation in order to support 
 ```
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.4: Reading balances
 
@@ -293,6 +307,8 @@ let balance = self
 ```
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.5: Transferring
 
@@ -363,6 +379,8 @@ Breaking the above down into pieces:
   </TabItem>
 </Tabs>
 
+---
+
 ### Step 4.6: Waiting for transaction resolution
 
 <Tabs groupId="sdk-examples">
@@ -395,7 +413,7 @@ The transaction hash can be used to query the status of a transaction:
 </Tabs>
 
 [account_basics]: /concepts/basics-accounts
-[typescript-sdk]: /sdks/typescript-sdk
+[typescript-sdk]: /sdks/ts-sdk/index
 [python-sdk]: /sdks/python-sdk
 [rust-sdk]: /sdks/rust-sdk
 [rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
