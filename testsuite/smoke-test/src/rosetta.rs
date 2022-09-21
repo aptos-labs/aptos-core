@@ -746,6 +746,22 @@ async fn test_block() {
     // Also fail to set an operator
     cli.set_operator(1, 3).await.unwrap_err();
 
+    // Successfully, and fail setting a voter
+    set_voter_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Set operator should work!");
+    cli.set_delegated_voter(1, 3).await.unwrap_err();
+
     // This one will fail (and skip estimation of gas)
     let maybe_final_txn = transfer_and_wait(
         &rosetta_client,
@@ -1106,38 +1122,81 @@ async fn parse_operations(
                         status,
                         "Successful transaction should have successful set operator operation"
                     );
-                    // Check that operator was set the same
-                    if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
-                        actual_txn.transaction
-                    {
-                        if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                            ref payload,
-                        ) = txn.payload()
-                        {
-                            let actual_operator_address: AccountAddress =
-                                bcs::from_bytes(payload.args().first().unwrap()).unwrap();
-                            let operator = operation
-                                .metadata
-                                .as_ref()
-                                .unwrap()
-                                .operator
-                                .as_ref()
-                                .unwrap()
-                                .account_address()
-                                .unwrap();
-                            assert_eq!(actual_operator_address, operator)
-                        } else {
-                            panic!("Not an entry function");
-                        }
-                    } else {
-                        panic!("Not a user transaction");
-                    }
                 } else {
                     assert_eq!(
                         OperationStatusType::Failure,
                         status,
                         "Failed transaction should have failed set operator operation"
                     );
+                }
+
+                // Check that operator was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator)
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            }
+            OperationType::SetVoter => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful set voter operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed set voter operation"
+                    );
+                }
+
+                // Check that voter was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_voter_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let voter = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .voter
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_voter_address, voter)
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
                 }
             }
             OperationType::Fee => {
@@ -1192,7 +1251,6 @@ async fn parse_operations(
                     }
                 };
             }
-            operation_type => panic!("Unhandled operation type {}", operation_type),
         }
     }
 
@@ -1560,6 +1618,36 @@ async fn set_operator_and_wait(
             network_identifier,
             sender_key,
             new_operator,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn set_voter_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    new_voter: AccountAddress,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .set_voter(
+            network_identifier,
+            sender_key,
+            new_voter,
             expiry_time.as_secs(),
             sequence_number,
             max_gas,
