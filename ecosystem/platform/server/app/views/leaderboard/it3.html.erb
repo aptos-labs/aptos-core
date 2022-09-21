@@ -107,7 +107,7 @@
                   <%= metric.rank %>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
-                  <a class="relative" href="https://explorer.devnet.aptos.dev/account/<%= metric.owner_address %>?network=ait3" target="_blank" title="<%= metric.owner_address %>">
+                  <a class="relative" href="https://explorer.aptoslabs.com/account/<%= metric.owner_address %>?network=ait3" target="_blank" title="<%= metric.owner_address %>">
                     <%= truncate_address(metric.owner_address) %>
                     <span class="absolute w-100 overflow-visible inline-block text-transparent left-0 pointer-events-none"><%= metric.owner_address %></span>
                   </a>

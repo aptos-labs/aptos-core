@@ -44,9 +44,9 @@
         <ul>
           <li class="mb-4">
             <% explorer_url = if @transaction_version
-                                "https://explorer.devnet.aptos.dev/txn/#{@transaction_version}?network=#{@wallet.network}"
+                                "https://explorer.aptoslabs.com/txn/#{@transaction_version}?network=#{@wallet.network}"
                               else
-                                "https://explorer.devnet.aptos.dev/txn/#{CGI.escape @transaction_hash}?network=#{@wallet.network}"
+                                "https://explorer.aptoslabs.com/txn/#{CGI.escape @transaction_hash}?network=#{@wallet.network}"
                               end %>
             <%= link_to explorer_url, class: 'font-mono uppercase text-base text-teal-400 hover:text-teal-300 flex gap-2', target: '_blank' do %>
               <%= render IconComponent.new(:search, class: 'w-5') %>

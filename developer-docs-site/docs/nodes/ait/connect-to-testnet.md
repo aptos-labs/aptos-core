@@ -143,7 +143,7 @@ At this point you already used your owner account to initialized a validator sta
 
 2. Check your validator account balance, make sure you have some coins to pay gas. (If not, transfer some coin to this account from your owner account) 
 
-    You can check on the explorer `https://explorer.devnet.aptos.dev/account/<account-address>?network=testnet` or use the CLI
+    You can check on the explorer `https://explorer.aptoslabs.com/account/<account-address>?network=testnet` or use the CLI
 
     ```bash
     aptos account list --profile testnet-operator
@@ -250,7 +250,7 @@ Once your validator node joined the validator set, you can verify the correctnes
 
     You should expect to see this number keep increasing.
     
-5. Finally, the most straight forward way to see if your node is functioning properly is to check if it's making staking reward. You can check it on the explorer, `https://explorer.devnet.aptos.dev/account/<owner-account-address>?network=testnet`
+5. Finally, the most straight forward way to see if your node is functioning properly is to check if it's making staking reward. You can check it on the explorer, `https://explorer.aptoslabs.com/account/<owner-account-address>?network=testnet`
 
     ```
     0x1::stake::StakePool
