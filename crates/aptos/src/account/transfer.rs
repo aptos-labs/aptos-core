@@ -14,15 +14,15 @@ use clap::Parser;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-/// Command to transfer coins between accounts
+/// Command to transfer APT coins between accounts
 ///
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
-    /// Address of account you want to send coins to
+    /// Address of account you want to send APT coins to
     #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
-    /// Amount of coins to transfer
+    /// Amount of Octas (10^-8 APT) to transfer
     #[clap(long)]
     pub(crate) amount: u64,
 

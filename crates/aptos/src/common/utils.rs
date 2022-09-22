@@ -315,13 +315,13 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
 /// Fund account (and possibly create it) from a faucet
 pub async fn fund_account(
     faucet_url: Url,
-    num_coins: u64,
+    num_octas: u64,
     address: AccountAddress,
 ) -> CliTypedResult<Vec<HashValue>> {
     let response = reqwest::Client::new()
         .post(format!(
             "{}mint?amount={}&auth_key={}",
-            faucet_url, num_coins, address
+            faucet_url, num_octas, address
         ))
         .send()
         .await
