@@ -242,15 +242,17 @@ impl QuorumStore {
                         .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
                         .await
                         .expect("Failed to send to BatchStore");
+
+                    batch_store_shutdown_rx
+                        .await
+                        .expect("Failed to stop BatchStore");
+
                     let (proof_builder_shutdown_tx, proof_builder_shutdown_rx) = oneshot::channel();
                     self.proof_builder_tx
                         .send(ProofBuilderCommand::Shutdown(proof_builder_shutdown_tx))
                         .await
                         .expect("Failed to send to ProofBuilder");
 
-                    batch_store_shutdown_rx
-                        .await
-                        .expect("Failed to stop BatchStore");
                     proof_builder_shutdown_rx
                         .await
                         .expect("Failed to stop ProofBuilder");
