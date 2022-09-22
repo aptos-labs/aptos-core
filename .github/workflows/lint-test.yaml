@@ -5,13 +5,8 @@ on:
     branches:
       - main
       - devnet
-      - testnet
-      - auto
-      - canary
 
 env:
-  HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
-  HAS_DATADOG_SECRETS: ${{ secrets.DD_API_KEY != '' }}
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
 
@@ -22,107 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  scripts-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
-      - run: shellcheck scripts/dev_setup.sh
-
-  terraform-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Run terraform fmt, validate, and tflint
-        run: ./scripts/lint_terraform.sh
-
-  ecosystem-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: .node-version
-      # install packages for examples
-      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install
-      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install
-      # Run package build+lint + tests
-      - run: cd ./ecosystem/typescript/sdk && yarn install
-      - run: cd ./ecosystem/typescript/sdk && yarn lint
-      - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
-
-  community-platform-lint:
-    runs-on: ubuntu-latest
-    env:
-      RAILS_ENV: test
-      NODE_ENV: test
-    defaults:
-      run:
-        working-directory: ecosystem/platform/server
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ruby/setup-ruby@v1
-        with:
-          working-directory: ecosystem/platform/server
-          bundler-cache: true
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: .node-version
-      - run: yarn install --frozen-lockfile
-      - run: yarn run prettier --check .
-      - run: yarn run tsc
-      - run: bundle exec bundler-audit --update
-      - run: bundle exec brakeman -q -w2
-      - run: bundle exec rubocop
-      - run: bundle exec erblint --lint-all
-
-  community-platform-test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:11-alpine
-        ports:
-          - "5432:5432"
-        env:
-          POSTGRES_USER: complat
-          POSTGRES_PASSWORD: password
-    env:
-      RAILS_ENV: test
-      NODE_ENV: test
-      CI: true
-      COMMUNITY_DB_USER: complat
-      COMMUNITY_DB_PASS: password
-      COMMUNITY_DB_HOST: localhost
-      COMMUNITY_DB_PORT: 5432
-    defaults:
-      run:
-        working-directory: ecosystem/platform/server
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ruby/setup-ruby@v1
-        with:
-          working-directory: ecosystem/platform/server
-          bundler-cache: true
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: .node-version
-      - run: bin/setup
-      - run: yarn build
-      - run: yarn build:css
-      - run: bin/rails test
-
-  docs-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: .node-version
-      - run: yarn lint
-        working-directory: developer-docs-site
-
   rust-lint:
-    runs-on: high-perf-docker
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/rust-setup
@@ -131,7 +27,7 @@ jobs:
       - run: scripts/rust_lint.sh --check
 
   rust-doc-test:
-    runs-on: high-perf-docker
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -140,7 +36,7 @@ jobs:
       - run: cargo test --doc --workspace --exclude aptos-node-checker
 
   rust-unit-test:
-    runs-on: high-perf-docker
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -155,7 +51,7 @@ jobs:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
   rust-smoke-test:
-    runs-on: high-perf-docker
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/rust-setup
@@ -179,9 +75,3 @@ jobs:
             /tmp/.tmp*
             !/tmp/.tmp*/**/db/
           retention-days: 1
-
-  python-unit-test:
-    uses: ./.github/workflows/python-unit-test.yaml
-
-  helm-lint:
-    uses: ./.github/workflows/helm-lint.yaml

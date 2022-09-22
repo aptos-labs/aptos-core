@@ -13,6 +13,7 @@ Ok(
             status: Discard(
                 UNEXPECTED_VERIFIER_ERROR,
             ),
+            call_traces: [],
         },
     ],
 )

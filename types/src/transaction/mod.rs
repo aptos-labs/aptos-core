@@ -48,6 +48,7 @@ pub use script::{
 };
 
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
+use move_deps::move_core_types::trace::CallTrace;
 use move_deps::move_core_types::vm_status::AbortLocation;
 use once_cell::sync::OnceCell;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
@@ -875,6 +876,9 @@ pub struct TransactionOutput {
 
     /// The execution status.
     status: TransactionStatus,
+
+    /// Call traces generated during the transaction execution
+    call_traces: Vec<CallTrace>,
 }
 
 impl TransactionOutput {
@@ -883,12 +887,14 @@ impl TransactionOutput {
         events: Vec<ContractEvent>,
         gas_used: u64,
         status: TransactionStatus,
+        call_traces: Vec<CallTrace>,
     ) -> Self {
         TransactionOutput {
             write_set,
             events,
             gas_used,
             status,
+            call_traces,
         }
     }
 
@@ -912,14 +918,28 @@ impl TransactionOutput {
         &self.status
     }
 
-    pub fn unpack(self) -> (WriteSet, Vec<ContractEvent>, u64, TransactionStatus) {
+    pub fn call_traces(&self) -> &[CallTrace] {
+        self.call_traces.as_slice()
+    }
+
+    pub fn unpack(
+        self,
+    ) -> (
+        WriteSet,
+        Vec<ContractEvent>,
+        u64,
+        TransactionStatus,
+        Vec<CallTrace>,
+    ) {
         let Self {
             write_set,
             events,
             gas_used,
             status,
+            call_traces,
         } = self;
-        (write_set, events, gas_used, status)
+
+        (write_set, events, gas_used, status, call_traces)
     }
 }
 
@@ -1079,6 +1099,9 @@ pub struct TransactionToCommit {
     write_set: WriteSet,
     events: Vec<ContractEvent>,
     is_reconfig: bool,
+
+    /// Call traces generated during the transaction execution
+    call_traces: Vec<CallTrace>,
 }
 
 impl TransactionToCommit {
@@ -1089,6 +1112,7 @@ impl TransactionToCommit {
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
+        call_traces: Vec<CallTrace>,
     ) -> Self {
         TransactionToCommit {
             transaction,
@@ -1097,6 +1121,7 @@ impl TransactionToCommit {
             write_set,
             events,
             is_reconfig,
+            call_traces,
         }
     }
 
@@ -1139,6 +1164,10 @@ impl TransactionToCommit {
 
     pub fn is_reconfig(&self) -> bool {
         self.is_reconfig
+    }
+
+    pub fn call_traces(&self) -> &[CallTrace] {
+        self.call_traces.as_slice()
     }
 }
 

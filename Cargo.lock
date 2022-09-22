@@ -3665,6 +3665,7 @@ dependencies = [
  "aptos-types",
  "bcs",
  "itertools",
+ "move-deps",
  "once_cell",
  "scratchpad",
  "serde 1.0.144",

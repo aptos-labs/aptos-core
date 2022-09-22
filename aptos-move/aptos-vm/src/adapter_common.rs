@@ -161,8 +161,13 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
     for (idx, txn) in signature_verified_block.into_iter().enumerate() {
         let log_context = AdapterLogSchema::new(data_cache.id(), idx);
         if should_restart {
-            let txn_output =
-                TransactionOutput::new(WriteSet::default(), vec![], 0, TransactionStatus::Retry);
+            let txn_output = TransactionOutput::new(
+                WriteSet::default(),
+                vec![],
+                0,
+                TransactionStatus::Retry,
+                vec![],
+            );
             result.push((VMStatus::Error(StatusCode::UNKNOWN_STATUS), txn_output));
             debug!(log_context, "Retry after reconfiguration");
             continue;
@@ -255,5 +260,6 @@ pub(crate) fn discard_error_output(err: StatusCode) -> TransactionOutputExt {
         vec![],
         0,
         TransactionStatus::Discard(err),
+        vec![],
     ))
 }

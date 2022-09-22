@@ -75,6 +75,7 @@ impl VMExecutor for MockVM {
                 )],
                 0,
                 KEEP_STATUS.clone(),
+                vec![],
             );
             return Ok(vec![output]);
         }
@@ -91,6 +92,7 @@ impl VMExecutor for MockVM {
                     vec![],
                     0,
                     KEEP_STATUS.clone(),
+                    vec![],
                 ));
                 continue;
             }
@@ -116,6 +118,7 @@ impl VMExecutor for MockVM {
                     )],
                     0,
                     KEEP_STATUS.clone(),
+                    vec![],
                 ));
                 continue;
             }
@@ -137,6 +140,7 @@ impl VMExecutor for MockVM {
                         events,
                         0,
                         KEEP_STATUS.clone(),
+                        vec![],
                     ));
                 }
                 MockVMTransaction::Payment {
@@ -152,6 +156,7 @@ impl VMExecutor for MockVM {
                             vec![],
                             0,
                             DISCARD_STATUS.clone(),
+                            vec![],
                         ));
                         continue;
                     }
@@ -178,6 +183,7 @@ impl VMExecutor for MockVM {
                         events,
                         0,
                         TransactionStatus::Keep(ExecutionStatus::Success),
+                        vec![],
                     ));
                 }
             }

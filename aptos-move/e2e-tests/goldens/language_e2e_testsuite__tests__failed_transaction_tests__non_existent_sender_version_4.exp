@@ -13,6 +13,7 @@ Ok(
             status: Discard(
                 SENDING_ACCOUNT_DOES_NOT_EXIST,
             ),
+            call_traces: [],
         },
     ],
 )

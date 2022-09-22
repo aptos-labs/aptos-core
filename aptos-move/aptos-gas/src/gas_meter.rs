@@ -157,7 +157,7 @@ impl AptosGasMeter {
         let balance = balance.into().to_unit_with_params(&gas_params.txn);
 
         Self {
-            initial_balance: balance.clone(),
+            initial_balance: balance,
             gas_params,
             balance,
         }

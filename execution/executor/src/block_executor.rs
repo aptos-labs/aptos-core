@@ -294,6 +294,9 @@ where
             sync_commit,
             result_in_memory_state,
         )?;
+
+        // TODO: call rules engine here
+
         self.block_tree
             .prune(ledger_info_with_sigs.ledger_info())
             .expect("Failure pruning block tree.");

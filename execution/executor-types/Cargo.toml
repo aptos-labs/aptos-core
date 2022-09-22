@@ -25,6 +25,8 @@ aptos-types = { path = "../../types" }
 scratchpad = { path = "../../storage/scratchpad" }
 storage-interface = { path = "../../storage/storage-interface" }
 
+move-deps = { path = "../../aptos-move/move-deps" }
+
 [features]
 default = []
 fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]

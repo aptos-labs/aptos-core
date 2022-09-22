@@ -75,6 +75,7 @@ impl PTransactionOutput for AptosTransactionOutput {
             vec![],
             0,
             TransactionStatus::Retry,
+            vec![],
         )))
     }
 }

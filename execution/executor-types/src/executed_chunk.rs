@@ -54,6 +54,7 @@ impl ExecutedChunk {
                     txn_data.write_set().clone(),
                     txn_data.events().to_vec(),
                     txn_data.is_reconfig(),
+                    txn_data.call_traces(),
                 ))
             })
             .collect()

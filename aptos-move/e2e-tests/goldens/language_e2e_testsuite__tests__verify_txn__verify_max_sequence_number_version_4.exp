@@ -13,6 +13,7 @@ Ok(
             status: Discard(
                 SEQUENCE_NUMBER_TOO_BIG,
             ),
+            call_traces: [],
         },
     ],
 )

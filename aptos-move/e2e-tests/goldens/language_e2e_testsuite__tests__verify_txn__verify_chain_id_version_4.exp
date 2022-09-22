@@ -13,6 +13,7 @@ Ok(
             status: Discard(
                 BAD_CHAIN_ID,
             ),
+            call_traces: [],
         },
     ],
 )

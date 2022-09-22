@@ -489,6 +489,7 @@ fn test_transaction_and_output_list_with_proof() {
         vec![event],
         0,
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+        vec![],
     );
 
     // Create transaction output list with proof

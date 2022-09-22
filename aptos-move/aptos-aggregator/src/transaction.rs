@@ -224,14 +224,20 @@ impl TransactionOutputExt {
         output: TransactionOutput,
         delta_writes: WriteSetMut,
     ) -> TransactionOutput {
-        let (write_set, events, gas_used, status) = output.unpack();
+        let (write_set, events, gas_used, status, call_traces) = output.unpack();
         // We expect to have only a few delta changes, so add them to
         // the write set of the transaction.
         let write_set_mut = write_set.into_mut();
         // TODO: Is it okay to panic here?
         let write_set_mut = write_set_mut.squash(delta_writes).unwrap();
 
-        TransactionOutput::new(write_set_mut.freeze().unwrap(), events, gas_used, status)
+        TransactionOutput::new(
+            write_set_mut.freeze().unwrap(),
+            events,
+            gas_used,
+            status,
+            call_traces,
+        )
     }
 }
 

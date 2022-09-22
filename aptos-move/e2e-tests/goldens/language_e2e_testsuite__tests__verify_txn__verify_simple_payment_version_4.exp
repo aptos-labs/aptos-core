@@ -13,6 +13,7 @@ Ok(
             status: Discard(
                 INVALID_AUTH_KEY,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -31,6 +32,7 @@ Ok(
             status: Discard(
                 SEQUENCE_NUMBER_TOO_OLD,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -49,6 +51,7 @@ Ok(
             status: Discard(
                 SEQUENCE_NUMBER_TOO_NEW,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -67,6 +70,7 @@ Ok(
             status: Discard(
                 INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -85,6 +89,7 @@ Ok(
             status: Discard(
                 SENDING_ACCOUNT_DOES_NOT_EXIST,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -103,6 +108,7 @@ Ok(
             status: Discard(
                 GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -121,6 +127,7 @@ Ok(
             status: Discard(
                 MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -139,6 +146,7 @@ Ok(
             status: Discard(
                 MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -157,6 +165,7 @@ Ok(
             status: Discard(
                 EXCEEDED_MAX_TRANSACTION_SIZE,
             ),
+            call_traces: [],
         },
     ],
 )
@@ -225,6 +234,7 @@ Ok(
                     ),
                 ),
             ),
+            call_traces: [],
         },
     ],
 )

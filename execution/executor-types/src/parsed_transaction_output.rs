@@ -7,6 +7,7 @@ use aptos_types::{
     transaction::{TransactionOutput, TransactionStatus},
     write_set::WriteSet,
 };
+use move_deps::move_core_types::trace::CallTrace;
 use std::ops::Deref;
 
 pub struct ParsedTransactionOutput {
@@ -50,13 +51,22 @@ impl ParsedTransactionOutput {
         Vec<ContractEvent>,
         u64,
         TransactionStatus,
+        Vec<CallTrace>,
     ) {
         let Self {
             output,
             reconfig_events,
         } = self;
-        let (write_set, events, gas_used, status) = output.unpack();
 
-        (write_set, events, reconfig_events, gas_used, status)
+        let (write_set, events, gas_used, status, call_traces) = output.unpack();
+
+        (
+            write_set,
+            events,
+            reconfig_events,
+            gas_used,
+            status,
+            call_traces,
+        )
     }
 }

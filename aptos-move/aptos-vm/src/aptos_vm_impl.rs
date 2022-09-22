@@ -28,6 +28,7 @@ use aptos_types::{
 use dashmap::DashMap;
 use fail::fail_point;
 use framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
+use move_deps::move_core_types::trace::CallTrace;
 use move_deps::{
     move_binary_format::{errors::VMResult, CompiledModule},
     move_core_types::{
@@ -532,6 +533,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     gas_left: Gas,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
+    call_traces: Vec<CallTrace>,
 ) -> Result<TransactionOutputExt, VMStatus> {
     let gas_used = txn_data
         .max_gas_amount()
@@ -548,6 +550,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
         events,
         gas_used.into(),
         TransactionStatus::Keep(status),
+        call_traces,
     );
 
     Ok(TransactionOutputExt::new(delta_change_set, txn_output))

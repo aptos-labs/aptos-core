@@ -12,6 +12,8 @@ use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
+use move_deps::move_core_types::trace::CallTrace;
+
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -331,6 +333,9 @@ pub struct TransactionData {
 
     /// TransactionInfo.hash()
     txn_info_hash: HashValue,
+
+    /// Call traces generated during the transaction execution
+    call_traces: Vec<CallTrace>,
 }
 
 impl TransactionData {
@@ -344,6 +349,7 @@ impl TransactionData {
         gas_used: u64,
         txn_info: TransactionInfo,
         txn_info_hash: HashValue,
+        call_traces: Vec<CallTrace>,
     ) -> Self {
         TransactionData {
             state_updates,
@@ -355,6 +361,7 @@ impl TransactionData {
             gas_used,
             txn_info,
             txn_info_hash,
+            call_traces,
         }
     }
 
@@ -388,5 +395,9 @@ impl TransactionData {
 
     pub fn is_reconfig(&self) -> bool {
         !self.reconfig_events.is_empty()
+    }
+
+    pub fn call_traces(&self) -> Vec<CallTrace> {
+        self.call_traces.clone()
     }
 }

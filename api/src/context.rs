@@ -447,7 +447,7 @@ impl Context {
             .enumerate()
             .map(|(i, ((txn, txn_output), info))| {
                 let version = start_version + i as u64;
-                let (write_set, events, _, _) = txn_output.unpack();
+                let (write_set, events, _, _, _) = txn_output.unpack();
                 self.get_accumulator_root_hash(version)
                     .map(|h| (version, txn, info, events, h, write_set).into())
             })

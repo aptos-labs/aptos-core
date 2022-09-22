@@ -48,6 +48,8 @@ use fail::fail_point;
 use framework::natives::code::PublishRequest;
 use move_deps::move_binary_format::errors::VMError;
 use move_deps::move_core_types::language_storage::ModuleId;
+use move_deps::move_core_types::trace::CallTrace;
+use move_deps::move_vm_runtime::session::SerializedReturnValues;
 use move_deps::{
     move_binary_format::{
         access::ModuleAccess,
@@ -220,9 +222,15 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
-                let txn_output =
-                    get_transaction_output(&mut (), session, gas_meter.balance(), txn_data, status)
-                        .unwrap_or_else(|e| discard_error_vm_status(e).1);
+                let txn_output = get_transaction_output(
+                    &mut (),
+                    session,
+                    gas_meter.balance(),
+                    txn_data,
+                    status,
+                    vec![],
+                )
+                .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
             }
             TransactionStatus::Discard(status) => {
@@ -239,6 +247,7 @@ impl AptosVM {
         gas_meter: &mut AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
+        call_traces: Vec<CallTrace>,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         let storage_with_changes =
             DeltaStateView::new(storage, user_txn_change_set_ext.write_set());
@@ -289,6 +298,7 @@ impl AptosVM {
             events,
             gas_used.into(),
             TransactionStatus::Keep(ExecutionStatus::Success),
+            call_traces,
         );
 
         Ok((
@@ -318,7 +328,7 @@ impl AptosVM {
                 .charge_intrinsic_gas_for_transaction(txn_data.transaction_size())
                 .map_err(|e| e.into_vm_status())?;
 
-            match payload {
+            let SerializedReturnValues { call_traces, .. } = match payload {
                 TransactionPayload::Script(script) => {
                     let mut senders = vec![txn_data.sender()];
                     senders.extend(txn_data.secondary_signers());
@@ -382,6 +392,7 @@ impl AptosVM {
                 gas_meter,
                 txn_data,
                 log_context,
+                call_traces,
             )
         }
     }
@@ -516,7 +527,14 @@ impl AptosVM {
         gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
         // TODO(Gas): Charge for aggregator writes
 
-        self.success_transaction_cleanup(storage, change_set_ext, gas_meter, txn_data, log_context)
+        self.success_transaction_cleanup(
+            storage,
+            change_set_ext,
+            gas_meter,
+            txn_data,
+            log_context,
+            vec![],
+        )
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
@@ -800,7 +818,8 @@ impl AptosVM {
         self.read_writeset(storage, &write_set)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let txn_output = TransactionOutput::new(write_set, events, 0, VMStatus::Executed.into());
+        let txn_output =
+            TransactionOutput::new(write_set, events, 0, VMStatus::Executed.into(), vec![]);
         Ok((
             VMStatus::Executed,
             TransactionOutputExt::new(delta_change_set, txn_output),
@@ -850,6 +869,7 @@ impl AptosVM {
             0.into(),
             &txn_data,
             ExecutionStatus::Success,
+            vec![],
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -1062,6 +1082,7 @@ impl VMAdapter for AptosVM {
                     Vec::new(),
                     0,
                     TransactionStatus::Keep(ExecutionStatus::Success),
+                    vec![],
                 );
                 (
                     VMStatus::Executed,

@@ -801,6 +801,7 @@ impl TransactionToCommitGen {
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
             false, /* event_gen never generates reconfig events */
+            vec![],
         )
     }
 
@@ -1116,6 +1117,7 @@ impl BlockGen {
             WriteSet::default(),
             Vec::new(),
             false,
+            vec![],
         ));
 
         // materialize ledger info
