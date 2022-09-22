@@ -11,7 +11,6 @@ import { bigIntMin } from 'core/utils/bigint';
 import { formatCoin, OCTA_NUMBER } from 'core/utils/coin';
 import { useCallback, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { parseMoveAbortDetails } from 'shared/move';
 import { useActiveAccount } from './useAccounts';
 import useDebounce from './useDebounce';
 
@@ -80,19 +79,16 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
     refetchInterval: 5000,
   });
 
-  const estimatedGasFeeOcta = debouncedNumberAmountOcta === 0n
-    ? 0
-    : (simulationResult
-      && Number(simulationResult.gas_used) * Number(simulationResult.gas_unit_price));
+  const estimatedGasFeeOcta = (debouncedNumberAmountOcta > 0n && simulationResult !== undefined)
+    ? simulationResult.gasFee * simulationResult.gasUnitPrice
+    : undefined;
 
   const estimatedGasFeeApt = useMemo(
     () => formatCoin(estimatedGasFeeOcta, { decimals: 8 }),
     [estimatedGasFeeOcta],
   );
 
-  const simulationAbortDetails = simulationResult !== undefined
-    ? parseMoveAbortDetails(simulationResult.vm_status)
-    : undefined;
+  const simulationAbortDetails = simulationResult?.error;
 
   const shouldBalanceShake = isBalanceEnoughBeforeFee === false
   || simulationError !== null

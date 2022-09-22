@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Types } from 'aptos';
 import { UseMutationOptions, useQueryClient, UseQueryOptions } from 'react-query';
 import {
   useTransactionSimulation,
@@ -9,19 +8,18 @@ import {
   useTransactionSubmit, UseTransactionSubmitOptions,
 } from 'core/hooks/useTransactions';
 import queryKeys from 'core/queries/queryKeys';
-import { buildAccountTransferPayload, buildCoinTransferPayload } from 'shared/transactions';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { coinEvents } from 'core/utils/analytics/events';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { useAnalytics } from 'core/hooks/useAnalytics';
+import { buildAccountTransferPayload, buildCoinTransferPayload } from 'shared/transactions';
+import { CoinTransferTransaction, Transaction } from 'shared/types';
 
 export interface UseCoinTransferParams {
   doesRecipientExist: boolean | undefined,
   octaAmount: bigint | undefined,
   recipient: string | undefined,
 }
-
-type UserTransaction = Types.UserTransaction;
 
 /**
  * Query a coin transfer simulation for the specified recipient and amount
@@ -32,7 +30,7 @@ export function useCoinTransferSimulation(
     octaAmount,
     recipient,
   }: UseCoinTransferParams,
-  options?: UseQueryOptions<UserTransaction, Error> & UseTransactionSimulationOptions,
+  options?: UseQueryOptions<Transaction, Error> & UseTransactionSimulationOptions,
 ) {
   const isReady = recipient !== undefined
     && octaAmount !== undefined
@@ -60,7 +58,7 @@ export interface SubmitCoinTransferParams {
  * Mutation for submitting a coin transfer transaction
  */
 export function useCoinTransferTransaction(
-  options?: UseMutationOptions<UserTransaction, Error, SubmitCoinTransferParams>
+  options?: UseMutationOptions<Transaction, Error, SubmitCoinTransferParams>
   & UseTransactionSubmitOptions,
 ) {
   const queryClient = useQueryClient();
@@ -90,29 +88,25 @@ export function useCoinTransferTransaction(
           ]),
         ]);
       },
-      async onSettled(txn, error, data, ...rest) {
-        // TODO: re-enable when fixing analytics
-        const { amount } = data;
+      async onSettled(txn, error, ...rest) {
+        const coinTransfer = txn as CoinTransferTransaction | undefined;
 
         const eventType = txn?.success
           ? coinEvents.TRANSFER_APTOS_COIN
           : coinEvents.ERROR_TRANSFER_APTOS_COIN;
 
-        const payload = (txn) ? txn.payload as Types.EntryFunctionPayload : undefined;
-        const coinType = (payload) ? payload.type_arguments[0] : undefined;
-
         const params = {
-          amount,
-          coinType,
-          fromAddress: txn?.sender,
+          amount: coinTransfer?.amount,
+          coinType: coinTransfer?.coinType,
+          fromAddress: coinTransfer?.sender,
           network: activeNetwork.nodeUrl,
           txnHash: txn?.hash,
         };
 
         trackEvent({ eventType, params });
 
-        if (options?.onSuccess && txn) {
-          options.onSuccess(txn, data, ...rest);
+        if (options?.onSettled && txn) {
+          options.onSettled(txn, error, ...rest);
         }
       },
     },

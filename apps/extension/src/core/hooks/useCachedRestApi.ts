@@ -3,9 +3,11 @@
 
 import { Types } from 'aptos';
 import { openDB, DBSchema } from 'idb';
-import { useNetworks } from 'core/hooks/useNetworks';
-import { EventWithVersion, Event } from 'core/types/event';
 import { useRef } from 'react';
+import { useNetworks } from 'core/hooks/useNetworks';
+import { useFetchAccountResource } from 'core/queries/useAccountResources';
+import { EventWithVersion, Event } from 'shared/types/event';
+import { CoinInfoData, CoinInfoResource } from 'shared/types/resource';
 
 function parseRawEvent(event: EventWithVersion) {
   return {
@@ -21,6 +23,10 @@ function parseRawEvent(event: EventWithVersion) {
 }
 
 interface RestCacheDbSchema extends DBSchema {
+  coins: {
+    key: string,
+    value: CoinInfoData,
+  },
   events: {
     indexes: { byEventKey: [string, number, number] },
     key: string,
@@ -46,6 +52,7 @@ interface MetaDbSchema extends DBSchema {
 
 export default function useCachedRestApi() {
   const { activeNetwork, aptosClient } = useNetworks();
+  const fetchAccountResource = useFetchAccountResource();
 
   const restCacheDbMeta = useRef<RestCacheDbMeta>();
 
@@ -75,6 +82,7 @@ export default function useCachedRestApi() {
           'guid.creationNumber',
           'sequenceNumber',
         ]);
+        conn.createObjectStore('coins');
       },
     });
 
@@ -92,6 +100,36 @@ export default function useCachedRestApi() {
     }
 
     return connection;
+  };
+
+  /**
+   * Get info for the specified coin type.
+   * If not available in cache, the value is fetched using the active AptosClient
+   * and added to the cache.
+   * @param coinType
+   */
+  const getCoinInfo = async (coinType: string) => {
+    const coinAddress = coinType.split('::')[0];
+    const conn = await getConnection();
+
+    const cachedCoinInfo = await conn.get('coins', coinType) as CoinInfoData;
+    if (cachedCoinInfo !== undefined) {
+      return cachedCoinInfo;
+    }
+
+    const coinInfoResourceType = `0x1::coin::CoinInfo<${coinType}>`;
+    const coinInfoResource = await fetchAccountResource(
+      coinAddress,
+      coinInfoResourceType,
+    ) as CoinInfoResource | undefined;
+    if (coinInfoResource === undefined) {
+      return undefined;
+    }
+
+    const coinInfo = coinInfoResource.data;
+    delete coinInfo.supply;
+    await conn.put('coins', coinInfo, coinType);
+    return coinInfo as CoinInfoData;
   };
 
   /**
@@ -160,6 +198,7 @@ export default function useCachedRestApi() {
   };
 
   return {
+    getCoinInfo,
     getEvents,
     getTransaction,
   };

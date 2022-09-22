@@ -3,7 +3,7 @@
 
 import { useQuery, useQueryClient, UseQueryOptions } from 'react-query';
 import { useNetworks } from 'core/hooks/useNetworks';
-import { Resource } from 'core/types/resource';
+import { Resource } from 'shared/types/resource';
 
 export const getAccountResourcesQueryKey = 'getAccountResources';
 
@@ -14,17 +14,28 @@ const defaultQueryOptions = {
 /**
  * Function for manually fetching account resources.
  * Leverages react-query caching mechanisms and shares data with `useAccountResources` query
- * @param address account address
  */
-export function useFetchAccountResources(address: string) {
+export function useFetchAccountResources() {
   const { aptosClient } = useNetworks();
   const queryClient = useQueryClient();
 
-  return () => queryClient.fetchQuery<Resource[]>(
+  return (address: string) => queryClient.fetchQuery<Resource[]>(
     [getAccountResourcesQueryKey, address],
     async () => aptosClient.getAccountResources(address) as Promise<Resource[]>,
     defaultQueryOptions,
   );
+}
+
+/**
+ * Function for manually fetching an account specific resource.
+ * Leverages react-query caching mechanisms and shares data with other resource queries
+ */
+export function useFetchAccountResource() {
+  const fetchResources = useFetchAccountResources();
+  return async (address: string, type: string) => {
+    const resources = await fetchResources(address);
+    return resources.find((res) => res.type === type);
+  };
 }
 
 /**

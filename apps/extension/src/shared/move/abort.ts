@@ -125,6 +125,14 @@ function parseMoveAbortRawDetails(vmStatus: string) {
   return undefined;
 }
 
+export interface MoveAbortDetails {
+  category: MoveAbortCategory,
+  code: number,
+  location: string,
+  reason: MoveAbortReason,
+  reasonDescr?: string,
+}
+
 /**
  * Parse abort details from the VM status of a transaction
  * @param vmStatus status of a transaction
@@ -138,10 +146,10 @@ export function parseMoveAbortDetails(vmStatus: string) {
   const { code, location } = details;
   const category = (code & 0xff0000) >> 16 as MoveAbortCategory;
   const reason = (code & 0xffff) as MoveAbortReason;
-  let { reasonDescr } = details;
+  let { reasonDescr: description } = details;
 
   // Retrieve user-friendly abort description if available
-  if (reasonDescr === undefined && location !== undefined) {
+  if (description === undefined && location !== undefined) {
     const categoryTxt = MoveAbortCategory[category];
     const moduleReasons = moduleReasonsMap[location];
     const reasonTxt = moduleReasons !== undefined
@@ -149,22 +157,22 @@ export function parseMoveAbortDetails(vmStatus: string) {
       : undefined;
 
     if (categoryTxt !== undefined && reasonTxt !== undefined) {
-      reasonDescr = `${categoryTxt}: ${reasonTxt}`;
+      description = `${categoryTxt}: ${reasonTxt}`;
     }
   }
 
   // Show details as fallback
-  if (reasonDescr === undefined) {
+  if (description === undefined) {
     const codeHex = code.toString(16);
     const locationSuffix = location ? ` in ${location}` : undefined;
-    reasonDescr = `Move abort 0x${codeHex}${locationSuffix}`;
+    description = `Move abort 0x${codeHex}${locationSuffix}`;
   }
 
   return {
     category,
     code,
+    description,
     location,
     reason,
-    reasonDescr,
-  };
+  } as MoveAbortDetails;
 }

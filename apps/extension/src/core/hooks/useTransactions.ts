@@ -5,22 +5,22 @@ import { Types, TxnBuilderTypes } from 'aptos';
 import axios from 'axios';
 import { useCallback } from 'react';
 import {
+  QueryKey, useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions,
+} from 'react-query';
+
+import { useActiveAccount } from 'core/hooks/useAccounts';
+import { useNetworks } from 'core/hooks/useNetworks';
+import { MoveVmError, MoveStatusCode } from 'shared/move';
+import {
   buildRawTransactionFromBCSPayload,
   buildRawTransactionFromJsonPayload, maxGasFeeFromEstimated,
   simulateTransaction as simulateTransactionInternal,
   submitTransaction as submitTransactionInternal,
   TransactionOptions,
 } from 'shared/transactions';
+import { Transaction } from 'shared/types';
+import useParseTransaction from 'core/hooks/useParseTransaction';
 
-import {
-  QueryKey, useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions,
-} from 'react-query';
-
-import { useNetworks } from 'core/hooks/useNetworks';
-import { MoveVmError, MoveStatusCode } from 'shared/move';
-import { useActiveAccount } from 'core/hooks/useAccounts';
-
-type UserTransaction = Types.UserTransaction;
 type RawTransaction = TxnBuilderTypes.RawTransaction;
 type TransactionPayload = TxnBuilderTypes.TransactionPayload | Types.EntryFunctionPayload;
 
@@ -156,13 +156,14 @@ export interface UseTransactionSimulationOptions {
 export function useTransactionSimulation(
   key: QueryKey,
   payloadOrFactory: PayloadOrFactory,
-  options?: UseQueryOptions<UserTransaction, Error> & UseTransactionSimulationOptions,
+  options?: UseQueryOptions<Transaction, Error> & UseTransactionSimulationOptions,
 ) {
   const { invalidate: invalidateSeqNumber } = useSequenceNumber();
   const {
     buildRawTransaction,
     simulateTransaction,
   } = useTransactions();
+  const parseTransaction = useParseTransaction();
   const { getGasUnitPriceEstimate } = useGasUnitPrice();
 
   return useQuery(
@@ -180,7 +181,8 @@ export function useTransactionSimulation(
       }
       const rawTxn = await buildRawTransaction(payload, txnOptions);
       try {
-        return await simulateTransaction(rawTxn);
+        return await simulateTransaction(rawTxn)
+          .then((txn) => parseTransaction(txn));
       } catch (err) {
         if (isSequenceNumberTooOldError(err)) {
           await invalidateSeqNumber();
@@ -205,7 +207,7 @@ export interface UseTransactionSubmitOptions {
 
 export function useTransactionSubmit<TParams>(
   payloadFactory: PayloadFactory<TParams>,
-  options?: UseMutationOptions<UserTransaction, Error, TParams> & UseTransactionSubmitOptions,
+  options?: UseMutationOptions<Transaction, Error, TParams> & UseTransactionSubmitOptions,
 ) {
   const {
     increment: incrementSeqNumber,
@@ -216,6 +218,7 @@ export function useTransactionSubmit<TParams>(
     buildRawTransaction,
     submitTransaction,
   } = useTransactions();
+  const parseTransaction = useParseTransaction();
 
   return useMutation(
     async (params: TParams) => {
@@ -231,7 +234,8 @@ export function useTransactionSubmit<TParams>(
 
       const rawTxn = await buildRawTransaction(payload, txnOptions);
       try {
-        return await submitTransaction(rawTxn);
+        return await submitTransaction(rawTxn)
+          .then((txn) => parseTransaction(txn));
       } catch (err) {
         if (isSequenceNumberTooOldError(err)) {
           await invalidateSeqNumber();

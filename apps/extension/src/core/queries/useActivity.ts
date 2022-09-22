@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Types } from 'aptos';
 import {
   UseInfiniteQueryOptions,
   useInfiniteQuery,
@@ -10,8 +9,8 @@ import {
 import { aptosCoinStoreStructTag } from 'core/constants';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import useCachedRestApi from 'core/hooks/useCachedRestApi';
-import { Event } from 'core/types/event';
-import { EventHandle } from 'core/types/resource';
+import useParseTransaction from 'core/hooks/useParseTransaction';
+import { Event, EventHandle, Transaction } from 'shared/types';
 import { useFetchAccountResources } from './useAccountResources';
 
 export const getActivityQueryKey = 'getActivity';
@@ -40,12 +39,12 @@ interface EventBuffer {
 
 interface ActivityBuffers {
   events: { [creationNum: number]: EventBuffer },
-  txns: Types.UserTransaction[],
+  txns: Transaction[],
 }
 
 interface ActivityQueryPage {
   buffers: ActivityBuffers,
-  txns: Types.UserTransaction[],
+  txns: Transaction[],
 }
 
 export interface UseActivityProps {
@@ -71,7 +70,8 @@ export default function useActivity(
 
   const { activeAccountAddress: address } = useActiveAccount();
   const { getEvents, getTransaction } = useCachedRestApi();
-  const fetchResources = useFetchAccountResources(address);
+  const parseTransaction = useParseTransaction();
+  const fetchResources = useFetchAccountResources();
 
   const loadMore = async (prevBuffers: ActivityBuffers) => {
     let newStartVersion = 0;
@@ -121,7 +121,8 @@ export default function useActivity(
     const newTransactions = await Promise.all(
       Array.from(mergedVersions)
         .sort((a, b) => b - a)
-        .map((version) => getTransaction(version)),
+        .map((version) => getTransaction(version)
+          .then((t) => parseTransaction(t))),
     );
 
     currBuffers.txns.push(...newTransactions);
@@ -147,7 +148,7 @@ export default function useActivity(
 
   const initializeBuffers = async () => {
     const initialBuffers: ActivityBuffers = { events: {}, txns: [] };
-    const resources = await fetchResources();
+    const resources = await fetchResources(address);
 
     managedEventsKeys.forEach(({ eventName, resourceType }) => {
       const resource = resources.find((res) => res.type === resourceType)?.data as any;

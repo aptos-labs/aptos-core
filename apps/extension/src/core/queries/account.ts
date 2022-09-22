@@ -15,6 +15,7 @@ import {
   coinStoreStructTag,
 } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
+import { CoinInfoData } from 'shared/types/resource';
 
 /**
  * QUERY KEYS
@@ -106,12 +107,6 @@ export const parseCoinInfoStructTag = (coinInfoStructTag: string) => {
     address,
     resource,
   };
-};
-
-type CoinInfoData = Record<string, any> & {
-  decimals: number;
-  name: string;
-  symbol: string;
 };
 
 interface GetCoinInfoParams {

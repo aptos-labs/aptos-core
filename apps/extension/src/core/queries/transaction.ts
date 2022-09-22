@@ -3,8 +3,11 @@
 
 import { AptosClient, Types } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
-import { useNetworks } from 'core/hooks/useNetworks';
 import { accountNamespace, coinNamespace } from 'core/constants';
+import { useNetworks } from 'core/hooks/useNetworks';
+import useCachedRestApi from 'core/hooks/useCachedRestApi';
+import useParseTransaction from 'core/hooks/useParseTransaction';
+import { Transaction } from 'shared/types';
 
 type EntryFunctionPayload = Types.EntryFunctionPayload;
 type UserTransaction = Types.UserTransaction;
@@ -97,13 +100,16 @@ export function useCoinTransferTransactions(
 
 export const useTransaction = (
   version: number | undefined,
-  options?: UseQueryOptions<UserTransaction>,
+  options?: UseQueryOptions<Transaction>,
 ) => {
   const { aptosClient } = useNetworks();
+  const { getTransaction } = useCachedRestApi();
+  const parseTransaction = useParseTransaction();
 
-  return useQuery<UserTransaction>(
+  return useQuery<Transaction>(
     [transactionQueryKeys.getTransaction, version],
-    async () => aptosClient.getTransactionByVersion(BigInt(version!)) as Promise<UserTransaction>,
+    async () => getTransaction(version!)
+      .then((txn) => parseTransaction(txn)),
     {
       ...options,
       enabled: Boolean(aptosClient && version) && options?.enabled,
