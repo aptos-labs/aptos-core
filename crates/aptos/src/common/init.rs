@@ -172,7 +172,7 @@ impl CliCommand<()> for InitTool {
         if let Some(faucet_url) = faucet_url {
             if client.get_account(address).await.is_err() {
                 eprintln!(
-                    "Account {} doesn't exist, creating it and funding it with {} coins",
+                    "Account {} doesn't exist, creating it and funding it with {} Octas",
                     address, NUM_DEFAULT_COINS
                 );
                 fund_account(faucet_url, NUM_DEFAULT_COINS, address).await?;

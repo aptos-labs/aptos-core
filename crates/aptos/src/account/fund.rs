@@ -59,7 +59,7 @@ impl CliCommand<String> for FundWithFaucet {
             client.wait_for_transaction_by_hash(hash, sys_time).await?;
         }
         return Ok(format!(
-            "Added {} coins to account {}",
+            "Added {} Octas to account {}",
             self.amount, self.account
         ));
     }
