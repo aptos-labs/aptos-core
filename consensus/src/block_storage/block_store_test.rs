@@ -466,8 +466,8 @@ async fn test_need_sync_for_ledger_info() {
         .ledger_info()
         .clone()
     };
-    let ordered_round_too_far =
-        block_store.ordered_root().round() + block_store.back_pressure_limit + 1;
+    // it's larger and the block doesn't exist in the tree
+    let ordered_round_too_far = block_store.ordered_root().round() + 1;
     let ordered_too_far = create_ledger_info(ordered_round_too_far);
     assert!(block_store.need_sync_for_ledger_info(&ordered_too_far));
 
