@@ -27,7 +27,7 @@ use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::transaction::{
-    authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
+    authenticator::AuthenticationKey, ExecutionStatus, SignedTransaction, TransactionPayload,
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -84,6 +84,8 @@ pub enum CliError {
     UnableToReadFile(String, String),
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
+    #[error("Simulation failed with status: {0:?}")]
+    SimulationError(ExecutionStatus),
 }
 
 impl CliError {
@@ -102,6 +104,7 @@ impl CliError {
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
+            CliError::SimulationError(_) => "SimulationError",
         }
     }
 }
@@ -1246,7 +1249,7 @@ impl TransactionOptions {
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
             if ask_to_confirm_price {
-                let message = format!("Do you want to execute a transaction for a maximum of {} coins at a gas unit price of {}?",  max_gas * gas_unit_price, gas_unit_price);
+                let message = format!("Do you want to submit transaction for a maximum of {} coins at a gas unit price of {}?",  max_gas * gas_unit_price, gas_unit_price);
                 prompt_yes_with_override(&message, self.prompt_options)?;
             }
             max_gas
@@ -1270,6 +1273,12 @@ impl TransactionOptions {
                 .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
                 .await?
                 .into_inner();
+
+            // Check if the transaction will pass, if it doesn't then fail
+            let status = simulated_txn.info.status();
+            if !status.is_success() {
+                return Err(CliError::SimulationError(status.clone()));
+            }
 
             // Take the gas used and use a headroom factor on it
             let adjusted_max_gas = adjust_gas_headroom(
