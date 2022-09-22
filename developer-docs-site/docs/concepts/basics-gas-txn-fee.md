@@ -96,7 +96,7 @@ In a transaction, for example, transaction A, you are transferring 1000 coins fr
 
 The gas used for a transaction can be estimated by simulating the transaction. When simulating the transaction, the simulation results represent the **exact** amount that is needed at the **exact** state of the blockchain at the time of simulation. These gas units used may change based on the state of the chain.  For this reason, any amount coming out of the simulation is only an estimate, and when setting the max gas amount, it should be increased above by an amount you’re comfortable with.
 
-## Simulating the transaction
+## Simulating the transaction to estimate the gas
 
 Transactions can be simulated with the [`SimulateTransaction`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction) API. This API will run the exact transaction that you plan to run.  
 
@@ -109,9 +109,9 @@ To simulate the transaction, there are two flags:
 1. `estimate_gas_unit_price`: This flag will estimate the gas unit price in the transaction using the same algorithm as the [`estimate_gas_price`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/estimate_gas_price) API.
 2. `estimate_max_gas_amount`: This flag will find the maximum possible gas you can use, and it will simulate the transaction to tell you the actual `gas_used`.
 
-## Using simulation to estimate the gas
+### Simulation steps
 
-The algorithm for finding the correct amount of gas for a transaction is as follows:
+The simulation steps for finding the correct amount of gas for a transaction are as follows:
 
 1. Estimate the gas via simulation with both `estimate_gas_unit_price` and `estimate_max_gas_amount` set to `true`.
 2. Use the `gas_unit_price` in the returned transaction as your new transaction’s `gas_unit_price`.
