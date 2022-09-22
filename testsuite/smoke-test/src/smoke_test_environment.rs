@@ -102,6 +102,7 @@ impl SwarmBuilder {
     }
 
     // Gas is not enabled with this setup, it's enabled via forge instance.
+    // Local swarm spin-up can fail due to port issues. So we retry SWARM_BUILD_NUM_RETRIES times.
     pub async fn build(&mut self) -> LocalSwarm {
         let num_retries = SWARM_BUILD_NUM_RETRIES;
         let mut attempt = 0;
