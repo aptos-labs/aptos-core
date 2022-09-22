@@ -8,6 +8,7 @@ use crate::types::{
 };
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::chain_id::ChainId;
+use aptos_types::transaction::{RawTransaction, SignedTransaction};
 use serde::{Deserialize, Serialize};
 
 /// Request for an account's currency balance either now, or historically
@@ -260,6 +261,16 @@ pub struct ConstructionParseResponse {
     /// The signers of the transaction, if it was a [`aptos_types::transaction::SignedTransaction`]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account_identifier_signers: Option<Vec<AccountIdentifier>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ConstructionParseMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ConstructionParseMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unsigned_transaction: Option<RawTransaction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signed_transaction: Option<SignedTransaction>,
 }
 
 /// Request to build payloads from the operations to sign
