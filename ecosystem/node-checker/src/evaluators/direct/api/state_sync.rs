@@ -90,7 +90,7 @@ impl StateSyncVersionEvaluator {
                         format!(
                             "NHC pulled ledger version from your node twice, \
                             saw that the version is increasing (it increased by {} over \
-                            {} seconds), and saw that it is within tolerance of the the \
+                            {} seconds), and saw that it is within tolerance of the \
                             baseline node. The baseline ledger version is {} and your node's \
                             ledger version is {}, which is within the allowed lag of {} versions.",
                             target_progress,

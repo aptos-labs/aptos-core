@@ -387,7 +387,7 @@ export class AptosClient {
   }
 
   /**
-   * Submits a signed transaction to the the endpoint that takes BCS payload
+   * Submits a signed transaction to the endpoint that takes BCS payload
    *
    * @param signedTxn A BCS transaction representation
    * @returns Transaction that is accepted and submitted to mempool

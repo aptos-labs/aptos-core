@@ -155,7 +155,7 @@ impl LocalSwarm {
             .build(rng)?;
 
         // Get the initial version to start the nodes with, either the one provided or fallback to
-        // using the the latest version
+        // using the latest version
         let initial_version_actual = initial_version.unwrap_or_else(|| {
             versions
                 .iter()

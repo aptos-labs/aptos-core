@@ -1110,7 +1110,7 @@ module aptos_framework::staking_contract {
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
 
         // End epoch to generate some rewards. Staker withdraws another 1/4 of the stake.
-        // Commission should be charged on the the rewards earned on the previous 1/4 stake withdrawal.
+        // Commission should be charged on the rewards earned on the previous 1/4 stake withdrawal.
         stake::end_epoch();
         let commission_on_withdrawn_stake = (with_rewards(withdrawn_stake) - withdrawn_stake) / 10;
         let commission_on_new_balance = (with_rewards(new_balance) - new_balance) / 10;

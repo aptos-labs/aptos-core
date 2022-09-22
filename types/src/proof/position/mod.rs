@@ -140,7 +140,7 @@ impl Position {
     /// This method takes in a node position and return its sibling position
     ///
     /// The observation is that, after stripping out the right-most common bits,
-    /// two sibling nodes flip the the next right-most bits with each other.
+    /// two sibling nodes flip the next right-most bits with each other.
     /// To find out the right-most common bits, first remove all the right-most ones
     /// because they are corresponding to level's indicator. Then remove next zero right after.
     pub fn sibling(self) -> Self {

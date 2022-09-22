@@ -54,7 +54,7 @@ fn get_build_profile_name() -> String {
 }
 
 /// This method returns the build information as visible during build-time.
-/// Note that it is recommended to use the the `build_information` macro since
+/// Note that it is recommended to use the `build_information` macro since
 /// this method does not return the build package version.
 pub fn get_build_information() -> BTreeMap<String, String> {
     shadow!(build);
