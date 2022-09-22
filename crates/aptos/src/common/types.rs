@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::init::Network;
 use crate::common::utils::prompt_yes_with_override;
 use crate::{
     common::{
@@ -181,6 +182,8 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
     /// Private key for commands.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub private_key: Option<Ed25519PrivateKey>,

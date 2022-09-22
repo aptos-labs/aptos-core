@@ -9,7 +9,7 @@ use crate::account::{
     list::{ListAccount, ListQuery},
     transfer::{TransferCoins, TransferSummary},
 };
-use crate::common::init::InitTool;
+use crate::common::init::{InitTool, Network};
 use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
     EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
@@ -473,6 +473,7 @@ impl CliTestFramework {
 
     pub async fn init(&self, private_key: &Ed25519PrivateKey) -> CliTypedResult<()> {
         InitTool {
+            network: Some(Network::Custom),
             rest_url: Some(self.endpoint.clone()),
             faucet_url: Some(self.faucet_endpoint.clone()),
             rng_args: RngArgs::from_seed([0; 32]),
