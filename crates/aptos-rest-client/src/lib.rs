@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+extern crate core;
+
 pub mod aptos;
 pub mod error;
 pub mod faucet;
@@ -23,8 +25,9 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::{
     deserialize_from_string,
     mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
-    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData,
-    TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
+    AptosError, BcsBlock, Block, Bytecode, ExplainVMStatus, GasEstimation, HexEncodedBytes,
+    MoveModuleId, TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult,
+    UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -33,13 +36,16 @@ use aptos_types::{
     contract_event::EventWithVersion,
     transaction::{ExecutionStatus, SignedTransaction},
 };
-use move_deps::move_core_types::language_storage::StructTag;
+use futures::executor::block_on;
+use move_deps::move_binary_format::CompiledModule;
+use move_deps::move_core_types::language_storage::{ModuleId, StructTag};
 use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::future::Future;
+use std::rc::Rc;
 use std::time::Duration;
 use tokio::time::Instant;
 use url::Url;
@@ -1257,4 +1263,16 @@ async fn parse_error(response: reqwest::Response) -> RestError {
 pub struct GasEstimationParams {
     pub estimated_gas_used: u64,
     pub estimated_gas_price: u64,
+}
+
+impl ExplainVMStatus for Client {
+    // TODO: Add some caching
+    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
+        let bytes =
+            block_on(self.get_account_module_bcs(*module_id.address(), module_id.name().as_str()))?
+                .into_inner();
+
+        let compiled_module = CompiledModule::deserialize(bytes.as_ref())?;
+        Ok(Rc::new(compiled_module) as Rc<dyn Bytecode>)
+    }
 }
