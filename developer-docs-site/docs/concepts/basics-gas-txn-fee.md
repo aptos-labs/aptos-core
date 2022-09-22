@@ -106,7 +106,7 @@ Note that the `Signature` provided on the transaction must be all zeros. This is
 
 To simulate the transaction, there are two flags:
 
-1. `estimate_gas_unit_price`: This flag will estimate the gas unit price in the transaction using the same algorithm as the `EstimateGas` API.
+1. `estimate_gas_unit_price`: This flag will estimate the gas unit price in the transaction using the same algorithm as the [`estimate_gas_price`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/estimate_gas_price) API.
 2. `estimate_max_gas_amount`: This flag will find the maximum possible gas you can use, and it will simulate the transaction to tell you the actual `gas_used`.
 
 ## Using simulation to estimate the gas
