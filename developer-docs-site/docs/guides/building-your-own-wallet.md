@@ -92,7 +92,7 @@ There will be some apis that certain wallets may add but there should be a few a
 // For multi-signer account, there are multiple publicKeys and minKeysRequired value.
 interface PublicAccount {
     address: string;
-    publicKeys: string[];
+    publicKey: string | string[];
     minKeysRequired?: number; // for multi-signer account
 }
 
@@ -149,7 +149,7 @@ export interface SignMessageResponse {
   message: string; // The message passed in by the user
   nonce: string,
   prefix: string, // Should always be APTOS
-  signatures: string[]; // The signed full message
+  signature: string | string[]; // The signed full message
   bitmap?: Uint8Array; // a 4-byte (32 bits) bit-vector of length N
 }
 ```
@@ -160,7 +160,7 @@ export interface SignMessageResponse {
 An example:
 `signMessage({nonce: 1234034, message: "Welcome to dapp!", address: true, application: true, chainId: true })`
 
-This would generate the `fullMessage` to be signed and returned as the `signatures`:
+This would generate the `fullMessage` to be signed and returned as the `signature`:
 ```yaml
 APTOS
 address: 0x000001
@@ -170,9 +170,9 @@ nonce: 1234034
 message: Welcome to dapp!
 ```
 
-If the wallet is single-signer account, there is one signature in `signatures` array and `bitmap` is null.
+If the wallet is single-signer account, there is one signature and `bitmap` is null.
 
-If the wallet is multi-signers account, there are multiple `signatures` and `bitmap` value. `bitmap` masks which public key has signed message.
+If the wallet is multi-signers account, there are multiple `signature` and `bitmap` value. `bitmap` masks which public key has signed message.
 
 ### Event listening (In progress)
 
