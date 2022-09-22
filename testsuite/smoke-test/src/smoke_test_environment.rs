@@ -7,13 +7,14 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
-use aptos_logger::info;
+use aptos_logger::prelude::*;
 use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
 use forge::{ActiveNodesGuard, Node};
 use forge::{Factory, LocalFactory, LocalSwarm};
 use framework::ReleaseBundle;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
+use std::pin::Pin;
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 use tokio::task::JoinHandle;
 
@@ -63,7 +64,7 @@ impl SwarmBuilder {
     }
 
     // Gas is not enabled with this setup, it's enabled via forge instance.
-    pub async fn build(self) -> LocalSwarm {
+    pub async fn build_wrapped(self) -> anyhow::Result<LocalSwarm> {
         ::aptos_logger::Logger::new().init();
         info!("Preparing to finish compiling");
         // TODO change to return Swarm trait
@@ -96,7 +97,11 @@ impl SwarmBuilder {
                 guard,
             )
             .await
-            .unwrap()
+    }
+
+    // Gas is not enabled with this setup, it's enabled via forge instance.
+    pub async fn build(self) -> LocalSwarm {
+        self.build_wrapped().await.unwrap()
     }
 
     pub async fn build_with_cli(
@@ -128,6 +133,27 @@ impl SwarmBuilder {
             num_cli_accounts
         );
         (swarm, tool, faucet)
+    }
+}
+
+pub async fn with_retry<
+    F: Fn() -> Pin<Box<dyn std::future::Future<Output = anyhow::Result<LocalSwarm>>>>,
+>(
+    build: F,
+    num_retries: u8,
+) -> LocalSwarm {
+    let mut attempt = 0;
+    loop {
+        if attempt >= num_retries {
+            panic!("Exhausted retries: {} / {}", attempt, num_retries);
+        }
+        match build().await {
+            Ok(swarm) => {
+                return swarm;
+            }
+            Err(err) => warn!("Attempt {} / {} failed with: {}", attempt, num_retries, err),
+        }
+        attempt += 1;
     }
 }
 
