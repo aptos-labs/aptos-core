@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::config::ApiConfig;
+use aptos_logger::prelude::*;
 use aptos_node::AptosNodeArgs;
 use aptos_rosetta::bootstrap;
 use aptos_types::chain_id::ChainId;
@@ -19,8 +20,10 @@ use std::{
 };
 use tokio::time::Instant;
 
-const REST_API_WAIT_DURATION_MS: u64 = 100;
-const TOTAL_REST_API_WAIT_DURATION_S: u64 = 60;
+/// Poll every 100 ms
+const DEFAULT_REST_API_WAIT_INTERVAL_MS: u64 = 100;
+/// Log failures every 10 seconds
+const LOG_INTERVAL_MS: u64 = 10_000;
 
 #[tokio::main]
 async fn main() {
@@ -48,24 +51,25 @@ async fn main() {
 
         // Wait and ensure the node is running on the URL
         let client = aptos_rest_client::Client::new(online_args.rest_api_url.clone());
-        let mut successful = false;
-        let total_wait_duration = Duration::from_secs(TOTAL_REST_API_WAIT_DURATION_S);
         let start = Instant::now();
-        while start.elapsed() < total_wait_duration {
-            if client.get_index_bcs().await.is_ok() {
-                successful = true;
-                break;
+        loop {
+            match client.get_index_bcs().await {
+                Ok(_) => {
+                    break;
+                }
+                Err(err) => {
+                    sample!(
+                        SampleRate::Duration(Duration::from_millis(LOG_INTERVAL_MS)),
+                        println!(
+                            "aptos-rosetta: Full node REST API isn't responding yet.  You should check the node logs.  It's been waiting {} seconds.  Error: {:?}",
+                            start.elapsed().as_secs(),
+                            err
+                        )
+                    );
+                    tokio::time::sleep(Duration::from_millis(DEFAULT_REST_API_WAIT_INTERVAL_MS))
+                        .await;
+                }
             }
-
-            tokio::time::sleep(Duration::from_millis(REST_API_WAIT_DURATION_MS)).await;
-        }
-
-        // If it didn't start up, we need to crash
-        if !successful {
-            panic!(
-                "aptos-rosetta: Local full node didn't start up on time after {} seconds at {}",
-                TOTAL_REST_API_WAIT_DURATION_S, online_args.rest_api_url
-            )
         }
 
         println!("aptos-rosetta: Local full node started successfully");
