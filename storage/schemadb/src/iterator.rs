@@ -77,8 +77,8 @@ where
             return Ok(None);
         }
 
-        let raw_key = self.db_iter.key().expect("Iterator must be valid.");
-        let raw_value = self.db_iter.value().expect("Iterator must be valid.");
+        let raw_key = self.db_iter.key().expect("db_iter.key() failed.");
+        let raw_value = self.db_iter.value().expect("db_iter.value(0 failed.");
         APTOS_SCHEMADB_ITER_BYTES
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .observe((raw_key.len() + raw_value.len()) as f64);

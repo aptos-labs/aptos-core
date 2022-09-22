@@ -12,7 +12,7 @@
 //!
 //! ```text
 //! |<-------------------key------------------->|
-//! | stale_since_vesrion | version | state_key |
+//! | stale_since_version | version | state_key |
 //! ```
 //!
 //! `stale_since_version` is serialized in big endian so that records in RocksDB will be in order of
