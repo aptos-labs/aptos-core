@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import numeral from 'numeral';
+import { CoinInfoData } from 'shared/types';
 
 export const APTOS_UNIT = 'APT' as const;
 export const OCTA_UNIT = 'OCTA' as const;
@@ -172,3 +173,33 @@ export const formatCoin = (value?: bigint | number, opts: FormatCoinOptions = {}
   const result = (includeUnit) ? `${transformedNumeral} ${units}` : transformedNumeral;
   return result;
 };
+
+interface FormatAmountOptions {
+  decimals?: number,
+  prefix?: boolean,
+}
+
+export function formatAmount(
+  amount: number | bigint,
+  coinInfo: CoinInfoData | undefined,
+  options?: FormatAmountOptions,
+) {
+  const { decimals, prefix } = {
+    decimals: 8,
+    prefix: true,
+    ...options,
+  };
+
+  const amountSign = amount > 0 ? '+' : '-';
+  const amountAbs = amount > 0 ? amount : -amount;
+  const multiplier = coinInfo?.decimals ? 10 ** (-coinInfo.decimals) : 1;
+  const amountPrefix = prefix ? amountSign : '';
+  const amountSuffix = coinInfo?.symbol ? ` ${coinInfo.symbol}` : '';
+  const formattedAmount = formatCoin(amountAbs, {
+    decimals,
+    includeUnit: false,
+    multiplier,
+  });
+
+  return `${amountPrefix}${formattedAmount}${amountSuffix}`;
+}

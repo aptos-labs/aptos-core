@@ -4,8 +4,8 @@
 import { Spinner, VStack } from '@chakra-ui/react';
 import React, { useMemo } from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
+import ActivityList from 'core/components/ActivityList';
 import NextPageLoader from 'core/components/NextPageLoader';
-import TransactionList from 'core/components/TransactionList';
 import useActivity from 'core/queries/useActivity';
 
 function Activity() {
@@ -22,7 +22,7 @@ function Activity() {
         {
           activity.isLoading || activity.isFetchingNextPage
             ? <Spinner />
-            : <TransactionList transactions={transactions} />
+            : <ActivityList transactions={transactions} />
         }
         <NextPageLoader query={activity} />
       </VStack>

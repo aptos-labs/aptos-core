@@ -18,19 +18,18 @@ import {
 } from '@chakra-ui/react';
 import React, { useEffect, useState } from 'react';
 import { useQueryClient } from 'react-query';
-import { HexString, Types } from 'aptos';
+import { Types } from 'aptos';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { darcula, docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 import { secondaryErrorMessageColor } from 'core/colors';
-import { aptosCoinStoreStructTag } from 'core/constants';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useTransactionSimulation } from 'core/hooks/useTransactions';
 import { useAccountOctaCoinBalance } from 'core/queries/account';
-import { formatCoin } from 'core/utils/coin';
-import { maxGasFeeFromEstimated } from 'shared/transactions';
-import { parseMoveAbortDetails } from 'shared/move';
 import { bigIntMin } from 'core/utils/bigint';
+import { formatAmount, formatCoin } from 'core/utils/coin';
+import { maxGasFeeFromEstimated } from 'shared/transactions';
+import { CoinBalanceChangesByCoinType, Transaction } from 'shared/types';
 import { usePermissionRequestContext } from '../hooks';
 import { LoadableContent } from './LoadableContent';
 import { PermissionPromptLayout } from './PermissionPromptLayout';
@@ -41,130 +40,47 @@ const ChakraSyntaxHighlighter = chakra(SyntaxHighlighter);
 const simulationQueryKey = 'promptSimulation';
 const simulationRefetchInterval = 10000;
 
+const positiveAmountColor = 'green.500';
+const negativeAmountColor = 'red.500';
+
 const headingProps = {
   lineHeight: '24px',
   mb: '4px',
   size: 'sm',
 };
 
-// region Utils
-
-/**
- * Convert number to little endian hex representation.
- * Used to compute the first part of an event key.
- * @param value numeric value to convert
- * @param digits number of hex digits
- */
-function toLittleEndianHex(value: number, digits = 16) {
-  const words = value.toString(digits).padStart(digits, '0').match(/.{2}/g);
-  return words!.reverse().join('');
-}
-
-/**
- * Retrieve an event key in the format `0x{creationNum}{address}` from an event state
- * @param eventState event state obtained from a writeset
- */
-function getEventKeyFromState(eventState: any) {
-  const resourceAddr = new HexString(eventState.guid.id.addr);
-  const creationNum = Number(eventState.guid.id.creation_num);
-  return `0x${toLittleEndianHex(creationNum)}${resourceAddr.noPrefix()}`;
-}
-
-/**
- * Get coin store changes from the associated state and events
- * @param coinStoreState state obtained from a writeset
- * @param events events emitted during the transaction
- */
-function getCoinStoreChanges(coinStoreState: any, events: Types.Event[]) {
-  // TODO: convert to bigint
-  const newBalance = coinStoreState?.coin?.value !== undefined
-    ? BigInt(coinStoreState.coin.value)
-    : undefined;
-
-  const withdrawEventKey = getEventKeyFromState(coinStoreState.withdraw_events);
-  const depositEventKey = getEventKeyFromState(coinStoreState.deposit_events);
-
-  let balanceChange = 0n;
-  events.forEach(({ data, key }) => {
-    if (key === depositEventKey) {
-      balanceChange += BigInt(data.amount);
-    } else if (key === withdrawEventKey) {
-      balanceChange -= BigInt(data.amount);
-    }
-  });
-
-  return {
-    balanceChange,
-    newBalance,
-  };
-}
-
-/**
- * Get useful details to be shown to the user after a transaction simulation
- * @param txn simulation used to extract info
- */
-function getSimulationDetails(txn: Types.UserTransaction) {
-  // No matter the type of transaction, the gas fee is always useful
-  const networkFee = BigInt(txn.gas_used) * BigInt(txn.gas_unit_price);
-
-  // Should always display changes in the user's resources
-  const ownResourceWrites = txn.changes
-    .filter((change) => change.type === 'write_resource')
-    .map((change) => change as Types.WriteResource)
-    .filter((change) => change.address === txn.sender);
-
-  const newAptosCoinStoreState = ownResourceWrites
-    .find((write) => write.data.type === aptosCoinStoreStructTag)
-    ?.data.data as any;
-
-  const aptosCoinStore = newAptosCoinStoreState !== undefined
-    ? getCoinStoreChanges(newAptosCoinStoreState, txn.events)
-    : undefined;
-
-  return {
-    aptosCoinStore,
-    networkFee,
-  };
-}
-
-type CoinStoreChanges = ReturnType<typeof getCoinStoreChanges>;
-
-// endregion
-
 // region Components
 
 interface TransactionCoinBalanceChangeProps {
-  coinStore: CoinStoreChanges,
+  changes: CoinBalanceChangesByCoinType,
 }
 
 /**
  * Display changes relative to a coin store
  * @param coinStore coin store changes
  */
-function TransactionCoinBalanceChange({ coinStore }: TransactionCoinBalanceChangeProps) {
+function TransactionCoinBalanceChange({ changes }: TransactionCoinBalanceChangeProps) {
   return (
     <Box>
       <Heading {...headingProps}>
         Estimated Balance Changes
       </Heading>
-      <Text fontSize="sm" lineHeight="20px">
-        Amount:&nbsp;
-        <Text as="span" color="teal">
-          {formatCoin(coinStore.balanceChange, { decimals: 8 })}
-        </Text>
-      </Text>
-      {/* <Text fontSize="sm" lineHeight="20px">
-        New balance:&nbsp;
-        <Text as="span" color="teal">
-          {formatCoin(coinStore.newBalance, { decimals: 8 })}
-        </Text>
-      </Text> */}
+      {
+        Object.values(changes).map(({ amount, coinInfo }) => (
+          <Text fontSize="sm" lineHeight="20px">
+            Amount:&nbsp;
+            <Text as="span" color={amount > 0 ? positiveAmountColor : negativeAmountColor}>
+              { formatAmount(amount, coinInfo) }
+            </Text>
+          </Text>
+        ))
+      }
     </Box>
   );
 }
 
 interface TransactionWritesetProps {
-  txn: Types.UserTransaction,
+  txn: Transaction,
 }
 
 function TransactionWriteset({ txn }: TransactionWritesetProps) {
@@ -188,7 +104,7 @@ function TransactionWriteset({ txn }: TransactionWritesetProps) {
           language="json"
           style={style}
         >
-          { JSON.stringify(txn.changes, null, 4) }
+          { JSON.stringify(txn.rawChanges, null, 4) }
         </ChakraSyntaxHighlighter>
       </Collapse>
     </Box>
@@ -219,8 +135,8 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
     refetchInterval: simulationRefetchInterval,
   });
   const { setApprovalState } = usePermissionRequestContext();
-  const details = simulation.data && getSimulationDetails(simulation.data);
 
+  // Keeping error state, since the query error is cleared on re-fetching
   const [simulationError, setSimulationError] = useState<string | undefined>();
   useEffect(() => {
     queryClient.resetQueries(simulationQueryKey).then();
@@ -229,24 +145,33 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
   useEffect(() => {
     if (simulation.error) {
       setSimulationError(simulation.error.message);
-    } else if (simulation.data?.success === false) {
-      const abortDetails = parseMoveAbortDetails(simulation.data.vm_status);
-      setSimulationError(abortDetails?.reasonDescr);
+    } else if (simulation.data?.error !== undefined) {
+      setSimulationError(simulation.data.error.reasonDescr);
     } else if (!simulation.isLoading) {
       setSimulationError(undefined);
     }
   }, [simulation.data, simulation.error, simulation.isLoading]);
 
   useEffect(() => {
-    const isSimulationSuccessful = simulation.data?.success === true;
-    const approvalArgs = isSimulationSuccessful
+    const approvalArgs = simulation.data && simulation.data.success
       ? {
-        gasUnitPrice: Number(simulation.data!.gas_unit_price),
-        maxGasFee: maxGasFeeFromEstimated(Number(simulation.data!.gas_used)),
+        gasUnitPrice: simulation.data.gasUnitPrice,
+        maxGasFee: maxGasFeeFromEstimated(Number(simulation.data.gasFee)),
       }
       : undefined;
-    setApprovalState({ args: approvalArgs, canApprove: isSimulationSuccessful });
+    setApprovalState({ args: approvalArgs, canApprove: approvalArgs !== undefined });
   }, [simulation.data, setApprovalState]);
+
+  const networkFee = simulation.data !== undefined
+    ? formatCoin(simulation.data.gasFee * simulation.data.gasUnitPrice, { decimals: 8 })
+    : undefined;
+
+  const hasCoinBalanceChanges = simulation.data !== undefined
+    && simulation.data.coinBalanceChanges[activeAccountAddress]
+    && Object.keys(simulation.data.coinBalanceChanges[activeAccountAddress]).length > 0;
+  const ownCoinBalanceChanges = hasCoinBalanceChanges
+    ? simulation.data.coinBalanceChanges[activeAccountAddress]
+    : undefined;
 
   return (
     <PermissionPromptLayout title="Approve transaction">
@@ -277,22 +202,22 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
                 : null
             }
             {
-              !simulationError && details?.networkFee !== undefined
+              !simulationError && networkFee !== undefined
                 ? (
                   <Box>
                     <Heading {...headingProps}>
                       Network Fee
                     </Heading>
                     <Text fontSize="sm" lineHeight="20px">
-                      {formatCoin(details.networkFee, { decimals: 8 })}
+                      { networkFee }
                     </Text>
                   </Box>
                 )
                 : null
             }
             {
-              !simulationError && details?.aptosCoinStore !== undefined
-                ? <TransactionCoinBalanceChange coinStore={details.aptosCoinStore} />
+              !simulationError && ownCoinBalanceChanges !== undefined
+                ? <TransactionCoinBalanceChange changes={ownCoinBalanceChanges} />
                 : null
             }
             {

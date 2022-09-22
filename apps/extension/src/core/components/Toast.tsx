@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createStandaloneToast } from '@chakra-ui/react';
-import { Types } from 'aptos';
-import { parseMoveAbortDetails } from 'shared/move';
-import { DefaultNetworks, Network } from 'shared/types';
+import { DefaultNetworks, Network, Transaction } from 'shared/types';
+import { formatCoin } from 'core/utils/coin';
 
 export const { toast } = createStandaloneToast({
   defaultOptions: {
@@ -165,21 +164,23 @@ export const networkDoesNotExistToast = () => {
 
 // transfer
 
-export function coinTransferSuccessToast(amount: string, txn: Types.UserTransaction) {
+export function coinTransferSuccessToast(amount: string, txn: Transaction) {
+  const networkFee = formatCoin(txn.gasFee * txn.gasUnitPrice, { decimals: 8 });
   toast({
-    description: `Amount transferred: ${amount}, gas consumed: ${txn.gas_used}`,
+    description: `Amount transferred: ${amount}, gas consumed: ${networkFee}`,
     status: 'success',
     title: 'Transaction succeeded',
   });
 }
 
-export function coinTransferAbortToast(txn: Types.UserTransaction) {
-  const abortDetails = parseMoveAbortDetails(txn.vm_status);
-  const abortReasonDescr = abortDetails !== undefined
-    ? abortDetails.reasonDescr
+export function coinTransferAbortToast(txn: Transaction) {
+  const networkFee = formatCoin(txn.gasFee * txn.gasUnitPrice, { decimals: 8 });
+
+  const abortReasonDescr = txn.error !== undefined
+    ? txn.error.reasonDescr
     : 'Transaction failed';
   toast({
-    description: `${abortReasonDescr}, gas consumed: ${txn.gas_used}`,
+    description: `${abortReasonDescr}, gas consumed: ${networkFee}`,
     status: 'error',
     title: 'Transaction failed',
   });

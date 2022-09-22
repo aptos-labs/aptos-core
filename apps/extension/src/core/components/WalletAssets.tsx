@@ -22,8 +22,8 @@ import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useAccountCoinResources } from 'core/queries/account';
 import useActivity from 'core/queries/useActivity';
 import { formatCoin } from 'core/utils/coin';
+import { ActivityList } from './ActivityList';
 import { AptosLogo } from './AptosLogo';
-import { TransactionList } from './TransactionList';
 import { Routes } from '../routes';
 
 const CoinType = {
@@ -157,7 +157,7 @@ export default function WalletAssets() {
         {
           activity.isLoading
             ? <Spinner />
-            : <TransactionList transactions={transactions} />
+            : <ActivityList transactions={transactions} />
         }
         {
           activity.hasNextPage

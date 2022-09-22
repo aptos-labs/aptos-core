@@ -10,23 +10,13 @@ import {
 } from '@chakra-ui/react';
 import React, { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Types } from 'aptos';
 import GraceHopperBoringAvatar from 'core/components/BoringAvatar';
 import Copyable from 'core/components/Copyable';
+import ActivityList from 'core/components/ActivityList';
 import NextPageLoader from 'core/components/NextPageLoader';
-import TransactionList from 'core/components/TransactionList';
 import useActivity from 'core/queries/useActivity';
 import WalletLayout from 'core/layouts/WalletLayout';
 import { collapseHexString } from 'core/utils/hex';
-
-type UserTransaction = Types.UserTransaction;
-type EntryFunctionPayload = Types.EntryFunctionPayload;
-
-function txnParties(txn: UserTransaction) {
-  const payload = txn.payload as EntryFunctionPayload;
-  const recipient = payload.arguments[0];
-  return [txn.sender, recipient];
-}
 
 function Account() {
   const { address } = useParams();
@@ -35,7 +25,8 @@ function Account() {
   const transactions = useMemo(
     () => activity.data?.pages
       .flatMap((page) => page.txns)
-      .filter((txn) => txnParties(txn).includes(address)),
+      .filter((txn) => address !== undefined
+        && Object.keys(txn.coinBalanceChanges).includes(address)),
     [activity.data, address],
   );
 
@@ -55,7 +46,7 @@ function Account() {
         {
           activity.isLoading || activity.isFetchingNextPage
             ? <Spinner />
-            : <TransactionList transactions={transactions} />
+            : <ActivityList transactions={transactions} />
         }
         <NextPageLoader query={activity} />
       </VStack>
