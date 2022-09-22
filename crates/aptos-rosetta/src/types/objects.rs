@@ -277,7 +277,7 @@ impl Operation {
         operation_index: u64,
         status: Option<OperationStatusType>,
         address: AccountAddress,
-        operator: AccountAddress,
+        new_operator: AccountAddress,
     ) -> Operation {
         Operation::new(
             OperationType::SetOperator,
@@ -285,7 +285,7 @@ impl Operation {
             status,
             address,
             None,
-            Some(OperationMetadata::set_operator(operator)),
+            Some(OperationMetadata::set_operator(new_operator)),
         )
     }
 
@@ -293,7 +293,7 @@ impl Operation {
         operation_index: u64,
         status: Option<OperationStatusType>,
         address: AccountAddress,
-        voter: AccountAddress,
+        new_voter: AccountAddress,
     ) -> Operation {
         Operation::new(
             OperationType::SetVoter,
@@ -301,7 +301,7 @@ impl Operation {
             status,
             address,
             None,
-            Some(OperationMetadata::set_voter(voter)),
+            Some(OperationMetadata::set_voter(new_voter)),
         )
     }
 }
@@ -341,9 +341,9 @@ pub struct OperationMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sender: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub operator: Option<AccountIdentifier>,
+    pub new_operator: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub voter: Option<AccountIdentifier>,
+    pub new_voter: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -354,16 +354,16 @@ impl OperationMetadata {
         }
     }
 
-    pub fn set_operator(operator: AccountAddress) -> Self {
+    pub fn set_operator(new_operator: AccountAddress) -> Self {
         OperationMetadata {
-            operator: Some(operator.into()),
+            new_operator: Some(new_operator.into()),
             ..Default::default()
         }
     }
 
-    pub fn set_voter(voter: AccountAddress) -> Self {
+    pub fn set_voter(new_voter: AccountAddress) -> Self {
         OperationMetadata {
-            voter: Some(voter.into()),
+            new_voter: Some(new_voter.into()),
             ..Default::default()
         }
     }
@@ -619,7 +619,7 @@ fn parse_failed_operations_from_txn_payload(
                 }
             }
             (AccountAddress::ONE, STAKE_MODULE, SET_OPERATOR_FUNCTION) => {
-                if let Some(Ok(operator)) = inner
+                if let Some(Ok(new_operator)) = inner
                     .args()
                     .get(0)
                     .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
@@ -628,14 +628,14 @@ fn parse_failed_operations_from_txn_payload(
                         operation_index,
                         Some(OperationStatusType::Failure),
                         sender,
-                        operator,
+                        new_operator,
                     ));
                 } else {
                     warn!("Failed to parse set operator {:?}", inner);
                 }
             }
             (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) => {
-                if let Some(Ok(voter)) = inner
+                if let Some(Ok(new_voter)) = inner
                     .args()
                     .get(0)
                     .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
@@ -644,7 +644,7 @@ fn parse_failed_operations_from_txn_payload(
                         operation_index,
                         Some(OperationStatusType::Failure),
                         sender,
-                        voter,
+                        new_voter,
                     ));
                 } else {
                     warn!("Failed to parse set voter {:?}", inner);
@@ -724,7 +724,7 @@ async fn parse_operations_from_write_set(
             inner.module().name().as_str(),
             inner.function().as_str(),
         ) {
-            return if let Some(Ok(voter)) = inner
+            return if let Some(Ok(new_voter)) = inner
                 .args()
                 .get(0)
                 .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
@@ -733,7 +733,7 @@ async fn parse_operations_from_write_set(
                     operation_index,
                     Some(OperationStatusType::Success),
                     sender,
-                    voter,
+                    new_voter,
                 )])
             } else {
                 warn!("Failed to parse set voter {:?}", inner);
@@ -844,12 +844,12 @@ fn parse_stakepool_changes(
         stakepool.set_operator_events.key();
 
         let addresses = get_set_operator_from_event(events, stakepool.set_operator_events.key());
-        for operator in addresses {
+        for new_operator in addresses {
             operations.push(Operation::set_operator(
                 operation_index,
                 Some(OperationStatusType::Success),
                 address,
-                operator,
+                new_operator,
             ));
             operation_index += 1;
         }
@@ -1035,7 +1035,7 @@ impl InternalOperation {
                         Ok(OperationType::SetOperator) => {
                             if let (
                                 Some(OperationMetadata {
-                                    operator: Some(operator),
+                                    new_operator: Some(new_operator),
                                     ..
                                 }),
                                 Some(account),
@@ -1043,21 +1043,22 @@ impl InternalOperation {
                             {
                                 return Ok(Self::SetOperator(SetOperator {
                                     owner: account.account_address()?,
-                                    operator: operator.account_address()?,
+                                    new_operator: new_operator.account_address()?,
                                 }));
                             }
                         }
                         Ok(OperationType::SetVoter) => {
                             if let (
                                 Some(OperationMetadata {
-                                    voter: Some(voter), ..
+                                    new_voter: Some(new_voter),
+                                    ..
                                 }),
                                 Some(account),
                             ) = (&operation.metadata, &operation.account)
                             {
                                 return Ok(Self::SetVoter(SetVoter {
                                     owner: account.account_address()?,
-                                    voter: voter.account_address()?,
+                                    new_voter: new_voter.account_address()?,
                                 }));
                             }
                         }
@@ -1105,11 +1106,11 @@ impl InternalOperation {
                 )
             }
             InternalOperation::SetOperator(set_operator) => (
-                aptos_stdlib::stake_set_operator(set_operator.operator),
+                aptos_stdlib::stake_set_operator(set_operator.new_operator),
                 set_operator.owner,
             ),
             InternalOperation::SetVoter(set_voter) => (
-                aptos_stdlib::stake_set_delegated_voter(set_voter.voter),
+                aptos_stdlib::stake_set_delegated_voter(set_voter.new_voter),
                 set_voter.owner,
             ),
         })
@@ -1232,13 +1233,13 @@ impl Transfer {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SetOperator {
     pub owner: AccountAddress,
-    pub operator: AccountAddress,
+    pub new_operator: AccountAddress,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SetVoter {
     pub owner: AccountAddress,
-    pub voter: AccountAddress,
+    pub new_voter: AccountAddress,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

@@ -1144,7 +1144,7 @@ async fn parse_operations(
                             .metadata
                             .as_ref()
                             .unwrap()
-                            .operator
+                            .new_operator
                             .as_ref()
                             .unwrap()
                             .account_address()
@@ -1186,7 +1186,7 @@ async fn parse_operations(
                             .metadata
                             .as_ref()
                             .unwrap()
-                            .voter
+                            .new_voter
                             .as_ref()
                             .unwrap()
                             .account_address()
