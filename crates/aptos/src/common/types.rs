@@ -22,12 +22,12 @@ use aptos_crypto::{
 };
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
+use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue, UserTransaction};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::transaction::{
-    authenticator::AuthenticationKey, ExecutionStatus, SignedTransaction, TransactionPayload,
+    authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -84,8 +84,8 @@ pub enum CliError {
     UnableToReadFile(String, String),
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
-    #[error("Simulation failed with status: {0:?}")]
-    SimulationError(ExecutionStatus),
+    #[error("Simulation failed with status: {0}")]
+    SimulationError(String),
 }
 
 impl CliError {
@@ -1275,9 +1275,11 @@ impl TransactionOptions {
                 .into_inner();
 
             // Check if the transaction will pass, if it doesn't then fail
+            // TODO: Add move resolver so we can explain the VM status with a proper error map
             let status = simulated_txn.info.status();
             if !status.is_success() {
-                return Err(CliError::SimulationError(status.clone()));
+                let status = client.explain_vm_status(status);
+                return Err(CliError::SimulationError(status));
             }
 
             // Take the gas used and use a headroom factor on it

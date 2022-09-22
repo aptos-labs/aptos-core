@@ -17,6 +17,7 @@ dpn = []
 anyhow = "1.0.57"
 bcs = "0.1.3"
 bytes = "1.2.1"
+futures = "0.3.17"
 hex = "0.4.3"
 poem-openapi = { version = "2.0.10", features = ["url"] }
 reqwest = { version = "0.11.10", features = ["json", "cookies", "blocking"] }
