@@ -172,7 +172,7 @@ mod tests {
             let partial_signatures = PartialSignatures::new(
                 current_signers
                     .iter()
-                    .map(|s| (s.author(), s.sign(&ledger_info)))
+                    .map(|s| (s.author(), s.sign(&ledger_info).unwrap()))
                     .collect(),
             );
 

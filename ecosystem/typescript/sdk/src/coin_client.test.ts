@@ -16,7 +16,7 @@ test(
 
     const alice = new AptosAccount();
     const bob = new AptosAccount();
-    await faucetClient.fundAccount(alice.address(), 50000);
+    await faucetClient.fundAccount(alice.address(), 100_000_000);
     await faucetClient.fundAccount(bob.address(), 0);
 
     await client.waitForTransaction(await coinClient.transfer(alice, bob, 42), { checkSuccess: true });

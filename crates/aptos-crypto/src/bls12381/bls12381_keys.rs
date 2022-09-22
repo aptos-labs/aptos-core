@@ -109,12 +109,15 @@ impl traits::SigningKey for PrivateKey {
     type VerifyingKeyMaterial = PublicKey;
     type SignatureMaterial = bls12381::Signature;
 
-    fn sign<T: CryptoHash + Serialize>(&self, message: &T) -> bls12381::Signature {
-        bls12381::Signature {
+    fn sign<T: CryptoHash + Serialize>(
+        &self,
+        message: &T,
+    ) -> Result<bls12381::Signature, CryptoMaterialError> {
+        Ok(bls12381::Signature {
             sig: self
                 .privkey
-                .sign(&signing_message(message), DST_BLS_SIG_IN_G2_WITH_POP, &[]),
-        }
+                .sign(&signing_message(message)?, DST_BLS_SIG_IN_G2_WITH_POP, &[]),
+        })
     }
 
     #[cfg(any(test, feature = "fuzzing"))]

@@ -20,7 +20,7 @@ use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     traits::{signing_message, SigningKey},
-    HashValue,
+    CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_deps::move_core_types::transaction_argument::convert_txn_args;
@@ -216,7 +216,7 @@ impl RawTransaction {
         private_key: &Ed25519PrivateKey,
         public_key: Ed25519PublicKey,
     ) -> Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self);
+        let signature = private_key.sign(&self)?;
         Ok(SignatureCheckedTransaction(SignedTransaction::new(
             self, public_key, signature,
         )))
@@ -236,7 +236,7 @@ impl RawTransaction {
     ) -> Result<SignatureCheckedTransaction> {
         let message =
             RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone());
-        let sender_signature = sender_private_key.sign(&message);
+        let sender_signature = sender_private_key.sign(&message)?;
         let sender_authenticator = AccountAuthenticator::ed25519(
             Ed25519PublicKey::from(sender_private_key),
             sender_signature,
@@ -249,7 +249,7 @@ impl RawTransaction {
         }
         let mut secondary_authenticators = vec![];
         for priv_key in secondary_private_keys {
-            let signature = priv_key.sign(&message);
+            let signature = priv_key.sign(&message)?;
             secondary_authenticators.push(AccountAuthenticator::ed25519(
                 Ed25519PublicKey::from(priv_key),
                 signature,
@@ -272,7 +272,7 @@ impl RawTransaction {
         private_key: &Ed25519PrivateKey,
         public_key: Ed25519PublicKey,
     ) -> Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self);
+        let signature = private_key.sign(&self)?;
         Ok(SignatureCheckedTransaction(
             SignedTransaction::new_multisig(self, public_key.into(), signature.into()),
         ))
@@ -328,7 +328,7 @@ impl RawTransaction {
     }
 
     /// Return the signing message for creating transaction signature.
-    pub fn signing_message(&self) -> Vec<u8> {
+    pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
         signing_message(self)
     }
 }

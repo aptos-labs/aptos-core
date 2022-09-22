@@ -112,7 +112,8 @@ impl LogEntry {
                     Value::Serde(s) => match serde_json::to_value(s) {
                         Ok(value) => value,
                         Err(e) => {
-                            eprintln!("error serializing structured log: {}", e);
+                            // Log and skip the value that can't be serialized
+                            eprintln!("error serializing structured log: {} for key {:?}", e, key);
                             return;
                         }
                     },

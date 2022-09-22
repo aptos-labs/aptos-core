@@ -10,20 +10,24 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Your First NFT
 
-This tutorial describes, in the following step-by-step approach, how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs or Tokens can be found in [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move).
+This tutorial describes how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs can be found in the [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
 
 ## Step 1: Pick an SDK
 
-* [Official Aptos Typescript SDK][typescript-sdk]
-* [Official Aptos Python SDK][python-sdk]
-* Official Aptos Rust SDK -- TBA
+Install your preferred SDK from the below list:
 
-## Step 2: Run the Example
+* [Typescript SDK][typescript-sdk]
+* [Python SDK][python-sdk]
+* [Rust SDK][rust-sdk]
 
-Each SDK provides an examples directory. This tutorial covers the `simple-nft` example.
+---
 
-Clone `aptos-core`:
-```sh
+## Step 2: Run the example
+
+Each SDK provides an `examples` directory. This tutorial covers the `simple-nft` example.
+
+Clone the `aptos-core` repo:
+```bash
 git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 ```
 
@@ -31,49 +35,51 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   <TabItem value="typescript" label="Typescript">
 
   Navigate to the Typescript SDK examples directory:
-  ```sh
+  ```bash
   cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
   ```
 
   Install the necessary dependencies:
-  ```
+  ```bash
   yarn install
   ```
 
-  Run the `simple_nft` example:
-  ```sh
+  Run the Typescript [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_nft.ts) example:
+  ```bash
   yarn run simple_nft
   ```
   </TabItem>
   <TabItem value="python" label="Python">
 
   Navigate to the Python SDK directory:
-  ```sh
+  ```bash
   cd ~/aptos-core/ecosystem/python/sdk
   ```
 
   Install the necessary dependencies:
-  ```
+  ```bash
   curl -sSL https://install.python-poetry.org | python3
   poetry update
   ```
 
-  Run the `simple-nft` example:
-  ```sh
+  Run the Python [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) example:
+  ```bash
   poetry run python -m examples.simple-nft
   ```
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
 
-## Step 3: Understand the Output
+---
+
+## Step 3: Understand the output
 
 The following output should appear after executing the `simple-nft` example, though some values will be different:
 
-```
+```yaml
 === Addresses ===
 Alice: 0x9df0f527f3a0b445e4d5c320cfa269cdefafc7cd1ed17ffce4b3fd485b17aafb
 Bob: 0xfcc74af84dde26b0050dce35d6b3d11c60f5c8c58728ca3a0b11035942a0b1de
@@ -133,35 +139,39 @@ Bob's token balance: 0
 
 This example demonstrates:
 
-* Initializing the REST and Faucet clients
-* The creation of two accounts: Alice and Bob
-* The funding and creation of Alice and Bob's accounts
-* The creation of a collection and a token using Alice's account
-* Alice offering a token and Bob claiming it
-* Bob unilaterally sending the token to Alice via a multiagent transaction
+* Initializing the REST and faucet clients.
+* The creation of two accounts: Alice and Bob.
+* The funding and creation of Alice and Bob's accounts.
+* The creation of a collection and a token using Alice's account.
+* Alice offering a token and Bob claiming it.
+* Bob unilaterally sending the token to Alice via a multiagent transaction.
 
-## Step 4: The SDK in Depth
+---
+
+## Step 4: The SDK in depth
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-:::tip See the full example
+:::tip See the full code
 See [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_nft.ts) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="python" label="Python">
 
-:::tip See the full example
+:::tip See the full code
 See [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
 
-### Step 4.1: Initializing the Clients
+---
+
+### Step 4.1: Initializing the clients
 
 In the first step the example initializes both the API and faucet clients.
 
@@ -199,9 +209,10 @@ Using the API client we can create a `TokenClient`, which we use for common toke
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
+
 
 :::tip
 
@@ -210,6 +221,7 @@ By default the URLs for both the services point to Aptos devnet services. Howeve
   - `APTOS_FAUCET_URL`
 :::
 
+---
 
 ### Step 4.2: Creating local accounts
 
@@ -230,9 +242,11 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.3: Creating blockchain accounts
 
@@ -253,9 +267,11 @@ In Aptos, each account must have an on-chain representation in order to support 
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.4: Creating a collection
 
@@ -288,9 +304,11 @@ The function signature of `create_collection`. It returns a transaction hash:
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.5: Creating a token
 
@@ -323,9 +341,11 @@ The function signature of `create_token`. It returns a transaction hash:
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.6: Reading token and collection metadata
 
@@ -370,9 +390,11 @@ Here's how `get_token_data` queries the token metadata:
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.7: Reading a token balance
 
@@ -393,9 +415,11 @@ Each token within Aptos is a distinct asset, the assets owned by the user are st
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.8: Offering and claiming a token
 
@@ -439,13 +463,16 @@ To claim a token:
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
+
+---
 
 ### Step 4.9: Safe unilateral transferring of a token
 
 To support safe unilateral transfers of a token, the sender may first ask the recipient to acknowledge off-chain about a pending transfer. This comes in the form of a multiagent transaction request. Multiagent transactions contain multiple signatures, one for each on-chain account. Move then can leverage this to give `signer` level permissions to all that signed. For token transfers, this ensures that the receiving party does indeed desire to receive this token without requiring the use of the token transfer framework described above.
+
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
@@ -461,30 +488,33 @@ To support safe unilateral transfers of a token, the sender may first ask the re
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
 
+---
+
 ### Step 4.10: Enabling unilateral token transfers
 
-Coming soon!
+Coming soon.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
-Coming soon!
+Coming soon.
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon!
+Coming soon.
   </TabItem>
   <TabItem value="typescript" label="Typescript">
 
-Coming soon!
+Coming soon.
   </TabItem>
 </Tabs>
 
 [account_basics]: /concepts/basics-accounts
-[typescript-sdk]: /sdks/typescript-sdk
+[typescript-sdk]: /sdks/ts-sdk/index
 [python-sdk]: /sdks/python-sdk
+[rust-sdk]: /sdks/rust-sdk
 [rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/

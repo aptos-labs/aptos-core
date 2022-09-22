@@ -296,7 +296,8 @@ async fn test_insert_vote() {
             voter.author(),
             placeholder_ledger_info(),
             voter,
-        );
+        )
+        .unwrap();
         let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
 
         // first vote of an author is accepted
@@ -324,7 +325,8 @@ async fn test_insert_vote() {
         final_voter.author(),
         placeholder_ledger_info(),
         final_voter,
-    );
+    )
+    .unwrap();
     match pending_votes.insert_vote(&vote, &validator_verifier) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());
@@ -354,7 +356,8 @@ async fn test_illegal_timestamp() {
         certificate_for_genesis(),
         &signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let result = block_store
         .execute_and_insert_block(block_with_illegal_timestamp)
         .await;

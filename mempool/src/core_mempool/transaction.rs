@@ -131,7 +131,7 @@ mod test {
         SignedTransaction::new(
             raw_transaction.clone(),
             public_key,
-            private_key.sign(&raw_transaction),
+            private_key.sign(&raw_transaction).unwrap(),
         )
     }
 }

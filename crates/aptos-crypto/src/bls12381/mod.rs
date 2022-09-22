@@ -143,7 +143,7 @@
 //!
 //! // The signer computes a normal signature on a message.
 //! let message = TestAptosCrypto("test".to_owned());
-//! let sig = kp.private_key.sign(&message);
+//! let sig = kp.private_key.sign(&message).unwrap();
 //! ```
 //!
 //! For verifiers:
@@ -256,7 +256,7 @@
 //! let mut sigshares = vec![];
 //! let message = Message("test".to_owned());
 //! for kp in key_pairs.iter() {
-//!     let sig = kp.private_key.sign(&message);
+//!     let sig = kp.private_key.sign(&message).unwrap();
 //!     sigshares.push(sig);
 //! }
 //!
@@ -355,7 +355,7 @@
 //! let mut messages = vec![];
 //! for i in 0..num_signers {
 //!     let message = Message("different message".to_owned(), i);
-//!     let sig = key_pairs[i].private_key.sign(&message);
+//!     let sig = key_pairs[i].private_key.sign(&message).unwrap();
 //!
 //!     messages.push(message);
 //!     sigshares.push(sig);

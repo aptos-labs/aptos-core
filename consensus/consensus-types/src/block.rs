@@ -199,7 +199,7 @@ impl Block {
         quorum_cert: QuorumCert,
         validator_signer: &ValidatorSigner,
         failed_authors: Vec<(Round, Author)>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let block_data = BlockData::new_proposal(
             payload,
             validator_signer.author(),
@@ -215,9 +215,11 @@ impl Block {
     pub fn new_proposal_from_block_data(
         block_data: BlockData,
         validator_signer: &ValidatorSigner,
-    ) -> Self {
-        let signature = validator_signer.sign(&block_data);
-        Self::new_proposal_from_block_data_and_signature(block_data, signature)
+    ) -> anyhow::Result<Self> {
+        let signature = validator_signer.sign(&block_data)?;
+        Ok(Self::new_proposal_from_block_data_and_signature(
+            block_data, signature,
+        ))
     }
 
     pub fn new_proposal_from_block_data_and_signature(

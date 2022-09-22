@@ -22,7 +22,7 @@ tempfile = "3.3.0"
 
 aptos = { path = "../../crates/aptos" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
-aptos-gas = { path = "../aptos-gas" }
+aptos-gas = { path = "../aptos-gas", features = ["testing"] }
 aptos-keygen = { path = "../../crates/aptos-keygen" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-parallel-executor = { path = "../parallel-executor" }

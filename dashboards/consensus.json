@@ -141,6 +141,64 @@
       }
     },
     {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "id": 133,
+      "isNew": false,
+      "span": 0,
+      "title": "Participating voting power in last 100 rounds",
+      "description": "Global statistics from the chain, all nodes that are caught up should have the same value.\n\nIf value goes below 80 it is concerning. if it goes below 72 it is a very bad.\n\nIt cannot go below 67%, because chain stops otherwise, and there is no data to show then.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 0.6 },
+              { "color": "orange", "value": 0.72 },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "green", "value": 0.9 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "area" }
+          }
+        }
+      }
+    },
+    {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
@@ -215,6 +273,64 @@
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "rate(aptos_consensus_committed_txns_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",state=\"retry\"}[$interval])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{state}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "transactions / s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 9 },
+      "id": 140,
+      "isNew": false,
+      "span": 0,
+      "title": "Round manager error rate",
+      "description": "",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_consensus_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{state}}",
           "format": "time_series"
@@ -896,7 +1012,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval]) / rate(consensus_duration_count{op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -976,7 +1092,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval]) / rate(consensus_duration_count{op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -1056,7 +1172,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -1136,7 +1252,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -1216,7 +1332,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='verify_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='verify_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='verify_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='verify_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -1296,7 +1412,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='process_different_epoch_consensus_msg', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_different_epoch_consensus_msg', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_different_epoch_consensus_msg', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_different_epoch_consensus_msg', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -1376,7 +1492,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='process_epoch_proof', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_epoch_proof', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_epoch_proof', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_epoch_proof', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -1536,7 +1652,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='reconfig', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='reconfig', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='reconfig', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='reconfig', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -1616,7 +1732,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(consensus_duration_sum{op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -1705,6 +1821,86 @@
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
         { "format": "none", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 75 },
+      "id": 129,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Buffer Manager Retry count",
+      "description": "A sampled binary number indicating whether the node is currently in a function. (Useful when the node is stuck somewhere)",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_consensus_buffer_manager_retry_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: {{op}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "none", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -2378,6 +2574,122 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# blocks",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 118 },
+      "id": 130,
+      "isNew": false,
+      "span": 0,
+      "title": "Back pressure",
+      "description": "",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=\"back_pressure\"} \u003e 10",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# blocks",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 118 },
+      "id": 131,
+      "isNew": false,
+      "span": 0,
+      "title": "Sync only",
+      "description": "",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=\"sync_only\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bool",
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
@@ -3481,7 +3793,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
       ],
@@ -3536,7 +3848,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
       ],
@@ -3647,7 +3959,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+          "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
       ],
@@ -3702,7 +4014,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+          "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
       ],
@@ -3868,7 +4180,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\",namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+          "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\",namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
       ],
@@ -4237,6 +4549,184 @@
           }
         }
       }
+    },
+    {
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 232 },
+      "id": 137,
+      "isNew": false,
+      "span": 0,
+      "title": "Collected votes",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 233 },
+      "id": 135,
+      "isNew": false,
+      "span": 0,
+      "title": "collected voting power for proposal",
+      "description": "Voting power of all votes for the same ledger info collected by a proposer",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_proposer_collected_most_voting_power_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/rate(aptos_proposer_collecting_round_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 233 },
+      "id": 138,
+      "isNew": false,
+      "span": 0,
+      "title": "collected voting power for conflicting",
+      "description": "Voting power of all votes for all other (conflicting) ledger infos collected by a proposer",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_proposer_collected_conflicting_voting_power_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/rate(aptos_proposer_collecting_round_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 233 },
+      "id": 139,
+      "isNew": false,
+      "span": 0,
+      "title": "collected voting power for timeout votes",
+      "description": "Voting power of timeout votes collected by a proposer",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_proposer_collected_timeout_voting_power_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/rate(aptos_proposer_collecting_round_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])/aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
     }
   ],
   "rows": null,
@@ -4414,7 +4904,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 33,
+  "version": 48,
   "links": [
     {
       "title": "Other Dashboards",

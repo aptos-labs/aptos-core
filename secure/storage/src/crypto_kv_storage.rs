@@ -91,7 +91,9 @@ impl<T: CryptoKVStorage> CryptoStorage for T {
         message: &U,
     ) -> Result<Ed25519Signature, Error> {
         let private_key = self.export_private_key(name)?;
-        Ok(private_key.sign(message))
+        private_key
+            .sign(message)
+            .map_err(|err| Error::SerializationError(err.to_string()))
     }
 
     fn sign_using_version<U: CryptoHash + Serialize>(
@@ -101,7 +103,9 @@ impl<T: CryptoKVStorage> CryptoStorage for T {
         message: &U,
     ) -> Result<Ed25519Signature, Error> {
         let private_key = self.export_private_key_for_version(name, version)?;
-        Ok(private_key.sign(message))
+        private_key
+            .sign(message)
+            .map_err(|err| Error::SerializationError(err.to_string()))
     }
 }
 

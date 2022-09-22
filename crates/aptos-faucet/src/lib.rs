@@ -165,7 +165,7 @@ impl Service {
         Service {
             faucet_account: Mutex::new(faucet_account),
             transaction_factory: TransactionFactory::new(chain_id)
-                .with_gas_unit_price(1)
+                .with_gas_unit_price(std::cmp::max(1, aptos_global_constants::GAS_UNIT_PRICE))
                 .with_transaction_expiration_time(30),
             client,
             endpoint,

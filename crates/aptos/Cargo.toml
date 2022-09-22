@@ -1,6 +1,6 @@
 [package]
 name = "aptos"
-version = "0.3.4"
+version = "0.3.5"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos tool for management of nodes and interacting with the blockchain"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -43,6 +43,7 @@ aptos-faucet = { path = "../aptos-faucet" }
 aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-genesis = { path = "../aptos-genesis" }
 aptos-github-client = { path = "../../secure/storage/github" }
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-keygen = { path = "../aptos-keygen" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }

@@ -5,8 +5,8 @@ slug: "aptos-cli-index"
 
 # Aptos CLI
 
-- [Install Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md)
-- [Use Aptos CLI](/cli-tools/aptos-cli-tool/use-aptos-cli.md)
+- [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md)
+- [Using Aptos CLI](/cli-tools/aptos-cli-tool/use-aptos-cli.md)
 
 :::tip Using CLI to run a local testnet
 

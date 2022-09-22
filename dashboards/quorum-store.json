@@ -11,9 +11,174 @@
   "sharedCrosshair": false,
   "panels": [
     {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "id": 162,
+      "isNew": false,
+      "span": 0,
+      "title": "PULLED_TXNS_COUNT",
+      "description": "Count of the pulled txns.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_pulled_txn_count[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "id": 164,
+      "isNew": false,
+      "span": 0,
+      "title": "PULLED_EMPTY_TXNS_COUNT",
+      "description": "Count of the pulled empty txns.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_pulled_empty_txn_count[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "id": 166,
+      "isNew": false,
+      "span": 0,
+      "title": "PULLED_LEFTOVER_TXNS_COUNT",
+      "description": "Count of the pulled leftover txns.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_pulled_leftover_txn_count[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
       "id": 148,
       "isNew": false,
       "span": 0,
@@ -27,7 +192,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
       "id": 150,
       "isNew": false,
       "span": 0,
@@ -39,7 +204,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.95, avg(rate(quorum_store_batch_creation_duration_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_batch_creation_duration_sum[$__rate_interval]) / rate(quorum_store_batch_creation_duration_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -82,7 +247,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
       "id": 152,
       "isNew": false,
       "span": 0,
@@ -94,7 +259,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.95, avg(rate(quorum_store_empty_batch_creation_duration_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_empty_batch_creation_duration_sum[$__rate_interval]) / rate(quorum_store_empty_batch_creation_duration_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -137,7 +302,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 9 },
       "id": 154,
       "isNew": false,
       "span": 0,
@@ -149,7 +314,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.90, avg(rate(quorum_store_batch_to_PoS_duration_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_batch_to_PoS_duration_sum[$__rate_interval]) / rate(quorum_store_batch_to_PoS_duration_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -191,7 +356,7 @@
     {
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
       "id": 146,
       "isNew": false,
       "span": 0,
@@ -205,7 +370,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
       "id": 144,
       "isNew": false,
       "span": 0,
@@ -217,7 +382,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.95, sum(rate(quorum_store_num_batch_per_block_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_num_batch_per_block_sum[$__rate_interval]) / rate(quorum_store_num_batch_per_block_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -260,7 +425,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
       "id": 142,
       "isNew": false,
       "span": 0,
@@ -272,7 +437,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "histogram_quantile(0.95, sum(rate(quorum_store_num_txn_per_batch_bucket[$__rate_interval])) by (le))",
+          "expr": "rate(quorum_store_num_txn_per_batch_sum[$__rate_interval]) / rate(quorum_store_num_txn_per_batch_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -315,7 +480,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
       "id": 132,
       "isNew": false,
       "span": 0,
@@ -370,7 +535,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
       "id": 134,
       "isNew": false,
       "span": 0,
@@ -383,16 +548,16 @@
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
           "expr": "rate(quorum_store_created_empty_batch_count[$__rate_interval])",
-          "legendFormat": "__auto"
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
       ],
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "single" }
+        "tooltip": { "mode": "multi" }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "",
+          "unit": "none",
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
@@ -425,7 +590,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
       "id": 138,
       "isNew": false,
       "span": 0,
@@ -480,7 +645,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
       "id": 140,
       "isNew": false,
       "span": 0,
@@ -535,7 +700,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
       "id": 136,
       "isNew": false,
       "span": 0,
@@ -590,7 +755,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
       "id": 156,
       "isNew": false,
       "span": 0,
@@ -645,7 +810,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
       "id": 158,
       "isNew": false,
       "span": 0,
@@ -657,7 +822,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "quorum_store_expired_batch_fragments_count",
+          "expr": "rate(quorum_store_expired_batch_fragments_count[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -700,7 +865,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
       "id": 160,
       "isNew": false,
       "span": 0,
@@ -779,7 +944,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 7,
+  "version": 9,
   "links": [],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }

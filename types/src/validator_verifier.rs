@@ -524,7 +524,8 @@ mod tests {
 
         let dummy_struct = TestAptosCrypto("Hello, World".to_string());
         for validator in validator_signers.iter() {
-            author_to_signature_map.insert(validator.author(), validator.sign(&dummy_struct));
+            author_to_signature_map
+                .insert(validator.author(), validator.sign(&dummy_struct).unwrap());
         }
 
         assert_eq!(
@@ -552,7 +553,7 @@ mod tests {
     fn test_validator() {
         let validator_signer = ValidatorSigner::random(TEST_SEED);
         let dummy_struct = TestAptosCrypto("Hello, World".to_string());
-        let signature = validator_signer.sign(&dummy_struct);
+        let signature = validator_signer.sign(&dummy_struct).unwrap();
         let validator =
             ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
         assert_eq!(
@@ -560,7 +561,7 @@ mod tests {
             Ok(())
         );
         let unknown_validator_signer = ValidatorSigner::random([1; 32]);
-        let unknown_signature = unknown_validator_signer.sign(&dummy_struct);
+        let unknown_signature = unknown_validator_signer.sign(&dummy_struct).unwrap();
         assert_eq!(
             validator.verify(
                 unknown_validator_signer.author(),
@@ -584,7 +585,7 @@ mod tests {
 
         // Generate a multi-sig from invalid signer and ensure verify_mutli_signatures fails.
         let unknown_validator_signer = ValidatorSigner::random([1; 32]);
-        let unknown_signature = unknown_validator_signer.sign(&dummy_struct);
+        let unknown_signature = unknown_validator_signer.sign(&dummy_struct).unwrap();
         let unknown_validator = ValidatorVerifier::new_single(
             unknown_validator_signer.author(),
             unknown_validator_signer.public_key(),
@@ -660,7 +661,8 @@ mod tests {
         // Create a map from author to signatures.
         let mut partial_signature = PartialSignatures::empty();
         for validator in validator_signers.iter() {
-            partial_signature.add_signature(validator.author(), validator.sign(&dummy_struct));
+            partial_signature
+                .add_signature(validator.author(), validator.sign(&dummy_struct).unwrap());
         }
 
         // Let's assume our verifier needs to satisfy at least 5 signatures from the original
@@ -684,7 +686,7 @@ mod tests {
 
         // Add an extra unknown signer, signatures > N; this will fail.
         let unknown_validator_signer = ValidatorSigner::random([NUM_SIGNERS + 1; 32]);
-        let unknown_signature = unknown_validator_signer.sign(&dummy_struct);
+        let unknown_signature = unknown_validator_signer.sign(&dummy_struct).unwrap();
         partial_signature
             .add_signature(unknown_validator_signer.author(), unknown_signature.clone());
 
@@ -696,7 +698,8 @@ mod tests {
         // Add 5 valid signers only (quorum threshold is met); this will pass.
         partial_signature = PartialSignatures::empty();
         for validator in validator_signers.iter().take(5) {
-            partial_signature.add_signature(validator.author(), validator.sign(&dummy_struct));
+            partial_signature
+                .add_signature(validator.author(), validator.sign(&dummy_struct).unwrap());
         }
         aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)
@@ -723,7 +726,8 @@ mod tests {
         // Add 4 valid signers only (quorum threshold is NOT met); this will fail.
         partial_signature = PartialSignatures::empty();
         for validator in validator_signers.iter().take(4) {
-            partial_signature.add_signature(validator.author(), validator.sign(&dummy_struct));
+            partial_signature
+                .add_signature(validator.author(), validator.sign(&dummy_struct).unwrap());
         }
         aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)
@@ -769,7 +773,7 @@ mod tests {
             ));
             partial_signature.add_signature(
                 validator_signer.author(),
-                validator_signer.sign(&dummy_struct),
+                validator_signer.sign(&dummy_struct).unwrap(),
             );
         }
 
@@ -790,7 +794,7 @@ mod tests {
 
         // Add an extra unknown signer, signatures > N; this will fail.
         let unknown_validator_signer = ValidatorSigner::random([NUM_SIGNERS + 1; 32]);
-        let unknown_signature = unknown_validator_signer.sign(&dummy_struct);
+        let unknown_signature = unknown_validator_signer.sign(&dummy_struct).unwrap();
         partial_signature
             .add_signature(unknown_validator_signer.author(), unknown_signature.clone());
 
@@ -802,7 +806,8 @@ mod tests {
         // Add 5 voting power signers only (quorum threshold is met) with (2, 3) ; this will pass.
         let mut partial_signature = PartialSignatures::empty();
         for validator in validator_signers.iter().skip(2) {
-            partial_signature.add_signature(validator.author(), validator.sign(&dummy_struct));
+            partial_signature
+                .add_signature(validator.author(), validator.sign(&dummy_struct).unwrap());
         }
 
         aggregated_signature = validator_verifier
@@ -826,7 +831,8 @@ mod tests {
         // Add first 3 valid signers only (quorum threshold is NOT met); this will fail.
         let mut partial_signature = PartialSignatures::empty();
         for validator in validator_signers.iter().take(3) {
-            partial_signature.add_signature(validator.author(), validator.sign(&dummy_struct));
+            partial_signature
+                .add_signature(validator.author(), validator.sign(&dummy_struct).unwrap());
         }
         aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)

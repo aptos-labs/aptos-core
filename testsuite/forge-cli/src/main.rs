@@ -517,19 +517,23 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 None,
                 None,
             )),
-        "account_creation_state_sync" => config
+        "account_creation" | "nft_mint" => config
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_initial_fullnode_count(3)
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["chain"]["epoch_duration_secs"] = 1200.into();
+                helm_values["chain"]["epoch_duration_secs"] = 600.into();
             }))
             .with_emit_job(
                 EmitJobRequest::default()
                     .mode(EmitJobMode::MaxLoad {
                         mempool_backlog: 30000,
                     })
-                    .transaction_type(TransactionType::AccountGeneration),
+                    .transaction_type(if test_name == "account_creation" {
+                        TransactionType::AccountGeneration
+                    } else {
+                        TransactionType::NftMint
+                    }),
             )
             .with_success_criteria(SuccessCriteria::new(
                 4000,
@@ -858,9 +862,8 @@ fn changing_working_quorum_test(
                     EmitJobMode::ConstTps { tps: target_tps }
                 })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 75),
+                    (TransactionType::P2P, 80),
                     (TransactionType::AccountGeneration, 20),
-                    (TransactionType::NftMint, 5),
                 ]),
         )
         .with_success_criteria(SuccessCriteria::new(
@@ -1032,7 +1035,13 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration, 1).unwrap();
+        let stats = generate_traffic(
+            ctx,
+            &all_validators,
+            duration,
+            aptos_global_constants::GAS_UNIT_PRICE,
+        )
+        .unwrap();
         ctx.report
             .report_txn_stats(self.name().to_string(), &stats, duration);
 

@@ -1981,7 +1981,7 @@ fn create_test_transaction(sequence_number: u64, code_bytes: Vec<u8>) -> Transac
     let signed_transaction = SignedTransaction::new(
         raw_transaction.clone(),
         public_key,
-        private_key.sign(&raw_transaction),
+        private_key.sign(&raw_transaction).unwrap(),
     );
 
     Transaction::UserTransaction(signed_transaction)
