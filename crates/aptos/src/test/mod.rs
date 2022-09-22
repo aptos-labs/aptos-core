@@ -39,8 +39,11 @@ use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
+use aptos_rest_client::aptos_api_types::{IdentifierWrapper, MoveStructTag};
 use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
 use aptos_sdk::move_types::account_address::AccountAddress;
+use aptos_sdk::move_types::identifier::Identifier;
+use aptos_sdk::move_types::language_storage::ModuleId;
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::validator_config::ValidatorConfig;
@@ -261,11 +264,23 @@ impl CliTestFramework {
         sender_index: usize,
         amount: u64,
         gas_options: Option<GasOptions>,
-    ) -> CliTypedResult<TransferSummary> {
-        TransferCoins {
+    ) -> CliTypedResult<TransactionSummary> {
+        RunFunction {
+            function_id: MemberId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from_str("coin").unwrap(),
+                ),
+                member_id: Identifier::from_str("transfer").unwrap(),
+            },
+            args: vec![ArgWithType::from_str(&format!("u64:{}", amount)).unwrap()],
+            type_args: vec![MoveType::Struct(MoveStructTag::new(
+                AccountAddress::ONE.into(),
+                IdentifierWrapper::from_str("aptos_coin").unwrap(),
+                IdentifierWrapper::from_str("AptosCoin").unwrap(),
+                vec![],
+            ))],
             txn_options: self.transaction_options(sender_index, gas_options),
-            account: AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
-            amount,
         }
         .execute()
         .await
