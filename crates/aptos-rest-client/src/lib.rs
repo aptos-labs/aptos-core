@@ -30,11 +30,12 @@ use aptos_api_types::{
     UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
+use aptos_logger::{info, sample, sample::SampleRate, sample::Sampling, warn};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
     contract_event::EventWithVersion,
-    transaction::{ExecutionStatus, SignedTransaction},
+    transaction::SignedTransaction,
 };
 use futures::executor::block_on;
 use move_deps::move_binary_format::CompiledModule;
@@ -463,6 +464,8 @@ impl Client {
                 .request
                 .expiration_timestamp_secs
                 .inner(),
+            None,
+            Some(Duration::from_secs(60)),
         )
         .await
     }
@@ -477,6 +480,8 @@ impl Client {
                 .request
                 .expiration_timestamp_secs
                 .inner(),
+            None,
+            Some(Duration::from_secs(60)),
         )
         .await
     }
@@ -489,6 +494,8 @@ impl Client {
         self.wait_for_transaction_by_hash(
             transaction.clone().committed_hash(),
             expiration_timestamp,
+            None,
+            Some(Duration::from_secs(60)),
         )
         .await
     }
@@ -501,86 +508,192 @@ impl Client {
         self.wait_for_transaction_by_hash_bcs(
             transaction.clone().committed_hash(),
             expiration_timestamp,
+            None,
+            Some(Duration::from_secs(60)),
         )
         .await
+    }
+
+    async fn wait_for_transaction_by_hash_inner<F, Fut, T>(
+        &self,
+        hash: HashValue,
+        expiration_timestamp_secs: u64,
+        server_lag_timeout_after_expiry: Option<Duration>,
+        timeout_from_call: Option<Duration>,
+        fetch: F,
+    ) -> AptosResult<Response<T>>
+    where
+        F: Fn(HashValue) -> Fut,
+        Fut: Future<Output = AptosResult<WaitForTransactionResult<T>>>,
+    {
+        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+
+        let start = std::time::Instant::now();
+        loop {
+            let mut chain_timestamp_usecs = None;
+            match fetch(hash).await? {
+                WaitForTransactionResult::Success(result) => {
+                    return Ok(result);
+                }
+                WaitForTransactionResult::FailedExecution(vm_status) => {
+                    return Err(anyhow!(
+                        "Transaction committed on chain, but failed execution: {}",
+                        vm_status
+                    ))?;
+                }
+                WaitForTransactionResult::Pending(state) => {
+                    if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
+                        return Err(anyhow!("Transaction expired, it is guaranteed it will not be committed on chain.").into());
+                    }
+                    chain_timestamp_usecs = Some(state.timestamp_usecs);
+                }
+                WaitForTransactionResult::NotFound(error) => {
+                    if let RestError::Api(aptos_error_response) = error {
+                        if let Some(state) = aptos_error_response.state {
+                            if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
+                                return Err(anyhow!("Transaction expired, it is guaranteed it will not be committed on chain.").into());
+                            }
+                            chain_timestamp_usecs = Some(state.timestamp_usecs);
+                        }
+                    } else {
+                        return Err(error);
+                    }
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(30)),
+                        warn!(
+                            "Cannot yet find transaction in mempool on {:?}, continuing to wait.",
+                            self.path_prefix_string(),
+                        )
+                    );
+                }
+            }
+
+            if let Some(server_lag_expiry_duration) = server_lag_timeout_after_expiry {
+                if aptos_infallible::duration_since_epoch().as_secs()
+                    > expiration_timestamp_secs + server_lag_expiry_duration.as_secs()
+                {
+                    return Err(anyhow!(
+                        "Ledger on endpoint ({}) is beyond {}s behind current time, timeouting waiting for the transaction. Transaction might still succeed.", self.path_prefix_string(), server_lag_expiry_duration.as_secs()).into());
+                }
+            }
+
+            let elapsed = start.elapsed();
+            if let Some(timeout_duration) = timeout_from_call {
+                if elapsed > timeout_duration {
+                    return Err(anyhow!(
+                        "Timeout of {}s after calling wait_for_transaction reached. Transaction might still succeed.",
+                        timeout_duration.as_secs(),
+                    ).into());
+                }
+            }
+
+            if elapsed.as_secs() > 30 {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(30)),
+                    warn!(
+                        "Continuing to wait for transaction {}, ledger on endpoint ({}) is {}",
+                        hash,
+                        self.path_prefix_string(),
+                        if let Some(timestamp_usecs) = chain_timestamp_usecs {
+                            format!(
+                                "{}s behind current time",
+                                aptos_infallible::duration_since_epoch()
+                                    .saturating_sub(Duration::from_micros(timestamp_usecs))
+                                    .as_secs()
+                            )
+                        } else {
+                            "unreachable".to_string()
+                        },
+                    )
+                );
+            }
+
+            tokio::time::sleep(DEFAULT_DELAY).await;
+        }
     }
 
     pub async fn wait_for_transaction_by_hash(
         &self,
         hash: HashValue,
         expiration_timestamp_secs: u64,
+        server_lag_timeout_after_expiry: Option<Duration>,
+        timeout_from_call: Option<Duration>,
     ) -> AptosResult<Response<Transaction>> {
-        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
-        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+        self.wait_for_transaction_by_hash_inner(
+            hash,
+            expiration_timestamp_secs,
+            server_lag_timeout_after_expiry,
+            timeout_from_call,
+            |hash| async move {
+                let resp = self.get_transaction_by_hash_inner(hash).await?;
+                if resp.status() != StatusCode::NOT_FOUND {
+                    let txn_resp: Response<Transaction> = self.json(resp).await?;
+                    let (transaction, state) = txn_resp.into_parts();
 
-        let start = std::time::Instant::now();
-        while start.elapsed() < DEFAULT_TIMEOUT {
-            let resp = self.get_transaction_by_hash_inner(hash).await?;
-            if resp.status() != StatusCode::NOT_FOUND {
-                let txn_resp: Response<Transaction> = self.json(resp).await?;
-                let (transaction, state) = txn_resp.into_parts();
-
-                if !transaction.is_pending() {
-                    if !transaction.success() {
-                        return Err(anyhow!(
-                            "transaction execution failed: {}",
-                            transaction.vm_status()
-                        ))?;
+                    if !transaction.is_pending() {
+                        if !transaction.success() {
+                            Ok(WaitForTransactionResult::FailedExecution(
+                                transaction.vm_status(),
+                            ))
+                        } else {
+                            Ok(WaitForTransactionResult::Success(Response::new(
+                                transaction,
+                                state,
+                            )))
+                        }
+                    } else {
+                        Ok(WaitForTransactionResult::Pending(state))
                     }
-                    return Ok(Response::new(transaction, state));
+                } else {
+                    let error_response = parse_error(resp).await;
+                    Ok(WaitForTransactionResult::NotFound(error_response))
                 }
-                if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
-                    return Err(anyhow!("transaction expired").into());
-                }
-            }
-
-            tokio::time::sleep(DEFAULT_DELAY).await;
-        }
-
-        Err(anyhow!("timeout").into())
+            },
+        )
+        .await
     }
 
     pub async fn wait_for_transaction_by_hash_bcs(
         &self,
         hash: HashValue,
         expiration_timestamp_secs: u64,
+        server_lag_timeout_after_expiry: Option<Duration>,
+        timeout_from_call: Option<Duration>,
     ) -> AptosResult<Response<TransactionOnChainData>> {
-        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
-        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+        self.wait_for_transaction_by_hash_inner(
+            hash,
+            expiration_timestamp_secs,
+            server_lag_timeout_after_expiry,
+            timeout_from_call,
+            |hash| async move {
+                let resp = self.get_transaction_by_hash_bcs_inner(hash).await?;
+                if resp.status() != StatusCode::NOT_FOUND {
+                    let resp = self.check_and_parse_bcs_response(resp).await?;
+                    let resp = resp.and_then(|bytes| bcs::from_bytes(&bytes))?;
+                    let (maybe_pending_txn, state) = resp.into_parts();
 
-        let start = std::time::Instant::now();
-        while start.elapsed() < DEFAULT_TIMEOUT {
-            let resp = self.get_transaction_by_hash_bcs_inner(hash).await?;
+                    // If we have a committed transaction, determine if it failed or not
+                    if let TransactionData::OnChain(txn) = maybe_pending_txn {
+                        let status = txn.info.status();
 
-            // If it's not found, keep waiting for it
-            if resp.status() != StatusCode::NOT_FOUND {
-                let resp = self.check_and_parse_bcs_response(resp).await?;
-                let resp = resp.and_then(|bytes| bcs::from_bytes(&bytes))?;
-                let (maybe_pending_txn, state) = resp.into_parts();
-
-                // If we have a committed transaction, determine if it failed or not
-                if let TransactionData::OnChain(txn) = maybe_pending_txn {
-                    let status = txn.info.status();
-
-                    // The user can handle the error
-                    return match status {
-                        ExecutionStatus::Success => Ok(Response::new(txn, state)),
-                        _ => Err(anyhow!("Transaction failed").into()),
-                    };
+                        if status.is_success() {
+                            Ok(WaitForTransactionResult::Success(Response::new(txn, state)))
+                        } else {
+                            Ok(WaitForTransactionResult::FailedExecution(format!(
+                                "{:?}",
+                                status
+                            )))
+                        }
+                    } else {
+                        Ok(WaitForTransactionResult::Pending(state))
+                    }
+                } else {
+                    let error_response = parse_error(resp).await;
+                    Ok(WaitForTransactionResult::NotFound(error_response))
                 }
-
-                // If it's expired lets give up
-                if Duration::from_secs(expiration_timestamp_secs)
-                    <= Duration::from_micros(state.timestamp_usecs)
-                {
-                    return Err(anyhow!("Transaction expired").into());
-                }
-            }
-
-            tokio::time::sleep(DEFAULT_DELAY).await;
-        }
-
-        Err(anyhow!("Timed out waiting for transaction").into())
+            },
+        )
+        .await
     }
 
     pub async fn wait_for_version(&self, version: u64) -> Result<State> {
@@ -1191,7 +1304,7 @@ impl Client {
                 break;
             }
 
-            aptos_logger::info!(
+            info!(
                 "Failed to call API, retrying in {}ms: {:?}",
                 backoff.as_millis(),
                 result.as_ref().err().unwrap()
@@ -1263,6 +1376,13 @@ async fn parse_error(response: reqwest::Response) -> RestError {
 pub struct GasEstimationParams {
     pub estimated_gas_used: u64,
     pub estimated_gas_price: u64,
+}
+
+enum WaitForTransactionResult<T> {
+    NotFound(RestError),
+    FailedExecution(String),
+    Pending(State),
+    Success(Response<T>),
 }
 
 impl ExplainVMStatus for Client {

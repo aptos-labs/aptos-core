@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use crate::{
     account::create::DEFAULT_FUNDED_COINS,
@@ -56,7 +56,9 @@ impl CliCommand<String> for FundWithFaucet {
             + 10;
         let client = self.rest_options.client(&self.profile_options.profile)?;
         for hash in hashes {
-            client.wait_for_transaction_by_hash(hash, sys_time).await?;
+            client
+                .wait_for_transaction_by_hash(hash, sys_time, Some(Duration::from_secs(60)), None)
+                .await?;
         }
         return Ok(format!(
             "Added {} Octas to account {}",
