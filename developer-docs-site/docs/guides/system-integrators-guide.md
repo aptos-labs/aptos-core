@@ -323,6 +323,13 @@ A transfer transaction would appear as follows:
   "events": [
     {
       "key": "0x0300000000000000810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+      "guid": {
+        "id": {
+          "addr": "0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+          "creation_num": "3"
+          }
+        }
+      },
       "sequence_number": "0",
       "type": "0x1::coin::WithdrawEvent",
       "data": {
@@ -331,6 +338,13 @@ A transfer transaction would appear as follows:
     },
     {
       "key": "0x02000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+      guid": {
+        "id": {
+          "addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+          "creation_num": "2"
+          }
+        }
+      },
       "sequence_number": "0",
       "type": "0x1::coin::DepositEvent",
       "data": {
@@ -341,6 +355,7 @@ A transfer transaction would appear as follows:
   "timestamp": "1660615531147935",
   "type": "user_transaction"
 }
+
 ```
 
 There's a lot of information in a transaction:
@@ -356,7 +371,11 @@ If `success` is false, then `vm_status` will contain an error code or message th
 
 Each event in `events` is differentiated by an `key`. The `key` is derived from the `guid` from `changes`. Specifically, the `key` is a 40-byte hex string where the first 8-bytes (or 16 characters) are the little endian representation of the `creation_num` in the `guid` of the `changes` event and the remaining characters are the account address. As events do not dictate what emitted them, it is imperative to track the path in `changes` to determine the source of an event. In particular, each `CoinStore<T>` has both a `WithdrawEvent` and a `DepositEvent`, based upon the type of coin. In order to determine which coin based upon a transaction, an indexer can compare the `guid::creation_num` in a `changes` event combined with the address to the `key` for events in `events`.
 
-Using the above example, `events[1].key` is `0x02000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e`. This is equivalent to `changes[0].data.data.deposit_events.guid`, which is `{"addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e", "creation_num": "2"}`.
+Using the above example, `events[1].guid` is equivalent to `changes[0].data.data.deposit_events.guid`, which is `{"addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e", "creation_num": "2"}`.
+
+:::tip
+The `key` field will be going away in favor of `guid`
+:::
 
 ### Querying events
 
@@ -369,6 +388,13 @@ Events can be queried by the events by handle url: `https://{rest_api_server}/ac
   {
     "version":"13629679",
     "key": "0x0300000000000000cb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
+    "guid": {
+      "id": {
+        "addr": "0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+        "creation_num": "3"
+        }
+      }
+    },
     "sequence_number": "0",
     "type": "0x1::coin::WithdrawEvent",
     "data": {
@@ -383,6 +409,129 @@ More information can be gathered from the transaction that generated the event. 
 :::tip
 
 When tracking full movement of coins, normally events are sufficient. `0x1::aptos_coin::AptosCoin`, however, requires considering `gas_used` for each transaction sent from the given account. To reduce unnecessary overheads, extracting gas fees due to transactions does not emit an event. All transactions for an account can be retrieved from this API: `https://{rest_server_api}/accounts/{address}/transactions`.
+
+:::
+
+### Tracking coin balance changes
+
+Consider the transaction from the earlier section, but now with an arbitrary coin `0x1337::my_coin::MyCoin` and some gas parameters changed:
+```
+{
+  "version": "13629679",
+  "gas_used": "20",
+  "success": true,
+  "vm_status": "Executed successfully",
+  "changes": [
+    {
+      "address": "0xb258b91eee04111039320a85b0c24a2dd433909e14a6b5c32ee722e0fdecfddc",
+      "data": {
+        "type": "0x1::coin::CoinStore<0x1337::my_coin::MyCoin>",
+        "data": {
+          "coin": {
+            "value": "1000"
+          },
+          "deposit_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+                "creaton_num": "2",
+              }
+            }
+          },
+          ...
+        }
+      },
+      "type": "write_resource"
+    },
+    ...
+  ],
+  "sender": "0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+  "sequence_number": "0",
+  "max_gas_amount": "2000",
+  "gas_unit_price": "110",
+  "expiration_timestamp_secs": "1660616127",
+  "payload": {
+    "function": "0x1::coin::transfer",
+    "type_arguments": [
+      "0x1337::my_coin::MyCoin"
+    ],
+    "arguments": [
+      "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+      "1000"
+    ],
+    "type": "entry_function_payload"
+  },
+  "events": [
+    {
+      "key": "0x0300000000000000810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+      "guid": {
+        "id": {
+          "addr": "0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+          "creation_num": "3"
+          }
+        }
+      },
+      "sequence_number": "0",
+      "type": "0x1::coin::WithdrawEvent",
+      "data": {
+        "amount": "1000"
+      }
+    },
+    {
+      "key": "0x02000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+      guid": {
+        "id": {
+          "addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+          "creation_num": "2"
+          }
+        }
+      },
+      "sequence_number": "0",
+      "type": "0x1::coin::DepositEvent",
+      "data": {
+        "amount": "1000"
+      }
+    }
+  ],
+  "timestamp": "1660615531147935",
+  "type": "user_transaction"
+}
+```
+
+There are three balance changes in this transaction:
+1. A withdrawal of `1000` of `0x1337::my_coin::MyCoin` from the sending account `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b`
+2. A deposit of `1000` of `0x1337::my_coin::MyCoin` to receiving account `0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e`
+3. A gas fee `2200` of `0x1::aptos_coin::AptosCoin` from the transaction sending account `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b`
+
+To retrieve the withdrawal information you can take these steps:
+1. Scan the `changes` for `0x1::coin::CoinStore<CoinType>`.  Note the `CoinType` is a generic signifying which coin is stored in the store.  In this example, the `CoinType` is `0x1337::my_coin::MyCoin`.
+2. Retrieve both the `guid` for `withdraw_events`. In this example, the `guid` contains `addr` `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b` and `creation_num` `3`.
+3. Scan for events with this `guid`, and extract the event associated with it.  In this example, it is the `0x1::coin::WithdrawEvent`.
+4. The `amount` field will be the number of `CoinType` removed from the account in the `guid`. In this example, it is `1000`.
+
+To retrieve the deposit information, it's the same as withdrawal except:
+1. The `guid` used is under `deposit_events`
+2. The `amount` will be a positive increase on the account's balance.
+3. The event's name will be `0x1::coin::DepositEvent`
+
+To retrieve the gas fee:
+1. The `gas_used` field must be multiplied times the `gas_unit_price`.  In this example, `gas_used=20` and `gas_unit_price=110` so the total gas coins withdrawn is `2200`.
+2. Gas is always `0x1::aptos_coin::AptosCoin`
+
+To retrieve information about the number of decimals of the coin:
+1. You can retrieve the number of decimals for a coin via it's `0x1::coin::CoinInfo<CoinType>`.
+2. This will be located at the address of the coin type.  In this example, you would need to lookup `0x1::coin::CoinInfo<0x1337::my_coin::MyCoin>` at address `0x1337`.
+
+:::tip
+If you always use the events in this manner, you won't miss any balance changes for an account.
+By monitoring the events, it will include any balance changes in the `0x1::coin::CoinStore`:
+1. Coin mints
+2. Coin burns
+3. Coin transfers
+4. Staking coins
+5. Withdrawing staked coins
+6. Transfers not derived from coin::transfer
 
 :::
 
