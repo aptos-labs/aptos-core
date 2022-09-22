@@ -89,7 +89,7 @@ impl K8sSwarm {
             }
         };
 
-        Ok(K8sSwarm {
+        let swarm = K8sSwarm {
             validators,
             fullnodes,
             root_account,
@@ -100,7 +100,17 @@ impl K8sSwarm {
             keep,
             chaoses: HashSet::new(),
             prom_client,
-        })
+        };
+
+        // test hitting the configured prometheus endpoint
+        let query = "container_memory_usage_bytes{pod=\"aptos-node-0-validator-0\"}";
+        let r = swarm.query_metrics(query, None, None).await?;
+        let ivs = r.as_instant().unwrap();
+        for iv in ivs {
+            info!("container_memory_usage_bytes: {}", iv.sample().value());
+        }
+
+        Ok(swarm)
     }
 
     fn get_rest_api_url(&self) -> String {
