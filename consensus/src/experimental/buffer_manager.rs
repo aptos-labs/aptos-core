@@ -166,7 +166,7 @@ impl BufferManager {
         duration: Duration,
     ) {
         counters::BUFFER_MANAGER_RETRY_COUNT.inc();
-        spawn_named!(&format!("retry request")[..], async move {
+        spawn_named!(&"retry request", async move {
             tokio::time::sleep(duration).await;
             sender
                 .send(request)
@@ -448,7 +448,11 @@ impl BufferManager {
         match commit_msg {
             VerifiedEvent::CommitVote(vote) => {
                 // find the corresponding item
-                info!("Receive commit vote {}", vote.commit_info());
+                info!(
+                    "Receive commit vote {} from {}",
+                    vote.commit_info(),
+                    vote.author()
+                );
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -520,7 +524,9 @@ impl BufferManager {
             }
             cursor = self.buffer.get_next(&cursor);
         }
-        info!("Rebroadcasting {} commit votes", count);
+        if count > 0 {
+            info!("Rebroadcasting {} commit votes", count);
+        }
     }
 
     fn update_buffer_manager_metrics(&self) {

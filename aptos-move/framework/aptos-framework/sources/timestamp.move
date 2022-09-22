@@ -51,7 +51,9 @@ module aptos_framework::timestamp {
 
     #[test_only]
     public fun set_time_has_started_for_testing(account: &signer) {
-        set_time_has_started(account);
+        if (!exists<CurrentTimeMicroseconds>(@aptos_framework)) {
+            set_time_has_started(account);
+        };
     }
 
     /// Gets the current time in microseconds.
