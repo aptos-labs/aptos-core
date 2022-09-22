@@ -3,7 +3,10 @@
 
 use crate::{
     executor::ParallelTransactionExecutor,
-    proptest_types::types::{ExpectedOutput, KeyType, Task, Transaction, ValueType},
+    proptest_types::{
+        baseline::ExpectedOutput,
+        types::{FromU128, KeyType, PathKind, Task, Transaction, ValueType},
+    },
     scheduler::{Scheduler, SchedulerTask, TaskGuard},
     task::ModulePath,
 };
@@ -18,16 +21,16 @@ use std::{
 
 fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
 where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    V: Send + Sync + Debug + Clone + Eq + TransactionWrite + FromU128 + 'static,
 {
     let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
+        .execute_transactions_parallel(None, &transactions)
         .map(|(res, _)| res);
 
-    let baseline = ExpectedOutput::generate_baseline(&transactions, None);
+    let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
 
-    baseline.assert_output(&output, None);
+    baseline.assert_output(&output, false);
 }
 
 fn random_value(delete_value: bool) -> ValueType<Vec<u8>> {
@@ -36,7 +39,7 @@ fn random_value(delete_value: bool) -> ValueType<Vec<u8>> {
 
 #[test]
 fn delta_counters() {
-    let key = KeyType(random::<[u8; 32]>(), false);
+    let key = KeyType(random::<[u8; 32]>(), PathKind::Data);
     let mut transactions = vec![Transaction::Write {
         incarnation: Arc::new(AtomicUsize::new(0)),
         reads: vec![vec![]],
@@ -70,7 +73,7 @@ fn delta_counters() {
 
 #[test]
 fn deleted_aggregator() {
-    let key = KeyType(random::<[u8; 32]>(), false);
+    let key = KeyType(random::<[u8; 32]>(), PathKind::Data);
     let transactions = vec![
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
@@ -113,7 +116,7 @@ fn delta_chains() {
     // Generate a series of transactions add and subtract from an aggregator.
 
     let keys: Vec<KeyType<[u8; 32]>> = (0..10)
-        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .map(|_| KeyType(random::<[u8; 32]>(), PathKind::Data))
         .collect();
 
     for i in 0..500 {
@@ -165,8 +168,11 @@ fn cycle_transactions() {
         for _ in 0..WRITES_PER_KEY {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
-                reads: vec![vec![KeyType(key, false)]],
-                writes_and_deltas: vec![(vec![(KeyType(key, false), random_value(false))], vec![])],
+                reads: vec![vec![KeyType(key, PathKind::Data)]],
+                writes_and_deltas: vec![(
+                    vec![(KeyType(key, PathKind::Data), random_value(false))],
+                    vec![],
+                )],
             })
         }
     }
@@ -180,7 +186,7 @@ const TXN_PER_BLOCK: u64 = 100;
 fn one_reads_all_barrier() {
     let mut transactions = vec![];
     let keys: Vec<KeyType<_>> = (0..TXN_PER_BLOCK)
-        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .map(|_| KeyType(random::<[u8; 32]>(), PathKind::Data))
         .collect();
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
@@ -204,7 +210,7 @@ fn one_reads_all_barrier() {
 fn one_writes_all_barrier() {
     let mut transactions = vec![];
     let keys: Vec<KeyType<_>> = (0..TXN_PER_BLOCK)
-        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .map(|_| KeyType(random::<[u8; 32]>(), PathKind::Data))
         .collect();
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
@@ -233,7 +239,7 @@ fn one_writes_all_barrier() {
 fn early_aborts() {
     let mut transactions = vec![];
     let keys: Vec<_> = (0..TXN_PER_BLOCK)
-        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .map(|_| KeyType(random::<[u8; 32]>(), PathKind::Data))
         .collect();
 
     for _ in 0..NUM_BLOCKS {
@@ -254,7 +260,7 @@ fn early_aborts() {
 fn early_skips() {
     let mut transactions = vec![];
     let keys: Vec<_> = (0..TXN_PER_BLOCK)
-        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .map(|_| KeyType(random::<[u8; 32]>(), PathKind::Data))
         .collect();
 
     for _ in 0..NUM_BLOCKS {

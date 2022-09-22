@@ -4,8 +4,12 @@
 use crate::{
     errors::Error,
     executor::ParallelTransactionExecutor,
-    proptest_types::types::{
-        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
+    proptest_types::{
+        baseline::ExpectedOutput,
+        types::{
+            FromU128, KeyType, PathKind, Task, Transaction, TransactionGen, TransactionGenParams,
+            ValueType,
+        },
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
@@ -28,8 +32,8 @@ fn run_transactions<K, V>(
     num_repeat: usize,
     module_access: (bool, bool),
 ) where
-    K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
-    V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    K: Hash + Clone + Debug + Eq + Send + Sync + Ord + 'static,
+    V: Clone + Eq + Send + Sync + Arbitrary + FromU128 + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
@@ -45,22 +49,28 @@ fn run_transactions<K, V>(
         *transactions.get_mut(i.index(length)).unwrap() = Transaction::SkipRest;
     }
 
-    for _ in 0..num_repeat {
-        let output = ParallelTransactionExecutor::<
-            Transaction<KeyType<K>, ValueType<V>>,
-            Task<KeyType<K>, ValueType<V>>,
-        >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
-        .map(|(res, _)| res);
-
-        if module_access.0 && module_access.1 {
-            assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
+    let cpu_count = num_cpus::get();
+    for num_cpus in [cpu_count / 4, cpu_count / 2, cpu_count] {
+        if num_cpus <= 1 {
             continue;
         }
+        for _ in 0..num_repeat {
+            let output = ParallelTransactionExecutor::<
+                Transaction<KeyType<K>, ValueType<V>>,
+                Task<KeyType<K>, ValueType<V>>,
+            >::new(num_cpus)
+            .execute_transactions_parallel(None, &transactions)
+            .map(|(res, _)| res);
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, None);
+            if module_access.0 && module_access.1 {
+                assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
+                continue;
+            }
 
-        baseline.assert_output(&output, None);
+            let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
+
+            baseline.assert_output(&output, false);
+        }
     }
 }
 
@@ -152,29 +162,75 @@ fn deltas_writes_mixed() {
         .new_tree(&mut runner)
         .expect("creating a new value should succeed")
         .current();
-    let transaction_gen = vec(
-        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        num_txns,
-    )
-    .new_tree(&mut runner)
-    .expect("creating a new value should succeed")
-    .current();
 
-    let transactions: Vec<_> = transaction_gen
-        .into_iter()
-        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, true))
-        .collect();
+    let cpu_count = num_cpus::get();
+    for num_cpus in [cpu_count / 2, cpu_count] {
+        for i in 0..5 {
+            let transaction_gen = vec(
+                any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+                num_txns,
+            )
+            .new_tree(&mut runner)
+            .expect("creating a new value should succeed")
+            .current();
 
-    for _ in 0..20 {
-        let output = ParallelTransactionExecutor::<
+            let limit = if i == 0 { 100 } else { u128::MAX };
+            let transactions: Vec<_> = transaction_gen
+                .into_iter()
+                .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, true, limit))
+                .collect();
+
+            for _ in 0..8 {
+                let output = ParallelTransactionExecutor::<
+                    Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+                    Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+                >::new(num_cpus)
+                .execute_transactions_parallel(None, &transactions)
+                .map(|(res, _)| res);
+
+                let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
+
+                baseline.assert_output(&output, false);
+            }
+        }
+    }
+}
+
+#[test]
+fn deltas_writes_mixed_sequential() {
+    let mut runner = TestRunner::default();
+    let num_txns = 1000;
+
+    for _ in 0..5 {
+        let universe = vec(any::<[u8; 32]>(), 50)
+            .new_tree(&mut runner)
+            .expect("creating a new value should succeed")
+            .current();
+        let transaction_gen = vec(
+            any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+            num_txns,
+        )
+        .new_tree(&mut runner)
+        .expect("creating a new value should succeed")
+        .current();
+
+        let transactions: Vec<_> = transaction_gen
+            .into_iter()
+            .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, true, u128::MAX))
+            .collect();
+
+        // Do not allow deletes as that would lead to delta application errors (sequential
+        // materializes and currently errors not supported even in testing).
+        let storage_aggregator_val = 100001;
+        let sequential_output = ParallelTransactionExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
-        .map(|(res, _)| res);
+        >::new(2) // Does not matter, we use sequential.
+        .execute_transactions_sequential(Some(storage_aggregator_val), &transactions);
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, None);
-        baseline.assert_output(&output, None);
+        let baseline =
+            ExpectedOutput::generate_baseline(&transactions, None, Some(storage_aggregator_val));
+        baseline.assert_output(&sequential_output, true);
     }
 }
 
@@ -198,34 +254,42 @@ fn deltas_resolver() {
     // Do not allow deletes as that would panic in resolver.
     let transactions: Vec<_> = transaction_gen
         .into_iter()
-        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
+        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false, u128::MAX))
         .collect();
 
-    for _ in 0..20 {
-        let output = ParallelTransactionExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+    // Should not be possible to overflow or underflow, as each delta is at
+    // most 100 in the tests.
+    let storage_aggregator_val = 100001;
 
-        let (output, delta_resolver) = output.unwrap();
-        // Should not be possible to overflow or underflow, as each delta is at
-        // most 100 in the tests.
-        let storage_delta_val = 100001;
-        let resolved = delta_resolver.resolve(
-            (15..50)
-                .map(|i| {
-                    (
-                        KeyType(universe[i], false),
-                        Ok(Some(serialize(&storage_delta_val))),
-                    )
-                })
-                .collect(),
-            num_txns,
-        );
+    let cpu_count = num_cpus::get();
+    for num_cpus in [cpu_count / 2, cpu_count] {
+        for _ in 0..15 {
+            let output = ParallelTransactionExecutor::<
+                Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+                Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            >::new(num_cpus)
+            .execute_transactions_parallel(None, &transactions);
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, Some(resolved));
-        baseline.assert_output(&Ok(output), Some(storage_delta_val));
+            let (output, delta_resolver) = output.unwrap();
+            let resolved = delta_resolver.resolve(
+                (15..50)
+                    .map(|i| {
+                        (
+                            KeyType(universe[i], PathKind::Data),
+                            Ok(Some(serialize(&storage_aggregator_val))),
+                        )
+                    })
+                    .collect(),
+                num_txns,
+            );
+
+            let baseline = ExpectedOutput::generate_baseline(
+                &transactions,
+                Some(resolved),
+                Some(storage_aggregator_val),
+            );
+            baseline.assert_output(&Ok(output), false);
+        }
     }
 }
 
@@ -330,7 +394,8 @@ fn publishing_fixed_params() {
                 assert!(!incarnation_writes.is_empty());
                 let val = incarnation_writes[0].1.clone();
                 let insert_idx = indices[1].index(incarnation_writes.len());
-                incarnation_writes.insert(insert_idx, (KeyType(universe[42], true), val));
+                incarnation_writes
+                    .insert(insert_idx, (KeyType(universe[42], PathKind::Module), val));
                 new_writes_and_deltas
                     .push((incarnation_writes.clone(), incarnation_deltas.clone()));
             }
@@ -351,7 +416,7 @@ fn publishing_fixed_params() {
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
-    .execute_transactions_parallel((), transactions.clone());
+    .execute_transactions_parallel(None, &transactions);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -366,7 +431,7 @@ fn publishing_fixed_params() {
             for incarnation_reads in reads {
                 assert!(!incarnation_reads.is_empty());
                 let insert_idx = indices[3].index(incarnation_reads.len());
-                incarnation_reads.insert(insert_idx, KeyType(universe[42], true));
+                incarnation_reads.insert(insert_idx, KeyType(universe[42], PathKind::Module));
                 new_reads.push(incarnation_reads.clone());
             }
 
@@ -386,7 +451,7 @@ fn publishing_fixed_params() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
+        .execute_transactions_parallel(None, &transactions)
         .map(|(res, _)| res);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);

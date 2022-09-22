@@ -7,12 +7,14 @@ mod vm_wrapper;
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     aptos_vm::AptosVM,
+    logging::AdapterLogSchema,
     parallel_executor::vm_wrapper::AptosVMWrapper,
 };
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
+use aptos_logger::{debug, info};
 use aptos_parallel_executor::{
     errors::Error,
-    executor::ParallelTransactionExecutor,
+    executor::{ParallelTransactionExecutor, RAYON_EXEC_POOL},
     output_delta_resolver::ResolvedData,
     task::{Transaction as PTransaction, TransactionOutput as PTransactionOutput},
 };
@@ -86,57 +88,98 @@ impl ParallelAptosVM {
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
-    ) -> Result<(Vec<TransactionOutput>, Option<Error<VMStatus>>), VMStatus> {
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
-        let signature_verified_block: Vec<PreprocessedTransaction> = transactions
-            .par_iter()
-            .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
-            .collect();
+        // TODO: use the same threadpool as for parallel execution.
+        let signature_verified_block: Vec<PreprocessedTransaction> =
+            RAYON_EXEC_POOL.install(|| {
+                transactions
+                    .par_iter()
+                    .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
+                    .collect()
+            });
 
-        match ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new(
-            concurrency_level,
-        )
-        .execute_transactions_parallel(state_view, signature_verified_block)
-        {
-            Ok((results, delta_resolver)) => {
-                // TODO: with more deltas, collect keys in parallel (in parallel executor).
-                let mut aggregator_keys: HashMap<StateKey, anyhow::Result<ResolvedData>> =
-                    HashMap::new();
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
 
-                for res in results.iter() {
-                    let output_ext = AptosTransactionOutput::as_ref(res);
-                    for (key, _) in output_ext.delta_change_set().iter() {
-                        if !aggregator_keys.contains_key(key) {
-                            aggregator_keys.insert(key.clone(), state_view.get_state_value(key));
+        let executor =
+            ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new(
+                concurrency_level,
+            );
+
+        let mut ret = None;
+        if concurrency_level > 1 {
+            ret = Some(
+                executor
+                    .execute_transactions_parallel(state_view, &signature_verified_block)
+                    .map(|(results, delta_resolver)| {
+                        // TODO: with more deltas, collect keys in parallel (in parallel executor).
+                        let mut aggregator_keys: HashMap<StateKey, anyhow::Result<ResolvedData>> =
+                            HashMap::new();
+
+                        for res in results.iter() {
+                            let output_ext = AptosTransactionOutput::as_ref(res);
+                            for (key, _) in output_ext.delta_change_set().iter() {
+                                if !aggregator_keys.contains_key(key) {
+                                    aggregator_keys
+                                        .insert(key.clone(), state_view.get_state_value(key));
+                                }
+                            }
                         }
-                    }
-                }
 
-                let materialized_deltas =
-                    delta_resolver.resolve(aggregator_keys.into_iter().collect(), results.len());
-                Ok((
-                    results
-                        .into_iter()
-                        .zip(materialized_deltas.into_iter())
-                        .map(|(res, delta_writes)| {
-                            let output_ext = AptosTransactionOutput::into(res);
-                            output_ext.output_with_delta_writes(WriteSetMut::new(delta_writes))
-                        })
-                        .collect(),
-                    None,
-                ))
-            }
-            Err(err @ Error::ModulePathReadWrite) => {
-                let output = AptosVM::execute_block_and_keep_vm_status(transactions, state_view)?;
-                Ok((
-                    output
-                        .into_iter()
-                        .map(|(_vm_status, txn_output)| txn_output)
-                        .collect(),
-                    Some(err),
-                ))
+                        let materialized_deltas = delta_resolver
+                            .resolve(aggregator_keys.into_iter().collect(), results.len());
+
+                        results
+                            .into_iter()
+                            .zip(materialized_deltas.into_iter())
+                            .map(|(res, delta_writes)| {
+                                let output_ext = AptosTransactionOutput::into(res);
+                                output_ext.output_with_delta_writes(WriteSetMut::new(delta_writes))
+                            })
+                            .collect()
+                    }),
+            );
+        }
+
+        if ret.is_none() || ret == Some(Err(Error::ModulePathReadWrite)) {
+            debug!("[Execution]: Module read & written, sequential fallback");
+
+            ret = Some(
+                executor
+                    .execute_transactions_sequential(state_view, &signature_verified_block)
+                    .map(|results| {
+                        results
+                            .into_iter()
+                            .map(|res| {
+                                let output_ext = AptosTransactionOutput::into(res);
+                                let (deltas, output) = output_ext.into();
+                                debug_assert!(
+                                    deltas.is_empty(),
+                                    "[Execution] Deltas must be materialized"
+                                );
+                                output
+                            })
+                            .collect()
+                    }),
+            );
+        }
+
+        RAYON_EXEC_POOL.spawn(move || {
+            // Explicit async drop.
+            drop(signature_verified_block);
+        });
+
+        match ret.unwrap() {
+            Ok(outputs) => Ok(outputs),
+            Err(Error::ModulePathReadWrite) => {
+                unreachable!("[Execution]: Must be handled by sequential fallback")
             }
             Err(Error::InvariantViolation) => Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
