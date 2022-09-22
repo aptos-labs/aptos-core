@@ -175,7 +175,7 @@ export function useTransactionSimulation(
       };
 
       if (options?.maxGasOctaAmount !== undefined) {
-        const maxGasAmountEstimate = options.maxGasOctaAmount / gasUnitPriceEstimate;
+        const maxGasAmountEstimate = Math.floor(options.maxGasOctaAmount / gasUnitPriceEstimate);
         txnOptions.maxGasAmount = Math.min(maxGasAmountEstimate, maxNumberOfGasUnits);
       }
 
