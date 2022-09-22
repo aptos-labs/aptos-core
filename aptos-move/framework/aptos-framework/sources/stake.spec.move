@@ -53,6 +53,10 @@ spec aptos_framework::stake {
 
     spec distribute_rewards {
         include ResourceRequirement;
+        requires rewards_rate <= MAX_REWARDS_RATE;
+        requires rewards_rate_denominator > 0;
+        requires rewards_rate <= rewards_rate_denominator;
+        requires num_successful_proposals <= num_total_proposals;
         aborts_if false;
         ensures old(stake.value) > 0 ==>
                 result == spec_rewards_amount(
@@ -74,13 +78,18 @@ spec aptos_framework::stake {
 
     spec calculate_rewards_amount {
         pragma opaque;
+        requires rewards_rate <= MAX_REWARDS_RATE;
+        requires rewards_rate_denominator > 0;
+        requires rewards_rate <= rewards_rate_denominator;
+        requires num_successful_proposals <= num_total_proposals;
         ensures [concrete] (rewards_rate_denominator * num_total_proposals == 0) ==> result == 0;
-        ensures [concrete] (rewards_rate_denominator * num_total_proposals > 0) ==>
-            result == ((stake_amount * rewards_rate * num_successful_proposals) /
+        ensures [concrete] (rewards_rate_denominator * num_total_proposals > 0) ==> {
+            let amount = ((stake_amount * rewards_rate * num_successful_proposals) /
                 (rewards_rate_denominator * num_total_proposals));
-        // We assume that rewards_rate < 100 and num_successful_proposals < 86400 (1 proposal per second in a day).
-        // So, the multiplication in the reward formula should not overflow.
-        aborts_if [abstract] false;
+            result == amount
+        };
+        aborts_if false;
+
         // Used an uninterpreted spec function to avoid dealing with the arithmetic overflow and non-linear arithmetic.
         ensures [abstract] result == spec_rewards_amount(
             stake_amount,

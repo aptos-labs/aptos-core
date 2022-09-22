@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module defines physical storage schema storing medadata for the internal indexer
+//! This module defines physical storage schema storing metadata for the internal indexer
 //!
 
 use crate::metadata::{MetadataKey, MetadataValue};

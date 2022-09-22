@@ -34,9 +34,10 @@ use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cached_packages::aptos_stdlib;
 use forge::{LocalSwarm, Node, NodeExt, Swarm};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{future::Future, time::Duration};
 use tokio::{task::JoinHandle, time::Instant};
@@ -89,6 +90,92 @@ pub async fn setup_test(
         .unwrap();
 
     (swarm, cli, faucet, rosetta_client)
+}
+
+#[tokio::test]
+async fn test_block_transactions() {
+    const NUM_TXNS_PER_PAGE: u16 = 2;
+
+    let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            // Only one transaction will show up in a block no matter what
+            config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE;
+        }))
+        .build_with_cli(2)
+        .await;
+    let validator = swarm.validators().next().unwrap();
+
+    // And the client
+    let rosetta_port = get_available_port();
+    let rosetta_socket_addr = format!("127.0.0.1:{}", rosetta_port);
+    let rosetta_url = format!("http://{}", rosetta_socket_addr.clone())
+        .parse()
+        .unwrap();
+    let rosetta_client = RosettaClient::new(rosetta_url);
+    let api_config = ApiConfig {
+        enabled: true,
+        address: rosetta_socket_addr.parse().unwrap(),
+        tls_cert_path: None,
+        tls_key_path: None,
+        content_length_limit: None,
+        max_transactions_page_size: NUM_TXNS_PER_PAGE,
+        ..Default::default()
+    };
+
+    // Start the server
+    let _rosetta = aptos_rosetta::bootstrap_async(
+        swarm.chain_id(),
+        api_config,
+        Some(aptos_rest_client::Client::new(
+            validator.rest_api_endpoint(),
+        )),
+    )
+    .await
+    .unwrap();
+
+    // Ensure rosetta can take requests
+    try_until_ok_default(|| rosetta_client.network_list())
+        .await
+        .unwrap();
+
+    let account_1 = cli.account_id(0);
+    let chain_id = swarm.chain_id();
+
+    // At time 0, there should be 0 balance
+    let response = get_balance(&rosetta_client, chain_id, account_1, Some(0))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.block_identifier,
+        BlockIdentifier {
+            index: 0,
+            hash: BlockHash::new(chain_id, 0).to_string()
+        }
+    );
+
+    // First fund account 1 with lots more gas
+    cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 10))
+        .await
+        .unwrap();
+    let response = cli.transfer_coins(0, 1, 100, None).await.unwrap();
+
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let height = rest_client
+        .get_block_by_version_bcs(response.version, false)
+        .await
+        .unwrap()
+        .into_inner()
+        .block_height;
+
+    let response = rosetta_client
+        .block(&BlockRequest::by_index(swarm.chain_id(), height))
+        .await
+        .unwrap();
+
+    // There is only one user transaction, so the other one should be dropped
+    assert_eq!(1, response.block.transactions.len());
 }
 
 #[tokio::test]
@@ -659,6 +746,22 @@ async fn test_block() {
     // Also fail to set an operator
     cli.set_operator(1, 3).await.unwrap_err();
 
+    // Successfully, and fail setting a voter
+    set_voter_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Set operator should work!");
+    cli.set_delegated_voter(1, 3).await.unwrap_err();
+
     // This one will fail (and skip estimation of gas)
     let maybe_final_txn = transfer_and_wait(
         &rosetta_client,
@@ -691,8 +794,6 @@ async fn test_block() {
     let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;
 
     // TODO: Track total supply?
-    // TODO: Check no repeated block hashes
-    // TODO: Check no repeated txn hashes (in a block)
     // TODO: Check account balance block hashes?
     // TODO: Handle multiple coin types
 
@@ -713,6 +814,7 @@ async fn test_block() {
     // Now we have to watch all the changes
     let mut current_version = 0;
     let mut previous_block_index = 0;
+    let mut block_hashes = HashSet::new();
     for block_height in 0..final_block_height {
         let request = BlockRequest::by_index(chain_id, block_height);
         let response: BlockResponse = rosetta_client
@@ -743,6 +845,11 @@ async fn test_block() {
             block.parent_block_identifier.hash,
             BlockHash::new(chain_id, previous_block_index).to_string(),
             "Parent block hash should be previous block chain_id-block_height"
+        );
+        assert!(
+            block_hashes.insert(block.block_identifier.hash.clone()),
+            "Block hash was repeated {}",
+            block.block_identifier.hash
         );
 
         // It's only greater or equal because microseconds are cut off
@@ -780,6 +887,7 @@ async fn parse_block_transactions(
     actual_txns: &[TransactionOnChainData],
     current_version: &mut u64,
 ) {
+    let mut txn_hashes = HashSet::new();
     for transaction in block.transactions.iter() {
         let txn_metadata = &transaction.metadata;
         let txn_version = txn_metadata.version.0;
@@ -798,10 +906,17 @@ async fn parse_block_transactions(
         let actual_txn_info = &actual_txn.info;
 
         // Ensure transaction identifier is correct
+        let txn_hash = transaction.transaction_identifier.hash.clone();
         assert_eq!(
             format!("{:x}", actual_txn_info.transaction_hash()),
-            transaction.transaction_identifier.hash,
+            txn_hash,
             "Transaction hash should match the actual hash"
+        );
+
+        assert!(
+            txn_hashes.insert(txn_hash.clone()),
+            "Transaction hash was repeated {}",
+            txn_hash
         );
 
         // Ensure the status is correct
@@ -1007,38 +1122,81 @@ async fn parse_operations(
                         status,
                         "Successful transaction should have successful set operator operation"
                     );
-                    // Check that operator was set the same
-                    if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
-                        actual_txn.transaction
-                    {
-                        if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                            ref payload,
-                        ) = txn.payload()
-                        {
-                            let actual_operator_address: AccountAddress =
-                                bcs::from_bytes(payload.args().first().unwrap()).unwrap();
-                            let operator = operation
-                                .metadata
-                                .as_ref()
-                                .unwrap()
-                                .operator
-                                .as_ref()
-                                .unwrap()
-                                .account_address()
-                                .unwrap();
-                            assert_eq!(actual_operator_address, operator)
-                        } else {
-                            panic!("Not an entry function");
-                        }
-                    } else {
-                        panic!("Not a user transaction");
-                    }
                 } else {
                     assert_eq!(
                         OperationStatusType::Failure,
                         status,
                         "Failed transaction should have failed set operator operation"
                     );
+                }
+
+                // Check that operator was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator)
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            }
+            OperationType::SetVoter => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful set voter operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed set voter operation"
+                    );
+                }
+
+                // Check that voter was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_voter_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let voter = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .voter
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_voter_address, voter)
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
                 }
             }
             OperationType::Fee => {
@@ -1460,6 +1618,36 @@ async fn set_operator_and_wait(
             network_identifier,
             sender_key,
             new_operator,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn set_voter_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    new_voter: AccountAddress,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .set_voter(
+            network_identifier,
+            sender_key,
+            new_voter,
             expiry_time.as_secs(),
             sequence_number,
             max_gas,

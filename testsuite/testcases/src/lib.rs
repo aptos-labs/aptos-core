@@ -3,7 +3,6 @@
 
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
-pub mod continuous_progress_test;
 pub mod forge_setup_test;
 pub mod fullnode_reboot_stress_test;
 pub mod gas_price_test;

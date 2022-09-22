@@ -314,6 +314,10 @@ const config = {
             to: "/sdks/ts-sdk/index",
             from: "/sdks/typescript-sdk",
           },
+          {
+            to: "/guides/getting-started",
+            from: "/aptos-developer-resources",
+          },
         ],
       },
     ],

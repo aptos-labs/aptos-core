@@ -14,7 +14,7 @@ use std::collections::HashMap;
 /// reflecting the difference of `current` on top of `base`.
 ///
 /// The `base` is the state SMT that current is based on.
-/// The `current` is the state SMT that results from applying udpates_since_base on top of `base`.
+/// The `current` is the state SMT that results from applying updates_since_base on top of `base`.
 /// `updates_since_base` tracks all those key-value pairs that's changed since `base`, useful
 ///  when the next checkpoint is calculated.
 #[derive(Clone, Debug)]

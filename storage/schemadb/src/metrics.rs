@@ -25,7 +25,7 @@ pub static APTOS_SCHEMADB_ITER_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
         // metric name
         "aptos_schemadb_iter_bytes",
         // metric description
-        "Aptos schemadb iter size in bytess",
+        "Aptos schemadb iter size in bytes",
         // metric labels (dimensions)
         &["cf_name"]
     )

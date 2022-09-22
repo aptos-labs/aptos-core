@@ -165,7 +165,7 @@ jobs:
           tool: nextest
       # prebuild node binary, so that tests don't start before node is built.
       # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      - run: cargo build --bin=aptos-node --features=failpoints --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
+      - run: cargo build --bin=aptos-node --features=failpoints,indexer --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 

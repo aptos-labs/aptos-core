@@ -145,6 +145,54 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
+    /// This will get all the transactions from the block in successive calls
+    /// and will handle the successive calls
+    ///
+    /// Note: This could take a long time to run
+    pub async fn get_full_block_by_height_bcs(
+        &self,
+        height: u64,
+        page_size: u16,
+    ) -> AptosResult<Response<BcsBlock>> {
+        let (mut block, state) = self
+            .get_block_by_height_bcs(height, true)
+            .await?
+            .into_parts();
+
+        let mut current_version = block.first_version;
+
+        // Set the current version to the last known transaction
+        if let Some(ref txns) = block.transactions {
+            if let Some(txn) = txns.last() {
+                current_version = txn.version + 1;
+            }
+        } else {
+            return Err(RestError::Unknown(anyhow!(
+                "No transactions were returned in the block"
+            )));
+        }
+
+        // Add in all transactions by paging through the other transactions
+        while current_version <= block.last_version {
+            let page_end_version =
+                std::cmp::min(block.last_version, current_version + page_size as u64 - 1);
+
+            let transactions = self
+                .get_transactions_bcs(
+                    Some(current_version),
+                    Some((page_end_version - current_version + 1) as u16),
+                )
+                .await?
+                .into_inner();
+            if let Some(txn) = transactions.last() {
+                current_version = txn.version + 1;
+            };
+            block.transactions.as_mut().unwrap().extend(transactions);
+        }
+
+        Ok(Response::new(block, state))
+    }
+
     pub async fn get_block_by_version(
         &self,
         version: u64,

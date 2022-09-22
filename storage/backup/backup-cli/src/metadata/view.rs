@@ -69,7 +69,7 @@ impl MetadataView {
             }
             ensure!(
                 backup.first_version == next_ver,
-                "Transactioon backup ranges not continuous, expecting version {}, got {}.",
+                "Transaction backup ranges not continuous, expecting version {}, got {}.",
                 next_ver,
                 backup.first_version,
             );
@@ -82,6 +82,15 @@ impl MetadataView {
         }
 
         Ok(res)
+    }
+
+    pub fn max_transaction_version(&self) -> Result<Option<Version>> {
+        Ok(self
+            .transaction_backups
+            .iter()
+            .sorted()
+            .last()
+            .map(|backup| backup.last_version))
     }
 
     pub fn select_epoch_ending_backups(

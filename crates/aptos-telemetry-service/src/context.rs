@@ -10,7 +10,6 @@ use crate::{
     TelemetryServiceConfig,
 };
 use aptos_crypto::{noise, x25519};
-use aptos_infallible::RwLock;
 use aptos_types::chain_id::ChainId;
 use aptos_types::PeerId;
 use gcp_bigquery_client::Client as BQClient;
@@ -22,8 +21,10 @@ pub struct Context {
     noise_config: Arc<noise::NoiseConfig>,
     validator_cache: PeerSetCache,
     vfn_cache: PeerSetCache,
-    pfn_cache: Arc<RwLock<HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>>>,
+    pfn_cache: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
+
     configured_chains: HashSet<ChainId>,
+    log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
 
     pub gcp_bq_client: Option<BQClient>,
     pub gcp_bq_config: GCPBigQueryConfig,
@@ -41,7 +42,8 @@ impl Context {
         config: &TelemetryServiceConfig,
         validator_cache: PeerSetCache,
         vfn_cache: PeerSetCache,
-        pfn_cache: Arc<RwLock<HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>>>,
+        pfn_cache: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
+        log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
         gcp_bigquery_client: Option<BQClient>,
         victoria_metrics_client: Option<MetricsClient>,
         humio_client: humio::IngestClient,
@@ -58,6 +60,7 @@ impl Context {
             vfn_cache,
             pfn_cache,
             configured_chains,
+            log_env_map,
 
             gcp_bq_client: gcp_bigquery_client,
             gcp_bq_config: config.gcp_bq_config.clone(),
@@ -83,8 +86,8 @@ impl Context {
         self.vfn_cache.clone()
     }
 
-    pub fn pfn_cache(&self) -> Arc<RwLock<HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>>> {
-        self.pfn_cache.clone()
+    pub fn pfn_cache(&self) -> &HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>> {
+        &self.pfn_cache
     }
 
     pub fn noise_config(&self) -> Arc<noise::NoiseConfig> {
@@ -93,6 +96,15 @@ impl Context {
 
     pub fn configured_chains(&self) -> &HashSet<ChainId> {
         &self.configured_chains
+    }
+
+    pub fn log_env_map(&self) -> &HashMap<ChainId, HashMap<PeerId, String>> {
+        &self.log_env_map
+    }
+
+    #[cfg(test)]
+    pub fn log_env_map_mut(&mut self) -> &mut HashMap<ChainId, HashMap<PeerId, String>> {
+        &mut self.log_env_map
     }
 
     #[cfg(test)]

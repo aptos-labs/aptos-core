@@ -7,7 +7,7 @@ use crate::{
     context::Context,
     custom_event,
     error::ServiceError,
-    log_ingest, prometheus_push_metrics,
+    log_ingest, prometheus_push_metrics, remote_config,
     types::index::IndexResponse,
 };
 use std::convert::Infallible;
@@ -31,7 +31,8 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
             .or(auth::auth(context.clone()))
             .or(custom_event::custom_event_ingest(context.clone()))
             .or(prometheus_push_metrics::metrics_ingest(context.clone()))
-            .or(log_ingest::log_ingest(context.clone())),
+            .or(log_ingest::log_ingest(context.clone()))
+            .or(remote_config::telemetry_log_env(context.clone())),
     );
 
     let legacy_api = index_legacy(context.clone())

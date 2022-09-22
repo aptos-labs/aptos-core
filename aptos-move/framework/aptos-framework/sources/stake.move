@@ -83,6 +83,9 @@ module aptos_framework::stake {
     /// https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.rs#L20
     const MAX_VALIDATOR_SET_SIZE: u64 = 65536;
 
+    /// Limit the maximum value of `rewards_rate` in order to avoid any arithmetic overflow.
+    const MAX_REWARDS_RATE: u64 = 1000000;
+
     /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
     /// Having this be separate from the signer for the account that the validator resources are hosted at allows
     /// modules to have control over a validator.
@@ -347,6 +350,10 @@ module aptos_framework::stake {
         (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
     }
 
+    public fun stake_pool_exists(addr: address): bool {
+        exists<StakePool>(addr)
+    }
+
     /// Initialize validator set to the core resource account.
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -466,7 +473,7 @@ module aptos_framework::stake {
     fun initialize_owner(owner: &signer) acquires AllowedValidators {
         let owner_address = signer::address_of(owner);
         assert!(is_allowed(owner_address), error::not_found(EINELIGIBLE_VALIDATOR));
-        assert!(!exists<StakePool>(owner_address), error::already_exists(EALREADY_REGISTERED));
+        assert!(!stake_pool_exists(owner_address), error::already_exists(EALREADY_REGISTERED));
 
         move_to(owner, StakePool {
             active: coin::zero<AptosCoin>(),
@@ -1106,6 +1113,8 @@ module aptos_framework::stake {
         let cur_validator_perf = vector::borrow(&validator_perf.validators, validator_config.validator_index);
         let num_successful_proposals = cur_validator_perf.successful_proposals;
         spec {
+            // The following addition should not overflow because `num_total_proposals` cannot be larger than 86400,
+            // the maximum number of proposals in a day (1 proposal per second).
             assume cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals <= MAX_U64;
         };
         let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
@@ -1158,6 +1167,13 @@ module aptos_framework::stake {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
     ): u64 {
+        spec {
+            // The following condition must hold because
+            // (1) num_successful_proposals <= num_total_proposals, and
+            // (2) `num_total_proposals` cannot be larger than 86400, the maximum number of proposals
+            //     in a day (1 proposal per second), and `num_total_proposals` is reset to 0 every epoch.
+            assume num_successful_proposals * MAX_REWARDS_RATE <= MAX_U64;
+        };
         // The rewards amount is equal to (stake amount * rewards rate * performance multiplier).
         // We do multiplication in u128 before division to avoid the overflow and minimize the rounding error.
         let rewards_numerator = (stake_amount as u128) * (rewards_rate as u128) * (num_successful_proposals as u128);
@@ -1250,7 +1266,7 @@ module aptos_framework::stake {
     }
 
     fun assert_stake_pool_exists(pool_address: address) {
-        assert!(exists<StakePool>(pool_address), error::invalid_argument(ESTAKE_POOL_DOES_NOT_EXIST));
+        assert!(stake_pool_exists(pool_address), error::invalid_argument(ESTAKE_POOL_DOES_NOT_EXIST));
     }
 
     /// This provides an ACL for Testnet purposes. In testnet, everyone is a whale, a whale can be a validator.
@@ -1343,7 +1359,9 @@ module aptos_framework::stake {
         voting_power_increase_limit: u64,
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        initialize(aptos_framework);
+        if (!exists<ValidatorSet>(@aptos_framework)) {
+            initialize(aptos_framework);
+        };
         staking_config::initialize_for_test(
             aptos_framework,
             minimum_stake,
@@ -1355,9 +1373,11 @@ module aptos_framework::stake {
             voting_power_increase_limit,
         );
 
-        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
-        store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+        if (!exists<AptosCoinCapabilities>(@aptos_framework)) {
+            let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
+            store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+            coin::destroy_burn_cap<AptosCoin>(burn_cap);
+        };
     }
 
     // This function assumes the stake module already the capability to mint aptos coins.

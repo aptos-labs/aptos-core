@@ -60,8 +60,6 @@ impl PeerSetCacheUpdater {
                 Ok(response) => {
                     let (peer_addrs, state) = response.into_parts();
 
-                    println!("peers: {}", peer_addrs);
-
                     let received_chain_id = ChainId::new(state.chain_id);
                     if received_chain_id != *chain_id {
                         error!("Chain Id mismatch: Received in headers: {}. Provided in configuration: {} for {}", received_chain_id, chain_id, url);

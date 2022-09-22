@@ -151,29 +151,43 @@ module aptos_framework::staking_contract {
     }
 
     public fun stake_pool_address(staker: address, operator: address): address acquires Store {
+        assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
         simple_map::borrow(staking_contracts, &operator).pool_address
     }
 
     public fun last_recorded_principal(staker: address, operator: address): u64 acquires Store {
+        assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
         simple_map::borrow(staking_contracts, &operator).principal
     }
 
     public fun commission_percentage(staker: address, operator: address): u64 acquires Store {
+        assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
         simple_map::borrow(staking_contracts, &operator).commission_percentage
     }
 
     public fun staking_contract_amounts(staker: address, operator: address): (u64, u64, u64) acquires Store {
+        assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
         let staking_contract = simple_map::borrow(staking_contracts, &operator);
         get_staking_contract_amounts_internal(staking_contract)
     }
 
     public fun pending_distribution_counts(staker: address, operator: address): u64 acquires Store {
+        assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
         pool_u64::shareholders_count(&simple_map::borrow(staking_contracts, &operator).distribution_pool)
+    }
+
+    public fun staking_contract_exists(staker: address, operator: address): bool acquires Store {
+        if (!exists<Store>(staker)) {
+            return false
+        };
+
+        let store = borrow_global<Store>(staker);
+        simple_map::contains_key(&store.staking_contracts, &operator)
     }
 
     /// Staker can call this function to create a simple staking contract with a specified operator.
@@ -661,8 +675,14 @@ module aptos_framework::staking_contract {
         // Reward rate of 0.1% per epoch.
         stake::initialize_for_test_custom(aptos_framework, INITIAL_BALANCE, MAXIMUM_STAKE, 3600, true, 10, 10000, 1000000);
 
-        account::create_account_for_test(signer::address_of(staker));
-        account::create_account_for_test(signer::address_of(operator));
+        let staker_address = signer::address_of(staker);
+        if (!account::exists_at(staker_address)) {
+            account::create_account_for_test(staker_address);
+        };
+        let operator_address = signer::address_of(operator);
+        if (!account::exists_at(operator_address)) {
+            account::create_account_for_test(operator_address);
+        };
         stake::mint(staker, initial_balance);
         stake::mint(operator, initial_balance);
     }

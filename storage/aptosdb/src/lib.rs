@@ -90,7 +90,6 @@ use aptos_types::{
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
         TransactionWithProof, Version,
     },
-    write_set::WriteSet,
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use aptosdb_indexer::Indexer;
@@ -122,6 +121,8 @@ use storage_interface::{
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 
+// This is last line of defense against large queries slipping through external facing interfaces,
+// like the API and State Sync, etc.
 const MAX_LIMIT: u64 = 10000;
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
@@ -433,7 +434,8 @@ impl AptosDB {
         let state_merkle_db_secondary_path =
             secondary_db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
 
-        // Secondary needs `max_open_files = -1` per https://github.com/facebook/rocksdb/wiki/Secondary-instance
+        // Secondary needs `max_open_files = -1` per
+        // https://github.com/facebook/rocksdb/wiki/Read-only-and-Secondary-instances
         rocksdb_configs.ledger_db_config.max_open_files = -1;
         rocksdb_configs.state_merkle_db_config.max_open_files = -1;
 
@@ -933,7 +935,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// This API is best-effort in that it CANNOT provide absense proof.
+    /// This API is best-effort in that it CANNOT provide absence proof.
     fn get_transaction_by_hash(
         &self,
         hash: HashValue,
@@ -1126,23 +1128,6 @@ impl DbReader for AptosDB {
                 Some(start_version),
                 proof,
             ))
-        })
-    }
-
-    /// Returns write sets for range [begin_version, end_version).
-    ///
-    /// Used by the executor to build in memory state after a state checkpoint.
-    /// Any missing write set in the entire range results in an error.
-    fn get_write_sets(
-        &self,
-        begin_version: Version,
-        end_version: Version,
-    ) -> Result<Vec<WriteSet>> {
-        gauged_api("get_write_sets", || {
-            self.error_if_ledger_pruned("Write set", begin_version)?;
-
-            self.transaction_store
-                .get_write_sets(begin_version, end_version)
         })
     }
 
@@ -1489,7 +1474,7 @@ impl DbWriter for AptosDB {
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
-    /// Note that even if `txns_to_commit` is empty, `frist_version` is checked to be
+    /// Note that even if `txns_to_commit` is empty, `first_version` is checked to be
     /// `ledger_info_with_sigs.ledger_info.version + 1` if `ledger_info_with_sigs` is not `None`.
     fn save_transactions(
         &self,

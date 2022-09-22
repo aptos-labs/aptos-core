@@ -1,9 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashMap;
+
 use aptos_logger::warn;
 use aptos_metrics_core::const_metric::ConstMetric;
-use procfs::KernelStats;
+use procfs::{DiskStat, KernelStats};
 use prometheus::{
     core::{Collector, Desc, Describer},
     proto::MetricFamily,
@@ -229,18 +231,34 @@ impl Collector for LinuxDiskMetricsCollector {
 
         let mut mfs = Vec::new();
 
-        let disk_stats = match procfs::diskstats() {
-            Ok(disk_stats) => disk_stats,
+        let disk_stats: HashMap<String, DiskStat> = match procfs::diskstats() {
+            Ok(disk_stats) => HashMap::from_iter(disk_stats.into_iter().filter_map(|stat| {
+                if !stat.name.starts_with("loop") {
+                    Some((format!("{}:{}", stat.major, stat.minor), stat))
+                } else {
+                    None
+                }
+            })),
             Err(err) => {
                 warn!("unable to collect disk metrics for linux: {}", err);
                 return mfs;
             }
         };
 
-        disk_stats
-            .into_iter()
-            .filter(|disk_stat| disk_stat.name.starts_with("sd"))
-            .for_each(|disk_stat| {
+        let mounts =
+            match procfs::process::Process::myself().and_then(|process| process.mountinfo()) {
+                Ok(mounts) => mounts,
+                Err(err) => {
+                    warn!(
+                    "unable to collect disk metrics for linux. failure collecting mountinfo: {}",
+                    err
+                );
+                    return mfs;
+                }
+            };
+
+        for mount in mounts {
+            if let Some(disk_stat) = disk_stats.get(&mount.majmin) {
                 let labels = &[disk_stat.name.clone()];
                 disk_stats_counter!(mfs, num_reads, disk_stat.reads, labels);
                 disk_stats_counter!(mfs, num_merged_reads, disk_stat.merged, labels);
@@ -252,7 +270,8 @@ impl Collector for LinuxDiskMetricsCollector {
                 disk_stats_counter!(mfs, time_writing_ms, disk_stat.time_writing, labels);
                 disk_stats_guage!(mfs, io_in_progress, disk_stat.in_progress, labels);
                 disk_stats_counter!(mfs, total_io_time_ms, disk_stat.time_in_progress, labels);
-            });
+            }
+        }
 
         mfs
     }

@@ -13,7 +13,6 @@ use std::sync::Arc;
 use std::{env, num::NonZeroUsize, process, thread, time::Duration};
 use structopt::StructOpt;
 use testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
-use testcases::continuous_progress_test::ContinuousProgressTest;
 use testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
 use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
@@ -567,40 +566,33 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             )),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
-        "consensus_stress_test" => config
-            .with_network_tests(vec![&ContinuousProgressTest { target_tps: 100 }])
-            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
-            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["chain"]["epoch_duration_secs"] = 60.into();
-            }))
-            .with_node_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 50.into();
-                helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
-                    500.into();
-                helm_values["validator"]["config"]["consensus"]
-                    ["round_timeout_backoff_exponent_base"] = 1.0.into();
-                helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] =
-                    1.into();
-            }))
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-            .with_success_criteria(SuccessCriteria::new(
-                80,
-                10000,
-                true,
-                Some(Duration::from_secs(30)),
-                None,
-                Some(StateProgressThreshold {
-                    max_no_progress_secs: 3.0,
-                    max_round_gap: 4,
-                }),
-            )),
+        // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
+        "consensus_stress_test" => changing_working_quorum_test(
+            10,
+            60,
+            100,
+            80,
+            &ChangingWorkingQuorumTest {
+                min_tps: 50,
+                always_healthy_nodes: 10,
+                max_down_nodes: 0,
+                num_large_validators: 0,
+                add_execution_delay: false,
+                // Check that every 27s all nodes make progress,
+                // without any failures.
+                // (make epoch length (120s) and this duration (27s) not be multiples of one another,
+                // to test different timings)
+                check_period_s: 27,
+            },
+            false,
+        ),
         "changing_working_quorum_test" => changing_working_quorum_test(
             20,
             120,
             100,
             70,
             &ChangingWorkingQuorumTest {
-                min_tps: 30,
+                min_tps: 20,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
@@ -835,7 +827,11 @@ fn changing_working_quorum_test(
     let num_large_validators = test.num_large_validators;
     config
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(std::cmp::max(2, target_tps / 1000))
+        .with_initial_fullnode_count(if test.max_down_nodes == 0 {
+            0
+        } else {
+            std::cmp::max(2, target_tps / 1000)
+        })
         .with_network_tests(vec![test])
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();
@@ -873,7 +869,7 @@ fn changing_working_quorum_test(
             Some(Duration::from_secs(30)),
             None,
             Some(StateProgressThreshold {
-                max_no_progress_secs: 20.0,
+                max_no_progress_secs: if test.max_down_nodes == 0 { 3.0 } else { 20.0 },
                 max_round_gap: 6,
             }),
         ))
