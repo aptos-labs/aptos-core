@@ -549,7 +549,14 @@ pub async fn execute_and_wait_transactions(
 
     for txn in state.txns.iter() {
         RETRY_POLICY
-            .retry(move || client.wait_for_signed_transaction_bcs(txn))
+            .retry(move || {
+                client.wait_for_transaction_by_hash_bcs(
+                    txn.clone().committed_hash(),
+                    txn.expiration_timestamp_secs(),
+                    Some(Duration::from_secs(120)),
+                    None,
+                )
+            })
             .await
             .map_err(|e| format_err!("Failed to wait for transactions: {:?}", e))?;
     }

@@ -10,7 +10,7 @@ use aptos_sdk::{
 use crate::emitter::{account_minter::create_and_fund_account_request, RETRY_POLICY};
 use aptos_logger::{info, warn};
 use rand::rngs::StdRng;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub struct NFTMint {
     txn_factory: TransactionFactory,
@@ -66,7 +66,14 @@ async fn submit_retry_and_wait(rest_client: &RestClient, txn: &SignedTransaction
     }
     // if submission timeouts, it might still get committed:
     RETRY_POLICY
-        .retry(move || rest_client.wait_for_signed_transaction_bcs(txn))
+        .retry(move || {
+            rest_client.wait_for_transaction_by_hash_bcs(
+                txn.clone().committed_hash(),
+                txn.expiration_timestamp_secs(),
+                Some(Duration::from_secs(120)),
+                None,
+            )
+        })
         .await
         .unwrap();
 }
