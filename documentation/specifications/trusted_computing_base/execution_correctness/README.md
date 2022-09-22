@@ -355,7 +355,7 @@ The tree structure would look exactly the same as the one in [Overview and Archi
 /// This module implements `SpeculationCache` that is an in-memory representation of this tree.
 /// The tree is reprensented by a root block id,
 /// all the children of root and a global block map. Each block is an Arc<Mutx<SpeculationBlock>>
-/// with ref_count = 1. For the chidren of the root, the sole owner is `heads`. For the rest, the sole
+/// with ref_count = 1. For the children of the root, the sole owner is `heads`. For the rest, the sole
 /// owner is their parent block. So when a block is dropped, all its descendants will be dropped
 /// recursively. In the meanwhile, wheir entries in the block map will be removed by each block's drop().
 pub(crate) struct SpeculationCache {
@@ -363,7 +363,7 @@ pub(crate) struct SpeculationCache {
     committed_trees: ExecutedTrees,
     // The id of root block.
     committed_block_id: HashValue,
-    // The chidren of root block.
+    // The children of root block.
     heads: Vec<Arc<Mutex<SpeculationBlock>>>,
     // A pointer to the global block map keyed by id to achieve O(1) lookup time complexity.
     // It is optional but an optimization.

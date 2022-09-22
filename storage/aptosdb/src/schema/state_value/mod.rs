@@ -7,7 +7,7 @@
 //! An Index Key in this data set has 2 pieces of information:
 //!     1. The state key
 //!     2. The version associated with the key
-//! The value associated with the key is the the serialized State Value.
+//! The value associated with the key is the serialized State Value.
 //!
 //! ```text
 //! |<-------- key -------->|<--- value --->|
