@@ -9,7 +9,7 @@ use crate::{
         transaction::{MempoolTransaction, TimelineState},
         transaction_store::TransactionStore,
     },
-    counters,
+    counters::{self, MEMPOOL_RETURNED_NUM_BYTES_PER_BLOCK, MEMPOOL_RETURNED_NUM_TXNS_PER_BLOCK},
     logging::{LogEntry, LogSchema, TxnsLog},
 };
 use aptos_config::config::NodeConfig;
@@ -201,6 +201,9 @@ impl Mempool {
             block_size = block.len(),
             byte_size = total_bytes,
         );
+
+        MEMPOOL_RETURNED_NUM_TXNS_PER_BLOCK.observe(block.len() as f64);
+        MEMPOOL_RETURNED_NUM_BYTES_PER_BLOCK.observe(total_bytes as f64);
         for transaction in &block {
             self.log_latency(
                 transaction.sender(),
