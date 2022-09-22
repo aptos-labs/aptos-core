@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SwarmBuilder;
+use crate::smoke_test_environment::{with_retry, SwarmBuilder};
 use crate::test_utils::{assert_balance, create_and_fund_account, transfer_coins};
 use aptos_config::config::NodeConfig;
 use forge::{NodeExt, Swarm, SwarmExt};
@@ -10,19 +10,24 @@ use std::time::{Duration, Instant};
 
 const MAX_WAIT_SECS: u64 = 60;
 
-//TODO: debug me and re-enable the test!
 /// Checks txn goes through consensus even if the local validator is not creating proposals.
 /// This behavior should be true with both mempool and quorum store.
-#[ignore]
 #[tokio::test]
 async fn test_txn_broadcast() {
-    let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
-        .with_init_config(Arc::new(|_, conf, _| {
-            conf.api.failpoints_enabled = true;
-        }))
-        .build()
-        .await;
+    let mut swarm = with_retry(
+        || {
+            Box::pin(
+                SwarmBuilder::new_local(4)
+                    .with_aptos()
+                    .with_init_config(Arc::new(|_, conf, _| {
+                        conf.api.failpoints_enabled = true;
+                    }))
+                    .build_wrapped(),
+            )
+        },
+        3,
+    )
+    .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
     let version = swarm.versions().max().unwrap();
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();

@@ -106,7 +106,7 @@ impl Signature for Ed25519Signature {
         message: &T,
         public_key: &Ed25519PublicKey,
     ) -> Result<()> {
-        Self::verify_arbitrary_msg(self, &signing_message(message), public_key)
+        Self::verify_arbitrary_msg(self, &signing_message(message)?, public_key)
     }
 
     /// Checks that `self` is valid for an arbitrary &[u8] `message` using `public_key`.

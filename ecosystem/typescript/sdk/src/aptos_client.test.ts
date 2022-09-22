@@ -286,7 +286,7 @@ test(
 
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
-    const txns1 = await faucetClient.fundAccount(account1.address(), 500_000_000);
+    const txns1 = await faucetClient.fundAccount(account1.address(), 100_000_000);
     const txns2 = await faucetClient.fundAccount(account2.address(), 100_000_000);
     const tx1 = await client.getTransactionByHash(txns1[1]);
     const tx2 = await client.getTransactionByHash(txns2[1]);
@@ -297,7 +297,7 @@ test(
       const resources2 = await client.getAccountResources(account2.address());
       const account1Resource = resources1.find((r) => r.type === aptosCoin);
       const account2Resource = resources2.find((r) => r.type === aptosCoin);
-      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("500000000");
+      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("100000000");
       expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("100000000");
     };
     await checkAptosCoin();
@@ -499,6 +499,22 @@ test(
     const block = await client.getBlockByVersion(version);
     expect(parseInt(block.first_version, 10)).toBeLessThanOrEqual(version);
     expect(parseInt(block.last_version, 10)).toBeGreaterThanOrEqual(version);
+  },
+  30 * 1000,
+);
+
+test(
+  "estimates max gas amount",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const alice = new AptosAccount();
+    await faucetClient.fundAccount(alice.address(), 10000000);
+
+    const maxGasAmount = await client.estimateMaxGasAmount(alice.address());
+
+    expect(maxGasAmount).toBeGreaterThan(BigInt(0));
   },
   30 * 1000,
 );

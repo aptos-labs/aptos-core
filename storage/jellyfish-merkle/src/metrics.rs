@@ -20,14 +20,6 @@ pub static APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES: Lazy<IntCounter> = Lazy::new(
     .unwrap()
 });
 
-pub static APTOS_JELLYFISH_STORAGE_READS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_jellyfish_storage_reads",
-        "Aptos jellyfish reads from storage"
-    )
-    .unwrap()
-});
-
 pub static APTOS_JELLYFISH_LEAF_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_jellyfish_leaf_count",

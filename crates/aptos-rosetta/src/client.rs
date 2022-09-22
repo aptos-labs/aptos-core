@@ -248,6 +248,38 @@ impl RosettaClient {
         .await
     }
 
+    pub async fn set_voter(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        new_voter: AccountAddress,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let sender = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+        let mut keys = HashMap::new();
+        keys.insert(sender, private_key);
+
+        // A transfer operation is made up of a withdraw and a deposit
+        let operations = vec![Operation::set_voter(0, None, sender, new_voter)];
+
+        self.submit_operations(
+            sender,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+    }
+
     /// Retrieves the account address from the derivation path if there isn't an overriding account specified
     async fn get_account_address(
         &self,
@@ -436,7 +468,7 @@ impl RosettaClient {
         let unsigned_transaction: RawTransaction = bcs::from_bytes(&hex::decode(
             unsigned_response.unsigned_transaction.clone(),
         )?)?;
-        let signing_message = hex::encode(unsigned_transaction.signing_message());
+        let signing_message = hex::encode(unsigned_transaction.signing_message().unwrap());
 
         // Sign the payload if it matches the unsigned transaction
         for payload in unsigned_response.payloads.into_iter() {
@@ -447,7 +479,7 @@ impl RosettaClient {
             signers.push(account.clone());
 
             assert_eq!(signing_message, payload.hex_bytes);
-            let txn_signature = private_key.sign(&unsigned_transaction);
+            let txn_signature = private_key.sign(&unsigned_transaction).unwrap();
             signatures.push(Signature {
                 signing_payload: payload,
                 public_key: private_key.public_key().try_into()?,

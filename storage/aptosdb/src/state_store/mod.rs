@@ -98,8 +98,8 @@ impl Deref for StateStore {
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
-// want another trait, `StateReader`, which is a subset of `DbReaer` here but Rust does not support trait
-// upcasting coercion for now. Should change it to a different trait once upcasting is stablized.
+// want another trait, `StateReader`, which is a subset of `DbReader` here but Rust does not support trait
+// upcasting coercion for now. Should change it to a different trait once upcasting is stabilized.
 // ref: https://github.com/rust-lang/rust/issues/65991
 impl DbReader for StateDb {
     /// Returns the latest state snapshot strictly before `next_version` if any.

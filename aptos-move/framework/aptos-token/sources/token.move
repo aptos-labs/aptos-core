@@ -859,7 +859,7 @@ module aptos_token::token {
         }
     }
 
-    /// return the number of distinct token_id created under this collection
+    /// return the number of distinct token_id created under this TokenData
     public fun get_token_supply(creator_address: address, token_data_id: TokenDataId): Option<u64> acquires Collections {
         assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
         let all_token_data = &borrow_global<Collections>(creator_address).token_data;
@@ -871,6 +871,19 @@ module aptos_token::token {
         } else {
             option::none<u64>()
         }
+    }
+
+    /// return the largest_property_version of this TokenData
+    public fun get_tokendata_largest_property_version(creator_address: address, token_data_id: TokenDataId): u64 acquires Collections {
+        assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_token_data = &borrow_global<Collections>(creator_address).token_data;
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+        table::borrow(all_token_data, token_data_id).largest_property_version
+    }
+
+    /// return the TokenId for a given Token
+    public fun get_token_id(token: &Token): TokenId {
+        token.id
     }
 
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
@@ -1357,7 +1370,11 @@ module aptos_token::token {
             new_vals,
             new_types,
         );
+
         // should have two new property_version from the orignal two tokens
+        let largest_property_version = get_tokendata_largest_property_version(signer::address_of(creator), token_id.token_data_id);
+        assert!(largest_property_version == 2, largest_property_version);
+
         let new_id_1 = create_token_id(token_id.token_data_id, 1);
         let new_id_2 = create_token_id(token_id.token_data_id, 2);
         let new_id_3 = create_token_id(token_id.token_data_id, 3);

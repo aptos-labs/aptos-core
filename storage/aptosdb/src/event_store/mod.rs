@@ -177,7 +177,7 @@ impl EventStore {
                 let msg = if cur_seq == start_seq_num {
                     "First requested event is probably pruned."
                 } else {
-                    "DB corruption: Sequence number not continous."
+                    "DB corruption: Sequence number not continuous."
                 };
                 bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
             }
@@ -322,13 +322,16 @@ impl EventStore {
                 batch.put::<EventByVersionSchema>(
                     &(*event.key(), version, event.sequence_number()),
                     &(idx as u64),
-                )?;
-                Ok(())
+                )
             })?;
 
         // EventAccumulatorSchema updates
         let event_hashes: Vec<HashValue> = events.iter().map(ContractEvent::hash).collect();
-        let (root_hash, writes) = EmptyAccumulator::append(&EmptyReader, 0, &event_hashes)?;
+        let (root_hash, writes) = MerkleAccumulator::<EmptyReader, EventAccumulatorHasher>::append(
+            &EmptyReader,
+            0,
+            &event_hashes,
+        )?;
         writes.into_iter().try_for_each(|(pos, hash)| {
             batch.put::<EventAccumulatorSchema>(&(version, pos), &hash)
         })?;
@@ -414,7 +417,7 @@ impl EventStore {
             },
             ledger_version,
         )?.ok_or_else(|| format_err!(
-            "No new block found beyond timestmap {}, so can't determine the last version before it.",
+            "No new block found beyond timestamp {}, so can't determine the last version before it.",
             timestamp,
         ))?;
 
@@ -528,8 +531,6 @@ impl EventStore {
     }
 }
 
-type Accumulator<'a> = MerkleAccumulator<EventHashReader<'a>, EventAccumulatorHasher>;
-
 struct EventHashReader<'a> {
     store: &'a EventStore,
     version: Version,
@@ -549,8 +550,6 @@ impl<'a> HashReader for EventHashReader<'a> {
             .ok_or_else(|| format_err!("Hash at position {:?} not found.", position))
     }
 }
-
-type EmptyAccumulator = MerkleAccumulator<EmptyReader, EventAccumulatorHasher>;
 
 struct EmptyReader;
 

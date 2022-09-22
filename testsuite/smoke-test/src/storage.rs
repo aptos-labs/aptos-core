@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::smoke_test_environment::{with_retry, SwarmBuilder};
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
         transfer_and_reconfig, transfer_coins,
@@ -35,7 +35,11 @@ async fn test_db_restore() {
     workspace_builder::get_bin("db-backup-verify");
     info!("---------- 1. pre-building finished.");
 
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = with_retry(
+        || Box::pin(SwarmBuilder::new_local(4).with_aptos().build_wrapped()),
+        3,
+    )
+    .await;
     info!("---------- 1.1 swarm built, sending some transactions.");
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let client_1 = swarm

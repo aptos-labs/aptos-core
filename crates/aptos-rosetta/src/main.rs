@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_config::config::ApiConfig;
+use aptos_config::config::{ApiConfig, DEFAULT_MAX_PAGE_SIZE};
 use aptos_node::AptosNodeArgs;
 use aptos_rosetta::bootstrap;
 use aptos_types::chain_id::ChainId;
@@ -158,6 +158,11 @@ pub struct OfflineArgs {
     /// ChainId to be used for the server e.g. TESTNET
     #[clap(long, default_value = "TESTING")]
     chain_id: ChainId,
+    /// Page size for transactions APIs, must match the downstream node
+    ///
+    /// This can be configured to change performance characteristics
+    #[clap(long, default_value_t = DEFAULT_MAX_PAGE_SIZE)]
+    transactions_page_size: u16,
 }
 
 impl ServerArgs for OfflineArgs {
@@ -168,6 +173,7 @@ impl ServerArgs for OfflineArgs {
             tls_cert_path: self.tls_cert_path.clone(),
             tls_key_path: self.tls_key_path.clone(),
             content_length_limit: self.content_length_limit,
+            max_transactions_page_size: self.transactions_page_size,
             ..Default::default()
         }
     }

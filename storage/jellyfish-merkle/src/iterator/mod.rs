@@ -37,7 +37,7 @@ struct NodeVisitInfo {
 
     /// This integer always has exactly one 1-bit. The position of the 1-bit (from LSB) indicates
     /// the next child to visit in the iteration process. All the ones on the left have already
-    /// been visited. All the chilren on the right (including this one) have not been visited yet.
+    /// been visited. All the children on the right (including this one) have not been visited yet.
     next_child_to_visit: u16,
 }
 

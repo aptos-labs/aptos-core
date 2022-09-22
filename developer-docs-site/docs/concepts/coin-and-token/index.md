@@ -17,7 +17,7 @@ See [Aptos Coin >](aptos-coin)
 
 ### [Aptos Token](aptos-token)
 
-The [`token.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move), Move module, on the other hand:
+The [`token.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module, on the other hand:
 
 - Encapsulates rich, flexible assets, fungible and nonfungible, and collectibles. 
 - The token standard is deployed as a separate package at the Aptos blockchain address `0x3`. 

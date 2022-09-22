@@ -159,12 +159,16 @@ impl BlockInfo {
 /// A cache of [`BlockInfo`] to allow us to keep track of the block boundaries
 #[derive(Debug)]
 pub struct BlockRetriever {
+    page_size: u16,
     rest_client: Arc<aptos_rest_client::Client>,
 }
 
 impl BlockRetriever {
-    pub fn new(rest_client: Arc<aptos_rest_client::Client>) -> Self {
-        BlockRetriever { rest_client }
+    pub fn new(page_size: u16, rest_client: Arc<aptos_rest_client::Client>) -> Self {
+        BlockRetriever {
+            page_size,
+            rest_client,
+        }
     }
 
     pub async fn get_block_info_by_height(
@@ -193,12 +197,18 @@ impl BlockRetriever {
         height: u64,
         with_transactions: bool,
     ) -> ApiResult<aptos_rest_client::aptos_api_types::BcsBlock> {
-        let block = self
-            .rest_client
-            .get_block_by_height_bcs(height, with_transactions)
-            .await?
-            .into_inner();
-
-        Ok(block)
+        if with_transactions {
+            Ok(self
+                .rest_client
+                .get_full_block_by_height_bcs(height, self.page_size)
+                .await?
+                .into_inner())
+        } else {
+            Ok(self
+                .rest_client
+                .get_block_by_height_bcs(height, false)
+                .await?
+                .into_inner())
+        }
     }
 }

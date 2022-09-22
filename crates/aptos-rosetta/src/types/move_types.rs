@@ -18,6 +18,7 @@ pub const STAKE_POOL_RESOURCE: &str = "StakePool";
 pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
 pub const TRANSFER_FUNCTION: &str = "transfer";
 pub const SET_OPERATOR_FUNCTION: &str = "set_operator";
+pub const SET_VOTER_FUNCTION: &str = "set_delegated_voter";
 
 pub const DECIMALS_FIELD: &str = "decimal";
 pub const DEPOSIT_EVENTS_FIELD: &str = "deposit_events";

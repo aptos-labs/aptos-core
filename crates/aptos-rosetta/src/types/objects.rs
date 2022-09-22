@@ -7,8 +7,8 @@
 
 use crate::types::{
     ACCOUNT_MODULE, ACCOUNT_RESOURCE, APTOS_ACCOUNT_MODULE, COIN_MODULE, COIN_STORE_RESOURCE,
-    CREATE_ACCOUNT_FUNCTION, SET_OPERATOR_FUNCTION, STAKE_MODULE, STAKE_POOL_RESOURCE,
-    TRANSFER_FUNCTION,
+    CREATE_ACCOUNT_FUNCTION, SET_OPERATOR_FUNCTION, SET_VOTER_FUNCTION, STAKE_MODULE,
+    STAKE_POOL_RESOURCE, TRANSFER_FUNCTION,
 };
 use crate::{
     common::{is_native_coin, native_coin},
@@ -288,6 +288,22 @@ impl Operation {
             Some(OperationMetadata::set_operator(operator)),
         )
     }
+
+    pub fn set_voter(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        voter: AccountAddress,
+    ) -> Operation {
+        Operation::new(
+            OperationType::SetVoter,
+            operation_index,
+            status,
+            address,
+            None,
+            Some(OperationMetadata::set_voter(voter)),
+        )
+    }
 }
 
 impl std::cmp::PartialOrd for Operation {
@@ -326,6 +342,8 @@ pub struct OperationMetadata {
     pub sender: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operator: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voter: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -339,6 +357,13 @@ impl OperationMetadata {
     pub fn set_operator(operator: AccountAddress) -> Self {
         OperationMetadata {
             operator: Some(operator.into()),
+            ..Default::default()
+        }
+    }
+
+    pub fn set_voter(voter: AccountAddress) -> Self {
+        OperationMetadata {
+            voter: Some(voter.into()),
             ..Default::default()
         }
     }
@@ -488,6 +513,7 @@ impl Transaction {
                     write_op,
                     &events,
                     maybe_user_txn.map(|inner| inner.sender()),
+                    maybe_user_txn.map(|inner| inner.payload()),
                     txn.version,
                     operation_index,
                 )
@@ -498,7 +524,7 @@ impl Transaction {
         } else {
             // Parse all failed operations from the payload
             if let Some(user_txn) = maybe_user_txn {
-                let mut ops = parse_operations_from_txn_payload(
+                let mut ops = parse_failed_operations_from_txn_payload(
                     coin_cache.clone(),
                     operation_index,
                     user_txn.sender(),
@@ -543,7 +569,7 @@ impl Transaction {
 ///
 /// This case only occurs if the transaction failed, and that's because it's less accurate
 /// than just following the state changes
-fn parse_operations_from_txn_payload(
+fn parse_failed_operations_from_txn_payload(
     coin_cache: Arc<CoinCache>,
     operation_index: u64,
     sender: AccountAddress,
@@ -601,11 +627,27 @@ fn parse_operations_from_txn_payload(
                     operations.push(Operation::set_operator(
                         operation_index,
                         Some(OperationStatusType::Failure),
-                        operator,
                         sender,
+                        operator,
                     ));
                 } else {
                     warn!("Failed to parse set operator {:?}", inner);
+                }
+            }
+            (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) => {
+                if let Some(Ok(voter)) = inner
+                    .args()
+                    .get(0)
+                    .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
+                {
+                    operations.push(Operation::set_voter(
+                        operation_index,
+                        Some(OperationStatusType::Failure),
+                        sender,
+                        voter,
+                    ));
+                } else {
+                    warn!("Failed to parse set voter {:?}", inner);
                 }
             }
             _ => {
@@ -665,10 +707,40 @@ async fn parse_operations_from_write_set(
     write_op: &WriteOp,
     events: &[ContractEvent],
     maybe_sender: Option<AccountAddress>,
+    maybe_payload: Option<&TransactionPayload>,
     version: u64,
     operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
     let operations = vec![];
+
+    // If we have any entry functions that don't provide proper event based changes, we have to
+    // pull the changes possibly from the payload.  This is more fragile, as it doesn't support
+    // move scripts and wrapper entry functions.
+    if let (Some(TransactionPayload::EntryFunction(inner)), Some(sender)) =
+        (maybe_payload, maybe_sender)
+    {
+        if let (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) = (
+            *inner.module().address(),
+            inner.module().name().as_str(),
+            inner.function().as_str(),
+        ) {
+            return if let Some(Ok(voter)) = inner
+                .args()
+                .get(0)
+                .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
+            {
+                Ok(vec![Operation::set_voter(
+                    operation_index,
+                    Some(OperationStatusType::Success),
+                    sender,
+                    voter,
+                )])
+            } else {
+                warn!("Failed to parse set voter {:?}", inner);
+                Ok(vec![])
+            };
+        }
+    }
 
     let (struct_tag, address) = match state_key {
         StateKey::AccessPath(path) => {
@@ -935,6 +1007,7 @@ pub enum InternalOperation {
     CreateAccount(CreateAccount),
     Transfer(Transfer),
     SetOperator(SetOperator),
+    SetVoter(SetVoter),
 }
 
 impl InternalOperation {
@@ -974,6 +1047,20 @@ impl InternalOperation {
                                 }));
                             }
                         }
+                        Ok(OperationType::SetVoter) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    voter: Some(voter), ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::SetVoter(SetVoter {
+                                    owner: account.account_address()?,
+                                    voter: voter.account_address()?,
+                                }));
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -998,6 +1085,7 @@ impl InternalOperation {
             Self::CreateAccount(inner) => inner.sender,
             Self::Transfer(inner) => inner.sender,
             Self::SetOperator(inner) => inner.owner,
+            Self::SetVoter(inner) => inner.owner,
         }
     }
 
@@ -1019,6 +1107,10 @@ impl InternalOperation {
             InternalOperation::SetOperator(set_operator) => (
                 aptos_stdlib::stake_set_operator(set_operator.operator),
                 set_operator.owner,
+            ),
+            InternalOperation::SetVoter(set_voter) => (
+                aptos_stdlib::stake_set_delegated_voter(set_voter.voter),
+                set_voter.owner,
             ),
         })
     }
@@ -1141,6 +1233,12 @@ impl Transfer {
 pub struct SetOperator {
     pub owner: AccountAddress,
     pub operator: AccountAddress,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SetVoter {
+    pub owner: AccountAddress,
+    pub voter: AccountAddress,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

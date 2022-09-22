@@ -69,7 +69,7 @@ impl MetadataView {
             }
             ensure!(
                 backup.first_version == next_ver,
-                "Transactioon backup ranges not continuous, expecting version {}, got {}.",
+                "Transaction backup ranges not continuous, expecting version {}, got {}.",
                 next_ver,
                 backup.first_version,
             );

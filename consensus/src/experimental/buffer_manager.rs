@@ -43,6 +43,7 @@ use futures::channel::mpsc::unbounded;
 use once_cell::sync::OnceCell;
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
+pub const LOOP_INTERVAL_MS: u64 = 1500;
 
 pub type ResetAck = ();
 
@@ -124,7 +125,6 @@ impl BufferManager {
         verifier: ValidatorVerifier,
         ongoing_tasks: Arc<AtomicU64>,
     ) -> Self {
-        counters::NUM_BLOCKS_IN_PIPELINE.set(0);
         let buffer = Buffer::<BufferItem>::new();
 
         Self {
@@ -189,7 +189,6 @@ impl BufferManager {
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
-        counters::NUM_BLOCKS_IN_PIPELINE.add(ordered_blocks.len() as i64);
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
@@ -293,7 +292,6 @@ impl BufferManager {
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
                 }
-                counters::NUM_BLOCKS_IN_PIPELINE.sub(blocks_to_persist.len() as i64);
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,
@@ -330,7 +328,6 @@ impl BufferManager {
         while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
-        counters::NUM_BLOCKS_IN_PIPELINE.set(0);
     }
 
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
@@ -526,10 +523,48 @@ impl BufferManager {
         info!("Rebroadcasting {} commit votes", count);
     }
 
+    fn update_buffer_manager_metrics(&self) {
+        let mut cursor = *self.buffer.head_cursor();
+        let mut pending_ordered = 0;
+        let mut pending_executed = 0;
+        let mut pending_signed = 0;
+        let mut pending_aggregated = 0;
+
+        while cursor.is_some() {
+            match self.buffer.get(&cursor) {
+                BufferItem::Ordered(_) => {
+                    pending_ordered += 1;
+                }
+                BufferItem::Executed(_) => {
+                    pending_executed += 1;
+                }
+                BufferItem::Signed(_) => {
+                    pending_signed += 1;
+                }
+                BufferItem::Aggregated(_) => {
+                    pending_aggregated += 1;
+                }
+            }
+            cursor = self.buffer.get_next(&cursor);
+        }
+
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["ordered"])
+            .set(pending_ordered as i64);
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["executed"])
+            .set(pending_executed as i64);
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["signed"])
+            .set(pending_signed as i64);
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["aggregated"])
+            .set(pending_aggregated as i64);
+    }
+
     pub async fn start(mut self) {
         info!("Buffer manager starts.");
-        let mut interval =
-            tokio::time::interval(Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS));
+        let mut interval = tokio::time::interval(Duration::from_millis(LOOP_INTERVAL_MS));
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
@@ -565,6 +600,7 @@ impl BufferManager {
                     }
                 },
                 _ = interval.tick().fuse() => {
+                    self.update_buffer_manager_metrics();
                     self.rebroadcast_commit_votes_if_needed().await;
                 },
                 // no else branch here because interval.tick will always be available

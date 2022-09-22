@@ -65,7 +65,8 @@ pub fn make_proposal_with_qc_and_proof(
             qc,
             validator_signer,
             Vec::new(),
-        ),
+        )
+        .unwrap(),
         None,
         false,
     )
@@ -156,7 +157,8 @@ pub fn make_proposal_with_parent_and_overrides(
         validator_signer.author(),
         ledger_info,
         validator_signer,
-    );
+    )
+    .unwrap();
 
     let mut ledger_info_with_signatures = LedgerInfoWithPartialSignatures::new(
         vote.ledger_info().clone(),
@@ -200,7 +202,7 @@ pub fn make_timeout_cert(
 ) -> TwoChainTimeoutCertificate {
     let timeout = TwoChainTimeout::new(1, round, hqc.clone());
     let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
-    let signature = timeout.sign(signer);
+    let signature = timeout.sign(signer).unwrap();
     tc_partial.add(signer.author(), timeout, signature);
     tc_partial
         .aggregate_signatures(&generate_validator_verifier(&[signer.clone()]))
