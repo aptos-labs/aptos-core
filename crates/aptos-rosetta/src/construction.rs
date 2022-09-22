@@ -410,11 +410,11 @@ async fn construction_parse(
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
                 }
-                (AccountAddress::ONE, STAKE_MODULE, SET_OPERATOR_FUNCTION) => {
-                    parse_set_operator_operation(sender, &type_args, &args)?
+                (AccountAddress::ONE, STAKING_PROXY_MODULE, SET_OPERATOR_FUNCTION) => {
+                    parse_set_operator_operation(sender, &type_args, &args, None)?
                 }
-                (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) => {
-                    parse_set_voter_operation(sender, &type_args, &args)?
+                (AccountAddress::ONE, STAKING_PROXY_MODULE, SET_VOTER_FUNCTION) => {
+                    parse_set_voter_operation(sender, &type_args, &args, None)?
                 }
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
@@ -557,10 +557,11 @@ fn parse_account_transfer_operation(
     Ok(operations)
 }
 
-fn parse_set_operator_operation(
+pub fn parse_set_operator_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
     args: &[Vec<u8>],
+    status: Option<OperationStatusType>,
 ) -> ApiResult<Vec<Operation>> {
     if !type_args.is_empty() {
         return Err(ApiError::TransactionParseError(Some(format!(
@@ -570,10 +571,17 @@ fn parse_set_operator_operation(
     }
 
     // Set operator
-    if let Some(encoded_new_operator) = args.first() {
+    if let (Some(encoded_old_operator), Some(encoded_new_operator)) = (args.get(0), args.get(1)) {
+        let old_operator: AccountAddress = bcs::from_bytes(encoded_old_operator)?;
         let new_operator: AccountAddress = bcs::from_bytes(encoded_new_operator)?;
 
-        Ok(vec![Operation::set_operator(0, None, sender, new_operator)])
+        Ok(vec![Operation::set_operator(
+            0,
+            status,
+            sender,
+            old_operator,
+            new_operator,
+        )])
     } else {
         Err(ApiError::InvalidOperations(Some(
             "Set operator doesn't have a operator argument".to_string(),
@@ -581,10 +589,11 @@ fn parse_set_operator_operation(
     }
 }
 
-fn parse_set_voter_operation(
+pub fn parse_set_voter_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
     args: &[Vec<u8>],
+    status: Option<OperationStatusType>,
 ) -> ApiResult<Vec<Operation>> {
     if !type_args.is_empty() {
         return Err(ApiError::TransactionParseError(Some(format!(
@@ -593,10 +602,13 @@ fn parse_set_voter_operation(
         ))));
     }
 
-    if let Some(new_voter) = args.first() {
-        let new_voter: AccountAddress = bcs::from_bytes(new_voter)?;
+    if let (Some(encoded_operator), Some(encoded_new_voter)) = (args.get(0), args.get(1)) {
+        let operator: AccountAddress = bcs::from_bytes(encoded_operator)?;
+        let new_voter: AccountAddress = bcs::from_bytes(encoded_new_voter)?;
 
-        Ok(vec![Operation::set_voter(0, None, sender, new_voter)])
+        Ok(vec![Operation::set_voter(
+            0, status, sender, operator, new_voter,
+        )])
     } else {
         Err(ApiError::InvalidOperations(Some(
             "Set voter doesn't have a voter argument".to_string(),

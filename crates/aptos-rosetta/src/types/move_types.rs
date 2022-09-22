@@ -8,6 +8,7 @@ pub const APTOS_ACCOUNT_MODULE: &str = "aptos_account";
 pub const APTOS_COIN_MODULE: &str = "aptos_coin";
 pub const COIN_MODULE: &str = "coin";
 pub const STAKE_MODULE: &str = "stake";
+pub const STAKING_PROXY_MODULE: &str = "staking_proxy";
 
 pub const ACCOUNT_RESOURCE: &str = "Account";
 pub const APTOS_COIN_RESOURCE: &str = "AptosCoin";
@@ -18,7 +19,8 @@ pub const STAKE_POOL_RESOURCE: &str = "StakePool";
 pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
 pub const TRANSFER_FUNCTION: &str = "transfer";
 pub const SET_OPERATOR_FUNCTION: &str = "set_operator";
-pub const SET_VOTER_FUNCTION: &str = "set_delegated_voter";
+pub const SET_VOTER_FUNCTION: &str = "set_voter";
+pub const SET_DELEGATED_VOTER_FUNCTION: &str = "set_delegated_voter";
 
 pub const DECIMALS_FIELD: &str = "decimal";
 pub const DEPOSIT_EVENTS_FIELD: &str = "deposit_events";

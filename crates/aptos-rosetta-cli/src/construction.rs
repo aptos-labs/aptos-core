@@ -185,7 +185,8 @@ pub struct SetOperatorCommand {
     /// AccountAddress if it rotates
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     sender: Option<AccountAddress>,
-    /// The receiving account
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    old_operator: AccountAddress,
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_operator: AccountAddress,
 }
@@ -204,6 +205,7 @@ impl SetOperatorCommand {
             .set_operator(
                 &network_identifier,
                 &private_key,
+                self.old_operator,
                 self.new_operator,
                 self.txn_args.expiry_time()?,
                 self.txn_args.sequence_number,
