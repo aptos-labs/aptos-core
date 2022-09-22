@@ -218,7 +218,7 @@ impl StateComputer for ExecutionProxy {
         });
         // Here to start to do state synchronization where ChunkExecutor inside will
         // process chunks and commit to Storage. However, after block execution and
-        // commitments, the the sync state of ChunkExecutor may be not up to date so
+        // commitments, the sync state of ChunkExecutor may be not up to date so
         // it is required to reset the cache of ChunkExecutor in State Sync
         // when requested to sync.
         let res = monitor!(
