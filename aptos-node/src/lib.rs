@@ -19,7 +19,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
-use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level};
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -190,8 +190,8 @@ pub fn start(
             .expect("Failed to build rayon global thread _pool.");
     }
 
-    let mut logger = aptos_logger::Logger::new();
-    logger
+    let mut logger_builder = aptos_logger::Logger::builder();
+    logger_builder
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)
@@ -200,18 +200,19 @@ pub fn start(
         .console_port(config.logger.console_port)
         .read_env();
     if config.logger.enable_backtrace {
-        logger.enable_backtrace();
+        logger_builder.enable_backtrace();
     }
     if let Some(log_file) = log_file {
-        logger.printer(Box::new(FileWriter::new(log_file)));
+        logger_builder.printer(Box::new(FileWriter::new(log_file)));
     }
     let mut remote_log_rx = None;
     if config.logger.enable_telemetry_remote_log {
         let (tx, rx) = mpsc::channel(TELEMETRY_LOG_INGEST_BUFFER_SIZE);
-        logger.remote_log_tx(tx);
+        logger_builder.remote_log_tx(tx);
         remote_log_rx = Some(rx);
     }
-    let _logger = logger.build();
+    let logger = logger_builder.build();
+    let logger_filter_update_job = aptos_logger::LoggerFilterUpdater::new(logger, logger_builder);
 
     // Print out build information.
     log_build_information();
@@ -230,7 +231,7 @@ pub fn start(
         warn!("failpoints is set in config, but the binary doesn't compile with this feature");
     }
 
-    let _node_handle = setup_environment(config, remote_log_rx)?;
+    let _node_handle = setup_environment(config, remote_log_rx, Some(logger_filter_update_job))?;
 
     let term = Arc::new(AtomicBool::new(false));
 
@@ -580,6 +581,7 @@ fn bootstrap_indexer(
 pub fn setup_environment(
     node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
     // Start the node inspection service
     let node_config_clone = node_config.clone();
@@ -864,6 +866,7 @@ pub fn setup_environment(
         chain_id,
         build_info,
         remote_log_rx,
+        logger_filter_update_job,
     );
 
     Ok(AptosHandle {
@@ -900,6 +903,6 @@ mod tests {
         validator_network.mutual_authentication = false;
 
         // Starting the node should panic
-        setup_environment(node_config, None).unwrap();
+        setup_environment(node_config, None, None).unwrap();
     }
 }

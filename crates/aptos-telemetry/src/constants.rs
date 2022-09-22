@@ -13,6 +13,7 @@ pub(crate) const ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS: &str =
     "APTOS_DISABLE_TELEMETRY_PUSH_EVENTS";
 pub(crate) const ENV_APTOS_DISABLE_PROMETHEUS_NODE_METRICS: &str =
     "APTOS_DISABLE_PROMETHEUS_NODE_METRICS";
+pub(crate) const ENV_APTOS_DISABLE_LOG_ENV_POLLING: &str = "APTOS_DISABLE_LOG_ENV_POLLING";
 
 pub(crate) const ENV_GA_MEASUREMENT_ID: &str = "GA_MEASUREMENT_ID";
 pub(crate) const ENV_GA_API_SECRET: &str = "GA_API_SECRET";
@@ -37,3 +38,5 @@ pub(crate) const NODE_SYS_INFO_FREQ_SECS: u64 = 5 * 60; // 5 minutes
 
 // TODO: consider making this interval configurable
 pub(crate) const PROMETHEUS_PUSH_METRICS_FREQ_SECS: u64 = 15; // 15 seconds
+pub(crate) const CHAIN_ACCESS_CHECK_FREQ_SECS: u64 = 30 * 60; // 30 minutes
+pub(crate) const LOG_ENV_POLL_FREQ_SECS: u64 = 5 * 60; // 5 minutes

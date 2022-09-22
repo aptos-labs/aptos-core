@@ -4,10 +4,13 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::config::NodeConfig;
-use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog};
+use aptos_logger::{
+    aptos_logger::RUST_LOG_TELEMETRY, prelude::*, telemetry_log_writer::TelemetryLog,
+    LoggerFilterUpdater,
+};
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
-use futures::channel::mpsc;
+use futures::channel::mpsc::{self, Receiver};
 use once_cell::sync::Lazy;
 use rand::Rng;
 use rand_core::OsRng;
@@ -52,35 +55,47 @@ static TELEMETRY_TOKEN: Lazy<String> = Lazy::new(|| {
 });
 
 /// Returns true iff telemetry is disabled
+#[inline]
 fn telemetry_is_disabled() -> bool {
     env::var(ENV_APTOS_DISABLE_TELEMETRY).is_ok()
 }
 
 /// Flag to force enabling/disabling of telemetry
+#[inline]
 fn force_enable_telemetry() -> bool {
     env::var(ENV_APTOS_FORCE_ENABLE_TELEMETRY).is_ok()
 }
 
 /// Flag to control enabling/disabling prometheus push metrics
+#[inline]
 fn enable_prometheus_push_metrics() -> bool {
     force_enable_telemetry()
         || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS).is_ok())
 }
 
+#[inline]
 fn enable_prometheus_node_metrics() -> bool {
     env::var(ENV_APTOS_DISABLE_PROMETHEUS_NODE_METRICS).is_err()
 }
 
 /// Flag to control enabling/disabling push logs
+#[inline]
 fn enable_push_logs() -> bool {
     force_enable_telemetry()
         || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_LOGS).is_ok())
 }
 
 /// Flag to control enabling/disabling telemetry push events
+#[inline]
 fn enable_push_custom_events() -> bool {
     force_enable_telemetry()
         || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS).is_ok())
+}
+
+#[inline]
+fn enable_log_env_polling() -> bool {
+    force_enable_telemetry()
+        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_LOG_ENV_POLLING).is_ok())
 }
 
 /// Starts the telemetry service and returns the execution runtime.
@@ -90,6 +105,7 @@ pub fn start_telemetry_service(
     chain_id: ChainId,
     build_info: BTreeMap<String, String>,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> Option<Runtime> {
     // Don't start the service if telemetry has been disabled
     if telemetry_is_disabled() {
@@ -114,6 +130,7 @@ pub fn start_telemetry_service(
         chain_id,
         build_info,
         remote_log_rx,
+        logger_filter_update_job,
     ));
 
     Some(telemetry_runtime)
@@ -124,6 +141,7 @@ async fn spawn_telemetry_service(
     chain_id: ChainId,
     build_info: BTreeMap<String, String>,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) {
     let telemetry_svc_url =
         env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
@@ -132,46 +150,72 @@ async fn spawn_telemetry_service(
 
     if !force_enable_telemetry() && !telemetry_sender.check_chain_access(chain_id).await {
         warn!(
-            "Aptos telemetry is not sent to the telemetry service because the service is not configured for chain ID {}",
-            chain_id
-        );
+                "Aptos telemetry is not sent to the telemetry service because the service is not configured for chain ID {}",
+                chain_id
+            );
         // Spawn the custom event sender to send to GA4 only.
         // This is a temporary workaround while we deprecate and remove GA4 completely.
         let peer_id = fetch_peer_id(&node_config);
-        tokio::spawn(custom_event_sender(
+        let handle = tokio::spawn(custom_event_sender(
             None,
             peer_id,
             chain_id,
-            node_config,
-            build_info,
+            node_config.clone(),
+            build_info.clone(),
         ));
-        return;
-    }
+        info!("Telemetry service for GA4 started!");
 
-    if enable_push_logs() {
-        if let Some(rx) = remote_log_rx {
-            let telemetry_log_sender = TelemetryLogSender::new(telemetry_sender.clone());
-            tokio::spawn(telemetry_log_sender.start(rx));
+        // Check for chain access periodically in case the service is configured later
+        let mut interval = time::interval(Duration::from_secs(CHAIN_ACCESS_CHECK_FREQ_SECS));
+        loop {
+            interval.tick().await;
+            if telemetry_sender.check_chain_access(chain_id).await {
+                handle.abort();
+                info!("Aptos telemetry service is now configured for Chain ID {}. Starting telemetry service...", chain_id);
+                break;
+            }
         }
     }
 
-    if enable_prometheus_push_metrics() {
-        if enable_prometheus_node_metrics() {
-            node_resource_metrics::register_node_metrics_collector();
-        }
+    try_spawn_log_sender(telemetry_sender.clone(), remote_log_rx);
+    try_spawn_metrics_sender(telemetry_sender.clone());
+    try_spawn_custom_event_sender(node_config, telemetry_sender.clone(), chain_id, build_info);
+    try_spawn_log_env_poll_task(telemetry_sender);
 
-        let telemetry_sender = telemetry_sender.clone();
+    // Run the logger filter update job within the telemetry runtime.
+    if let Some(job) = logger_filter_update_job {
+        tokio::spawn(job.run());
+    }
+
+    info!("Telemetry service started!");
+}
+
+fn try_spawn_log_env_poll_task(sender: TelemetrySender) {
+    if enable_log_env_polling() {
         tokio::spawn(async move {
-            // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
-            let mut interval =
-                time::interval(Duration::from_secs(PROMETHEUS_PUSH_METRICS_FREQ_SECS));
+            let mut interval = time::interval(Duration::from_secs(LOG_ENV_POLL_FREQ_SECS));
             loop {
                 interval.tick().await;
-                telemetry_sender.try_push_prometheus_metrics().await;
+                if let Some(env) = sender.get_telemetry_log_env().await {
+                    info!(
+                        "Updating {} env variable: previous value: {:?}, new value: {}",
+                        RUST_LOG_TELEMETRY,
+                        env::var(RUST_LOG_TELEMETRY).ok(),
+                        env
+                    );
+                    env::set_var(RUST_LOG_TELEMETRY, env)
+                }
             }
         });
     }
+}
 
+fn try_spawn_custom_event_sender(
+    node_config: NodeConfig,
+    telemetry_sender: TelemetrySender,
+    chain_id: ChainId,
+    build_info: BTreeMap<String, String>,
+) {
     if enable_push_custom_events() {
         // Spawn the custom event sender
         let peer_id = fetch_peer_id(&node_config);
@@ -183,8 +227,36 @@ async fn spawn_telemetry_service(
             build_info,
         ));
     }
+}
 
-    info!("Telemetry service started!");
+fn try_spawn_metrics_sender(telemetry_sender: TelemetrySender) {
+    if enable_prometheus_push_metrics() {
+        if enable_prometheus_node_metrics() {
+            node_resource_metrics::register_node_metrics_collector();
+        }
+
+        tokio::spawn(async move {
+            // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
+            let mut interval =
+                time::interval(Duration::from_secs(PROMETHEUS_PUSH_METRICS_FREQ_SECS));
+            loop {
+                interval.tick().await;
+                telemetry_sender.try_push_prometheus_metrics().await;
+            }
+        });
+    }
+}
+
+fn try_spawn_log_sender(
+    telemetry_sender: TelemetrySender,
+    remote_log_rx: Option<Receiver<TelemetryLog>>,
+) {
+    if enable_push_logs() {
+        if let Some(rx) = remote_log_rx {
+            let telemetry_log_sender = TelemetryLogSender::new(telemetry_sender);
+            tokio::spawn(telemetry_log_sender.start(rx));
+        }
+    }
 }
 
 /// Returns the peer id given the node config.
