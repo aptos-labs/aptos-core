@@ -161,6 +161,8 @@ impl QuorumStoreWrapper {
                 counters::EMPTY_BATCH_CREATION_DURATION
                     .observe_duration(Duration::from_secs_f64(duration));
 
+                self.last_end_batch_time = Instant::now();
+
                 return None;
             }
 
@@ -352,7 +354,7 @@ impl QuorumStoreWrapper {
 
         // TODO: parameter? bring back back-off?
         let mut interval = time::interval(Duration::from_millis(
-            25, // 50 is currently the end batch timer
+            50, // 50 is currently the end batch timer
         ));
 
         loop {
