@@ -294,7 +294,7 @@ impl LedgerStore {
         Ok(root_hash)
     }
 
-    /// Write `ledger_info` to `batch`.
+    /// Write `ledger_info_with_sigs` to `batch`.
     pub fn put_ledger_info(
         &self,
         ledger_info_with_sigs: &LedgerInfoWithSignatures,
