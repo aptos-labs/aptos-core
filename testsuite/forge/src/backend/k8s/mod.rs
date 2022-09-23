@@ -137,6 +137,7 @@ impl Factory for K8sFactory {
                 self.kube_namespace.clone(),
                 num_validators.get(),
                 num_fullnodes,
+                num_public_fullnodes,
                 format!("{}", init_version),
                 format!("{}", genesis_version),
                 genesis_modules_path,

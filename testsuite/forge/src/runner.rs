@@ -129,6 +129,9 @@ pub struct ForgeConfig<'cfg> {
     /// The initial number of fullnodes to spawn when the test harness creates a swarm
     initial_fullnode_count: usize,
 
+    /// The initial number of fullnodes to spawn when the test harness creates a swarm
+    initial_public_fullnode_count: usize,
+
     /// The initial version to use when the test harness creates a swarm
     initial_version: InitialVersion,
 
@@ -261,6 +264,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             network_tests: vec![],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_fullnode_count: 0,
+            initial_public_fullnode_count: 0,
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
             genesis_helm_config_fn: None,
@@ -346,6 +350,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 &mut rng,
                 self.tests.initial_validator_count,
                 self.tests.initial_fullnode_count,
+                self.tests.initial_public_fullnode_count,
                 &initial_version,
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
