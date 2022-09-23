@@ -3,9 +3,9 @@
 
 use framework::natives::code::UpgradePolicy;
 use itertools::Itertools;
-use move_deps::move_command_line_common::files::MOVE_EXTENSION;
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
-use std::path::PathBuf;
+use move_command_line_common::files::MOVE_EXTENSION;
+use move_package::compilation::package_layout::CompiledPackageLayout;
+use std::path::Path;
 use tempfile::{tempdir, TempDir};
 
 /// A helper for building Move packages on-the-fly for testing.
@@ -13,7 +13,7 @@ use tempfile::{tempdir, TempDir};
 pub struct PackageBuilder {
     name: String,
     policy: UpgradePolicy,
-    deps: Vec<String>,
+    deps: Vec<(String, String)>,
     aliases: Vec<(String, String)>,
     sources: Vec<(String, String)>,
 }
@@ -33,8 +33,8 @@ impl PackageBuilder {
         Self { policy, ..self }
     }
 
-    pub fn add_dep(&mut self, dep: &str) {
-        self.deps.push(dep.to_string())
+    pub fn add_local_dep(&mut self, name: &str, path: &str) {
+        self.deps.push((name.to_string(), path.to_string()))
     }
 
     pub fn add_alias(&mut self, name: &str, addr: &str) {
@@ -45,7 +45,9 @@ impl PackageBuilder {
         self.sources.push((name.to_string(), src.to_string()))
     }
 
-    pub fn write_to_disk(self, path: PathBuf) -> anyhow::Result<()> {
+    pub fn write_to_disk(self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+        let path = path.as_ref();
+
         let sources_path = path.join(CompiledPackageLayout::Sources.path());
         std::fs::create_dir_all(&sources_path)?;
         std::fs::write(
@@ -66,7 +68,10 @@ upgrade_policy = \"{}\"
                     .into_iter()
                     .map(|(k, v)| format!("{} = \"{}\"", k, v))
                     .join("\n"),
-                self.deps.into_iter().join("\n")
+                self.deps
+                    .into_iter()
+                    .map(|(name, dep_path)| format!("{} = {{ local = \"{}\" }}", name, dep_path))
+                    .join("\n")
             ),
         )?;
         for (name, src) in self.sources {
@@ -77,7 +82,7 @@ upgrade_policy = \"{}\"
 
     pub fn write_to_temp(self) -> anyhow::Result<TempDir> {
         let dir = tempdir()?;
-        self.write_to_disk(dir.path().to_path_buf())?;
+        self.write_to_disk(dir.path())?;
         Ok(dir)
     }
 }

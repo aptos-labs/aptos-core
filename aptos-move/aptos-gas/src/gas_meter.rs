@@ -21,6 +21,8 @@ use move_vm_types::{
 };
 use std::collections::BTreeMap;
 
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 1;
+
 /// A trait for converting from a map representation of the on-chain gas schedule.
 pub trait FromOnChainGasSchedule: Sized {
     /// Constructs a value of this type from a map representation of the on-chain gas schedule.

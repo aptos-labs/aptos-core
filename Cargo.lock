@@ -593,15 +593,21 @@ dependencies = [
 name = "aptos-gas"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-global-constants",
  "aptos-types",
+ "bcs",
+ "clap 3.2.17",
  "framework",
  "gas-algebra-ext",
  "move-binary-format",
  "move-core-types",
+ "move-model",
  "move-stdlib",
  "move-table-extension",
  "move-vm-types",
+ "package-builder",
+ "tempfile",
 ]
 
 [[package]]
@@ -3338,6 +3344,7 @@ dependencies = [
  "itertools",
  "language-e2e-tests",
  "move-deps",
+ "package-builder",
  "project-root",
  "proptest",
  "rand 0.7.3",
@@ -6716,6 +6723,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "628223faebab4e3e40667ee0b2336d34a5b960ff60ea743ddfdbcf7770bcfb66"
 dependencies = [
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "package-builder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "framework",
+ "itertools",
+ "move-command-line-common",
+ "move-package",
+ "tempfile",
 ]
 
 [[package]]
