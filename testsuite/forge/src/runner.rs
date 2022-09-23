@@ -181,6 +181,14 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
+    pub fn with_initial_public_fullnode_count(
+        mut self,
+        initial_public_fullnode_count: usize,
+    ) -> Self {
+        self.initial_public_fullnode_count = initial_public_fullnode_count;
+        self
+    }
+
     pub fn with_genesis_helm_config_fn(mut self, genesis_helm_config_fn: GenesisConfigFn) -> Self {
         self.genesis_helm_config_fn = Some(genesis_helm_config_fn);
         self
