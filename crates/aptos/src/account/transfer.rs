@@ -38,7 +38,10 @@ impl CliCommand<TransferSummary> for TransferCoins {
 
     async fn execute(self) -> CliTypedResult<TransferSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::aptos_coin_transfer(self.account, self.amount))
+            .submit_transaction(aptos_stdlib::aptos_account_transfer(
+                self.account,
+                self.amount,
+            ))
             .await
             .map(TransferSummary::from)
     }
