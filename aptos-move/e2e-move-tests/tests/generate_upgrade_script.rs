@@ -3,10 +3,10 @@
 
 use crate::common::test_dir_path;
 use aptos_types::account_address::AccountAddress;
-use e2e_move_tests::package_builder::PackageBuilder;
 use e2e_move_tests::MoveHarness;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
+use package_builder::PackageBuilder;
 
 mod common;
 
@@ -33,10 +33,10 @@ module 0x{}::test {{
     let upgrade_dir = upgrade.write_to_temp().unwrap();
 
     let mut proposal = PackageBuilder::new("Proposal");
-    proposal.add_dep(&format!(
-        "AptosFramework = {{ local = \"{}\" }}",
-        test_dir_path("../../framework/aptos-framework").display()
-    ));
+    proposal.add_local_dep(
+        "AptosFramework",
+        &test_dir_path("../../framework/aptos-framework").to_string_lossy(),
+    );
     let proposal_dir = proposal.write_to_temp().unwrap();
 
     let upgrade_release = ReleasePackage::new(

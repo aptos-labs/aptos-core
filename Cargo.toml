@@ -23,6 +23,7 @@ members = [
     "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
+    "aptos-move/package-builder",
     "aptos-move/parallel-executor",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
