@@ -98,7 +98,7 @@ pub async fn handle_log_ingest(
     debug!("ingesting to humio: {:?}", unstructured_log);
 
     let res = context
-        .humio_client
+        .humio_client()
         .ingest_unstructured_log(unstructured_log)
         .await;
 
