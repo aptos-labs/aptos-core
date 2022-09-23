@@ -496,7 +496,10 @@ fn create_and_initialize_validators_with_commission(
     validators: &[ValidatorWithCommissionRate],
 ) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
-    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    let mut serialized_values = serialize_values(&vec![
+        MoveValue::Signer(CORE_CODE_ADDRESS),
+        MoveValue::Bool(true),
+    ]);
     serialized_values.push(validators_bytes);
     exec_function(
         session,
@@ -954,10 +957,10 @@ pub fn test_mainnet_end_to_end() {
     employee_validator_2.owner_address = admin1;
     employee_validator_2.operator_address = operator1;
     employee_validator_2.voter_address = voter1;
-    let mut direct_validator = test_validators[2].data.clone();
-    direct_validator.owner_address = account44;
-    direct_validator.operator_address = operator2;
-    direct_validator.voter_address = voter2;
+    let mut zero_commission_validator = test_validators[2].data.clone();
+    zero_commission_validator.owner_address = account44;
+    zero_commission_validator.operator_address = operator2;
+    zero_commission_validator.voter_address = voter2;
     let mut same_owner_validator_1 = test_validators[3].data.clone();
     same_owner_validator_1.owner_address = account45;
     same_owner_validator_1.operator_address = operator3;
@@ -1013,7 +1016,7 @@ pub fn test_mainnet_end_to_end() {
             join_during_genesis: false,
         },
         ValidatorWithCommissionRate {
-            validator: direct_validator,
+            validator: zero_commission_validator,
             validator_commission_percentage: 0,
             join_during_genesis: true,
         },
@@ -1055,6 +1058,8 @@ pub fn test_mainnet_end_to_end() {
         .map(|v| v.account_address)
         .collect::<Vec<_>>();
 
+    let zero_commission_validator_pool_address =
+        account_address::default_stake_pool_address(account44, operator2);
     let same_owner_validator_1_pool_address =
         account_address::default_stake_pool_address(account45, operator3);
     let same_owner_validator_2_pool_address =
@@ -1066,6 +1071,7 @@ pub fn test_mainnet_end_to_end() {
     let employee_2_pool_address =
         account_address::create_vesting_pool_address(admin1, operator1, 0, &[]);
 
+    assert!(validator_set_addresses.contains(&zero_commission_validator_pool_address));
     assert!(validator_set_addresses.contains(&employee_1_pool_address));
     // This validator should not be in the genesis validator set as they specified
     // join_during_genesis = false.
@@ -1075,5 +1081,4 @@ pub fn test_mainnet_end_to_end() {
     // This validator should not be in the genesis validator set as they specified
     // join_during_genesis = false.
     assert!(!validator_set_addresses.contains(&same_owner_validator_3_pool_address));
-    assert!(validator_set_addresses.contains(&account44));
 }
