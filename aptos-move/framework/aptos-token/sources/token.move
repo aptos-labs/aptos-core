@@ -416,10 +416,12 @@ module aptos_token::token {
         let collections = borrow_global_mut<Collections>(creator);
         let collection_data = borrow_collection_data_mut(collections, collection_name);
         assert!(collection_data.mutability_config.maximum, EFIELD_NOT_MUTABLE);
-        assert!(
-            collection_data.supply <= maximum,
-            error::invalid_argument(ECOLLECTION_MAXIMUM_SMALLER_THAN_SUPPLY)
-        );
+        if (maximum > 0) {
+            assert!(
+                collection_data.supply <= maximum,
+                error::invalid_argument(ECOLLECTION_MAXIMUM_SMALLER_THAN_SUPPLY)
+            );
+        };
         collection_data.maximum = maximum;
     }
 
