@@ -13,6 +13,12 @@ pub fn hash_str(val: &str) -> String {
     hex::encode(sha2::Sha256::digest(val.as_bytes()))
 }
 
+pub fn truncate_str(val: &str, max_chars: usize) -> String {
+    let mut trunc = val.to_string();
+    trunc.truncate(max_chars);
+    trunc
+}
+
 pub fn u64_to_bigdecimal(val: u64) -> BigDecimal {
     BigDecimal::from(val)
 }

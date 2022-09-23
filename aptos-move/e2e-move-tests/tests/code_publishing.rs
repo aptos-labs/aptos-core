@@ -3,11 +3,11 @@
 
 use aptos_types::account_address::AccountAddress;
 use aptos_types::on_chain_config::FeatureFlag;
-use e2e_move_tests::package_builder::PackageBuilder;
 use e2e_move_tests::{assert_abort, assert_success, assert_vm_status, MoveHarness};
 use framework::natives::code::{PackageRegistry, UpgradePolicy};
 use move_deps::move_core_types::parser::parse_struct_tag;
 use move_deps::move_core_types::vm_status::StatusCode;
+use package_builder::PackageBuilder;
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
@@ -251,10 +251,7 @@ fn code_publishing_weak_dep_fail(#[case] features: Vec<FeatureFlag>) {
     assert_success!(h.publish_package(&acc, weak_dir.path()));
 
     let mut normal = PackageBuilder::new("Package").with_policy(UpgradePolicy::compat());
-    normal.add_dep(&format!(
-        "WeakPackage = {{ local = \"{}\" }}",
-        weak_dir.path().display()
-    ));
+    normal.add_local_dep("WeakPackage", &weak_dir.path().to_string_lossy());
     normal.add_source(
         "normal",
         "module 0xcafe::normal { use 0xcafe::weak; public fun f() { weak::f() } }",
@@ -278,10 +275,7 @@ fn code_publishing_arbitray_dep_different_address(#[case] features: Vec<FeatureF
     let pack1_dir = pack1.write_to_temp().unwrap();
 
     let mut pack2 = PackageBuilder::new("Package2").with_policy(UpgradePolicy::arbitrary());
-    pack2.add_dep(&format!(
-        "Package1 = {{ local = \"{}\" }}",
-        pack1_dir.path().display()
-    ));
+    pack2.add_local_dep("Package1", &pack1_dir.path().to_string_lossy());
     pack2.add_source(
         "m",
         "module 0xdeaf::m { use 0xcafe::m; public fun f() { m::f() } }",
@@ -342,10 +336,7 @@ fn code_publishing_faked_dependency(#[case] features: Vec<FeatureFlag>) {
 
     // pack2 has a higher policy and should not be able to depend on pack1
     let mut pack2 = PackageBuilder::new("Package2").with_policy(UpgradePolicy::immutable());
-    pack2.add_dep(&format!(
-        "Package1 = {{ local = \"{}\" }}",
-        pack1_dir.path().display()
-    ));
+    pack2.add_local_dep("Package1", &pack1_dir.path().to_string_lossy());
     pack2.add_source(
         "m",
         "module 0xdeaf::m { use 0xcafe::m; public fun f() { m::f() } }",

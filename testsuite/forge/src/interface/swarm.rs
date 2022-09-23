@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
-    AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
+    interface::system_metrics::SystemMetricsThreshold, AptosPublicInfo, ChainInfo, FullNode,
+    NodeExt, Result, SwarmChaos, Validator, Version,
 };
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
@@ -101,6 +101,12 @@ pub trait Swarm: Sync {
 
     fn aptos_public_info(&mut self) -> AptosPublicInfo<'_> {
         self.chain_info().into_aptos_public_info()
+    }
+
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_>;
+
+    fn aptos_public_info_for_node(&mut self, idx: usize) -> AptosPublicInfo<'_> {
+        self.chain_info_for_node(idx).into_aptos_public_info()
     }
 }
 

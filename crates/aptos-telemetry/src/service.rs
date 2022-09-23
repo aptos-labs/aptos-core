@@ -235,10 +235,6 @@ fn try_spawn_custom_event_sender(
 
 fn try_spawn_metrics_sender(telemetry_sender: TelemetrySender) {
     if enable_prometheus_push_metrics() {
-        if enable_prometheus_node_metrics() {
-            node_resource_metrics::register_node_metrics_collector();
-        }
-
         tokio::spawn(async move {
             // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
             let mut interval =

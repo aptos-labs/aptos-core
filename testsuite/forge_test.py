@@ -54,7 +54,6 @@ from forge import (
     get_dashboard_link,
     get_humio_logs_link,
     get_testsuite_images,
-    get_validator_logs_link,
     list_eks_clusters,
     main,
     sanitize_forge_resource_name,
@@ -553,16 +552,9 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         self.assertFixture(link, "testHumioLogLink.fixture")
         self.assertIn("forge-pr-2983", link)
 
-    def testValidatorLogsLink(self) -> None:
-        self.assertFixture(
-            get_validator_logs_link("aptos-perry", "perrynet", True),
-            "testValidatorLogsLink.fixture",
-        )
-
     def testDashboardLinkAutoRefresh(self) -> None:
         self.assertFixture(
             get_dashboard_link(
-                "aptos-forge-big-1",
                 "forge-pr-2983",
                 "forge-big-1",
                 True,
@@ -573,7 +565,6 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
     def testDashboardLinkTimeInterval(self) -> None:
         self.assertFixture(
             get_dashboard_link(
-                "aptos-forge-big-1",
                 "forge-pr-2983",
                 "forge-big-1",
                 (

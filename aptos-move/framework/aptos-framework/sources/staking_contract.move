@@ -435,6 +435,19 @@ module aptos_framework::staking_contract {
         unlock_stake(staker, operator, staker_rewards);
     }
 
+    /// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+    public entry fun switch_operator_with_same_commission(
+        staker: &signer,
+        old_operator: address,
+        new_operator: address,
+    ) acquires Store {
+        let staker_address = signer::address_of(staker);
+        assert_staking_contract_exists(staker_address, old_operator);
+
+        let commission_percentage = commission_percentage(staker_address, old_operator);
+        switch_operator(staker, old_operator, new_operator, commission_percentage);
+    }
+
     /// Allows staker to switch operator without going through the lenghthy process to unstake.
     public entry fun switch_operator(
         staker: &signer,
@@ -999,6 +1012,26 @@ module aptos_framework::staking_contract {
         );
     }
 
+    #[test(aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345)]
+    public entry fun test_staker_can_switch_operator_with_same_commission(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator_1: &signer,
+        operator_2: &signer,
+    ) acquires Store {
+        setup_staking_contract(aptos_framework, staker, operator_1, INITIAL_BALANCE, 10);
+        let staker_address = signer::address_of(staker);
+        let operator_1_address = signer::address_of(operator_1);
+        let operator_2_address = signer::address_of(operator_2);
+
+        // Switch operators.
+        switch_operator_with_same_commission(staker, operator_1_address, operator_2_address);
+        // The staking_contract should now be associated with operator 2 but with same commission rate.
+        assert!(staking_contract_exists(staker_address, operator_2_address), 0);
+        assert!(!staking_contract_exists(staker_address, operator_1_address), 1);
+        assert!(commission_percentage(staker_address, operator_2_address) == 10, 2);
+    }
+
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
     public entry fun test_staker_can_withdraw_partial_stake(
         aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store {
@@ -1110,7 +1143,7 @@ module aptos_framework::staking_contract {
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
 
         // End epoch to generate some rewards. Staker withdraws another 1/4 of the stake.
-        // Commission should be charged on the the rewards earned on the previous 1/4 stake withdrawal.
+        // Commission should be charged on the rewards earned on the previous 1/4 stake withdrawal.
         stake::end_epoch();
         let commission_on_withdrawn_stake = (with_rewards(withdrawn_stake) - withdrawn_stake) / 10;
         let commission_on_new_balance = (with_rewards(new_balance) - new_balance) / 10;

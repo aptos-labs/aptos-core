@@ -317,6 +317,12 @@ pub enum EntryFunctionCall {
         new_commission_percentage: u64,
     },
 
+    /// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+    StakingContractSwitchOperatorWithSameCommission {
+        old_operator: AccountAddress,
+        new_operator: AccountAddress,
+    },
+
     /// Unlock all accumulated rewards since the last recorded principals.
     StakingContractUnlockRewards {
         operator: AccountAddress,
@@ -622,6 +628,10 @@ impl EntryFunctionCall {
                 new_operator,
                 new_commission_percentage,
             ),
+            StakingContractSwitchOperatorWithSameCommission {
+                old_operator,
+                new_operator,
+            } => staking_contract_switch_operator_with_same_commission(old_operator, new_operator),
             StakingContractUnlockRewards { operator } => staking_contract_unlock_rewards(operator),
             StakingContractUnlockStake { operator, amount } => {
                 staking_contract_unlock_stake(operator, amount)
@@ -1553,6 +1563,28 @@ pub fn staking_contract_switch_operator(
             bcs::to_bytes(&old_operator).unwrap(),
             bcs::to_bytes(&new_operator).unwrap(),
             bcs::to_bytes(&new_commission_percentage).unwrap(),
+        ],
+    ))
+}
+
+/// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+pub fn staking_contract_switch_operator_with_same_commission(
+    old_operator: AccountAddress,
+    new_operator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_contract").to_owned(),
+        ),
+        ident_str!("switch_operator_with_same_commission").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&old_operator).unwrap(),
+            bcs::to_bytes(&new_operator).unwrap(),
         ],
     ))
 }
@@ -2499,6 +2531,21 @@ mod decoder {
         }
     }
 
+    pub fn staking_contract_switch_operator_with_same_commission(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::StakingContractSwitchOperatorWithSameCommission {
+                    old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn staking_contract_unlock_rewards(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -2947,6 +2994,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_contract_switch_operator".to_string(),
             Box::new(decoder::staking_contract_switch_operator),
+        );
+        map.insert(
+            "staking_contract_switch_operator_with_same_commission".to_string(),
+            Box::new(decoder::staking_contract_switch_operator_with_same_commission),
         );
         map.insert(
             "staking_contract_unlock_rewards".to_string(),

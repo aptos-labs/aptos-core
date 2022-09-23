@@ -152,7 +152,7 @@ impl Cluster {
     ) -> Result<LocalAccount> {
         let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
             format_err!(
-                "query_sequence_numbers on {:?} for account {} failed: {:?}",
+                "query_sequence_number on {:?} for account {} failed: {:?}",
                 client,
                 address,
                 e

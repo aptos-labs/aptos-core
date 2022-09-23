@@ -331,13 +331,13 @@ impl AptosDB {
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
                     ledger_db_path.clone(),
-                    "ledger_db_ro",
+                    LEDGER_DB_NAME,
                     ledger_db_column_families(),
                 )?,
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, true),
                     state_merkle_db_path.clone(),
-                    "state_merkle_db_ro",
+                    STATE_MERKLE_DB_NAME,
                     state_merkle_db_column_families(),
                 )?,
             )
@@ -346,13 +346,13 @@ impl AptosDB {
                 DB::open_cf(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
                     ledger_db_path.clone(),
-                    "ledger_db",
+                    LEDGER_DB_NAME,
                     gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
                 )?,
                 DB::open_cf(
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
                     state_merkle_db_path.clone(),
-                    "state_merkle_db",
+                    STATE_MERKLE_DB_NAME,
                     gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
                 )?,
             )

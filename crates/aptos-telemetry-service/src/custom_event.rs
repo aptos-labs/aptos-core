@@ -111,15 +111,12 @@ pub(crate) async fn handle_custom_event(
     })?;
 
     context
-        .gcp_bq_client
-        .unwrap()
-        .tabledata()
-        .insert_all(
-            context.gcp_bq_config.project_id.as_str(),
-            context.gcp_bq_config.dataset_id.as_str(),
-            context.gcp_bq_config.table_id.as_str(),
-            insert_request,
-        )
+        .bigquery_client()
+        .ok_or_else(|| {
+            error!("big query client is not configured");
+            ServiceError::from(anyhow!("unable to insert row into bigquery"))
+        })?
+        .insert_all(insert_request)
         .await
         .map_err(|e| {
             error!("unable to insert row into bigquery: {}", e);

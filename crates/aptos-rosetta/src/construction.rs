@@ -364,9 +364,13 @@ async fn construction_parse(
 ) -> ApiResult<ConstructionParseResponse> {
     debug!("/construction/parse {:?}", request);
     check_network(request.network_identifier, &server_context)?;
-
+    let metadata;
     let (account_identifier_signers, unsigned_txn) = if request.signed {
         let signed_txn: SignedTransaction = decode_bcs(&request.transaction, "SignedTransaction")?;
+        metadata = Some(ConstructionParseMetadata {
+            unsigned_transaction: None,
+            signed_transaction: Some(signed_txn.clone()),
+        });
         let mut account_identifier_signers: Vec<_> = vec![signed_txn.sender().into()];
 
         for account in signed_txn.authenticator().secondary_signer_addreses() {
@@ -379,6 +383,10 @@ async fn construction_parse(
         )
     } else {
         let unsigned_txn: RawTransaction = decode_bcs(&request.transaction, "UnsignedTransaction")?;
+        metadata = Some(ConstructionParseMetadata {
+            unsigned_transaction: Some(unsigned_txn.clone()),
+            signed_transaction: None,
+        });
         (None, unsigned_txn)
     };
     let sender = unsigned_txn.sender();
@@ -429,6 +437,7 @@ async fn construction_parse(
     Ok(ConstructionParseResponse {
         operations,
         account_identifier_signers,
+        metadata,
     })
 }
 

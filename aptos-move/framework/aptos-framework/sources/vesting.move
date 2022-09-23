@@ -1375,7 +1375,7 @@ module aptos_framework::vesting {
         // Reset the beneficiary.
         reset_beneficiary(admin, contract_address, @11);
 
-        // Distribution should go to the the original account.
+        // Distribution should go to the original account.
         stake::end_epoch();
         // No rewards as validator never joined the validator set.
         let vested_amount = fraction(GRANT_AMOUNT, 3, 48);

@@ -11,6 +11,7 @@ pub mod move_tables;
 pub mod processor_statuses;
 pub mod signatures;
 pub mod token_datas;
+pub mod token_utils;
 pub mod tokens;
 pub mod transactions;
 pub mod user_transactions;

@@ -100,6 +100,87 @@ impl MoveTool {
     }
 }
 
+#[derive(Parser)]
+pub struct FrameworkPackageArgs {
+    /// Git revision or branch for the Aptos framework
+    #[clap(long, group = "framework_package_args")]
+    pub(crate) framework_git_rev: Option<String>,
+
+    /// Use a local framework directory
+    #[clap(long, parse(from_os_str), group = "framework_package_args")]
+    pub(crate) framework_local_dir: Option<PathBuf>,
+}
+
+impl FrameworkPackageArgs {
+    pub fn init_move_dir(
+        &self,
+        package_dir: &Path,
+        name: &str,
+        addresses: BTreeMap<String, ManifestNamedAddress>,
+        prompt_options: PromptOptions,
+    ) -> CliTypedResult<()> {
+        const APTOS_FRAMEWORK: &str = "AptosFramework";
+        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
+        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
+        const DEFAULT_BRANCH: &str = "main";
+
+        let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
+        check_if_file_exists(move_toml.as_path(), prompt_options)?;
+        create_dir_if_not_exist(
+            package_dir
+                .join(SourcePackageLayout::Sources.path())
+                .as_path(),
+        )?;
+
+        // Add the framework dependency if it's provided
+        let mut dependencies = BTreeMap::new();
+        if let Some(ref path) = self.framework_local_dir {
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: Some(path.display().to_string()),
+                    git: None,
+                    rev: None,
+                    subdir: None,
+                    aptos: None,
+                    address: None,
+                },
+            );
+        } else {
+            let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: None,
+                    git: Some(APTOS_GIT_PATH.to_string()),
+                    rev: Some(git_rev.to_string()),
+                    subdir: Some(SUBDIR_PATH.to_string()),
+                    aptos: None,
+                    address: None,
+                },
+            );
+        }
+
+        let manifest = MovePackageManifest {
+            package: PackageInfo {
+                name: name.to_string(),
+                version: "1.0.0".to_string(),
+                author: None,
+            },
+            addresses,
+            dependencies,
+        };
+
+        write_to_file(
+            move_toml.as_path(),
+            SourcePackageLayout::Manifest.location_str(),
+            toml::to_string_pretty(&manifest)
+                .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+                .as_bytes(),
+        )
+    }
+}
+
 /// Creates a new Move package at the given location
 #[derive(Parser)]
 pub struct InitPackage {
@@ -122,9 +203,8 @@ pub struct InitPackage {
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 
-    /// For test: use the given local reference to the aptos framework
-    #[clap(skip)]
-    pub(crate) for_test_framework: Option<PathBuf>,
+    #[clap(flatten)]
+    pub(crate) framework_package_args: FrameworkPackageArgs,
 }
 
 #[async_trait]
@@ -141,78 +221,13 @@ impl CliCommand<()> for InitPackage {
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
 
-        init_move_dir(
+        self.framework_package_args.init_move_dir(
             package_dir.as_path(),
             &self.name,
-            Some("main".to_string()),
             addresses,
             self.prompt_options,
-            self.for_test_framework,
         )
     }
-}
-
-pub fn init_move_dir(
-    package_dir: &Path,
-    name: &str,
-    rev: Option<String>,
-    addresses: BTreeMap<String, ManifestNamedAddress>,
-    prompt_options: PromptOptions,
-    for_test_framework: Option<PathBuf>,
-) -> CliTypedResult<()> {
-    let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
-    check_if_file_exists(move_toml.as_path(), prompt_options)?;
-    create_dir_if_not_exist(
-        package_dir
-            .join(SourcePackageLayout::Sources.path())
-            .as_path(),
-    )?;
-
-    // Add the framework dependency if it's provided
-    let mut dependencies = BTreeMap::new();
-    if let Some(path) = for_test_framework {
-        dependencies.insert(
-            "AptosFramework".to_string(),
-            Dependency {
-                local: Some(path.display().to_string()),
-                git: None,
-                rev: None,
-                subdir: None,
-                aptos: None,
-                address: None,
-            },
-        );
-    } else if let Some(rev) = rev {
-        dependencies.insert(
-            "AptosFramework".to_string(),
-            Dependency {
-                local: None,
-                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-                rev: Some(rev),
-                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-                aptos: None,
-                address: None,
-            },
-        );
-    }
-
-    let manifest = MovePackageManifest {
-        package: PackageInfo {
-            name: name.to_string(),
-            version: "1.0.0".to_string(),
-            author: None,
-        },
-        addresses,
-        dependencies,
-    };
-
-    write_to_file(
-        move_toml.as_path(),
-        SourcePackageLayout::Manifest.location_str(),
-        toml::to_string_pretty(&manifest)
-            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
-            .as_bytes(),
-    )
 }
 
 /// Compiles a package and returns the [`ModuleId`]s
@@ -782,7 +797,7 @@ impl CliCommand<TransactionSummary> for RunScript {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let (bytecode, _script_hash) = self
             .compile_proposal_args
-            .compile(self.txn_options.prompt_options)?;
+            .compile("RunScript", self.txn_options.prompt_options)?;
 
         let txn = self
             .txn_options

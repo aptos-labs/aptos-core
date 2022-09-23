@@ -12,28 +12,13 @@ use forge::{AptosPublicInfo, Result, Swarm};
 use std::sync::Arc;
 
 pub fn wipe_database(conn: &mut PgPoolConnection) {
-    for table in [
-        "collection_datas",
-        "tokens",
-        "token_datas",
-        "token_ownerships",
-        "signatures",
-        "move_modules",
-        "move_resources",
-        "table_items",
-        "table_metadatas",
-        "write_set_changes",
-        "events",
-        "user_transactions",
-        "block_metadata_transactions",
-        "transactions",
-        "processor_statuses",
-        "ledger_infos",
-        "__diesel_schema_migrations",
+    for command in [
+        "DROP SCHEMA public CASCADE",
+        "CREATE SCHEMA public",
+        "GRANT ALL ON SCHEMA public TO postgres",
+        "GRANT ALL ON SCHEMA public TO public",
     ] {
-        diesel::sql_query(format!("DROP TABLE IF EXISTS {} CASCADE", table))
-            .execute(conn)
-            .unwrap();
+        diesel::sql_query(command).execute(conn).unwrap();
     }
 }
 

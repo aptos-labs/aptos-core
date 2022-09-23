@@ -279,13 +279,14 @@ module aptos_framework::genesis {
 
     fun create_initialize_validators_with_commission(
         aptos_framework: &signer,
+        use_staking_contract: bool,
         validators: vector<ValidatorConfigurationWithCommission>,
     ) {
         let i = 0;
         let num_validators = vector::length(&validators);
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
-            create_initialize_validator(aptos_framework, validator);
+            create_initialize_validator(aptos_framework, validator, use_staking_contract);
 
             i = i + 1;
         };
@@ -324,12 +325,13 @@ module aptos_framework::genesis {
             i = i + 1;
         };
 
-        create_initialize_validators_with_commission(aptos_framework, validators_with_commission);
+        create_initialize_validators_with_commission(aptos_framework, false, validators_with_commission);
     }
 
     fun create_initialize_validator(
         aptos_framework: &signer,
         commission_config: &ValidatorConfigurationWithCommission,
+        use_staking_contract: bool,
     ) {
         let validator = &commission_config.validator_config;
 
@@ -338,15 +340,7 @@ module aptos_framework::genesis {
         create_account(aptos_framework, validator.voter_address, 0);
 
         // Initialize the stake pool and join the validator set.
-        let pool_address = if (commission_config.commission_percentage == 0) {
-            stake::initialize_stake_owner(
-                owner,
-                validator.stake_amount,
-                validator.operator_address,
-                validator.voter_address,
-            );
-            validator.owner_address
-        } else {
+        let pool_address = if (use_staking_contract) {
             staking_contract::create_staking_contract(
                 owner,
                 validator.operator_address,
@@ -356,6 +350,14 @@ module aptos_framework::genesis {
                 x"",
             );
             staking_contract::stake_pool_address(validator.owner_address, validator.operator_address)
+        } else {
+            stake::initialize_stake_owner(
+                owner,
+                validator.stake_amount,
+                validator.operator_address,
+                validator.voter_address,
+            );
+            validator.owner_address
         };
 
         if (commission_config.join_during_genesis) {

@@ -6,7 +6,7 @@ spec aptos_framework::stake {
 
     spec module {
         // The validator set should satisfy its desired invariant.
-        invariant [suspendable] validator_set_is_valid();
+        invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> validator_set_is_valid();
         // After genesis, `AptosCoinCapabilities`, `ValidatorPerformance` and `ValidatorSet` exist.
         invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorPerformance>(@aptos_framework);

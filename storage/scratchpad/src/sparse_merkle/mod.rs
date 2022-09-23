@@ -100,6 +100,8 @@ use std::{
 use thiserror::Error;
 
 type NodePosition = bitvec::vec::BitVec<bitvec::order::Msb0, u8>;
+const BITS_IN_NIBBLE: usize = 4;
+const BITS_IN_BYTE: usize = 8;
 
 /// To help finding the oldest ancestor of any SMT, a branch tracker is created each time
 /// the chain of SMTs forked (two or more SMTs updating the same parent).
@@ -569,7 +571,7 @@ where
                 NodeInner::Leaf(leaf_node) => {
                     let mut path = NibblePath::new_even(leaf_node.key.to_vec());
                     if !is_nibble {
-                        path.truncate(pos.len() as usize / 4 + 1);
+                        path.truncate(pos.len() as usize / BITS_IN_NIBBLE + 1);
                     }
                     node_hashes.insert(path, subtree.hash());
                 }
@@ -579,9 +581,6 @@ where
 
     fn maybe_to_nibble_path(pos: &NodePosition) -> Option<NibblePath> {
         assert!(pos.len() <= HashValue::LENGTH_IN_BITS);
-
-        const BITS_IN_NIBBLE: usize = 4;
-        const BITS_IN_BYTE: usize = 8;
 
         if pos.len() % BITS_IN_NIBBLE == 0 {
             let mut bytes = pos.clone().into_vec();
