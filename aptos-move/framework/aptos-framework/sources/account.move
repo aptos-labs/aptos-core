@@ -48,7 +48,7 @@ module aptos_framework::account {
         address_map: Table<address, address>,
     }
 
-    /// This structs stores the challenge message that should be signed during key rotation. First, this struct is
+    /// This struct stores the challenge message that should be signed during key rotation. First, this struct is
     /// signed by the account owner's current public key, which proves possession of a capability to rotate the key.
     /// Second, this struct is signed by the new public key that the account owner wants to rotate to, which proves
     /// knowledge of this new public key's associated secret key. These two signatures cannot be replayed in another
