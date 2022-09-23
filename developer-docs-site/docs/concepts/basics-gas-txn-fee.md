@@ -41,7 +41,7 @@ When your transaction is executed on the blockchain, instead of separately prese
 In the Aptos network, the Aptos governance sets the minimum gas unit price. However, the market determines the actual minimum gas unit price. See [Ethereum Gas Tracker](https://etherscan.io/gastracker), for example, which shows the market price movements of Ethereum gas price.
 
 :::tip Unit of gas
-👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](/basics/basics-txns-states) for how a transaction submitted to the Aptos blockchain looks like.
+👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](/concepts/basics-txns-states) for how a transaction submitted to the Aptos blockchain looks like.
 :::
 
 ## Gas and transaction fee on the Aptos blockchain
