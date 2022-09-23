@@ -25,6 +25,9 @@ use std::{
 pub struct AccountIdentifier {
     /// Hex encoded AccountAddress beginning with 0x
     pub address: String,
+    /// Sub account identifier to mark the staked balances
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_account_identifier: Option<SubAccountIdentifier>,
 }
 
 impl AccountIdentifier {
@@ -32,19 +35,21 @@ impl AccountIdentifier {
     pub fn account_address(&self) -> ApiResult<AccountAddress> {
         self.try_into()
     }
+
+    pub fn stake(address: AccountAddress) -> Self {
+        Self {
+            address: to_hex_lower(&address),
+            sub_account_identifier: Some(SubAccountIdentifier::stake()),
+        }
+    }
 }
 
 impl TryFrom<&AccountIdentifier> for AccountAddress {
     type Error = ApiError;
 
     fn try_from(account: &AccountIdentifier) -> Result<Self, Self::Error> {
-        // Allow 0x in front of account address
-        if let Ok(address) = AccountAddress::from_hex_literal(&account.address) {
-            Ok(address)
-        } else {
-            Ok(AccountAddress::from_str(&account.address)
-                .map_err(|_| ApiError::InvalidInput(Some("Invalid account address".to_string())))?)
-        }
+        AccountAddress::from_str(&account.address)
+            .map_err(|_| ApiError::InvalidInput(Some("Invalid account address".to_string())))
     }
 }
 
@@ -52,6 +57,21 @@ impl From<AccountAddress> for AccountIdentifier {
     fn from(address: AccountAddress) -> Self {
         AccountIdentifier {
             address: to_hex_lower(&address),
+            sub_account_identifier: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SubAccountIdentifier {
+    /// Hex encoded AccountAddress beginning with 0x
+    pub address: String,
+}
+
+impl SubAccountIdentifier {
+    fn stake() -> Self {
+        Self {
+            address: "stake".to_string(),
         }
     }
 }
