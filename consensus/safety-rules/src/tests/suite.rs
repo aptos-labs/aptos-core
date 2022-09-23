@@ -30,14 +30,14 @@ fn make_proposal_with_qc_and_proof(
     test_utils::make_proposal_with_qc_and_proof(Payload::empty(), round, proof, qc, signer)
 }
 
-fn make_proposal_with_parent(
-    round: Round,
-    parent: &VoteProposal,
-    committed: Option<&VoteProposal>,
-    signer: &ValidatorSigner,
-) -> VoteProposal {
-    test_utils::make_proposal_with_parent(Payload::empty(), round, parent, committed, signer)
-}
+// fn make_proposal_with_parent(
+//     round: Round,
+//     parent: &VoteProposal,
+//     committed: Option<&VoteProposal>,
+//     signer: &ValidatorSigner,
+// ) -> VoteProposal {
+//     test_utils::make_proposal_with_parent(Payload::empty(), round, parent, committed, signer)
+// }
 
 pub type Callback = Box<dyn Fn() -> (Box<dyn TSafetyRules + Send + Sync>, ValidatorSigner)>;
 

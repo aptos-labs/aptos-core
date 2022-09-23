@@ -3,11 +3,11 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
+    experimental::ordering_state_computer::OrderingComputer,
     logging::{LogEvent, LogSchema},
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    state_replication::StateComputer,
 };
 use anyhow::{bail, Context};
 use aptos_crypto::HashValue;
@@ -150,7 +150,7 @@ impl BlockStore {
         while let Some(block) = pending.pop() {
             let block_qc = block.quorum_cert().clone();
             self.insert_single_quorum_cert(block_qc)?;
-            self.execute_and_insert_block(block).await?;
+            self.insert_ordered_block(block).await?;
         }
         self.insert_single_quorum_cert(qc)
     }
@@ -176,7 +176,7 @@ impl BlockStore {
             &highest_commit_cert,
             retriever,
             self.storage.clone(),
-            self.state_computer.clone(),
+            self.ordering_state_computer.clone(),
         )
         .await?
         .take();
@@ -205,7 +205,7 @@ impl BlockStore {
         highest_commit_cert: &'a QuorumCert,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
-        state_computer: Arc<dyn StateComputer>,
+        state_computer: Arc<dyn OrderingComputer>,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),

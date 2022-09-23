@@ -10,17 +10,34 @@ use crate::{
     state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
-use consensus_types::{block::Block, executed_block::ExecutedBlock};
-use executor_types::{Error as ExecutionError, StateComputeResult};
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use consensus_types::block::Block;
+use executor_types::Error as ExecutionError;
 use fail::fail_point;
 use futures::{
     channel::{mpsc::UnboundedSender, oneshot},
     SinkExt,
 };
 use std::sync::Arc;
+
+#[async_trait::async_trait]
+pub trait OrderingComputer: Send + Sync {
+    /// Send ordered blocks to the real execution phase through the channel.
+    /// A future is fulfilled after execution is completed
+    async fn send_to_execution(
+        &self,
+        blocks: Vec<Block>,
+        finality_proof: LedgerInfoWithSignatures,
+        callback: StateComputerCommitCallBackType,
+    ) -> Result<(), ExecutionError>;
+
+    /// Best effort state synchronization to the given target LedgerInfo.
+    /// In case of success (`Result::Ok`) the LI of storage is at the given target.
+    /// In case of failure (`Result::Error`) the LI of storage remains unchanged, and the validator
+    /// can assume there were no modifications to the storage made.
+    async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
+}
 
 /// Ordering-only execution proxy
 /// implements StateComputer traits.
@@ -48,26 +65,12 @@ impl OrderingStateComputer {
 }
 
 #[async_trait::async_trait]
-impl StateComputer for OrderingStateComputer {
-    async fn compute(
-        &self,
-        // The block to be executed.
-        _block: &Block,
-        // The parent block id.
-        _parent_block_id: HashValue,
-    ) -> Result<StateComputeResult, ExecutionError> {
-        // Return dummy block and bypass the execution phase.
-        // This will break the e2e smoke test (for now because
-        // no one is actually handling the next phase) if the
-        // decoupled execution feature is turned on.
-        Ok(StateComputeResult::new_dummy())
-    }
-
+impl OrderingComputer for OrderingStateComputer {
     /// Send ordered blocks to the real execution phase through the channel.
-    /// A future is fulfilled right away when the blocks are sent into the channel.
-    async fn commit(
+    /// A future is fulfilled after execution is completed
+    async fn send_to_execution(
         &self,
-        blocks: &[Arc<ExecutedBlock>],
+        blocks: Vec<Block>,
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
@@ -77,10 +80,7 @@ impl StateComputer for OrderingStateComputer {
             .executor_channel
             .clone()
             .send(OrderedBlocks {
-                ordered_blocks: blocks
-                    .iter()
-                    .map(|b| (**b).clone())
-                    .collect::<Vec<ExecutedBlock>>(),
+                ordered_blocks: blocks,
                 ordered_proof: finality_proof,
                 callback,
             })
@@ -116,6 +116,4 @@ impl StateComputer for OrderingStateComputer {
         self.state_computer_for_sync.sync_to(target).await?;
         Ok(())
     }
-
-    fn new_epoch(&self, _: &EpochState) {}
 }

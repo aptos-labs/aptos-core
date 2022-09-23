@@ -12,7 +12,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use consensus_types::{
-    executed_block::ExecutedBlock, quorum_cert::QuorumCert,
+    block::Block, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeoutCertificate,
 };
 use mirai_annotations::{checked_verify_eq, precondition};
@@ -220,10 +220,8 @@ impl BlockTree {
         self.id_to_quorum_cert.get(block_id).cloned()
     }
 
-    pub(super) fn insert_block(
-        &mut self,
-        block: ExecutedBlock,
-    ) -> anyhow::Result<Arc<ExecutedBlock>> {
+    pub(super) fn insert_block(&mut self, block: Block) -> anyhow::Result<Arc<ExecutedBlock>> {
+        let block = ExecutedBlock::new_empty(block);
         let block_id = block.id();
         if let Some(existing_block) = self.get_block(&block_id) {
             debug!("Already had block {:?} for id {:?} when trying to add another block {:?} for the same id",

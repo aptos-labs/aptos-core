@@ -5,9 +5,8 @@ use crate::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
-    vote_proposal::VoteProposal,
 };
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -47,6 +46,13 @@ impl ExecutedBlock {
         Self {
             block,
             state_compute_result,
+        }
+    }
+
+    pub fn new_empty(block: Block) -> Self {
+        Self {
+            block,
+            state_compute_result: StateComputeResult::new_dummy(),
         }
     }
 
@@ -94,15 +100,6 @@ impl ExecutedBlock {
         )
     }
 
-    pub fn vote_proposal(&self, decoupled_execution: bool) -> VoteProposal {
-        VoteProposal::new(
-            self.compute_result().extension_proof(),
-            self.block.clone(),
-            self.compute_result().epoch_state().clone(),
-            decoupled_execution,
-        )
-    }
-
     pub fn transactions_to_commit(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
         if self.is_reconfiguration_suffix() {
@@ -132,5 +129,13 @@ impl ExecutedBlock {
     pub fn is_reconfiguration_suffix(&self) -> bool {
         self.state_compute_result.has_reconfiguration()
             && self.state_compute_result.compute_status().is_empty()
+    }
+
+    pub fn to_ordered_block(self) -> Block {
+        assert_eq!(
+            self.state_compute_result.root_hash(),
+            *ACCUMULATOR_PLACEHOLDER_HASH
+        );
+        self.block
     }
 }

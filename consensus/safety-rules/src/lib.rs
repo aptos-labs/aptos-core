@@ -28,8 +28,8 @@ pub use crate::{
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing_utils;
 
-#[cfg(any(test, feature = "fuzzing"))]
-pub use crate::fuzzing_utils::fuzzing;
+// #[cfg(any(test, feature = "fuzzing"))]
+// pub use crate::fuzzing_utils::fuzzing;
 
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;

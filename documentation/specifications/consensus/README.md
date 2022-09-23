@@ -665,7 +665,7 @@ fn insert_quorum_cert(&self, quorum_cert: QuorumCert);
 ```
 
 * ensure a block with `quorum_cert.certified_block().id()` is present in block_tree otherwise initiate rpc calls with `BlockRetrievalRequest` to peers until one of the block's parent id is present in block_tree (fetch the chain of missing blocks)
-* insert the fetched blocks in block_tree via `insert_single_quorum_cert` and `execute_and_insert_block` repeatively.
+* insert the fetched blocks in block_tree via `insert_single_quorum_cert` and `insert_ordered_block` repeatively.
 * if quorum_cert is a valid commit cert (commit info is not empty), `commit(quorum_cert.ledger_info())`
 
 ```rust
@@ -1274,7 +1274,7 @@ A `round` number is received when the timer setup in the constructor of `RoundSt
   * if no vote has been cached (`round_state.vote_sent` is empty), create one:
 
     * create a NIL block by calling `nil_block = proposal_generator.generate_nil_block(round)`
-    * execute and store the block by calling `executed_block = block_store.execute_and_insert_block(nil_block)`
+    * execute and store the block by calling `executed_block = block_store.insert_ordered_block(nil_block)`
     * obtain a signed vote by calling `safety_rules.vote(executed_block)`
     * cache the vote in `round_state.vote_sent`
 
@@ -1317,7 +1317,7 @@ fn process_local_timeout(&mut self, round: Round) -> Result<()> {
         Some(vote) => vote,
         None => {
             let nil_block = self.proposal_generator.generate_nil_block(round)?;
-            let executed_block = self.block_store.execute_and_insert_block(nil_block)?;
+            let executed_block = self.block_store.insert_ordered_block(nil_block)?;
             self.safety_rules.vote(executed_block)?
         }
     };

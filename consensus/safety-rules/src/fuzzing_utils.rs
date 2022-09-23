@@ -121,11 +121,9 @@ prop_compose! {
 prop_compose! {
     pub fn arb_vote_proposal(
     )(
-        accumulator_extension_proof in arb_accumulator_extension_proof(),
         block in arb_block(),
-        next_epoch_state in arb_epoch_state(),
     ) -> VoteProposal {
-        VoteProposal::new(accumulator_extension_proof, block, next_epoch_state, false)
+        VoteProposal::new(block)
     }
 }
 
@@ -233,97 +231,97 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
     ]
 }
 
-#[cfg(any(test, feature = "fuzzing"))]
-pub mod fuzzing {
-    use crate::{error::Error, serializer::SafetyRulesInput, test_utils, TSafetyRules};
-    use aptos_crypto::bls12381;
-    use aptos_types::epoch_change::EpochChangeProof;
-    use consensus_types::{
-        block_data::BlockData, timeout_2chain::TwoChainTimeout, vote::Vote,
-        vote_proposal::VoteProposal,
-    };
+// #[cfg(any(test, feature = "fuzzing"))]
+// pub mod fuzzing {
+//     use crate::{error::Error, serializer::SafetyRulesInput, test_utils, TSafetyRules};
+//     use aptos_crypto::bls12381;
+//     use aptos_types::epoch_change::EpochChangeProof;
+//     use consensus_types::{
+//         block_data::BlockData, timeout_2chain::TwoChainTimeout, vote::Vote,
+//         vote_proposal::VoteProposal,
+//     };
 
-    pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
-        let mut safety_rules = test_utils::test_safety_rules_uninitialized();
-        safety_rules.initialize(&proof)
-    }
+//     pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
+//         let mut safety_rules = test_utils::test_safety_rules_uninitialized();
+//         safety_rules.initialize(&proof)
+//     }
 
-    pub fn fuzz_construct_and_sign_vote_two_chain(
-        vote_proposal: VoteProposal,
-    ) -> Result<Vote, Error> {
-        let mut safety_rules = test_utils::test_safety_rules();
-        safety_rules.construct_and_sign_vote_two_chain(&vote_proposal, None)
-    }
+//     pub fn fuzz_construct_and_sign_vote_two_chain(
+//         vote_proposal: VoteProposal,
+//     ) -> Result<Vote, Error> {
+//         let mut safety_rules = test_utils::test_safety_rules();
+//         safety_rules.construct_and_sign_vote_two_chain(&vote_proposal, None)
+//     }
 
-    pub fn fuzz_handle_message(safety_rules_input: SafetyRulesInput) -> Result<Vec<u8>, Error> {
-        // Create a safety rules serializer test instance for fuzzing
-        let mut serializer_service = test_utils::test_serializer();
+//     pub fn fuzz_handle_message(safety_rules_input: SafetyRulesInput) -> Result<Vec<u8>, Error> {
+//         // Create a safety rules serializer test instance for fuzzing
+//         let mut serializer_service = test_utils::test_serializer();
 
-        // encode the safety_rules_input and fuzz the handle_message() method
-        if let Ok(safety_rules_input) = serde_json::to_vec(&safety_rules_input) {
-            serializer_service.handle_message(safety_rules_input)
-        } else {
-            Err(Error::SerializationError(
-                "Unable to serialize safety rules input for fuzzer!".into(),
-            ))
-        }
-    }
+//         // encode the safety_rules_input and fuzz the handle_message() method
+//         if let Ok(safety_rules_input) = serde_json::to_vec(&safety_rules_input) {
+//             serializer_service.handle_message(safety_rules_input)
+//         } else {
+//             Err(Error::SerializationError(
+//                 "Unable to serialize safety rules input for fuzzer!".into(),
+//             ))
+//         }
+//     }
 
-    pub fn fuzz_sign_proposal(block_data: &BlockData) -> Result<bls12381::Signature, Error> {
-        let mut safety_rules = test_utils::test_safety_rules();
-        safety_rules.sign_proposal(block_data)
-    }
+//     pub fn fuzz_sign_proposal(block_data: &BlockData) -> Result<bls12381::Signature, Error> {
+//         let mut safety_rules = test_utils::test_safety_rules();
+//         safety_rules.sign_proposal(block_data)
+//     }
 
-    pub fn fuzz_sign_timeout_with_qc(
-        timeout: TwoChainTimeout,
-    ) -> Result<bls12381::Signature, Error> {
-        let mut safety_rules = test_utils::test_safety_rules();
-        safety_rules.sign_timeout_with_qc(&timeout, None)
-    }
-}
+//     pub fn fuzz_sign_timeout_with_qc(
+//         timeout: TwoChainTimeout,
+//     ) -> Result<bls12381::Signature, Error> {
+//         let mut safety_rules = test_utils::test_safety_rules();
+//         safety_rules.sign_timeout_with_qc(&timeout, None)
+//     }
+// }
 
-// Note: these tests ensure that the various fuzzers are maintained (i.e., not broken
-// at some time in the future and only discovered when a fuzz test fails).
-#[cfg(test)]
-mod tests {
-    use crate::{
-        fuzzing::{
-            fuzz_construct_and_sign_vote_two_chain, fuzz_handle_message, fuzz_initialize,
-            fuzz_sign_proposal, fuzz_sign_timeout_with_qc,
-        },
-        fuzzing_utils::{
-            arb_block_data, arb_epoch_change_proof, arb_safety_rules_input, arb_timeout,
-            arb_vote_proposal,
-        },
-    };
-    use proptest::prelude::*;
+// // Note: these tests ensure that the various fuzzers are maintained (i.e., not broken
+// // at some time in the future and only discovered when a fuzz test fails).
+// #[cfg(test)]
+// mod tests {
+//     use crate::{
+//         fuzzing::{
+//             fuzz_construct_and_sign_vote_two_chain, fuzz_handle_message, fuzz_initialize,
+//             fuzz_sign_proposal, fuzz_sign_timeout_with_qc,
+//         },
+//         fuzzing_utils::{
+//             arb_block_data, arb_epoch_change_proof, arb_safety_rules_input, arb_timeout,
+//             arb_vote_proposal,
+//         },
+//     };
+//     use proptest::prelude::*;
 
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(10))]
+//     proptest! {
+//         #![proptest_config(ProptestConfig::with_cases(10))]
 
-        #[test]
-        fn handle_message_proptest(input in arb_safety_rules_input()) {
-            let _ = fuzz_handle_message(input);
-        }
+//         #[test]
+//         fn handle_message_proptest(input in arb_safety_rules_input()) {
+//             let _ = fuzz_handle_message(input);
+//         }
 
-        #[test]
-        fn initialize_proptest(input in arb_epoch_change_proof()) {
-            let _ = fuzz_initialize(input);
-        }
+//         #[test]
+//         fn initialize_proptest(input in arb_epoch_change_proof()) {
+//             let _ = fuzz_initialize(input);
+//         }
 
-        #[test]
-        fn construct_and_sign_vote_two_chain_proptest(input in arb_vote_proposal()) {
-            let _ = fuzz_construct_and_sign_vote_two_chain(input);
-        }
+//         #[test]
+//         fn construct_and_sign_vote_two_chain_proptest(input in arb_vote_proposal()) {
+//             let _ = fuzz_construct_and_sign_vote_two_chain(input);
+//         }
 
-        #[test]
-        fn sign_proposal_proptest(input in arb_block_data()) {
-            let _ = fuzz_sign_proposal(&input);
-        }
+//         #[test]
+//         fn sign_proposal_proptest(input in arb_block_data()) {
+//             let _ = fuzz_sign_proposal(&input);
+//         }
 
-        #[test]
-        fn sign_timeout_proptest(input in arb_timeout()) {
-            let _ = fuzz_sign_timeout_with_qc(input);
-        }
-    }
-}
+//         #[test]
+//         fn sign_timeout_proptest(input in arb_timeout()) {
+//             let _ = fuzz_sign_timeout_with_qc(input);
+//         }
+//     }
+// }

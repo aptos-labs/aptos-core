@@ -71,7 +71,7 @@ fn build_empty_store(
     Arc::new(BlockStore::new(
         storage,
         initial_data,
-        Arc::new(EmptyStateComputer),
+        Arc::new(EmptyOrderingComputer),
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
@@ -174,7 +174,6 @@ fn create_node_for_fuzzing() -> RoundManager {
         network,
         storage,
         false,
-        OnChainConsensusConfig::default(),
         round_manager_tx,
         2000,
     )

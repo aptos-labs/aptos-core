@@ -35,7 +35,8 @@ use aptos_types::{
 };
 use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
-    block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
+    block::{block_test_utils::certificate_for_genesis, Block},
+    executed_block::ExecutedBlock,
     vote_proposal::VoteProposal,
 };
 use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
@@ -214,7 +215,7 @@ async fn loopback_commit_vote(
     };
 }
 
-async fn assert_results(batches: Vec<Vec<ExecutedBlock>>, result_rx: &mut Receiver<OrderedBlocks>) {
+async fn assert_results(batches: Vec<Vec<Block>>, result_rx: &mut Receiver<OrderedBlocks>) {
     for (i, batch) in enumerate(batches) {
         let OrderedBlocks { ordered_blocks, .. } = result_rx.next().await.unwrap();
         assert_eq!(
@@ -248,7 +249,7 @@ fn buffer_manager_happy_path_test() {
     let blocks_per_batch = 5;
     let mut init_round = 0;
 
-    let mut batches = vec![];
+    let mut batches: Vec<Vec<Block>> = vec![];
     let mut proofs = vec![];
     let mut last_proposal: Option<VoteProposal> = None;
 
@@ -263,7 +264,12 @@ fn buffer_manager_happy_path_test() {
             init_round,
         );
         init_round += blocks_per_batch;
-        batches.push(vecblocks);
+        batches.push(
+            vecblocks
+                .into_iter()
+                .map(|executed_block| executed_block.to_ordered_block())
+                .collect(),
+        );
         proofs.push(li_sig);
         last_proposal = Some(proposal.last().unwrap().clone());
     }
@@ -310,7 +316,7 @@ fn buffer_manager_sync_test() {
     let blocks_per_batch = 5;
     let mut init_round = 0;
 
-    let mut batches = vec![];
+    let mut batches: Vec<Vec<Block>> = vec![];
     let mut proofs = vec![];
     let mut last_proposal: Option<VoteProposal> = None;
 
@@ -325,7 +331,12 @@ fn buffer_manager_sync_test() {
             init_round,
         );
         init_round += blocks_per_batch;
-        batches.push(vecblocks);
+        batches.push(
+            vecblocks
+                .into_iter()
+                .map(|executed_block| executed_block.to_ordered_block())
+                .collect(),
+        );
         proofs.push(li_sig);
         last_proposal = Some(proposal.last().unwrap().clone());
     }

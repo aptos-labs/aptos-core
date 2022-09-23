@@ -20,7 +20,7 @@ use aptos_types::{
     account_address::AccountAddress, ledger_info::LedgerInfoWithSignatures,
     validator_verifier::ValidatorVerifier,
 };
-use consensus_types::{common::Author, executed_block::ExecutedBlock};
+use consensus_types::{block::Block, common::Author, executed_block::ExecutedBlock};
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
@@ -54,7 +54,7 @@ pub struct ResetRequest {
 }
 
 pub struct OrderedBlocks {
-    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_blocks: Vec<Block>,
     pub ordered_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }
@@ -190,7 +190,14 @@ impl BufferManager {
             self.buffer.len() + 1,
         );
         counters::NUM_BLOCKS_IN_PIPELINE.add(ordered_blocks.len() as i64);
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
+        let item = BufferItem::new_ordered(
+            ordered_blocks
+                .into_iter()
+                .map(|b| ExecutedBlock::new_empty(b))
+                .collect(),
+            ordered_proof,
+            callback,
+        );
         self.buffer.push_back(item);
     }
 
@@ -209,7 +216,12 @@ impl BufferManager {
         );
         if self.execution_root.is_some() {
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
-            let request = self.create_new_request(ExecutionRequest { ordered_blocks });
+            let request = self.create_new_request(ExecutionRequest {
+                ordered_blocks: ordered_blocks
+                    .into_iter()
+                    .map(|b| b.to_ordered_block())
+                    .collect(),
+            });
             if cursor == self.execution_root {
                 let sender = self.execution_phase_tx.clone();
                 Self::spawn_retry_request(sender, request, Duration::from_millis(100));

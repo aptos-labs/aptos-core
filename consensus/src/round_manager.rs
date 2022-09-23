@@ -25,10 +25,7 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
-use aptos_types::{
-    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier,
-};
+use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use channel::aptos_channel;
 use consensus_types::{
     block::Block,
@@ -40,6 +37,7 @@ use consensus_types::{
     timeout_2chain::TwoChainTimeoutCertificate,
     vote::Vote,
     vote_msg::VoteMsg,
+    vote_proposal::VoteProposal,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
@@ -146,7 +144,6 @@ pub struct RoundManager {
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     sync_only: bool,
-    onchain_config: OnChainConsensusConfig,
     round_manager_tx:
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     back_pressure_proposal_timeout_ms: u64,
@@ -163,7 +160,6 @@ impl RoundManager {
         network: NetworkSender,
         storage: Arc<dyn PersistentLivenessStorage>,
         sync_only: bool,
-        onchain_config: OnChainConsensusConfig,
         round_manager_tx: aptos_channel::Sender<
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
@@ -175,9 +171,6 @@ impl RoundManager {
         counters::OP_COUNTERS
             .gauge("sync_only")
             .set(sync_only as i64);
-        counters::OP_COUNTERS
-            .gauge("decoupled_execution")
-            .set(onchain_config.decoupled_execution() as i64);
         Self {
             epoch_state,
             block_store,
@@ -188,14 +181,9 @@ impl RoundManager {
             network,
             storage,
             sync_only,
-            onchain_config,
             round_manager_tx,
             back_pressure_proposal_timeout_ms,
         }
-    }
-
-    fn decoupled_execution(&self) -> bool {
-        self.onchain_config.decoupled_execution()
     }
 
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
@@ -487,16 +475,12 @@ impl RoundManager {
     }
 
     fn sync_only(&self) -> bool {
-        if self.decoupled_execution() {
-            let sync_or_not = self.sync_only || self.block_store.back_pressure();
-            counters::OP_COUNTERS
-                .gauge("sync_only")
-                .set(sync_or_not as i64);
+        let sync_or_not = self.sync_only || self.block_store.back_pressure();
+        counters::OP_COUNTERS
+            .gauge("sync_only")
+            .set(sync_or_not as i64);
 
-            sync_or_not
-        } else {
-            self.sync_only
-        }
+        sync_or_not
     }
 
     /// The replica broadcasts a "timeout vote message", which includes the round signature, which
@@ -617,7 +601,7 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
-        if self.decoupled_execution() && self.block_store.back_pressure() {
+        if self.block_store.back_pressure() {
             // In case of back pressure, we delay processing proposal. This is done by resending the
             // same proposal to self after some time.
             Ok(self
@@ -686,11 +670,12 @@ impl RoundManager {
     /// * save the updated state to consensus DB
     /// * return a VoteMsg with the LedgerInfo to be committed in case the vote gathers QC.
     async fn execute_and_vote(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
-        let executed_block = self
+        let buffered_block = self
             .block_store
-            .execute_and_insert_block(proposed_block)
+            .insert_ordered_block(proposed_block)
             .await
             .context("[RoundManager] Failed to execute_and_insert the block")?;
+        let block = buffered_block.block();
 
         // Short circuit if already voted.
         ensure!(
@@ -704,17 +689,14 @@ impl RoundManager {
             "[RoundManager] sync_only flag is set, stop voting"
         );
 
-        let vote_proposal = executed_block.vote_proposal(self.decoupled_execution());
+        let vote_proposal = VoteProposal::new(block.clone());
         let vote_result = self.safety_rules.lock().construct_and_sign_vote_two_chain(
             &vote_proposal,
             self.block_store.highest_2chain_timeout_cert().as_deref(),
         );
-        let vote = vote_result.context(format!(
-            "[RoundManager] SafetyRules Rejected {}",
-            executed_block.block()
-        ))?;
-        if !executed_block.block().is_nil_block() {
-            observe_block(executed_block.block().timestamp_usecs(), BlockStage::VOTED);
+        let vote = vote_result.context(format!("[RoundManager] SafetyRules Rejected {}", block))?;
+        if !block.is_nil_block() {
+            observe_block(block.timestamp_usecs(), BlockStage::VOTED);
         }
 
         self.storage

@@ -598,14 +598,10 @@ impl EpochManager {
             .new_epoch(consensus_to_quorum_store_sender);
 
         self.commit_state_computer.new_epoch(&epoch_state);
-        let state_computer = if onchain_config.decoupled_execution() {
-            Arc::new(self.spawn_decoupled_execution(
-                safety_rules_container.clone(),
-                epoch_state.verifier.clone(),
-            ))
-        } else {
-            self.commit_state_computer.clone()
-        };
+        let state_computer = Arc::new(self.spawn_decoupled_execution(
+            safety_rules_container.clone(),
+            epoch_state.verifier.clone(),
+        ));
 
         info!(epoch = epoch, "Create BlockStore");
         let block_store = Arc::new(BlockStore::new(
@@ -650,7 +646,6 @@ impl EpochManager {
             network_sender,
             self.storage.clone(),
             self.config.sync_only,
-            onchain_config,
             round_manager_tx,
             self.config.round_initial_timeout_ms,
         );

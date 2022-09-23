@@ -228,7 +228,6 @@ impl NodeSetup {
             network,
             storage.clone(),
             false,
-            OnChainConsensusConfig::default(),
             round_manager_tx,
             2000,
         );

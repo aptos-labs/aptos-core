@@ -70,7 +70,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
     Arc::new(BlockStore::new(
         storage,
         initial_data,
-        Arc::new(EmptyStateComputer),
+        Arc::new(EmptyOrderingComputer),
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,

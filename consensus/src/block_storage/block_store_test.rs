@@ -126,7 +126,7 @@ proptest! {
                 let known_parent = block_store.block_exists(block.parent_id());
                 let certified_parent = block.quorum_cert().certified_block().id() == block.parent_id();
                 let verify_res = block.verify_well_formed();
-                let res = timed_block_on(&mut runtime, block_store.execute_and_insert_block(block.clone()));
+                let res = timed_block_on(&mut runtime, block_store.insert_ordered_block(block.clone()));
                 if !certified_parent {
                     prop_assert!(verify_res.is_err());
                 } else if !known_parent {
@@ -359,7 +359,7 @@ async fn test_illegal_timestamp() {
     )
     .unwrap();
     let result = block_store
-        .execute_and_insert_block(block_with_illegal_timestamp)
+        .insert_ordered_block(block_with_illegal_timestamp)
         .await;
     assert!(result.is_err());
 }

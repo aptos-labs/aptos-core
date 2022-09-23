@@ -105,7 +105,7 @@ impl StateComputer for MockStateComputer {
 pub struct EmptyStateComputer;
 
 #[async_trait::async_trait]
-impl StateComputer for EmptyStateComputer {
+impl OrderingComputer for EmptyStateComputer {
     async fn compute(
         &self,
         _block: &Block,
@@ -128,6 +128,24 @@ impl StateComputer for EmptyStateComputer {
     }
 
     fn new_epoch(&self, _: &EpochState) {}
+}
+
+pub struct EmptyOrderingComputer;
+
+#[async_trait::async_trait]
+impl OrderingComputer for EmptyOrderingComputer {
+    async fn commit(
+        &self,
+        _blocks: &[Arc<ExecutedBlock>],
+        _commit: LedgerInfoWithSignatures,
+        _call_back: StateComputerCommitCallBackType,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        Ok(())
+    }
 }
 
 /// Random Compute Result State Computer

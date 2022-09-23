@@ -5,7 +5,7 @@ use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use async_trait::async_trait;
-use consensus_types::executed_block::ExecutedBlock;
+use consensus_types::{block::Block, executed_block::ExecutedBlock};
 use executor_types::Error as ExecutionError;
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -19,7 +19,7 @@ use std::{
 ///
 
 pub struct ExecutionRequest {
-    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_blocks: Vec<Block>,
 }
 
 impl Debug for ExecutionRequest {
@@ -68,9 +68,9 @@ impl StatelessPipeline for ExecutionPhase {
         let mut result = vec![];
 
         for b in ordered_blocks {
-            match self.execution_proxy.compute(b.block(), b.parent_id()).await {
+            match self.execution_proxy.compute(&b, b.parent_id()).await {
                 Ok(compute_result) => {
-                    result.push(ExecutedBlock::new(b.block().clone(), compute_result));
+                    result.push(ExecutedBlock::new(b.clone(), compute_result));
                 }
                 Err(e) => {
                     return ExecutionResponse {
