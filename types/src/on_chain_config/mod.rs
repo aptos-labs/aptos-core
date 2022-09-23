@@ -211,7 +211,7 @@ impl ConfigurationResource {
     pub fn bump_epoch_for_test(&self) -> Self {
         let epoch = self.epoch + 1;
         let last_reconfiguration_time = self.last_reconfiguration_time + 1;
-        let mut events = self.events.clone();
+        let mut events = self.events;
         *events.count_mut() += 1;
 
         Self {

@@ -127,7 +127,7 @@ impl fmt::Display for EventKeyParseError {
 impl std::error::Error for EventKeyParseError {}
 
 /// A Rust representation of an Event Handle Resource.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventHandle {
     /// Number of events in the event stream.
     count: u64,

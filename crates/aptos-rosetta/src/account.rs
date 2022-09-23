@@ -171,6 +171,7 @@ async fn get_balances(
                         balances.insert(coin_type.clone(), coin_store.coin());
                     }
                 }
+
                 _ => {}
             }
         }

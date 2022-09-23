@@ -326,8 +326,8 @@ impl CoinStore {
         let coin_store = CoinStoreResource::new(
             self.coin,
             self.frozen,
-            self.deposit_events.clone(),
-            self.withdraw_events.clone(),
+            self.deposit_events,
+            self.withdraw_events,
         );
         bcs::to_bytes(&coin_store).unwrap()
     }
@@ -416,8 +416,8 @@ impl AccountData {
         let account = AccountResource::new(
             self.sequence_number,
             AuthenticationKey::ed25519(&self.account.pubkey).to_vec(),
-            self.coin_register_events.clone(),
-            self.key_rotation_events.clone(),
+            self.coin_register_events,
+            self.key_rotation_events,
         );
         bcs::to_bytes(&account).unwrap()
     }
