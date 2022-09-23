@@ -164,7 +164,7 @@ module aptos_token::property_map {
     }
 
     /// Update the property in the existing property map
-    /// Allow updating existing Key's value and add new keys
+    /// Allow updating existing keys' value and add new key-value pairs
     public fun update_property_map(
         map: &mut PropertyMap,
         keys: vector<String>,
