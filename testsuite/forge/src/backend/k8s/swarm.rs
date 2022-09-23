@@ -342,6 +342,10 @@ impl Swarm for K8sSwarm {
             bail!("No prom client");
         }
     }
+
+    fn generate_full_node_config(&mut self, _upstream: PeerId) -> NodeConfig {
+        todo!()
+    }
 }
 
 /// Amount of time to wait for genesis to complete

@@ -102,6 +102,8 @@ pub trait Swarm: Sync {
     fn aptos_public_info(&mut self) -> AptosPublicInfo<'_> {
         self.chain_info().into_aptos_public_info()
     }
+
+    fn generate_full_node_config(&mut self, upstream: PeerId) -> NodeConfig;
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}

@@ -596,6 +596,10 @@ impl Swarm for LocalSwarm {
     ) -> Result<()> {
         todo!()
     }
+
+    fn generate_full_node_config(&mut self, _upstream: PeerId) -> NodeConfig {
+        todo!()
+    }
 }
 
 #[derive(Debug)]

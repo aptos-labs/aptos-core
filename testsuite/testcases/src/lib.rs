@@ -13,6 +13,7 @@ pub mod network_partition_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
 pub mod performance_with_fullnode_test;
+pub mod pfn_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod three_region_simulation_test;
