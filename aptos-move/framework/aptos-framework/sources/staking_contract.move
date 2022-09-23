@@ -435,6 +435,19 @@ module aptos_framework::staking_contract {
         unlock_stake(staker, operator, staker_rewards);
     }
 
+    /// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+    public entry fun switch_operator_with_same_commission(
+        staker: &signer,
+        old_operator: address,
+        new_operator: address,
+    ) acquires Store {
+        let staker_address = signer::address_of(staker);
+        assert_staking_contract_exists(staker_address, old_operator);
+
+        let commission_percentage = commission_percentage(staker_address, old_operator);
+        switch_operator(staker, old_operator, new_operator, commission_percentage);
+    }
+
     /// Allows staker to switch operator without going through the lenghthy process to unstake.
     public entry fun switch_operator(
         staker: &signer,
@@ -997,6 +1010,26 @@ module aptos_framework::staking_contract {
             0,
             0,
         );
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345)]
+    public entry fun test_staker_can_switch_operator_with_same_commission(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator_1: &signer,
+        operator_2: &signer,
+    ) acquires Store {
+        setup_staking_contract(aptos_framework, staker, operator_1, INITIAL_BALANCE, 10);
+        let staker_address = signer::address_of(staker);
+        let operator_1_address = signer::address_of(operator_1);
+        let operator_2_address = signer::address_of(operator_2);
+
+        // Switch operators.
+        switch_operator_with_same_commission(staker, operator_1_address, operator_2_address);
+        // The staking_contract should now be associated with operator 2 but with same commission rate.
+        assert!(staking_contract_exists(staker_address, operator_2_address), 0);
+        assert!(!staking_contract_exists(staker_address, operator_1_address), 1);
+        assert!(commission_percentage(staker_address, operator_2_address) == 10, 2);
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
