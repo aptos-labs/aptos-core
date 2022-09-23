@@ -52,7 +52,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
-use thiserror::private::PathAsDisplay;
+use thiserror::__private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
