@@ -11,10 +11,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::data_store::GENESIS_CHANGE_SET_MAINNET;
 use crate::{
     account::{Account, AccountData},
-    data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_TESTNET},
+    data_store::{
+        FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET,
+        GENESIS_CHANGE_SET_TESTNET,
+    },
     golden_outputs::GoldenOutputs,
 };
 use aptos_bitvec::BitVec;
@@ -200,7 +202,7 @@ impl FakeExecutor {
 
     /// Creates fresh genesis from the framework passed in.
     pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts, true);
+        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
         Self::from_genesis(genesis.0.write_set())
     }
 
