@@ -18,6 +18,7 @@ import { NetworksProvider } from 'core/hooks/useNetworks';
 import { createStandaloneToast } from '@chakra-ui/toast';
 import { routes } from 'core/routes';
 import { AnalyticsProvider } from 'core/hooks/useAnalytics';
+import { customColors } from 'core/colors';
 
 const { ToastContainer } = createStandaloneToast();
 
@@ -28,9 +29,7 @@ const isProductionEnv = process.env.NODE_ENV === 'production';
 
 const theme: ThemeConfig = extendTheme({
   colors: {
-    navy: {
-      800: '#172B45',
-    },
+    ...customColors,
   },
   initialColorMode: 'light',
   styles: {

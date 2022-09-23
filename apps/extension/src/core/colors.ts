@@ -179,7 +179,7 @@ export const assetSecondaryBgColor = {
 export const walletBgColor = (pathname: string) => {
   switch (pathname) {
     case Routes.wallet.path:
-      return 'navy.800';
+      return 'navy.900';
     default:
       return undefined;
   }
@@ -192,4 +192,28 @@ export const walletTextColor = (pathname: string) => {
     default:
       return undefined;
   }
+};
+
+export const customColors = {
+  green: {
+    100: '#EDF9F8',
+    500: '#70C0BA',
+    800: '#3E8E88',
+  },
+  navy: {
+    100: '#F1F2F3',
+    200: '#DEE1E3',
+    600: '#828C95',
+    700: '#4d5c6d',
+    800: '#324459',
+    // primary
+    900: '#172B45',
+  },
+  salmon: {
+    300: '#FFAFAF',
+    // primary
+    500: '#FF5F5F',
+    600: '#E11919',
+    700: '#953232',
+  },
 };

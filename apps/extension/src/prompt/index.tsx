@@ -10,6 +10,7 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { AppStateProvider } from 'core/hooks/useAppState';
+import { customColors } from 'core/colors';
 import Prompt from './Prompt';
 import { PromptStateProvider } from './hooks';
 
@@ -18,9 +19,7 @@ const isProductionEnv = process.env.NODE_ENV === 'production';
 // TODO: merge app and prompt themes
 const theme = extendTheme({
   colors: {
-    navy: {
-      800: '#172B45',
-    },
+    ...customColors,
   },
   initialColorMode: 'light',
   styles: {

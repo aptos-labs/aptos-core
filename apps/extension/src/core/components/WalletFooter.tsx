@@ -21,8 +21,8 @@ const secondaryIconColor = {
 };
 
 const secondaryIconUnpressedColor = {
-  dark: 'teal.400',
-  light: 'teal.400',
+  dark: 'salmon.500',
+  light: 'salmon.500',
 };
 
 export default function WalletFooter() {
