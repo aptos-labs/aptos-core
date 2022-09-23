@@ -52,7 +52,6 @@ The most common usecase for signing a message is to verify ownership of a privat
 ```typescript
 import nacl from 'tweetnacl';
 
-const wallet = getAptosWallet(); // see "Connecting"
 const message = "hello";
 const nonce = "random_string"
 
@@ -61,7 +60,7 @@ try {
     message,
     nonce,
   });
-  const { publicKey } = await wallet.account();
+  const { publicKey } = await window.aptos.account();
   // Remove the 0x prefix
   const key = publicKey!.slice(2, 66);
   const verified = nacl.sign.detached.verify(Buffer.from(response.fullMessage), 

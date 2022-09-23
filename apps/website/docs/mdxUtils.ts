@@ -15,5 +15,6 @@ export const docsSlugOrdering = Object.freeze([
   'connect-to-petra',
   'sending-a-transaction',
   'signing-a-message',
+  'event-listening',
   'errors',
 ]);
