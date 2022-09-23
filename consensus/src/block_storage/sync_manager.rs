@@ -43,7 +43,8 @@ impl BlockStore {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
-        self.ordered_root().round() + self.back_pressure_limit < li.commit_info().round()
+        (self.ordered_root().round() < li.commit_info().round()
+            && !self.block_exists(li.commit_info().id()))
             || self.commit_root().round() + 2 * self.back_pressure_limit < li.commit_info().round()
     }
 

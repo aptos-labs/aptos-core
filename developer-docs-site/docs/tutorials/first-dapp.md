@@ -13,7 +13,7 @@ We will use:
 
 - The [Aptos Typescript SDK][ts_sdk].
 - The [Aptos Wallet][building_wallet], and
-- The [Aptos CLI][installing_cli] to interact with the Aptos blockchain.
+- The [Aptos CLI][install_cli] to interact with the Aptos blockchain.
 
 The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 

@@ -133,8 +133,11 @@ impl RestoreCoordinator {
                 );
                 metadata_view.expect_state_snapshot(version)?
             } else {
+                let max_txn_ver = metadata_view
+                    .max_transaction_version()?
+                    .ok_or_else(|| anyhow!("No transaction backup found."))?;
                 metadata_view
-                    .select_state_snapshot(self.target_version())?
+                    .select_state_snapshot(std::cmp::min(self.target_version(), max_txn_ver))?
                     .ok_or_else(|| anyhow!("No usable state snapshot."))?
             };
         let version = state_snapshot_backup.version;
