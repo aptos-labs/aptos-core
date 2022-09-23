@@ -806,11 +806,11 @@ module aptos_framework::coin {
     }
 
     #[test(account = @0x1)]
-    public entry fun deposit_and_widthdraw_unfrozen(account: signer) acquires CoinInfo, CoinStore {
+    public entry fun deposit_widthdraw_unfrozen(account: signer) acquires CoinInfo, CoinStore {
         let account_addr = signer::address_of(&account);
         account::create_account_for_test(account_addr);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&account, 18, true);
-        
+
         let coins_minted = mint<FakeMoney>(100, &mint_cap);
         freeze_coin_store(account_addr, &freeze_cap);
         unfreeze_coin_store(account_addr, &freeze_cap);
