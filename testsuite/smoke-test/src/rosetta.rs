@@ -11,8 +11,10 @@ use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
 use aptos_crypto::{HashValue, PrivateKey};
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_rest_client::aptos_api_types::{TransactionOnChainData, UserTransaction};
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{
+    aptos_api_types::{TransactionOnChainData, UserTransaction},
+    Transaction,
+};
 use aptos_rosetta::common::BlockHash;
 use aptos_rosetta::types::{
     AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
@@ -28,12 +30,13 @@ use aptos_rosetta::{
     ROSETTA_VERSION,
 };
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_sdk::types::LocalAccount;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::on_chain_config::GasScheduleV2;
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cached_packages::aptos_stdlib;
-use forge::{LocalSwarm, Node, NodeExt, Swarm};
+use forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -176,6 +179,72 @@ async fn test_block_transactions() {
 
     // There is only one user transaction, so the other one should be dropped
     assert_eq!(1, response.block.transactions.len());
+}
+
+#[tokio::test]
+async fn test_staking_contracts() {
+    const NUM_TXNS_PER_PAGE: u16 = 2;
+
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            // Only one transaction will show up in a block no matter what
+            config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE;
+        }))
+        .build_with_cli(2)
+        .await;
+    let validator = swarm.validators().next().unwrap();
+
+    // And the client
+    let rosetta_port = get_available_port();
+    let rosetta_socket_addr = format!("127.0.0.1:{}", rosetta_port);
+    let rosetta_url = format!("http://{}", rosetta_socket_addr.clone())
+        .parse()
+        .unwrap();
+    let rosetta_client = RosettaClient::new(rosetta_url);
+    let api_config = ApiConfig {
+        enabled: true,
+        address: rosetta_socket_addr.parse().unwrap(),
+        tls_cert_path: None,
+        tls_key_path: None,
+        content_length_limit: None,
+        max_transactions_page_size: NUM_TXNS_PER_PAGE,
+        ..Default::default()
+    };
+
+    // Start the server
+    let _rosetta = aptos_rosetta::bootstrap_async(
+        swarm.chain_id(),
+        api_config,
+        Some(aptos_rest_client::Client::new(
+            validator.rest_api_endpoint(),
+        )),
+    )
+    .await
+    .unwrap();
+
+    // Ensure rosetta can take requests
+    try_until_ok_default(|| rosetta_client.network_list())
+        .await
+        .unwrap();
+
+    let account_1 = cli.account_id(0);
+    let account_2 = cli.account_id(1);
+    let mut info = swarm.aptos_public_info();
+    let mut owner = info.random_account();
+    let owner_index = cli.add_account_to_cli(owner.private_key().clone());
+    // Fund account with 200M APT (+ change for gas) for staking with 2 operators.
+    let stake_amount = 100_000_000_000_000;
+    cli.fund_account(
+        owner_index,
+        Some(stake_amount * 2 + DEFAULT_FUNDED_COINS * 10),
+    )
+    .await
+    .unwrap();
+
+    // Set up the staking contracts.
+    create_staking_contract(&info, &mut owner, account_1, account_2, stake_amount, 10).await;
+    create_staking_contract(&info, &mut owner, account_2, account_1, stake_amount, 15).await;
 }
 
 #[tokio::test]
@@ -361,6 +430,28 @@ async fn account_has_balance(
             response
         ))
     }
+}
+
+async fn create_staking_contract(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    voter: AccountAddress,
+    amount: u64,
+    commission_percentage: u64,
+) {
+    let staking_contract_creation =
+        info.transaction_factory()
+            .payload(aptos_stdlib::staking_contract_create_staking_contract(
+                operator,
+                voter,
+                amount,
+                commission_percentage,
+                vec![],
+            ));
+
+    let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap();
 }
 
 async fn get_balance(
