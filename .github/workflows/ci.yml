@@ -15,7 +15,7 @@ jobs:
     #  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
 
     steps:
       - name: Check out code
@@ -37,3 +37,45 @@ jobs:
         run: yarn build
         env:
           REACT_APP_SEGMENT_WRITE_KEY: ${{ secrets.REACT_APP_SEGMENT_WRITE_KEY }}
+      
+      - name: Zip extension
+        run: |
+          chmod +x "${GITHUB_WORKSPACE}/.github/zip_extension.sh"
+          ${GITHUB_WORKSPACE}/.github/zip_extension.sh
+
+      - name: Get extension package version
+        id: package-version
+        uses: martinbeentjes/npm-get-version-action@main
+        with:
+          path: apps/extension
+      
+      - name: Get all releases
+        run: |
+          chmod +x "${GITHUB_WORKSPACE}/.github/get_releases.sh"
+          ${GITHUB_WORKSPACE}/.github/get_releases.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+
+      # - name: Create extension draft release
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+      #   with:
+      #     tag_name: ${{ steps.package-version.outputs.current-version }}
+      #     release_name: Draft release ${{ steps.package-version.outputs.current-version }}
+      #     body: |
+      #       Draft release
+      #     draft: true
+      #     prerelease: true
+      
+      # - name: Upload extension draft release asset
+      #   id: upload-release-asset 
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+      #     asset_path: apps/extension/release.zip
+      #     asset_name: release.zip
+      #     asset_content_type: application/zip
