@@ -1393,6 +1393,7 @@ fn assert_failed_transfer_transaction(
     let rosetta_txn_metadata = &rosetta_txn.metadata;
     assert_eq!(TransactionType::User, rosetta_txn_metadata.transaction_type);
     assert_eq!(actual_txn.info.version.0, rosetta_txn_metadata.version.0);
+    // Failed transactions aren't cared about too much in Rosetta
     // This should have 3, the deposit, withdraw, and fee
     assert_eq!(rosetta_txn.operations.len(), 3);
 
