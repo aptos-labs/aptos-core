@@ -39,7 +39,7 @@
 
     <div class="mb-10">
       <%= form.label :category_ids, 'Categories', class: 'font-mono uppercase block mb-2' %>
-      <%= form.collection_select :category_ids, Category.all, :id, :title, {}, { multiple: true, class: 'bg-transparent border border-neutral-600 text-neutral-400 rounded-lg focus:ring-teal-700 focus:border-teal-700 block w-full max-w-2xl' } %>
+      <%= form.collection_select :category_ids, Category.order(title: :asc).all, :id, :title, {}, { multiple: true, class: 'bg-transparent border border-neutral-600 text-neutral-400 rounded-lg focus:ring-teal-700 focus:border-teal-700 block w-full max-w-2xl' } %>
     </div>
   </div>
 

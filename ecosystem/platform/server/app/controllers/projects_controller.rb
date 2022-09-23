@@ -11,7 +11,7 @@ class ProjectsController < ApplicationController
 
   # GET /projects
   def index
-    @categories = Category.all.index_by(&:id)
+    @categories = Category.order(title: :asc).all.index_by(&:id)
     @projects = params[:s].blank? ? Project : Project.search(params[:s])
     @projects = @projects.where(public: true, verified: true)
                          .includes(:project_categories)
