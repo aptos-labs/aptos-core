@@ -4,7 +4,7 @@
 import { Serializer } from "./serializer";
 
 describe("BCS Serializer", () => {
-  let serializer: Serializer = null;
+  let serializer: Serializer;
 
   beforeEach(() => {
     serializer = new Serializer();
