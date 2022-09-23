@@ -12,6 +12,8 @@
 #![cfg_attr(feature = "fuzzing", allow(dead_code))]
 #![recursion_limit = "512"]
 
+extern crate core;
+
 mod block_storage;
 mod commit_notifier;
 mod consensusdb;
@@ -28,6 +30,7 @@ mod payload_manager;
 mod pending_votes;
 mod persistent_liveness_storage;
 mod quorum_store;
+mod recovery_manager;
 mod round_manager;
 mod state_computer;
 mod state_replication;
