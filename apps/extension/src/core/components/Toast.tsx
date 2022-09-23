@@ -199,16 +199,24 @@ export function transactionErrorToast(err: unknown) {
 
 // faucet
 
-export function faucetOnErrorToast(activeNetwork: Network) {
-  const localhostMessage = (activeNetwork.name === DefaultNetworks.Localhost)
-    ? 'If you are on localhost, please ensure that the faucet is running.'
-    : undefined;
-
-  toast({
-    description: `Error accessing faucet at ${activeNetwork?.faucetUrl}. ${localhostMessage}`,
-    status: 'error',
-    title: 'Error calling faucet',
-  });
+export function faucetOnErrorToast(activeNetwork: Network, errorMessage: string | undefined) {
+  if (activeNetwork.name === DefaultNetworks.Localhost) {
+    const localhostMessage = (activeNetwork.name === DefaultNetworks.Localhost)
+      ? 'If you are on localhost, please ensure that the faucet is running.'
+      : undefined;
+    toast({
+      description: `Error accessing faucet at ${activeNetwork?.faucetUrl}. ${localhostMessage}`,
+      status: 'error',
+      title: 'Error calling faucet',
+    });
+  } else {
+    toast({
+      description: errorMessage ?? 'Error calling faucet',
+      duration: 5000,
+      status: 'error',
+      title: 'Error calling faucet',
+    });
+  }
 }
 
 export default toast;

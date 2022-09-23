@@ -30,7 +30,7 @@ export function useFundAccount() {
     ...other
   } = useMutation({
     mutationFn: fundAccount,
-    onError: (err) => {
+    onError: (err: any) => {
       trackEvent({
         eventType: faucetEvents.ERROR_RECEIVE_FAUCET,
         params: {
@@ -39,7 +39,7 @@ export function useFundAccount() {
           error: String(err),
         },
       });
-      faucetOnErrorToast(activeNetwork);
+      faucetOnErrorToast(activeNetwork, err?.body);
     },
     onSuccess: async (result, { address }: UseFundAccountParams) => {
       if (result) {

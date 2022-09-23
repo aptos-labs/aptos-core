@@ -14,7 +14,7 @@ export const aptosCoinStoreStructTag = `${coinStoreStructTag}<${aptosCoinStructT
 export const aptosStakePoolStructTag = `${stakeNamespace}::StakePool` as const;
 
 // faucet
-export const defaultFundAmount = 100000000;
+export const defaultFundAmount = 1000000000;
 
 export const latestVersion = 1;
 
