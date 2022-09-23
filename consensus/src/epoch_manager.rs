@@ -34,6 +34,7 @@ use crate::{
     payload_manager::QuorumStoreClient,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore,
+    recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,
     util::time_service::TimeService,
@@ -89,17 +90,8 @@ const PROPSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
-    RecoveryData(RecoveryData),
-    LedgerRecoveryData(LedgerRecoveryData),
-}
-
-impl LivenessStorageData {
-    pub fn expect_recovery_data(self, msg: &str) -> RecoveryData {
-        match self {
-            LivenessStorageData::RecoveryData(data) => data,
-            LivenessStorageData::LedgerRecoveryData(_) => panic!("{}", msg),
-        }
-    }
+    FullRecoveryData(RecoveryData),
+    PartialRecoveryData(LedgerRecoveryData),
 }
 
 // Manager the components that shared across epoch and spawn per-epoch RoundManager with
@@ -542,6 +534,35 @@ impl EpochManager {
         self.block_retrieval_tx = None;
     }
 
+    async fn start_recovery_manager(
+        &mut self,
+        ledger_data: LedgerRecoveryData,
+        epoch_state: EpochState,
+    ) {
+        let network_sender = NetworkSender::new(
+            self.author,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+            epoch_state.verifier.clone(),
+        );
+        let (round_manager_tx, round_manager_rx) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+        );
+        self.round_manager_tx = Some(round_manager_tx);
+        let (close_tx, close_rx) = oneshot::channel();
+        self.round_manager_close_tx = Some(close_tx);
+        let recovery_manager = RecoveryManager::new(
+            epoch_state,
+            network_sender,
+            self.storage.clone(),
+            self.commit_state_computer.clone(),
+            ledger_data.committed_round(),
+        );
+        tokio::spawn(recovery_manager.start(round_manager_rx, close_rx));
+    }
+
     async fn start_round_manager(
         &mut self,
         recovery_data: RecoveryData,
@@ -680,16 +701,19 @@ impl EpochManager {
 
         self.epoch_state = Some(epoch_state.clone());
 
-        let initial_data = self
-            .storage
-            .start()
-            .expect_recovery_data("consensusdb is not consistent with aptosdb");
-        self.start_round_manager(
-            initial_data,
-            epoch_state,
-            onchain_config.unwrap_or_default(),
-        )
-        .await;
+        match self.storage.start() {
+            LivenessStorageData::FullRecoveryData(initial_data) => {
+                self.start_round_manager(
+                    initial_data,
+                    epoch_state,
+                    onchain_config.unwrap_or_default(),
+                )
+                .await
+            }
+            LivenessStorageData::PartialRecoveryData(ledger_data) => {
+                self.start_recovery_manager(ledger_data, epoch_state).await
+            }
+        }
     }
 
     async fn process_message(
