@@ -671,6 +671,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "async-trait",
+ "bcs",
  "bigdecimal",
  "chrono",
  "clap 3.2.17",
