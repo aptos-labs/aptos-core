@@ -14,7 +14,7 @@ anyhow = "1.0.57"
 itertools = "0.10.0"
 tempfile = "3.3.0"
 
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "0fe2e6ce5af811d68b8a995b7da3f4c4ecc485fa" }
-move-package = { git = "https://github.com/move-language/move", rev = "0fe2e6ce5af811d68b8a995b7da3f4c4ecc485fa" }
+move-command-line-common = { git = "https://github.com/aptos-labs/move", rev = "77750b37bb3663d00a7c4058937fed42ceb3089e" }
+move-package = { git = "https://github.com/aptos-labs/move", rev = "77750b37bb3663d00a7c4058937fed42ceb3089e" }
 
 framework = { path = "../framework" }
