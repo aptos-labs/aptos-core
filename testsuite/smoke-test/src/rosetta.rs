@@ -33,7 +33,7 @@ use aptos_types::on_chain_config::GasScheduleV2;
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cached_packages::aptos_stdlib;
-use forge::{LocalSwarm, Node, NodeExt, Swarm};
+use forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -41,6 +41,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{future::Future, time::Duration};
 use tokio::{task::JoinHandle, time::Instant};
+use aptos_sdk::types::LocalAccount;
 
 const DEFAULT_MAX_WAIT_MS: u64 = 5000;
 const DEFAULT_INTERVAL_MS: u64 = 100;
@@ -524,6 +525,121 @@ async fn test_transfer() {
         sender_balance - gas_usage
     );
     */
+}
+
+#[tokio::test]
+async fn test_staking_contracts() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .build_with_cli(3)
+        .await;
+    let validator = swarm.validators().next().unwrap();
+
+    // And the client
+    let rosetta_port = get_available_port();
+    let rosetta_socket_addr = format!("127.0.0.1:{}", rosetta_port);
+    let rosetta_url = format!("http://{}", rosetta_socket_addr.clone())
+        .parse()
+        .unwrap();
+    let rosetta_client = RosettaClient::new(rosetta_url);
+    let api_config = ApiConfig {
+        enabled: true,
+        address: rosetta_socket_addr.parse().unwrap(),
+        tls_cert_path: None,
+        tls_key_path: None,
+        content_length_limit: None,
+        ..Default::default()
+    };
+
+    // Start the server
+    let chain_id = swarm.chain_id();
+    let _rosetta = aptos_rosetta::bootstrap_async(
+        chain_id,
+        api_config,
+        Some(aptos_rest_client::Client::new(
+            validator.rest_api_endpoint(),
+        )),
+    )
+        .await
+        .unwrap();
+
+    // Ensure rosetta can take requests
+    try_until_ok_default(|| rosetta_client.network_list())
+        .await
+        .unwrap();
+
+    let account_1 = cli.account_id(0);
+    let account_2 = cli.account_id(1);
+    let account_3 = cli.account_id(2);
+    let mut owner = swarm.aptos_public_info().random_account();
+    let owner_index = cli.add_account_to_cli(owner.private_key().clone());
+    // Fund account with 200M APT (+ change for gas) for staking with 2 operators.
+    let stake_amount = 100_000_000_000_000;
+    cli.fund_account(
+        owner_index,
+        Some(stake_amount * 2 + DEFAULT_FUNDED_COINS * 10),
+    )
+        .await
+        .unwrap();
+
+    // Set up the staking contracts.
+    let info = swarm.aptos_public_info();
+    create_staking_contract(&info, &mut owner, account_1, account_2, stake_amount, 10).await;
+    create_staking_contract(&info, &mut owner, account_2, account_1, stake_amount, 15).await;
+
+    // Check set operator on the new flow
+    let network_identifier = NetworkIdentifier::from(chain_id);
+    let transaction_identifier = rosetta_client.set_operator(&network_identifier, owner.private_key(), account_1, account_3, u64::MAX, None,  None, None).await.unwrap();
+    let txn = info.client().get_transaction_by_hash(HashValue::from_str(&transaction_identifier.hash).unwrap()).await.unwrap().into_inner();
+    let version = txn.version().unwrap();
+    let block_height = info.client().get_block_by_version_bcs(version, false).await.unwrap().into_inner().block_height;
+
+    let block = rosetta_client.block(&BlockRequest::by_index(chain_id, block_height)).await.unwrap().block;
+    let parsed_txn = block.transactions.into_iter().find(|txn| txn.transaction_identifier == transaction_identifier).unwrap();
+
+    let operator_operation = parsed_txn.operations.into_iter().find(|operation| operation.operation_type == OperationType::SetOperator.to_string()).unwrap();
+    assert_eq!(operator_operation.operation_identifier.index, 0);
+    assert_eq!(operator_operation.status.unwrap(), OperationStatusType::Success.to_string());
+    assert_eq!(operator_operation.metadata.clone().unwrap().old_operator.unwrap().account_address().unwrap(), account_1);
+    assert_eq!(operator_operation.metadata.unwrap().new_operator.unwrap().account_address().unwrap(), account_2);
+
+    // Check set voter on the new flow
+    let network_identifier = NetworkIdentifier::from(chain_id);
+    let transaction_identifier = rosetta_client.set_voter(&network_identifier, owner.private_key(), account_2, account_3, u64::MAX, None,  None, None).await.unwrap();
+    let txn = info.client().get_transaction_by_hash(HashValue::from_str(&transaction_identifier.hash).unwrap()).await.unwrap().into_inner();
+    let version = txn.version().unwrap();
+    let block_height = info.client().get_block_by_version_bcs(version, false).await.unwrap().into_inner().block_height;
+
+    let block = rosetta_client.block(&BlockRequest::by_index(chain_id, block_height)).await.unwrap().block;
+    let parsed_txn = block.transactions.into_iter().find(|txn| txn.transaction_identifier == transaction_identifier).unwrap();
+
+    let voter_operation = parsed_txn.operations.into_iter().find(|operation| operation.operation_type == OperationType::SetVoter.to_string()).unwrap();
+    assert_eq!(voter_operation.operation_identifier.index, 0);
+    assert_eq!(voter_operation.status.unwrap(), OperationStatusType::Success.to_string());
+    assert_eq!(voter_operation.metadata.clone().unwrap().operator.unwrap().account_address().unwrap(), account_2);
+    assert_eq!(voter_operation.metadata.unwrap().new_voter.unwrap().account_address().unwrap(), account_2);
+}
+
+async fn create_staking_contract(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    voter: AccountAddress,
+    amount: u64,
+    commission_percentage: u64,
+) {
+    let staking_contract_creation =
+        info.transaction_factory()
+            .payload(aptos_stdlib::staking_contract_create_staking_contract(
+                operator,
+                voter,
+                amount,
+                commission_percentage,
+                vec![],
+            ));
+
+    let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap();
 }
 
 /// This test tests all of Rosetta's functionality from the read side in one go.  Since

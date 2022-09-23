@@ -71,7 +71,5 @@ pub struct Pool {
     total_shares: u64,
     shares: BTreeMap<AccountAddress, u64>,
     shareholders: Vec<AccountAddress>,
-    // Default to 1. This can be used to minimize rounding errors when computing shares and coins amount.
-    // However, users need to make sure the coins amount don't overflow when multiplied by the scaling factor.
     scaling_factor: u64,
 }
