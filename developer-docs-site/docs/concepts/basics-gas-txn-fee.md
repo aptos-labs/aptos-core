@@ -7,18 +7,14 @@ slug: "basics-gas-txn-fee"
 
 ## Concept
 
-To conduct any transaction with the Aptos blockchain on the mainnet, you are required to pay a processing fees. This includes transactions from a client application, or from a stake owner, a node operator or a voter. Think of this processing fee in the following terms: 
-
-Any blockchain, for example, the Aptos blockchain, exists in a distributed network of computing and storage resources. The Aptos mainnet is one such distributed network, holding the Aptos blockchain. 
-
-The processing fee you are required to pay is based on the computing and storage resources in the Aptos mainnet to:
+To conduct any transaction with the Aptos blockchain on the mainnet, you are required to pay a processing fees. This includes transactions from a client application, from a stake owner, a node operator, or from a voter. The processing fee you are required to pay is based on the computing and storage resources you use on the blockchain to:
 
 1. Process your transactions on the blockchain.
-2. Propagate the validated record throughout the distributed network of the mainnet, and
+2. Propagate the validated record throughout the distributed network of the mainnet.
 3. Store the validated record in the distributed blockchain storage.  
 
 :::tip 
-Conceptually, this fee can be thought of as quite similar to how we pay for our home electricity or water utility.
+Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
 :::
  
 ### Prioritizing your transaction
@@ -27,7 +23,7 @@ You can even bump up your transaction to a higher priority level on the blockcha
 
 ### Unit of gas
 
-You can make a simple transaction, or a complicated transaction that requires the blockchain to perform lots of computation and distributed storage. In either case, you will be required to spend a processing fee sufficient to complete the transaction. This is where the notion of **gas** becomes clear**.** Here is how it works:
+You can make a simple transaction, or a complicated transaction that requires the blockchain to perform lots of computation and distributed storage. In either case, you will be required to spend a processing fee sufficient to complete the transaction. This is where the notion of **gas** becomes clear. Here is how it works:
 
 In the Aptos blockchain a **unit of gas** represents a basic unit of resource consumption. A single unit of gas is a combined representation of:
 
@@ -61,20 +57,20 @@ When a transaction is submitted to the Aptos blockchain, the transaction must co
 
 The transaction fee charged to the client will be at the most `gas_price * max_gas_amount`.
 
-## Gas parameters set by the governance
+## Gas parameters set by governance
 
-The following gas parameters are set by the Aptos governance. 
+The following gas parameters are set by Aptos governance. 
 
 :::tip On-chain gas schedule
 These on-chain gas parameters are published on the Aptos blockchain at `0x1::gas_schedule::GasScheduleV2`.
 :::
 
-- `lower bound` : The `max_gas_amount` value in the transaction must be set to significantly greater than this parameter’s value.
-- `upper bound` : The maximum allowed value for the `max_gas_amount` gas parameter.
+- `txn.maximum_number_of_gas_units`: Maximum number of gas units that can be spent (this is the maximum allowed value for the `max_gas_amount` gas parameter in the transaction). This is to ensure that the dynamic pricing adjustments do not exceed how much you are willing to pay in total.
+- `txn.min_transaction_gas_units:` Minimum number of gas units that can be spent. The `max_gas_amount` value in the transaction must be set to greater than this parameter’s value. 
 
 ## Dynamic gas pricing for storage
 
-Aptos gas pricing uses dynamic prices for the storage operations. This means that the storage costs, hence the `gas_price`, can increase exponentially as the Aptos blockchain state database is filled up. The storage cost can become as high as `100x` at 100% utilization. However, the expectation is that the validators will make use of larger and cheaper storage hardware to mitigate such exponential rise in the storage costs. 
+Aptos gas pricing uses dynamic prices for the storage operations. This means that the storage costs, hence the `gas_used`, can increase exponentially as the Aptos blockchain state database is filled up. The storage cost can become as high as `100x` at 100% utilization. However, the expectation is that the validators will make use of larger and cheaper storage hardware to mitigate such exponential rise in the storage costs. 
 
 Dynamic pricing is used to protect the Aptos network in the worse-case scenarios. However, we expect upgrades to Aptos network to happen well before the network gets into the high-cost zones.
 
