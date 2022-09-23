@@ -11,8 +11,8 @@ import { FAUCET_URL, NODE_URL } from "./utils/test_helper.test";
 test(
   "full tutorial nft token flow",
   async () => {
-    const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const client = new AptosClient(NODE_URL!);
+    const faucetClient = new FaucetClient(NODE_URL!, FAUCET_URL!);
     const tokenClient = new TokenClient(client);
 
     const alice = new AptosAccount();

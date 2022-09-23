@@ -21,8 +21,8 @@ test("faucet url empty", () => {
 test(
   "full tutorial faucet flow",
   async () => {
-    const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const client = new AptosClient(NODE_URL!);
+    const faucetClient = new FaucetClient(NODE_URL!, FAUCET_URL!);
 
     const account1 = new AptosAccount();
     const txns = await faucetClient.fundAccount(account1.address(), 1000000);

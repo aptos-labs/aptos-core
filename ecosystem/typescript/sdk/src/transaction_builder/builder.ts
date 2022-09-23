@@ -161,7 +161,7 @@ interface ABIBuilderConfig {
 export class TransactionBuilderABI {
   private readonly abiMap: Map<string, ScriptABI>;
 
-  private readonly builderConfig: ABIBuilderConfig;
+  private readonly builderConfig: Partial<ABIBuilderConfig>;
 
   /**
    * Constructs a TransactionBuilderABI instance
@@ -257,7 +257,7 @@ export class TransactionBuilderABI {
       payload = new TransactionPayloadScript(new Script(funcABI.code, typeTags, scriptArgs));
     }
 
-    return payload;
+    return payload!;
   }
 
   /**
@@ -286,17 +286,17 @@ export class TransactionBuilderABI {
       throw new Error("No gasUnitPrice provided.");
     }
 
-    const senderAccount = sender instanceof AccountAddress ? sender : AccountAddress.fromHex(sender);
+    const senderAccount = sender instanceof AccountAddress ? sender : AccountAddress.fromHex(sender!);
     const expTimestampSec = BigInt(Math.floor(Date.now() / 1000) + Number(expSecFromNow));
     const payload = this.buildTransactionPayload(func, ty_tags, args);
 
     if (payload) {
       return new RawTransaction(
         senderAccount,
-        BigInt(sequenceNumber),
+        BigInt(sequenceNumber!),
         payload,
-        BigInt(maxGasAmount),
-        BigInt(gasUnitPrice),
+        BigInt(maxGasAmount!),
+        BigInt(gasUnitPrice!),
         expTimestampSec,
         new ChainId(Number(chainId)),
       );
@@ -335,12 +335,12 @@ export class TransactionBuilderRemoteABI {
     const abis = modules
       .map((module) => module.abi)
       .flatMap((abi) =>
-        abi.exposed_functions
+        abi!.exposed_functions
           .filter((ef) => ef.is_entry)
           .map(
             (ef) =>
               ({
-                fullName: `${abi.address}::${abi.name}::${ef.name}`,
+                fullName: `${abi!.address}::${abi!.name}::${ef.name}`,
                 ...ef,
               } as Gen.MoveFunction & { fullName: string }),
           ),
@@ -387,16 +387,16 @@ export class TransactionBuilderRemoteABI {
     // Remove all `signer` and `&signer` from argument list because the Move VM injects those arguments. Clients do not
     // need to care about those args. `signer` and `&signer` are required be in the front of the argument list. But we
     // just loop through all arguments and filter out `signer` and `&signer`.
-    const originalArgs = funcAbi.params.filter((param) => param !== "signer" && param !== "&signer");
+    const originalArgs = funcAbi!.params.filter((param) => param !== "signer" && param !== "&signer");
 
     // Convert string arguments to TypeArgumentABI
     const typeArgABIs = originalArgs.map((arg, i) => new ArgumentABI(`var${i}`, new TypeTagParser(arg).parseTypeTag()));
 
     const entryFunctionABI = new EntryFunctionABI(
-      funcAbi.name,
+      funcAbi!.name,
       ModuleId.fromStr(`${addr}::${module}`),
       "", // Doc string
-      funcAbi.generic_type_params.map((_, i) => new TypeArgumentABI(`${i}`)),
+      funcAbi!.generic_type_params.map((_, i) => new TypeArgumentABI(`${i}`)),
       typeArgABIs,
     );
 

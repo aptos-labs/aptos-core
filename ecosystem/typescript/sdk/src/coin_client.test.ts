@@ -10,8 +10,8 @@ import { CoinClient } from "./coin_client";
 test(
   "transferCoins and checkBalance works",
   async () => {
-    const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const client = new AptosClient(NODE_URL!);
+    const faucetClient = new FaucetClient(NODE_URL!, FAUCET_URL!);
     const coinClient = new CoinClient(client);
 
     const alice = new AptosAccount();

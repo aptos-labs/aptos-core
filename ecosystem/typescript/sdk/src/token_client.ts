@@ -417,8 +417,8 @@ export class TokenClient {
 
     try {
       return await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
-    } catch (error) {
-      if (error.status === 404) {
+    } catch (error: any) {
+      if (error?.status === 404) {
         return {
           id: tokenId,
           amount: "0",

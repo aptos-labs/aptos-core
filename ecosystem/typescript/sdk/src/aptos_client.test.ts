@@ -8,7 +8,7 @@ import { AptosAccount } from "./aptos_account";
 import { TxnBuilderTypes, TransactionBuilderMultiEd25519, TransactionBuilderRemoteABI } from "./transaction_builder";
 import { TokenClient } from "./token_client";
 import { HexString } from "./hex_string";
-import { FAUCET_URL, NODE_URL } from "./utils/test_helper.test";
+import { FAUCET_URL as faucetUrl, NODE_URL as nodeUrl } from "./utils/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "./bcs";
 
 const account = "0x1::account::Account";
@@ -16,6 +16,9 @@ const account = "0x1::account::Account";
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
 const coinTransferFunction = "0x1::coin::transfer";
+
+const FAUCET_URL = faucetUrl!;
+const NODE_URL = nodeUrl!;
 
 test("node url empty", () => {
   expect(() => {
