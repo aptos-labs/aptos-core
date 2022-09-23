@@ -918,19 +918,6 @@ async fn parse_coinstore_changes(
             ));
             operation_index += 1;
         }
-
-        if operations.is_empty() {
-            warn!(
-                "No transfer operations found for {} coinstore for {} at version {}",
-                currency
-                    .metadata
-                    .as_ref()
-                    .map(|inner| inner.move_type.as_str())
-                    .unwrap_or("Unknown move type"),
-                address,
-                version
-            );
-        }
     } else {
         warn!(
             "Currency {} is invalid for {} at version {}",
