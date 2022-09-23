@@ -168,6 +168,42 @@ pub static EXCEEDED_STORAGE_QUOTA_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the number of batch request sent to other nodes.
+pub static SENT_BATCH_REQUEST_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_sent_batch_request_count",
+        "Count of the number of batch request sent to other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of batch request retry sent to other nodes.
+pub static SENT_BATCH_REQUEST_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_sent_batch_request_retry_count",
+        "Count of the number of batch request retry sent to other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of batch request received from other nodes.
+pub static RECEIVED_BATCH_REQUEST_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_request_count",
+        "Count of the number of batch request received from other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of batch request received from other nodes that is timeout.
+pub static RECEIVED_BATCH_REQUEST_TIMTOUT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_request_timeout_count",
+        "Count of the number of batch request received from other nodes that is timeout."
+    )
+    .unwrap()
+});
+
 /// Latencies
 
 /// Histogram of the time durations for batch creation.

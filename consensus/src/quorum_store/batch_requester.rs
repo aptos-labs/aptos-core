@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network::QuorumStoreSender;
-use crate::quorum_store::{types::Batch, utils::DigestTimeouts};
+use crate::quorum_store::{counters, types::Batch, utils::DigestTimeouts};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_types::{transaction::SignedTransaction, PeerId};
@@ -53,6 +53,7 @@ impl BatchRequesterState {
     // TODO: if None, then return an error to the caller
     fn serve_request(self, digest: HashValue, maybe_payload: Option<Vec<SignedTransaction>>) {
         if let Some(payload) = maybe_payload {
+            counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
             debug!(
                 "QS: batch to oneshot, digest {}, tx {:?}",
                 digest, self.ret_tx
@@ -61,6 +62,7 @@ impl BatchRequesterState {
                 .send(Ok(payload))
                 .expect("Receiver of requested batch not available");
         } else {
+            counters::RECEIVED_BATCH_REQUEST_TIMTOUT_COUNT.inc();
             debug!("QS: batch timed out, digest {}", digest);
             if self.ret_tx.send(Err(Error::CouldNotGetData)).is_err() {
                 debug!("Receiver of requested batch not available");
@@ -99,6 +101,8 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
     }
 
     async fn send_requests(&self, digest: HashValue, request_peers: Vec<PeerId>) {
+        // Quorum Store measurements
+        counters::SENT_BATCH_REQUEST_COUNT.inc();
         let batch = Batch::new(self.epoch, self.my_peer_id, digest, None);
         self.network_sender.send_batch(batch, request_peers).await;
     }
@@ -125,6 +129,9 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
         for digest in self.timeouts.expire() {
             debug!("QS: timed out batch request, digest = {}", digest);
             if let Some(state) = self.digest_to_state.get_mut(&digest) {
+                // Quoruo Store measurements
+                counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();
+
                 if let Some(request_peers) = state.next_request_peers(self.request_num_peers) {
                     self.send_requests(digest, request_peers).await;
                     self.timeouts.add_digest(digest, self.request_timeout_ms);
