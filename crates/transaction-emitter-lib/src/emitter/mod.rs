@@ -17,7 +17,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use futures::future::{try_join_all, FutureExt};
-use itertools::zip;
+use std::iter::zip;
 use once_cell::sync::Lazy;
 use rand::seq::IteratorRandom;
 use rand_core::SeedableRng;
