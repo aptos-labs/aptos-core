@@ -345,6 +345,9 @@ impl BatchReader {
                     .expect("Receiver of requested batch is not available");
             }
         } else {
+            // Quorum store metrics
+            counters::MISSED_BATCHES_COUNT.inc();
+
             self.self_tx
                 .send(BatchReaderCommand::GetBatchForSelf(proof, tx))
                 .await

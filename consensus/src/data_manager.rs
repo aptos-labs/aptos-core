@@ -205,9 +205,6 @@ impl DataManager for QuorumStoreDataManager {
                                 vec_ret.into_iter().flatten().collect();
                             entry.replace_entry(DataStatus::Cached(ret.clone()));
 
-                            // Quorum store metrics
-                            counters::MISSED_BATCHES_COUNT.inc();
-
                             Ok(ret)
                         }
                     },
