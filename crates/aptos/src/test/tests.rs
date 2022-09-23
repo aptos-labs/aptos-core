@@ -32,6 +32,7 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "genesis", "generate-layout-template", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "genesis", "set-validator-configuration", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "genesis", "setup-git", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "genesis", "generate-admin-write-set", "--help"]).await;
 
     assert_cmd_not_panic(&["aptos", "governance"]).await;
     assert_cmd_not_panic(&["aptos", "governance", "execute-proposal", "--help"]).await;
