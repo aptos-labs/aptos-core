@@ -24,6 +24,11 @@ storage:
 {{- toYaml $.Values.validator.config.storage | nindent 4 -}}
 {{- end }}
 
+{{ if $.Values.validator.config.mempool -}}
+mempool:
+{{- toYaml $.Values.validator.config.mempool | nindent 4 -}}
+{{- end }}
+
 execution:
   genesis_file_location: /opt/aptos/genesis/genesis.blob
 {{- if $.Values.validator.config.execution -}}{{- toYaml $.Values.validator.config.execution | nindent 4 -}}{{- end }}
