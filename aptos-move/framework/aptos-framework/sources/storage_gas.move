@@ -145,10 +145,6 @@ module aptos_framework::storage_gas {
         *borrow_global_mut<StorageGasConfig>(@aptos_framework) = config;
     }
 
-    fun init_module(aptos_framework: &signer) {
-        initialize(aptos_framework);
-    }
-
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
