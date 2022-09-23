@@ -325,8 +325,6 @@ fn exec_function(
         });
 }
 
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 1;
-
 fn initialize(
     session: &mut SessionExt<impl MoveResolver>,
     consensus_config: OnChainConsensusConfig,
@@ -340,7 +338,7 @@ fn initialize(
     //            We should get rid of it after we make another testnet release.
     let gas_schedule_blob = if use_gas_schedule_v2 {
         let gas_schedule = GasScheduleV2 {
-            feature_version: LATEST_GAS_FEATURE_VERSION,
+            feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
             entries: genesis_gas_params.to_on_chain_gas_schedule(),
         };
         bcs::to_bytes(&gas_schedule).expect("Failure serializing genesis gas schedule")
