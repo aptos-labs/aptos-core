@@ -10,6 +10,7 @@ mod generate_upgrade_script;
 mod init_module;
 mod lazy_natives;
 mod max_loop_depth;
+mod mint_nft;
 mod rotate_auth_key;
 mod stake;
 mod string_args;
