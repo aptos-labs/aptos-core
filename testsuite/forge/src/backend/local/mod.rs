@@ -171,6 +171,7 @@ impl Factory for LocalFactory {
         rng: &mut StdRng,
         num_validators: NonZeroUsize,
         num_fullnodes: usize,
+        num_public_fullnodes: usize,
         version: &Version,
         _genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,

@@ -93,6 +93,7 @@ impl Factory for K8sFactory {
         _rng: &mut StdRng,
         num_validators: NonZeroUsize,
         num_fullnodes: usize,
+        num_public_fullnodes: usize,
         init_version: &Version,
         genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
