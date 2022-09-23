@@ -273,7 +273,10 @@ impl CliTestFramework {
                 ),
                 member_id: Identifier::from_str("transfer").unwrap(),
             },
-            args: vec![ArgWithType::from_str(&format!("u64:{}", amount)).unwrap()],
+            args: vec![
+                ArgWithType::from_str("address:0xdeadbeefcafebabe").unwrap(),
+                ArgWithType::from_str(&format!("u64:{}", amount)).unwrap(),
+            ],
             type_args: vec![MoveType::Struct(MoveStructTag::new(
                 AccountAddress::ONE.into(),
                 IdentifierWrapper::from_str("aptos_coin").unwrap(),
