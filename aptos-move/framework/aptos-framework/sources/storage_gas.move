@@ -149,7 +149,7 @@ module aptos_framework::storage_gas {
         initialize(aptos_framework);
     }
 
-    public(friend) fun initialize(aptos_framework: &signer) {
+    public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             !exists<StorageGasConfig>(@aptos_framework),
