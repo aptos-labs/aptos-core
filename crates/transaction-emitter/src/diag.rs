@@ -4,9 +4,9 @@
 use anyhow::{bail, format_err, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use futures::future::join_all;
-use std::iter::zip;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rand_core::OsRng;
+use std::iter::zip;
 use std::{
     cmp::min,
     time::{Duration, Instant},
