@@ -36,8 +36,7 @@ const transaction = {
 try {
     const pendingTransaction = await (window as any).aptos.signAndSubmitTransaction(transaction);
 
-
-    // In most cases a dapp will want to wait for the transaction, in these cases you can use the typescript sdk
+    // In most cases a dApp will want to wait for the transaction, in these cases you can use the typescript sdk
     const client = new AptosClient('https://testnet.aptoslabs.com');
     client.waitForTransaction(pendingTransaction.hash);
 } catch (error) {
@@ -50,7 +49,7 @@ try {
 
 The below code example shows how to use the `signTransaction()` API to only sign the transaction, without submitting it to the Aptos blockchain.
 
-**We don't recommend using this because in most cases you don't need it, and it isn't super safe for users. They will receive extra warning for this.
+**We don't recommend using this because in most cases you don't need it, and it isn't super safe for users. They will receive an extra warning for this.
 
 
 ```typescript

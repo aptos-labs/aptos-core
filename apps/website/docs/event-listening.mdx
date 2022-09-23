@@ -3,18 +3,18 @@ title: "Event Listening"
 slug: "event-listening"
 ---
 
-# Event Listneing
+# Event Listening
 
 ## onNetworkChange() and network()
-A dapp may want to make sure that a user is on the right network, in this case you will need to check what network the wallet is using.
+A dApp may want to make sure that a user is on the right network. In this case you will need to check what network the wallet is using.
 
 Default networks provided by the Petra wallet:
 ```typescript
 // default networks in the wallet
 enum Network {
-  testnet = 'testnet',
-  mainnet = 'mainnet',
-  devnet = 'devnet'
+  Testnet = 'Testnet',
+  Mainnet = 'Mainnet',
+  Devnet = 'Devnet'
 }
 
 // Current network
@@ -28,7 +28,7 @@ window.aptos.onNetworkChange((newNetwork) => {
 
 
 ## onAccountChange()
-In <CompanyName /> a user may change accounts while interacting with you app. To check for these events you can listen for them with `onAccountChange`
+In <CompanyName /> a user may change accounts while interacting with your app. To check for these events you can listen for them with `onAccountChange`
 
 
 ```typescript
@@ -49,7 +49,7 @@ window.aptos.onAccountChange((newAccount) => {
 
 
 # onDisconnect()
-A user may choose to disconnect from your dapp. In that case you will want to update your state.
+A user may choose to disconnect from your dApp. In that case you will want to update your state.
 
 ```typescript
 // get current connection status
