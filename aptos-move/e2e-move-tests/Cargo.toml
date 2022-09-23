@@ -31,6 +31,7 @@ aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../aptos-vm", features = ["fuzzing"] }
 cached-packages = { path = "../framework/cached-packages" }
 framework = { path = "../framework" }
+package-builder = { path = "../package-builder" }
 vm-genesis = { path = "../vm-genesis" }
 
 aptos-writeset-generator = { path = "../writeset-transaction-generator" }

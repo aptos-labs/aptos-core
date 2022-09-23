@@ -4,8 +4,8 @@ module aptos_framework::code {
     use std::error;
     use std::signer;
     use std::vector;
+    use std::features;
 
-    use aptos_framework::features;
     use aptos_framework::util;
     use aptos_framework::system_addresses;
     use aptos_std::copyable_any::Any;

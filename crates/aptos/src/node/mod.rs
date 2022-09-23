@@ -608,7 +608,7 @@ const TESTNET_FOLDER: &str = "testnet";
 /// Run local testnet
 ///
 /// This local testnet will run it's own Genesis and run as a single node
-/// network locally.  Optionally, a faucet can be added for minting coins.
+/// network locally.  Optionally, a faucet can be added for minting APT coins.
 #[derive(Parser)]
 pub struct RunLocalTestnet {
     /// An overridable config template for the test node

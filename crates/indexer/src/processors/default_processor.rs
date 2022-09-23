@@ -112,18 +112,14 @@ fn insert_transactions(
     use schema::transactions::dsl::*;
     let chunks = get_chunks(txns.len(), TransactionModel::field_count());
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::transactions::table)
                 .values(&txns[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     Ok(())
 }
@@ -146,7 +142,7 @@ fn insert_user_transactions_w_sigs(
         UserTransactionModel::field_count(),
     );
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::user_transactions::table)
                 .values(&all_user_transactions[start_ind..end_ind])
@@ -165,16 +161,12 @@ fn insert_user_transactions_w_sigs(
                     ut_schema::entry_function_id_str.eq(excluded(ut_schema::entry_function_id_str)),
                     ut_schema::inserted_at.eq(excluded(ut_schema::inserted_at)),
                 )),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     let chunks = get_chunks(all_signatures.len(), Signature::field_count());
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::signatures::table)
                 .values(&all_signatures[start_ind..end_ind])
@@ -185,12 +177,8 @@ fn insert_user_transactions_w_sigs(
                     sig_schema::is_sender_primary,
                 ))
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     Ok(())
 }
@@ -211,18 +199,14 @@ fn insert_block_metadata_transactions(
 
     let chunks = get_chunks(bmt.len(), BlockMetadataTransactionModel::field_count());
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::block_metadata_transactions::table)
                 .values(&bmt[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     Ok(())
 }
@@ -233,18 +217,14 @@ fn insert_events(conn: &mut PgConnection, ev: &[EventModel]) -> Result<(), diese
     let chunks = get_chunks(ev.len(), EventModel::field_count());
 
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::events::table)
                 .values(&ev[start_ind..end_ind])
                 .on_conflict((account_address, creation_number, sequence_number))
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     Ok(())
 }
@@ -258,18 +238,14 @@ fn insert_write_set_changes(
     let chunks = get_chunks(wscs.len(), WriteSetChangeModel::field_count());
 
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::write_set_changes::table)
                 .values(&wscs[start_ind..end_ind])
                 .on_conflict((transaction_version, index))
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     Ok(())
 }
@@ -290,18 +266,14 @@ fn insert_move_modules(
 
     let chunks = get_chunks(modules.len(), MoveModule::field_count());
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::move_modules::table)
                 .values(&modules[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     Ok(())
 }
@@ -322,18 +294,14 @@ fn insert_move_resources(
 
     let chunks = get_chunks(resources.len(), MoveResource::field_count());
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::move_resources::table)
                 .values(&resources[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     Ok(())
 }
@@ -365,33 +333,25 @@ fn insert_table_data(
 
     let chunks = get_chunks(items.len(), TableItem::field_count());
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::table_items::table)
                 .values(&items[start_ind..end_ind])
                 .on_conflict((ti::transaction_version, ti::write_set_change_index))
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     let chunks = get_chunks(metadata_nonnull.len(), TableMetadata::field_count());
     for (start_ind, end_ind) in chunks {
-        match execute_with_better_error(
+        execute_with_better_error(
             conn,
             diesel::insert_into(schema::table_metadatas::table)
                 .values(&metadata_nonnull[start_ind..end_ind])
                 .on_conflict(tm::handle)
                 .do_nothing(),
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+            None,
+        )?;
     }
     Ok(())
 }

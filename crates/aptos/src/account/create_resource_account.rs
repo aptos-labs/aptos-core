@@ -16,7 +16,7 @@ use std::str::FromStr;
 /// Command to create a resource account on-chain
 ///
 /// To create an account there are two options:
-/// 1. Submit a create account transaction with an account that has coins
+/// 1. Submit a create account transaction with an account that has APT coins
 /// 2. Use a faucet to create the account
 #[derive(Debug, Parser)]
 pub struct CreateResourceAccount {

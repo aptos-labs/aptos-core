@@ -37,12 +37,12 @@ impl StakeTool {
     }
 }
 
-/// Stake coins to the stake pool
+/// Stake APT coins to the stake pool
 ///
-/// This command allows stake pool owners to add coins to their stake.
+/// This command allows stake pool owners to add APT coins to their stake.
 #[derive(Parser)]
 pub struct AddStake {
-    /// Amount of coins to add to stake
+    /// Amount of Octas (10^-8 APT) to add to stake
     #[clap(long)]
     pub amount: u64,
 
@@ -64,12 +64,12 @@ impl CliCommand<TransactionSummary> for AddStake {
     }
 }
 
-/// Unlock staked coins
+/// Unlock staked APT coins
 ///
-/// Coins can only be unlocked if they no longer have an applied lockup period
+/// APT coins can only be unlocked if they no longer have an applied lockup period
 #[derive(Parser)]
 pub struct UnlockStake {
-    /// Amount of coins to unlock
+    /// Amount of Octas (10^-8 APT) to unlock
     #[clap(long)]
     pub amount: u64,
 
@@ -91,13 +91,13 @@ impl CliCommand<TransactionSummary> for UnlockStake {
     }
 }
 
-/// Withdraw unlocked staked coins
+/// Withdraw unlocked staked APT coins
 ///
 /// This allows users to withdraw stake back into their CoinStore.
 /// Before calling `WithdrawStake`, `UnlockStake` must be called first.
 #[derive(Parser)]
 pub struct WithdrawStake {
-    /// Amount of coins to withdraw
+    /// Amount of Octas (10^-8 APT) to withdraw
     #[clap(long)]
     pub amount: u64,
 
@@ -119,7 +119,7 @@ impl CliCommand<TransactionSummary> for WithdrawStake {
     }
 }
 
-/// Increase lockup of all staked coins in the stake pool
+/// Increase lockup of all staked APT coins in the stake pool
 ///
 /// Lockup may need to be increased in order to vote on a proposal.
 #[derive(Parser)]
@@ -148,7 +148,7 @@ impl CliCommand<TransactionSummary> for IncreaseLockup {
 /// stake pool to an operator, or delegate voting to a different account.
 #[derive(Parser)]
 pub struct InitializeStakeOwner {
-    /// Initial amount of coins to be staked
+    /// Initial amount of Octas (10^-8 APT) to be staked
     #[clap(long)]
     pub initial_stake_amount: u64,
 

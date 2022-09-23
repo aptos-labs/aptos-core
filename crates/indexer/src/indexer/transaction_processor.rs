@@ -160,6 +160,7 @@ pub trait TransactionProcessor: Send + Sync + Debug {
                         dsl::details.eq(excluded(dsl::details)),
                         dsl::last_updated.eq(excluded(dsl::last_updated)),
                     )),
+                None,
             )
             .expect("Error updating Processor Status!");
         }
