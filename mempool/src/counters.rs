@@ -168,6 +168,15 @@ pub fn mempool_service_transactions(label: &'static str, num: usize) {
         .observe(num as f64)
 }
 
+/// Histogram for the byte size of transactions processed in get_block
+pub static MEMPOOL_SERVICE_BYTES_GET_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_service_bytes_get_block",
+        "Histogram for the number of txns per (mempool returned for proposal) blocks."
+    )
+    .unwrap()
+});
+
 /// Counter for tracking latency of mempool processing requests from consensus/state sync
 /// A 'fail' result means the mempool's callback response to consensus/state sync failed.
 static MEMPOOL_SERVICE_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
@@ -473,22 +482,4 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         )
         .unwrap(),
     )
-});
-
-/// Histogram for the number of txns per (committed) blocks.
-pub static MEMPOOL_RETURNED_NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_mempool_returned_num_txns_per_block",
-        "Histogram for the number of txns per (mempool returned for proposal) blocks."
-    )
-    .unwrap()
-});
-
-/// Histogram for the number of txns per (committed) blocks.
-pub static MEMPOOL_RETURNED_NUM_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_mempool_returned_num_bytes_per_block",
-        "Histogram for the number of txns per (mempool returned for proposal) blocks."
-    )
-    .unwrap()
 });
