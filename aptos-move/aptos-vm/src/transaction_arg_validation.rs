@@ -163,7 +163,7 @@ fn validate_arg<S: MoveResolverExt>(
             // performed in `is_valid_txn_arg`
             let st = session
                 .get_struct_type(*idx)
-                .expect("unreachable, type must exist");
+                .expect("unrachable, type must exist");
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
             // load the serialized string
             let len = get_len(cursor)?;
