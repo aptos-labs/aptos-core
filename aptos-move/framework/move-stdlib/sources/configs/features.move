@@ -1,6 +1,8 @@
-/// Maintains feature flags.
-module aptos_framework::features {
-    use aptos_framework::system_addresses;
+/// Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in
+/// the Move stdlib, the Aptos stdlib, and the Aptos framework.
+module std::features {
+    use std::error;
+    use std::signer;
     use std::vector;
 
     // ============================================================================================
@@ -20,8 +22,10 @@ module aptos_framework::features {
     //   behavior in native code, and the behavior with or without the feature need to be preserved
     //   for playback.
     //
-    // Features should be grouped along components. Their name should start with the module or
-    // component name they are associated with.
+    // Note that removing a feature flag still requires the function which tests for the feature
+    // (like `code_dependency_check_enabled` below) to stay around for compatibility reasons, as it
+    // is a public function. However, once the feature flag is disabled, those functions can constantly
+    // return true.
 
 
     // --------------------------------------------------------------------------------------------
@@ -31,35 +35,37 @@ module aptos_framework::features {
     /// available. This is needed because of introduction of a new native function.
     /// Lifetime: transient
     const CODE_DEPENDENCY_CHECK: u64 = 1;
-    public(friend) fun code_dependency_check_enabled(): bool acquires Features {
+    public fun code_dependency_check_enabled(): bool acquires Features {
         is_enabled(CODE_DEPENDENCY_CHECK)
     }
-    friend aptos_framework::code;
 
     /// Whether during upgrade compatibility checking, friend functions should be treated similar like
     /// private functions.
     /// Lifetime: ephemeral
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
-    public(friend) fun treat_friend_as_private(): bool acquires Features {
+    public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
 
     // ============================================================================================
-    // Feature Flag  Management
+    // Feature Flag Implementation
+
+    /// The provided signer has not a framework address.
+    const EFRAMEWORK_SIGNER_NEEDED: u64 = 1;
 
     /// The enabled features, represented by a bitset stored on chain.
     struct Features has key {
         features: vector<u8>,
     }
 
-    /// Function to enable and disable features. Can only be called by @aptos_framework.
-    public fun change_feature_flags(aptos_framework: &signer, enable: vector<u64>, disable: vector<u64>)
+    /// Function to enable and disable features. Can only be called by a signer of @std.
+    public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>)
     acquires Features {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        if (!exists<Features>(@aptos_framework)) {
-            move_to<Features>(aptos_framework, Features{features: vector[]})
+        assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+        if (!exists<Features>(@std)) {
+            move_to<Features>(framework, Features{features: vector[]})
         };
-        let features = &mut borrow_global_mut<Features>(@aptos_framework).features;
+        let features = &mut borrow_global_mut<Features>(@std).features;
         let i = 0;
         let n = vector::length(&enable);
         while (i < n) {
@@ -76,8 +82,8 @@ module aptos_framework::features {
 
     /// Check whether the feature is enabled.
     fun is_enabled(feature: u64): bool acquires Features {
-        exists<Features>(@aptos_framework) &&
-        contains(&borrow_global<Features>(@aptos_framework).features, feature)
+        exists<Features>(@std) &&
+        contains(&borrow_global<Features>(@std).features, feature)
     }
 
     /// Helper to include or exclude a feature flag.
@@ -120,7 +126,7 @@ module aptos_framework::features {
         assert!(contains(&features, 23), 3);
     }
 
-    #[test(fx = @aptos_framework)]
+    #[test(fx = @std)]
     fun test_change_feature_txn(fx: signer) acquires Features {
         change_feature_flags(&fx, vector[1, 9, 23], vector[]);
         assert!(is_enabled(1), 1);
