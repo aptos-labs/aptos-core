@@ -19,7 +19,6 @@ const sidebars = {
     "index",
     "whats-new-in-docs",
     "guides/getting-started",
-    "aptos-developer-resources",
     {
       type: "category",
       label: "Developer Tutorials",

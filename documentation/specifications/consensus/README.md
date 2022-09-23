@@ -122,7 +122,7 @@ Fields
   * `author` of the block that can be validated by the author's public key and the signature
 
 * `NilBlock` blocks don't have authors or signatures. They are generated when a validator reaches a timeout for a round without having already voted for a block. If >2f validators vote for a `NilBlock`, it can be added to a `QuorumCert` chain and reduce round gaps and improve commit latency.
-* `Genesis` blocks are the first committed block in any epoch that is identically constructed on all validators by any (potentially different) LedgerInfo that justifies the epoch change from the previous epoch. The genesis block is used as the the first root block of the BlockTree for all epochs.
+* `Genesis` blocks are the first committed block in any epoch that is identically constructed on all validators by any (potentially different) LedgerInfo that justifies the epoch change from the previous epoch. The genesis block is used as the first root block of the BlockTree for all epochs.
 
 Verification
 

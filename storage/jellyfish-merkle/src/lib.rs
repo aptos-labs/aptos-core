@@ -136,9 +136,9 @@ pub trait TreeReader<K> {
     /// Gets node given a node key. Returns `None` if the node does not exist.
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>>;
 
-    /// Gets the rightmost leaf. Note that this assumes we are in the process of restoring the tree
-    /// and all nodes are at the same version.
-    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<K>)>>;
+    /// Gets the rightmost leaf at a version. Note that this assumes we are in the process of
+    /// restoring the tree and all nodes are at the same version.
+    fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode<K>)>>;
 }
 
 pub trait TreeWriter<K>: Send + Sync {

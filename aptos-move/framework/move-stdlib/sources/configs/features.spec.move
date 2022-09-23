@@ -1,12 +1,12 @@
 /// Maintains feature flags.
-spec aptos_framework::features {
+spec std::features {
     spec module {
         pragma verify = false;
     }
 
     spec change_feature_flags {
         pragma opaque = true;
-        modifies global<Features>(@aptos_framework);
+        modifies global<Features>(@std);
     }
 
     spec code_dependency_check_enabled {

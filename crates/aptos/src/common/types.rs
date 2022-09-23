@@ -22,7 +22,7 @@ use aptos_crypto::{
 };
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
+use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue, UserTransaction};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
@@ -84,6 +84,8 @@ pub enum CliError {
     UnableToReadFile(String, String),
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
+    #[error("Simulation failed with status: {0}")]
+    SimulationError(String),
 }
 
 impl CliError {
@@ -102,6 +104,7 @@ impl CliError {
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
+            CliError::SimulationError(_) => "SimulationError",
         }
     }
 }
@@ -1153,11 +1156,13 @@ pub struct GasOptions {
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
-    /// Estimate maximum gas via simulation
+    /// [Deprecated] Estimate maximum gas via simulation
+    ///
+    /// Deprecated parameter, the default behavior is now to estimate max gas automatically, and ask for
+    /// confirmation
     ///
     /// This will simulate the transaction, and use the simulated actual amount of gas
-    /// to be used as the max gas.  If disabled, and no max gas provided, 50000 will be used
-    /// as the max gas
+    /// to be used as the max gas.
     #[clap(long)]
     pub(crate) estimate_max_gas: bool,
 
@@ -1242,8 +1247,13 @@ impl TransactionOptions {
         };
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
+            // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
+            if ask_to_confirm_price {
+                let message = format!("Do you want to submit transaction for a maximum of {} coins at a gas unit price of {}?",  max_gas * gas_unit_price, gas_unit_price);
+                prompt_yes_with_override(&message, self.prompt_options)?;
+            }
             max_gas
-        } else if self.estimate_max_gas {
+        } else {
             let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
                 .with_gas_unit_price(gas_unit_price);
 
@@ -1264,6 +1274,14 @@ impl TransactionOptions {
                 .await?
                 .into_inner();
 
+            // Check if the transaction will pass, if it doesn't then fail
+            // TODO: Add move resolver so we can explain the VM status with a proper error map
+            let status = simulated_txn.info.status();
+            if !status.is_success() {
+                let status = client.explain_vm_status(status);
+                return Err(CliError::SimulationError(status));
+            }
+
             // Take the gas used and use a headroom factor on it
             let adjusted_max_gas = adjust_gas_headroom(
                 simulated_txn.info.gas_used(),
@@ -1274,16 +1292,16 @@ impl TransactionOptions {
                     .max_gas_amount(),
             );
 
-            // Ask if you want to
-            prompt_yes_with_override(&format!("Do you want to execute a transaction for a maximum of {} coins at a gas unit price of {}?",  adjusted_max_gas * gas_unit_price, gas_unit_price), self.prompt_options)?;
+            // Ask if you want to accept the estimate amount
+            let upper_cost_bound = adjusted_max_gas * gas_unit_price;
+            let lower_cost_bound = simulated_txn.info.gas_used() * gas_unit_price;
+            let message = format!(
+                    "Do you want to execute a transaction for a range of [{} - {}] coins at a gas unit price of {}?",
+                    lower_cost_bound,
+                    upper_cost_bound,
+                    gas_unit_price);
+            prompt_yes_with_override(&message, self.prompt_options)?;
             adjusted_max_gas
-        } else {
-            // TODO: Remove once simulation is stabilized and can handle all cases
-            let max_gas = aptos_global_constants::MAX_GAS_AMOUNT;
-            if ask_to_confirm_price {
-                prompt_yes_with_override(&format!("Do you want to execute a transaction for a maximum of {} coins at a gas unit price of {}?",  max_gas * gas_unit_price, gas_unit_price), self.prompt_options)?;
-            }
-            max_gas
         };
 
         // Sign and submit transaction

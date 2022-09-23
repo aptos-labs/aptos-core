@@ -84,6 +84,15 @@ impl MetadataView {
         Ok(res)
     }
 
+    pub fn max_transaction_version(&self) -> Result<Option<Version>> {
+        Ok(self
+            .transaction_backups
+            .iter()
+            .sorted()
+            .last()
+            .map(|backup| backup.last_version))
+    }
+
     pub fn select_epoch_ending_backups(
         &self,
         target_version: Version,

@@ -30,7 +30,10 @@ impl TreeReader<StateKey> for DummyReader {
         unimplemented!()
     }
 
-    fn get_rightmost_leaf(&self) -> anyhow::Result<Option<(NodeKey, LeafNode<StateKey>)>> {
+    fn get_rightmost_leaf(
+        &self,
+        _version: Version,
+    ) -> anyhow::Result<Option<(NodeKey, LeafNode<StateKey>)>> {
         unimplemented!()
     }
 }

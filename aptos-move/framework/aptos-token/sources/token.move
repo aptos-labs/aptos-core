@@ -365,8 +365,9 @@ module aptos_token::token {
         direct_transfer(sender, receiver, token_id, amount);
     }
 
-    public entry fun initialize_token_script(account: &signer) {
-        initialize_token_store(account);
+    /// Deprecated function call
+    public entry fun initialize_token_script(_account: &signer) {
+        abort 0
     }
 
     public entry fun opt_in_direct_transfer(account: &signer, opt_in: bool) acquires TokenStore {
@@ -495,11 +496,6 @@ module aptos_token::token {
         assert!(get_token_amount(&token) > 0, error::invalid_argument(ENO_DEPOSIT_TOKEN_WITH_ZERO_AMOUNT));
         let account_addr = signer::address_of(account);
         initialize_token_store(account);
-        let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
-        if (!table::contains(tokens, token.id)) {
-            initialize_token(account, token.id);
-        };
-
         direct_deposit(account_addr, token)
     }
 
@@ -542,16 +538,9 @@ module aptos_token::token {
         deposit_token(receiver, token);
     }
 
-    public fun initialize_token(account: &signer, token_id: TokenId) acquires TokenStore {
-        let account_addr = signer::address_of(account);
-        initialize_token_store(account);
-        let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
-
-        assert!(
-            !table::contains(tokens, token_id),
-            error::already_exists(EALREADY_HAS_BALANCE),
-        );
-        table::add(tokens, token_id, Token { amount: 0, id: token_id, token_properties: property_map::empty() });
+    /// Deprecated function call
+    public fun initialize_token(_account: &signer, _token_id: TokenId) {
+        abort 0
     }
 
     public fun initialize_token_store(account: &signer) {
@@ -1402,9 +1391,7 @@ module aptos_token::token {
         );
         assert!(balance_of(signer::address_of(creator), new_id_3) == 0, 1);
         // transfer token with property_version > 0 also transfer the token properties
-        initialize_token_store(owner);
-        opt_in_direct_transfer(owner, true);
-        transfer(creator, new_id_1, signer::address_of(owner), 1);
+        direct_transfer(creator, owner, new_id_1, 1);
 
         let props = &borrow_global<TokenStore>(signer::address_of(owner)).tokens;
         assert!(table::contains(props, new_id_1), 1);
