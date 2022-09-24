@@ -10,7 +10,6 @@ export interface Network {
 export type Networks = Record<string, Network>;
 
 export enum DefaultNetworks {
-  AIT3 = 'AIT3',
   Devnet = 'Devnet',
   Localhost = 'Localhost',
   Testnet = 'Testnet',
@@ -34,11 +33,6 @@ export const defaultNetworks: Networks = Object.freeze({
     faucetUrl: 'https://faucet.devnet.aptoslabs.com',
     name: DefaultNetworks.Devnet,
     nodeUrl: 'https://fullnode.devnet.aptoslabs.com',
-  },
-  [DefaultNetworks.AIT3]: {
-    faucetUrl: undefined,
-    name: DefaultNetworks.AIT3,
-    nodeUrl: 'https://ait3.aptosdev.com/',
   },
 } as const);
 

@@ -40,7 +40,7 @@ const urlValidator = {
   },
 };
 
-const referenceNetwork = defaultNetworks[DefaultNetworks.Devnet];
+const referenceNetwork = defaultNetworks[DefaultNetworks.Testnet];
 
 function AddNetworkBody() {
   const {

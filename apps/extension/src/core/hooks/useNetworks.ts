@@ -29,7 +29,7 @@ export const [NetworksProvider, useNetworks] = constate(() => {
   const customNetworks = appState.customNetworks ?? defaultCustomNetworks;
 
   const networks = { ...defaultNetworks, ...customNetworks };
-  const activeNetwork = networks[activeNetworkName];
+  const activeNetwork = networks[activeNetworkName] ?? networks[defaultNetworkName];
 
   const addNetwork = async (network: Network, shouldSwitch: boolean = true) => {
     const newCustomNetworks = { ...customNetworks, [network.name]: network };
