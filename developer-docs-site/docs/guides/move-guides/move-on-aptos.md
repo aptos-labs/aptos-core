@@ -9,9 +9,9 @@ The Aptos blockchain consists of validator nodes that run a consensus protocol. 
 
 ## What is Move?
 
-Move is a safe and secure programming language for Web3 that emphasizes **scarcity** and **access control**. An assets in Move can be represented by or stored within *resource*. **Scarcity** is enforced by default as structs cannot be duplicated. Only structs that have explicitly been defined at the bytecode layer as *copy* can be duplicated.
+Move is a safe and secure programming language for Web3 that emphasizes **scarcity** and **access control**. An asset in Move can be represented by or stored within *resource*. **Scarcity** is enforced by default as structs cannot be duplicated. Only structs that have explicitly been defined at the bytecode layer as *copy* can be duplicated.
 
-**Access control** comes from both the notion of accounts as well as module access privileges. A module in Move may either be a library or a program that can create, store, or transfer assets. Move ensures that only public module functions may be accessed by other modules. Unless a struct has a public constructor, it can only be constructed within the module that defines it. Similarly, fields within a struct can only be accessed and mutated within its module that or via public accessors and setters.
+**Access control** comes from both the notion of accounts as well as module access privileges. A module in Move may either be a library or a program that can create, store, or transfer assets. Move ensures that only public module functions may be accessed by other modules. Unless a struct has a public constructor, it can only be constructed within the module that defines it. Similarly, fields within a struct can only be accessed and mutated within its module or via public accessors and setters.
 
 In Move, a transaction's sender is represented by a *signer*, a verified owner of a specific account. The signer has the highest level of permission in Move and is the only entity capable of adding resources into an account. In addition, a module developer can require that a signer be present to access resources or modify assets stored within an account.
 
@@ -48,24 +48,24 @@ With much more coming soon...
 
 ## Key Concepts in Move
 
-* Data should be stored within the account that owns it not the account that published the module.
-* Data flow should have minimal constraints with an emphasis on ecosystem usability
-* Prefer static type-safety over run-time safety via generics
-* A `signer` should be required to restrict access to adding or removing assets to an account unless it is explicitly clear
+* Data should be stored within the account that owns it, not the account that published the module.
+* Data flow should have minimal constraints with an emphasis on ecosystem usability.
+* Prefer static type-safety over run-time safety via generics.
+* A `signer` should be required to restrict access to adding or removing assets to an account unless it is explicitly clear.
 
 ### Data ownership
 
-Data should be stored within the account that owns it not the account that published the module.
+Data should be stored within the account that owns it, not the account that published the module.
 
 In Solidity, data is stored within the namespace of the account that created the contract. Typically this is represented by a map of an address to a value or of an instance id to the address of the owner.
 
 In Solana, data is stored within a distinct account associated with a contract.
 
-In Move, data can be stored within the module owner's account, but that creates the issue of ownership ambiguity and implies that two issues:
-1. It makes ownership ambiguous as the asset has no resource associated with the owner
-2. The module creator takes responsibility for the lifetime of that resources, e.g., rent, reclamation, etc
+In Move, data can be stored within the module owner's account, but that creates two issues:
+1. Ownership is ambiguous as the asset has no resource associated with the owner, and
+2. The module creator must take responsibility for the lifetime of that resources, e.g., rent, reclamation, etc.
 
-On the first point, by placing assets within trusted resources within an account, the owner can ensure that even a maliciously programmed module will be unable to modify those assets. In Move, we can program a standard orderbook structure and interface that would let applications built on top be unable to gain backdoor access to an account or its orderbook entries.
+On the first point, by placing assets within trusted resources within an account, the owner can ensure that even a maliciously programmed module will not be able to modify the assets. In Move, we can program a standard orderbook structure and interface that would prevent applications built on top from gaining backdoor access to an account or its orderbook entries.
 
 Contrast the following two coin storage strategies:
 
@@ -114,19 +114,19 @@ public fun deposit<T>(account: address, coin: Coin<T>)
 
 ### Type-safety
 
-In Move, given a specific struct, say `A`, different instances can be made distinct in two fashions:
+In Move, given a specific struct, say `A`, different instances can be made distinct in two ways:
 * Internal identifiers, such as [GUID](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/guid.move)s
 * Generics such as `A<T>`, where `T` is another struct
 
 Internal identifiers can be convenient due to their simplicity and easier programmability. Generics, however, provide much higher guarantees including explicit compile or validation time checks though with some costs.
 
-Generics allow for completely distinct types and resources and interfaces that expects those types. For example, an order book can state that they expect two currencies for all orders but one of them must be fixed, e.g., `buy<T>(coin: Coin<Aptos>): Coin<T>`. This explicitly states that a user can buy any coin `<T>` but must pay for it with `Coin<Aptos>`.
+Generics allow for completely distinct types, and resources and interfaces that expects those types. For example, an order book can permit orders between two currencies, but with one currency fixed, e.g., `buy<T>(coin: Coin<Aptos>): Coin<T>`. This explicitly states that a user can buy any coin `<T>` but must pay for it with `Coin<Aptos>`.
 
 The complexity with generics arises when it would be desirable to store data on `T`. Move does not support static dispatch on generics, hence in a function like `create<T>(...) : Coin<T>`, T must either be a phantom type, i.e., only used as a type parameter in `Coin` or it must be specified as an input into `Create`. No functions can be called on a `T`, such as `T::function` even if every `T` implements said function.
 
-In addition for structs that may be created in mass, generics results in the creation of a lot of new stores and resources associated with tracking the data and event emitting, which arguably is a lesser concern.
+In addition for structs that may be created in mass, generics result in the creation of many new stores and resources associated with tracking the data and event emitting, which arguably is a lesser concern.
 
-Because of this, we made the difficult choice of creating two "Token" standards, one for tokens associated with currency called `Coin` and another for tokens associated with assets or NFTs called `Token`. `Coin` leverages static type safety via generics but is a far simpler contract. While `Token` leverages dynamic type safety via its own universal identifier and eschews generics due to complexity that impacts the ergonomics of its use.
+Because of this, we made the difficult choice of creating two "Token" standards, one for tokens associated with currency called `Coin` and another for tokens associated with assets or NFTs called `Token`. `Coin` leverages static type safety via generics but is a far simpler contract. While `Token` leverages dynamic type safety via its own universal identifier, and eschews generics due to complexity that impacts the ergonomics of its use.
 
 ### Data access
 
