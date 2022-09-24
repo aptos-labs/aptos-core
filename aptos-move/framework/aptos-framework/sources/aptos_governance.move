@@ -295,9 +295,6 @@ module aptos_framework::aptos_governance {
             error::invalid_argument(EALREADY_VOTED));
         table::add(&mut voting_records.votes, record_key, true);
 
-        // Voting power does not include pending_active or pending_inactive balances.
-        // In general, the stake pool should not have pending_inactive balance if it still has lockup (required to vote)
-        // And if pending_active will be added to active in the next epoch.
         let voting_power = get_voting_power(stake_pool);
         // Short-circuit if the voter has no voting power.
         assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
