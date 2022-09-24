@@ -195,8 +195,12 @@ pub fn routes(
     health
         .or(mint)
         .with(warp::log::custom(|info| {
+            let actual_ip = info
+                .request_headers()
+                .get("x-forwarded-for")
+                .map(|inner| inner.to_str().unwrap_or("-"));
             info!(
-                "{} \"{} {} {:?}\" {} \"{}\" \"{}\" {:?}",
+                "{} \"{} {} {:?}\" {} \"{}\" \"{}\" \"{}\" {:?}",
                 OptFmt(info.remote_addr()),
                 info.method(),
                 info.path(),
@@ -204,6 +208,7 @@ pub fn routes(
                 info.status().as_u16(),
                 OptFmt(info.referer()),
                 OptFmt(info.user_agent()),
+                OptFmt(actual_ip),
                 info.elapsed(),
             )
         }))
