@@ -28,6 +28,17 @@ module aptos_std::simple_map {
         vector::length(&map.data)
     }
 
+    public fun keys<Key: copy + store, Value: store>(map: &SimpleMap<Key, Value>): vector<Key> {
+        let keys = vector::empty<Key>();
+        let len = length(map);
+        let i = 0;
+        while (i < len) {
+            vector::push_back(&mut keys, vector::borrow(&map.data, i).key);
+            i = i + 1;
+        };
+        keys
+    }
+
     public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
         SimpleMap {
             data: vector::empty(),
@@ -207,6 +218,14 @@ module aptos_std::simple_map {
 
         remove(&mut map, &3);
         destroy_empty(map);
+    }
+
+    #[test]
+    public fun test_keys() {
+        let map = create<u64, u64>();
+        add(&mut map, 1, 1);
+        add(&mut map, 2, 2);
+        assert!(keys(&map) == vector[1, 2], 0);
     }
 
     #[test]
