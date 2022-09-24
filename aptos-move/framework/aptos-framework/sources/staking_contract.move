@@ -190,6 +190,14 @@ module aptos_framework::staking_contract {
         simple_map::contains_key(&store.staking_contracts, &operator)
     }
 
+    public fun operators(staker: address): vector<address> acquires Store {
+        if (!exists<Store>(staker)) {
+            vector::empty<address>()
+        } else {
+            simple_map::keys(&borrow_global<Store>(staker).staking_contracts)
+        }
+    }
+
     /// Staker can call this function to create a simple staking contract with a specified operator.
     public entry fun create_staking_contract(
         staker: &signer,
@@ -1158,6 +1166,21 @@ module aptos_framework::staking_contract {
         assert_distribution(staker_address, operator_address, operator_address, unpaid_commission - 1);
         assert_distribution(staker_address, operator_address, staker_address, withdrawn_stake);
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345)]
+    public entry fun test_staker_multiple_staking_contracts(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator_1: &signer,
+        operator_2: &signer,
+    ) acquires Store {
+        setup_staking_contract(aptos_framework, staker, operator_1, INITIAL_BALANCE, 10);
+        setup_staking_contract(aptos_framework, staker, operator_2, INITIAL_BALANCE, 15);
+        let staker_address = signer::address_of(staker);
+        let operator_1_address = signer::address_of(operator_1);
+        let operator_2_address = signer::address_of(operator_2);
+        assert!(operators(staker_address) == vector[operator_1_address, operator_2_address], 0);
     }
 
     #[test_only]
