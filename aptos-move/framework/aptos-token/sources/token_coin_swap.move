@@ -295,7 +295,17 @@ module aptos_token::token_coin_swap {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         timestamp::update_global_time_for_test(10000000);
         aptos_framework::account::create_account_for_test(signer::address_of(&token_owner));
-        let token_id = token::create_collection_and_token(&token_owner, 100, 100, 100);
+        let token_id = token::create_collection_and_token(
+            &token_owner,
+            100,
+            100,
+            100,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
         aptos_framework::account::create_account_for_test(signer::address_of(&coin_owner));
         token::initialize_token_store(&coin_owner);
         coin::create_fake_money(&coin_owner, &token_owner, 100);

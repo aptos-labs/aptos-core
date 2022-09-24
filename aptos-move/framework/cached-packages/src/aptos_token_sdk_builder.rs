@@ -34,8 +34,19 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    /// Burn a token by the token owner
     TokenBurn {
         creators_address: AccountAddress,
+        collection: Vec<u8>,
+        name: Vec<u8>,
+        property_version: u64,
+        amount: u64,
+    },
+
+    /// Burn a token by creator when the token's BURNABLE_BY_CREATOR is true
+    /// The token is owned at address owner
+    TokenBurnByCreator {
+        owner: AccountAddress,
         collection: Vec<u8>,
         name: Vec<u8>,
         property_version: u64,
@@ -156,6 +167,13 @@ impl EntryFunctionCall {
                 property_version,
                 amount,
             } => token_burn(creators_address, collection, name, property_version, amount),
+            TokenBurnByCreator {
+                owner,
+                collection,
+                name,
+                property_version,
+                amount,
+            } => token_burn_by_creator(owner, collection, name, property_version, amount),
             TokenCreateCollectionScript {
                 name,
                 description,
@@ -308,6 +326,7 @@ impl EntryFunctionCall {
     }
 }
 
+/// Burn a token by the token owner
 pub fn token_burn(
     creators_address: AccountAddress,
     collection: Vec<u8>,
@@ -327,6 +346,35 @@ pub fn token_burn(
         vec![],
         vec![
             bcs::to_bytes(&creators_address).unwrap(),
+            bcs::to_bytes(&collection).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Burn a token by creator when the token's BURNABLE_BY_CREATOR is true
+/// The token is owned at address owner
+pub fn token_burn_by_creator(
+    owner: AccountAddress,
+    collection: Vec<u8>,
+    name: Vec<u8>,
+    property_version: u64,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("burn_by_creator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&owner).unwrap(),
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
             bcs::to_bytes(&property_version).unwrap(),
@@ -660,6 +708,20 @@ mod decoder {
         }
     }
 
+    pub fn token_burn_by_creator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenBurnByCreator {
+                owner: bcs::from_bytes(script.args().get(0)?).ok()?,
+                collection: bcs::from_bytes(script.args().get(1)?).ok()?,
+                name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn token_create_collection_script(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -843,6 +905,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert("token_burn".to_string(), Box::new(decoder::token_burn));
+        map.insert(
+            "token_burn_by_creator".to_string(),
+            Box::new(decoder::token_burn_by_creator),
+        );
         map.insert(
             "token_create_collection_script".to_string(),
             Box::new(decoder::token_create_collection_script),
