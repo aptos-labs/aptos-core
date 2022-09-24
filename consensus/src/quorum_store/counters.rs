@@ -196,7 +196,7 @@ pub static RECEIVED_BATCH_REQUEST_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// Count of the number of batch request received from other nodes that is timeout.
-pub static RECEIVED_BATCH_REQUEST_TIMTOUT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+pub static RECEIVED_BATCH_REQUEST_TIMEOUT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_received_batch_request_timeout_count",
         "Count of the number of batch request received from other nodes that is timeout."

@@ -62,7 +62,7 @@ impl BatchRequesterState {
                 .send(Ok(payload))
                 .expect("Receiver of requested batch not available");
         } else {
-            counters::RECEIVED_BATCH_REQUEST_TIMTOUT_COUNT.inc();
+            counters::RECEIVED_BATCH_REQUEST_TIMEOUT_COUNT.inc();
             debug!("QS: batch timed out, digest {}", digest);
             if self.ret_tx.send(Err(Error::CouldNotGetData)).is_err() {
                 debug!("Receiver of requested batch not available");
