@@ -396,7 +396,7 @@ async fn test_account_balance() {
     .await
     .unwrap();
 
-    // Let's now check the staking balance with the original staking contract
+    // Let's now check the staking balance with the original staking contract, it should not be supported
     cli.fund_account(2, Some(10_000_000)).await.unwrap();
     cli.initialize_stake_owner(2, 1_000_000, None, None)
         .await
@@ -409,7 +409,7 @@ async fn test_account_balance() {
         1,
     )
     .await
-    .unwrap();
+    .expect_err("Original staking contract is not supported");
 
     create_staking_contract(
         &swarm.aptos_public_info(),

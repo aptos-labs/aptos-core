@@ -139,12 +139,6 @@ async fn get_balances(
                         }
                     }
                 }
-                (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE) => {
-                    let stake_pool: StakePool = bcs::from_bytes(&bytes)?;
-                    if let Ok(balance) = get_stake_balance_from_stake_pool(&stake_pool, &account) {
-                        balances.push(balance);
-                    }
-                }
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE) => {
                     if account.is_base_account() {
                         continue;
@@ -158,7 +152,12 @@ async fn get_balances(
                             if let Ok(response) = rest_client
                                 .get_account_resource_bcs::<StakePool>(
                                     contract.pool_address,
-                                    "0x1::stake::StakePool",
+                                    &format!(
+                                        "{}::{}::{}",
+                                        AccountAddress::ONE.to_hex_literal(),
+                                        STAKE_MODULE,
+                                        STAKE_POOL_RESOURCE
+                                    ),
                                 )
                                 .await
                             {
