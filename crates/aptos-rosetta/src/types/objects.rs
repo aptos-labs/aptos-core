@@ -775,6 +775,15 @@ async fn parse_operations_from_write_set(
                 operation_index,
             )
         }
+        (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE, 0) => {
+            parse_staking_contract_resource_changes(
+                server_context,
+                address,
+                data,
+                events,
+                operation_index,
+            )
+        }
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
                 // TODO: This will need to be updated to support more coins
@@ -987,7 +996,7 @@ fn parse_stake_pool_resource_changes(
                     } else {
                         // If we can't parse the withdraw event, then there's nothing
                         warn!(
-                            "Failed to parse coin store withdraw event!  Skipping for {}:{}",
+                            "Failed to parse set operator event!  Skipping for {}:{}",
                             event_key.get_creator_address(),
                             event_key.get_creation_number()
                         );
@@ -1041,6 +1050,54 @@ fn parse_stake_pool_resource_changes(
     Ok(operations)
 }
 
+fn parse_staking_contract_resource_changes(
+    server_context: &RosettaContext,
+    pool_address: AccountAddress,
+    data: &[u8],
+    events: &[ContractEvent],
+    mut operation_index: u64,
+) -> ApiResult<Vec<Operation>> {
+    let mut operations = Vec::new();
+
+    // This only handles the voter events from the staking contract
+    // If there are direct events on the pool, they will be ignored
+    if let Some(owner_address) = server_context.pool_address_to_owner.get(&pool_address) {
+        if let Ok(store) = bcs::from_bytes::<Store>(data) {
+            // Handle set voter events
+            let set_voter_events = filter_events(
+                events,
+                store.update_voter_events.key(),
+                |event_key, event| {
+                    if let Ok(event) = bcs::from_bytes::<UpdateVoterEvent>(event.event_data()) {
+                        Some(event)
+                    } else {
+                        // If we can't parse the withdraw event, then there's nothing
+                        warn!(
+                            "Failed to parse update voter event!  Skipping for {}:{}",
+                            event_key.get_creator_address(),
+                            event_key.get_creation_number()
+                        );
+                        None
+                    }
+                },
+            );
+
+            // Parse all set voter events
+            for event in set_voter_events {
+                operations.push(Operation::set_voter(
+                    operation_index,
+                    Some(OperationStatusType::Success),
+                    *owner_address,
+                    AccountIdentifier::base_account(event.operator),
+                    AccountIdentifier::base_account(event.new_voter),
+                ));
+                operation_index += 1;
+            }
+        }
+    }
+
+    Ok(operations)
+}
 async fn parse_coinstore_changes(
     currency: Currency,
     version: u64,
