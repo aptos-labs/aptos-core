@@ -86,8 +86,7 @@ async fn build_block(
     // TODO: Parallelize these and then sort at end
     if let Some(txns) = block.transactions {
         for txn in txns {
-            let transaction =
-                Transaction::from_transaction(server_context.coin_cache.clone(), txn).await?;
+            let transaction = Transaction::from_transaction(server_context, txn).await?;
             if keep_empty_transactions || !transaction.operations.is_empty() {
                 transactions.push(transaction)
             }
