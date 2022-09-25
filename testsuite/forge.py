@@ -1083,6 +1083,7 @@ def create_forge_command(
         forge_args.append("--keep")
     if forge_enable_haproxy == "true":
         forge_args.append("--enable-haproxy")
+    forge_args.append("--enable-haproxy")
 
     if test_args:
         forge_args.extend(test_args)
