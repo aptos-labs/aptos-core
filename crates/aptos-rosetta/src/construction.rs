@@ -247,6 +247,71 @@ async fn construction_metadata(
         response.inner().sequence_number
     };
 
+    // We have to cheat the set operator and set voter operations right here
+    let mut internal_operation = request.options.internal_operation;
+
+    match &mut internal_operation {
+        InternalOperation::SetOperator(op) => {
+            // If there was no old operator set, and there is only one, we should use that
+            if op.old_operator.is_none() {
+                let store = rest_client
+                    .get_account_resource_bcs::<Store>(op.owner, "0x1::staking_contract::Store")
+                    .await?
+                    .into_inner();
+                if store.staking_contracts.len() != 1 {
+                    let operators: Vec<_> = store
+                        .staking_contracts
+                        .iter()
+                        .map(|(operator, _)| operator)
+                        .collect();
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Account has more than one operator, operator must be specified from: {:?}",
+                        operators
+                    ))));
+                } else {
+                    op.old_operator = Some(
+                        *store
+                            .staking_contracts
+                            .iter()
+                            .next()
+                            .map(|inner| inner.0)
+                            .unwrap(),
+                    );
+                }
+            }
+        }
+        InternalOperation::SetVoter(op) => {
+            // If there was no operator set, and there is only one, we should use that
+            if op.operator.is_none() {
+                let store = rest_client
+                    .get_account_resource_bcs::<Store>(op.owner, "0x1::staking_contract::Store")
+                    .await?
+                    .into_inner();
+                if store.staking_contracts.len() != 1 {
+                    let operators: Vec<_> = store
+                        .staking_contracts
+                        .iter()
+                        .map(|(operator, _)| operator)
+                        .collect();
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Account has more than one operator, operator must be specified from: {:?}",
+                        operators
+                    ))));
+                } else {
+                    op.operator = Some(
+                        *store
+                            .staking_contracts
+                            .iter()
+                            .next()
+                            .map(|inner| inner.0)
+                            .unwrap(),
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
+
     // If both are present, we skip simulation
     let (suggested_fee, gas_unit_price, max_gas_amount) =
         if let (Some(gas_unit_price), Some(max_gas_amount)) = (
@@ -265,7 +330,7 @@ async fn construction_metadata(
             }
 
             // Build up the transaction
-            let (txn_payload, sender) = request.options.internal_operation.payload()?;
+            let (txn_payload, sender) = internal_operation.payload()?;
             let unsigned_transaction = transaction_factory
                 .payload(txn_payload)
                 .sender(sender)
@@ -348,6 +413,7 @@ async fn construction_metadata(
             max_gas_amount: max_gas_amount.into(),
             gas_price_per_unit: gas_unit_price.into(),
             expiry_time_secs: request.options.expiry_time_secs,
+            internal_operation,
         },
         suggested_fee: vec![suggested_fee],
     })
@@ -648,12 +714,72 @@ async fn construction_payloads(
     check_network(request.network_identifier, &server_context)?;
 
     // Retrieve the real operation we're doing
-    let operation = InternalOperation::extract(&request.operations)?;
+    let mut operation = InternalOperation::extract(&request.operations)?;
     let metadata = if let Some(ref metadata) = request.metadata {
         metadata
     } else {
         return Err(ApiError::MissingPayloadMetadata);
     };
+
+    // This is a hack to ensure that the payloads actually have overridden operators if not provided
+    match &mut operation {
+        InternalOperation::CreateAccount(_) => {
+            if operation != metadata.internal_operation {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "CreateAccount operation doesn't match metadata {:?} vs {:?}",
+                    operation, metadata.internal_operation
+                ))));
+            }
+        }
+        InternalOperation::Transfer(_) => {
+            if operation != metadata.internal_operation {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Transfer operation doesn't match metadata {:?} vs {:?}",
+                    operation, metadata.internal_operation
+                ))));
+            }
+        }
+        InternalOperation::SetOperator(inner) => {
+            if let InternalOperation::SetOperator(ref metadata_op) = metadata.internal_operation {
+                if inner.owner == metadata_op.owner
+                    && inner.new_operator == metadata_op.new_operator
+                {
+                    if inner.old_operator.is_none() {
+                        inner.old_operator = metadata_op.old_operator;
+                    }
+                } else {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Set operator operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Set operator operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        }
+        InternalOperation::SetVoter(inner) => {
+            if let InternalOperation::SetVoter(ref metadata_op) = metadata.internal_operation {
+                if inner.owner == metadata_op.owner && inner.new_voter == metadata_op.new_voter {
+                    if inner.operator.is_none() {
+                        inner.operator = metadata_op.operator;
+                    }
+                } else {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Set voter operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Set voter operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        }
+    }
 
     // Encode operation
     let (txn_payload, sender) = operation.payload()?;

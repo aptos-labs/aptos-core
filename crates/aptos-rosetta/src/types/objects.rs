@@ -1220,14 +1220,22 @@ impl InternalOperation {
                         Ok(OperationType::SetOperator) => {
                             if let (
                                 Some(OperationMetadata {
+                                    old_operator,
                                     new_operator: Some(new_operator),
                                     ..
                                 }),
                                 Some(account),
                             ) = (&operation.metadata, &operation.account)
                             {
+                                let old_operator = if let Some(old_operator) = old_operator {
+                                    Some(old_operator.account_address()?)
+                                } else {
+                                    None
+                                };
+
                                 return Ok(Self::SetOperator(SetOperator {
                                     owner: account.account_address()?,
+                                    old_operator,
                                     new_operator: new_operator.account_address()?,
                                 }));
                             }
@@ -1235,14 +1243,21 @@ impl InternalOperation {
                         Ok(OperationType::SetVoter) => {
                             if let (
                                 Some(OperationMetadata {
+                                    operator,
                                     new_voter: Some(new_voter),
                                     ..
                                 }),
                                 Some(account),
                             ) = (&operation.metadata, &operation.account)
                             {
+                                let operator = if let Some(operator) = operator {
+                                    Some(operator.account_address()?)
+                                } else {
+                                    None
+                                };
                                 return Ok(Self::SetVoter(SetVoter {
                                     owner: account.account_address()?,
+                                    operator,
                                     new_voter: new_voter.account_address()?,
                                 }));
                             }
@@ -1290,14 +1305,34 @@ impl InternalOperation {
                     transfer.sender,
                 )
             }
-            InternalOperation::SetOperator(set_operator) => (
-                aptos_stdlib::stake_set_operator(set_operator.new_operator),
-                set_operator.owner,
-            ),
-            InternalOperation::SetVoter(set_voter) => (
-                aptos_stdlib::stake_set_delegated_voter(set_voter.new_voter),
-                set_voter.owner,
-            ),
+            InternalOperation::SetOperator(set_operator) => {
+                if set_operator.old_operator.is_none() {
+                    return Err(ApiError::InvalidInput(Some(
+                        "SetOperator doesn't have an old operator".to_string(),
+                    )));
+                }
+                (
+                    aptos_stdlib::staking_contract_switch_operator_with_same_commission(
+                        set_operator.old_operator.unwrap(),
+                        set_operator.new_operator,
+                    ),
+                    set_operator.owner,
+                )
+            }
+            InternalOperation::SetVoter(set_voter) => {
+                if set_voter.operator.is_none() {
+                    return Err(ApiError::InvalidInput(Some(
+                        "Set voter doesn't have an operator".to_string(),
+                    )));
+                }
+                (
+                    aptos_stdlib::staking_contract_update_voter(
+                        set_voter.operator.unwrap(),
+                        set_voter.new_voter,
+                    ),
+                    set_voter.owner,
+                )
+            }
         })
     }
 }
@@ -1430,18 +1465,13 @@ impl Transfer {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SetOperator {
     pub owner: AccountAddress,
+    pub old_operator: Option<AccountAddress>,
     pub new_operator: AccountAddress,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SetVoter {
     pub owner: AccountAddress,
+    pub operator: Option<AccountAddress>,
     pub new_voter: AccountAddress,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-pub struct SetOperatorEvent {
-    pub pool_address: AccountAddress,
-    pub old_operator: AccountAddress,
-    pub new_operator: AccountAddress,
 }
