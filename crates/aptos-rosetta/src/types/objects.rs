@@ -1156,7 +1156,13 @@ impl Transfer {
         let (sender, withdraw_amount) = if let Some(withdraw) = op_map.get(&OperationType::Withdraw)
         {
             if let (Some(account), Some(amount)) = (&withdraw.account, &withdraw.amount) {
-                (AccountAddress::try_from(account)?, amount)
+                if account.is_base_account() {
+                    (account.account_address()?, amount)
+                } else {
+                    return Err(ApiError::InvalidInput(Some(
+                        "Transferring stake amounts is not supported".to_string(),
+                    )));
+                }
             } else {
                 return Err(ApiError::InvalidTransferOperations(Some(
                     "Invalid withdraw account provided",
@@ -1171,7 +1177,13 @@ impl Transfer {
         let (receiver, deposit_amount) = if let Some(deposit) = op_map.get(&OperationType::Deposit)
         {
             if let (Some(account), Some(amount)) = (&deposit.account, &deposit.amount) {
-                (AccountAddress::try_from(account)?, amount)
+                if account.is_base_account() {
+                    (account.account_address()?, amount)
+                } else {
+                    return Err(ApiError::InvalidInput(Some(
+                        "Transferring stake amounts is not supported".to_string(),
+                    )));
+                }
             } else {
                 return Err(ApiError::InvalidTransferOperations(Some(
                     "Invalid deposit account provided",
