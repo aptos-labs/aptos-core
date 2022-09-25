@@ -82,6 +82,7 @@ pub enum OperationType {
     // Withdraw must come before deposit
     Withdraw,
     Deposit,
+    StakingReward,
     SetOperator,
     SetVoter,
     // Fee must always be last for ordering
@@ -93,17 +94,20 @@ impl OperationType {
     const DEPOSIT: &'static str = "deposit";
     const WITHDRAW: &'static str = "withdraw";
     const FEE: &'static str = "fee";
+    const STAKING_REWARD: &'static str = "staking_reward";
     const SET_OPERATOR: &'static str = "set_operator";
     const SET_VOTER: &'static str = "set_voter";
 
     pub fn all() -> Vec<OperationType> {
+        use OperationType::*;
         vec![
-            OperationType::CreateAccount,
-            OperationType::Withdraw,
-            OperationType::Deposit,
-            OperationType::Fee,
-            OperationType::SetOperator,
-            OperationType::SetVoter,
+            CreateAccount,
+            Withdraw,
+            Deposit,
+            Fee,
+            SetOperator,
+            SetVoter,
+            StakingReward,
         ]
     }
 }
@@ -117,6 +121,7 @@ impl FromStr for OperationType {
             Self::DEPOSIT => Ok(OperationType::Deposit),
             Self::WITHDRAW => Ok(OperationType::Withdraw),
             Self::FEE => Ok(OperationType::Fee),
+            Self::STAKING_REWARD => Ok(OperationType::StakingReward),
             Self::SET_OPERATOR => Ok(OperationType::SetOperator),
             Self::SET_VOTER => Ok(OperationType::SetVoter),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
@@ -129,13 +134,15 @@ impl FromStr for OperationType {
 
 impl Display for OperationType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use OperationType::*;
         f.write_str(match self {
-            OperationType::CreateAccount => Self::CREATE_ACCOUNT,
-            OperationType::Deposit => Self::DEPOSIT,
-            OperationType::Withdraw => Self::WITHDRAW,
-            OperationType::SetOperator => Self::SET_OPERATOR,
-            OperationType::SetVoter => Self::SET_VOTER,
-            OperationType::Fee => Self::FEE,
+            CreateAccount => Self::CREATE_ACCOUNT,
+            Deposit => Self::DEPOSIT,
+            Withdraw => Self::WITHDRAW,
+            StakingReward => Self::STAKING_REWARD,
+            SetOperator => Self::SET_OPERATOR,
+            SetVoter => Self::SET_VOTER,
+            Fee => Self::FEE,
         })
     }
 }
