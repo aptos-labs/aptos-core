@@ -1055,6 +1055,7 @@ def create_forge_command(
 
     if forge_num_validators:
         forge_args.extend(["--num-validators", forge_num_validators])
+    forge_args.extend(["--num-validators", "100"])
     if forge_num_validator_fullnodes:
         forge_args.extend([
             "--num-validator-fullnodes",
