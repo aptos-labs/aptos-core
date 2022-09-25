@@ -232,6 +232,9 @@ pub struct ConstructionMetadata {
     /// Unix timestamp of expiry time, defaults to 30 seconds from the payload request
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry_time_secs: Option<U64>,
+    /// Because we need information from metadata to have the real operation
+    /// We don't have to parse any fields in the `Payloads` call
+    pub internal_operation: InternalOperation,
 }
 
 /// Request to parse a signed or unsigned transaction into operations
