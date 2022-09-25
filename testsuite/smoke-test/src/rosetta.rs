@@ -371,7 +371,7 @@ async fn get_balance(
 ) -> anyhow::Result<AccountBalanceResponse> {
     let request = AccountBalanceRequest {
         network_identifier: chain_id.into(),
-        account_identifier: account.into(),
+        account_identifier: AccountIdentifier::base_account(account),
         block_identifier: Some(PartialBlockIdentifier { index, hash: None }),
         currencies: Some(vec![native_coin()]),
     };
@@ -1275,7 +1275,7 @@ async fn check_balances(
             let response = rosetta_client
                 .account_balance(&AccountBalanceRequest {
                     network_identifier: NetworkIdentifier::from(chain_id),
-                    account_identifier: account.into(),
+                    account_identifier: AccountIdentifier::base_account(account),
                     block_identifier: Some(PartialBlockIdentifier {
                         index: Some(block_height),
                         hash: None,
@@ -1493,7 +1493,7 @@ fn assert_transfer(
     assert_eq!(native_coin(), amount.currency);
     assert_eq!(expected_amount, amount.value);
     assert_eq!(
-        &AccountIdentifier::from(account),
+        &AccountIdentifier::base_account(account),
         operation.account.as_ref().unwrap()
     );
     let expected_status = if success {

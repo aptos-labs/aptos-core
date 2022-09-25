@@ -90,15 +90,6 @@ impl AccountIdentifier {
     }
 }
 
-impl From<AccountAddress> for AccountIdentifier {
-    fn from(address: AccountAddress) -> Self {
-        AccountIdentifier {
-            address: to_hex_lower(&address),
-            sub_account: None,
-        }
-    }
-}
-
 fn str_to_account_address(address: &str) -> Result<AccountAddress, ApiError> {
     AccountAddress::from_str(address)
         .map_err(|_| ApiError::InvalidInput(Some("Invalid account address".to_string())))

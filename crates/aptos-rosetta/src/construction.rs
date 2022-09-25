@@ -195,7 +195,7 @@ async fn construction_derive(
     let address = AuthenticationKey::ed25519(&public_key).derived_address();
 
     Ok(ConstructionDeriveResponse {
-        account_identifier: address.into(),
+        account_identifier: AccountIdentifier::base_account(address),
     })
 }
 
@@ -371,10 +371,11 @@ async fn construction_parse(
             unsigned_transaction: None,
             signed_transaction: Some(signed_txn.clone()),
         });
-        let mut account_identifier_signers: Vec<_> = vec![signed_txn.sender().into()];
+        let mut account_identifier_signers: Vec<_> =
+            vec![AccountIdentifier::base_account(signed_txn.sender())];
 
         for account in signed_txn.authenticator().secondary_signer_addreses() {
-            account_identifier_signers.push(account.into())
+            account_identifier_signers.push(AccountIdentifier::base_account(account))
         }
 
         (
@@ -513,11 +514,17 @@ fn parse_transfer_operation(
     operations.push(Operation::withdraw(
         0,
         None,
-        sender,
+        AccountIdentifier::base_account(sender),
         currency.clone(),
         amount,
     ));
-    operations.push(Operation::deposit(1, None, receiver, currency, amount));
+    operations.push(Operation::deposit(
+        1,
+        None,
+        AccountIdentifier::base_account(receiver),
+        currency,
+        amount,
+    ));
     Ok(operations)
 }
 
@@ -552,8 +559,20 @@ fn parse_account_transfer_operation(
         )));
     };
 
-    operations.push(Operation::withdraw(0, None, sender, native_coin(), amount));
-    operations.push(Operation::deposit(1, None, receiver, native_coin(), amount));
+    operations.push(Operation::withdraw(
+        0,
+        None,
+        AccountIdentifier::base_account(sender),
+        native_coin(),
+        amount,
+    ));
+    operations.push(Operation::deposit(
+        1,
+        None,
+        AccountIdentifier::base_account(receiver),
+        native_coin(),
+        amount,
+    ));
     Ok(operations)
 }
 
@@ -650,7 +669,7 @@ async fn construction_payloads(
         )))
     })?);
     let payload = SigningPayload {
-        account_identifier: AccountIdentifier::from(sender),
+        account_identifier: AccountIdentifier::base_account(sender),
         hex_bytes: signing_message,
         signature_type: Some(SignatureType::Ed25519),
     };
@@ -675,7 +694,7 @@ async fn construction_preprocess(
     check_network(request.network_identifier, &server_context)?;
 
     let internal_operation = InternalOperation::extract(&request.operations)?;
-    let required_public_keys = vec![internal_operation.sender().into()];
+    let required_public_keys = vec![AccountIdentifier::base_account(internal_operation.sender())];
 
     if let Some(max_gas) = request
         .metadata

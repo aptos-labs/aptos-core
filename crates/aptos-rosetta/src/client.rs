@@ -199,8 +199,20 @@ impl RosettaClient {
 
         // A transfer operation is made up of a withdraw and a deposit
         let operations = vec![
-            Operation::withdraw(0, None, sender, native_coin(), amount),
-            Operation::deposit(1, None, receiver, native_coin(), amount),
+            Operation::withdraw(
+                0,
+                None,
+                AccountIdentifier::base_account(sender),
+                native_coin(),
+                amount,
+            ),
+            Operation::deposit(
+                1,
+                None,
+                AccountIdentifier::base_account(receiver),
+                native_coin(),
+                amount,
+            ),
         ];
 
         self.submit_operations(
