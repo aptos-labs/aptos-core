@@ -53,7 +53,7 @@ impl BlockMetadataTransaction {
             previous_block_votes_bitvec: serde_json::to_value(&txn.previous_block_votes_bitvec)
                 .unwrap(),
             // time is in microseconds
-            timestamp: parse_timestamp(txn.timestamp, txn_version),
+            timestamp: parse_timestamp(txn.timestamp.0, txn_version),
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }

@@ -9,11 +9,17 @@ use crate::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
-    models::{
+    models::token_models::{
         collection_datas::{CollectionData, CurrentCollectionData},
+        token_activities::TokenActivity,
+        token_claims::CurrentTokenPendingClaim,
         token_datas::{CurrentTokenData, TokenData},
+        token_escrows::{CurrentTokenEscrow, TokenEscrow},
+        token_listings::CurrentTokenListing,
+        token_ownerships::{CurrentTokenOwnership, TokenOwnership},
         tokens::{
-            CurrentTokenOwnership, CurrentTokenOwnershipPK, Token, TokenDataIdHash, TokenOwnership,
+            CurrentTokenEscrowPK, CurrentTokenListingPK, CurrentTokenOwnershipPK,
+            CurrentTokenPendingClaimPK, Token, TokenDataIdHash,
         },
     },
     schema,
@@ -48,14 +54,24 @@ impl Debug for TokenTransactionProcessor {
 
 fn insert_to_db_impl(
     conn: &mut PgConnection,
-    tokens: &[Token],
-    token_ownerships: &[TokenOwnership],
-    token_datas: &[TokenData],
-    collection_datas: &[CollectionData],
-    current_token_ownerships: &[CurrentTokenOwnership],
-    current_token_datas: &[CurrentTokenData],
-    current_collection_datas: &[CurrentCollectionData],
+    basic_token_transaction_lists: (&[Token], &[TokenOwnership], &[TokenData], &[CollectionData]),
+    basic_token_current_lists: (
+        &[CurrentTokenOwnership],
+        &[CurrentTokenData],
+        &[CurrentCollectionData],
+    ),
+    token_activities: &[TokenActivity],
+    current_token_claims: &[CurrentTokenPendingClaim],
+    token_listing_lists: (
+        &[CurrentTokenListing],
+        &[TokenEscrow],
+        &[CurrentTokenEscrow],
+    ),
 ) -> Result<(), diesel::result::Error> {
+    let (tokens, token_ownerships, token_datas, collection_datas) = basic_token_transaction_lists;
+    let (current_token_ownerships, current_token_datas, current_collection_datas) =
+        basic_token_current_lists;
+    let (current_token_listings, token_escrows, current_token_escrows) = token_listing_lists;
     insert_tokens(conn, tokens)?;
     insert_token_datas(conn, token_datas)?;
     insert_token_ownerships(conn, token_ownerships)?;
@@ -63,6 +79,11 @@ fn insert_to_db_impl(
     insert_current_token_ownerships(conn, current_token_ownerships)?;
     insert_current_token_datas(conn, current_token_datas)?;
     insert_current_collection_datas(conn, current_collection_datas)?;
+    insert_token_activities(conn, token_activities)?;
+    insert_current_token_claims(conn, current_token_claims)?;
+    insert_current_token_listings(conn, current_token_listings)?;
+    insert_token_escrows(conn, token_escrows)?;
+    insert_current_token_escrows(conn, current_token_escrows)?;
     Ok(())
 }
 
@@ -71,13 +92,24 @@ fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    tokens: Vec<Token>,
-    token_ownerships: Vec<TokenOwnership>,
-    token_datas: Vec<TokenData>,
-    collection_datas: Vec<CollectionData>,
-    current_token_ownerships: Vec<CurrentTokenOwnership>,
-    current_token_datas: Vec<CurrentTokenData>,
-    current_collection_datas: Vec<CurrentCollectionData>,
+    basic_token_transaction_lists: (
+        Vec<Token>,
+        Vec<TokenOwnership>,
+        Vec<TokenData>,
+        Vec<CollectionData>,
+    ),
+    basic_token_current_lists: (
+        Vec<CurrentTokenOwnership>,
+        Vec<CurrentTokenData>,
+        Vec<CurrentCollectionData>,
+    ),
+    token_activities: Vec<TokenActivity>,
+    current_token_claims: Vec<CurrentTokenPendingClaim>,
+    token_listing_lists: (
+        Vec<CurrentTokenListing>,
+        Vec<TokenEscrow>,
+        Vec<CurrentTokenEscrow>,
+    ),
 ) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         name = name,
@@ -85,19 +117,29 @@ fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
+    let (tokens, token_ownerships, token_datas, collection_datas) = basic_token_transaction_lists;
+    let (current_token_ownerships, current_token_datas, current_collection_datas) =
+        basic_token_current_lists;
+    let (current_token_listings, token_escrows, current_token_escrows) = token_listing_lists;
     match conn
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
             insert_to_db_impl(
                 pg_conn,
-                &tokens,
-                &token_ownerships,
-                &token_datas,
-                &collection_datas,
-                &current_token_ownerships,
-                &current_token_datas,
-                &current_collection_datas,
+                (&tokens, &token_ownerships, &token_datas, &collection_datas),
+                (
+                    &current_token_ownerships,
+                    &current_token_datas,
+                    &current_collection_datas,
+                ),
+                &token_activities,
+                &current_token_claims,
+                (
+                    &current_token_listings,
+                    &token_escrows,
+                    &current_token_escrows,
+                ),
             )
         }) {
         Ok(_) => Ok(()),
@@ -112,16 +154,27 @@ fn insert_to_db(
                 let current_token_ownerships = clean_data_for_db(current_token_ownerships, true);
                 let current_token_datas = clean_data_for_db(current_token_datas, true);
                 let current_collection_datas = clean_data_for_db(current_collection_datas, true);
+                let token_activities = clean_data_for_db(token_activities, true);
+                let current_token_claims = clean_data_for_db(current_token_claims, true);
+                let current_token_listings = clean_data_for_db(current_token_listings, true);
+                let token_escrows = clean_data_for_db(token_escrows, true);
+                let current_token_escrows = clean_data_for_db(current_token_escrows, true);
 
                 insert_to_db_impl(
                     pg_conn,
-                    &tokens,
-                    &token_ownerships,
-                    &token_datas,
-                    &collection_datas,
-                    &current_token_ownerships,
-                    &current_token_datas,
-                    &current_collection_datas,
+                    (&tokens, &token_ownerships, &token_datas, &collection_datas),
+                    (
+                        &current_token_ownerships,
+                        &current_token_datas,
+                        &current_collection_datas,
+                    ),
+                    &token_activities,
+                    &current_token_claims,
+                    (
+                        &current_token_listings,
+                        &token_escrows,
+                        &current_token_escrows,
+                    ),
                 )
             }),
     }
@@ -140,7 +193,11 @@ fn insert_tokens(
             diesel::insert_into(schema::tokens::table)
                 .values(&tokens_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, property_version, transaction_version))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                )),
             None,
         )?;
     }
@@ -168,7 +225,12 @@ fn insert_token_ownerships(
                     transaction_version,
                     table_handle,
                 ))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    table_type.eq(excluded(table_type)),
+                )),
             None,
         )?;
     }
@@ -188,7 +250,11 @@ fn insert_token_datas(
             diesel::insert_into(schema::token_datas::table)
                 .values(&token_datas_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, transaction_version))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                )),
             None,
         )?;
     }
@@ -241,8 +307,10 @@ fn insert_current_token_ownerships(
                     token_properties.eq(excluded(token_properties)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    table_type.eq(excluded(table_type)),
                 )),
-            Some(" WHERE current_token_ownerships.last_transaction_version < excluded.last_transaction_version "),
+            Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
         )?;
     }
     Ok(())
@@ -282,8 +350,9 @@ fn insert_current_token_datas(
                     default_properties.eq(excluded(default_properties)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                 )),
-            Some(" WHERE current_token_datas.last_transaction_version < excluded.last_transaction_version "),
+            Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
     }
     Ok(())
@@ -317,8 +386,158 @@ fn insert_current_collection_datas(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
                 )),
-            Some(" WHERE current_collection_datas.last_transaction_version < excluded.last_transaction_version "),
+            Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
+    }
+    Ok(())
+}
+
+fn insert_token_activities(
+    conn: &mut PgConnection,
+    items_to_insert: &[TokenActivity],
+) -> Result<(), diesel::result::Error> {
+    use schema::token_activities::dsl::*;
+
+    let chunks = get_chunks(items_to_insert.len(), TokenActivity::field_count());
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::token_activities::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((
+                    transaction_version,
+                    event_account_address,
+                    event_creation_number,
+                    event_sequence_number,
+                ))
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+fn insert_current_token_claims(
+    conn: &mut PgConnection,
+    items_to_insert: &[CurrentTokenPendingClaim],
+) -> Result<(), diesel::result::Error> {
+    use schema::current_token_pending_claims::dsl::*;
+
+    let chunks = get_chunks(
+        items_to_insert.len(),
+        CurrentTokenPendingClaim::field_count(),
+    );
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::current_token_pending_claims::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((
+                    token_data_id_hash, property_version, from_address, to_address
+                ))
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    creator_address.eq(excluded(creator_address)),
+                    collection_name.eq(excluded(collection_name)),
+                    name.eq(excluded(name)),
+                    amount.eq(excluded(amount)),
+                    table_handle.eq(excluded(table_handle)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+            Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
+        )?;
+    }
+    Ok(())
+}
+fn insert_current_token_listings(
+    conn: &mut PgConnection,
+    items_to_insert: &[CurrentTokenListing],
+) -> Result<(), diesel::result::Error> {
+    use schema::current_token_listings::dsl::*;
+
+    let chunks = get_chunks(items_to_insert.len(), CurrentTokenListing::field_count());
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::current_token_listings::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((
+                    token_data_id_hash, property_version, lister_address                ))
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    creator_address.eq(excluded(creator_address)),
+                    collection_name.eq(excluded(collection_name)),
+                    name.eq(excluded(name)),
+                    coin_type.eq(excluded(coin_type)),
+                    min_price_per_token.eq(excluded(min_price_per_token)),
+                    amount.eq(excluded(amount)),
+                    table_handle.eq(excluded(table_handle)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+            Some(" WHERE current_token_listings.last_transaction_version <= excluded.last_transaction_version "),
+        )?;
+    }
+    Ok(())
+}
+fn insert_token_escrows(
+    conn: &mut PgConnection,
+    items_to_insert: &[TokenEscrow],
+) -> Result<(), diesel::result::Error> {
+    use schema::token_escrows::dsl::*;
+
+    let chunks = get_chunks(items_to_insert.len(), TokenEscrow::field_count());
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::token_escrows::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((
+                    table_handle,
+                    token_data_id_hash,
+                    property_version,
+                    transaction_version,
+                ))
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+fn insert_current_token_escrows(
+    conn: &mut PgConnection,
+    items_to_insert: &[CurrentTokenEscrow],
+) -> Result<(), diesel::result::Error> {
+    use schema::current_token_escrows::dsl::*;
+
+    let chunks = get_chunks(items_to_insert.len(), CurrentTokenEscrow::field_count());
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::current_token_escrows::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((owner_address, token_data_id_hash, property_version))
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    creator_address.eq(excluded(creator_address)),
+                    collection_name.eq(excluded(collection_name)),
+                    name.eq(excluded(name)),
+                    amount.eq(excluded(amount)),
+                    locked_until_secs.eq(excluded(locked_until_secs)),
+                    table_handle.eq(excluded(table_handle)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+                Some(" WHERE current_token_escrows.last_transaction_version <= excluded.last_transaction_version "),
+            )?;
     }
     Ok(())
 }
@@ -339,6 +558,8 @@ impl TransactionProcessor for TokenTransactionProcessor {
         let mut all_token_ownerships = vec![];
         let mut all_token_datas = vec![];
         let mut all_collection_datas = vec![];
+        let mut all_token_activities = vec![];
+        let mut all_token_escrows = vec![];
 
         // Hashmap key will be the PK of the table, we do not want to send duplicates writes to the db within a batch
         let mut all_current_token_ownerships: HashMap<
@@ -349,6 +570,14 @@ impl TransactionProcessor for TokenTransactionProcessor {
             HashMap::new();
         let mut all_current_collection_datas: HashMap<TokenDataIdHash, CurrentCollectionData> =
             HashMap::new();
+        let mut all_current_token_listings: HashMap<CurrentTokenListingPK, CurrentTokenListing> =
+            HashMap::new();
+        let mut all_current_token_escrows: HashMap<CurrentTokenEscrowPK, CurrentTokenEscrow> =
+            HashMap::new();
+        let mut all_current_token_claims: HashMap<
+            CurrentTokenPendingClaimPK,
+            CurrentTokenPendingClaim,
+        > = HashMap::new();
 
         for txn in transactions {
             let (
@@ -356,9 +585,13 @@ impl TransactionProcessor for TokenTransactionProcessor {
                 mut token_ownerships,
                 mut token_datas,
                 mut collection_datas,
+                mut token_escrows,
                 current_token_ownerships,
                 current_token_datas,
                 current_collection_datas,
+                current_token_claims,
+                current_token_listings,
+                current_token_escrows,
             ) = Token::from_transaction(&txn);
             all_tokens.append(&mut tokens);
             all_token_ownerships.append(&mut token_ownerships);
@@ -368,6 +601,16 @@ impl TransactionProcessor for TokenTransactionProcessor {
             all_current_token_ownerships.extend(current_token_ownerships);
             all_current_token_datas.extend(current_token_datas);
             all_current_collection_datas.extend(current_collection_datas);
+
+            // Track token activities
+            let mut activities = TokenActivity::from_transaction(&txn);
+            all_token_activities.append(&mut activities);
+
+            // claims/escrows/listings
+            all_token_escrows.append(&mut token_escrows);
+            all_current_token_claims.extend(current_token_claims);
+            all_current_token_listings.extend(current_token_listings);
+            all_current_token_escrows.extend(current_token_escrows);
         }
 
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
@@ -380,6 +623,17 @@ impl TransactionProcessor for TokenTransactionProcessor {
         let mut all_current_collection_datas = all_current_collection_datas
             .into_values()
             .collect::<Vec<CurrentCollectionData>>();
+        let mut all_current_token_claims = all_current_token_claims
+            .into_values()
+            .collect::<Vec<CurrentTokenPendingClaim>>();
+        let mut all_current_token_listings = all_current_token_listings
+            .into_values()
+            .collect::<Vec<CurrentTokenListing>>();
+        let mut all_current_token_escrows = all_current_token_escrows
+            .into_values()
+            .collect::<Vec<CurrentTokenEscrow>>();
+
+        // Sort by PK
         all_current_token_ownerships.sort_by(|a, b| {
             (&a.token_data_id_hash, &a.property_version, &a.owner_address).cmp(&(
                 &b.token_data_id_hash,
@@ -390,6 +644,39 @@ impl TransactionProcessor for TokenTransactionProcessor {
         all_current_token_datas.sort_by(|a, b| a.token_data_id_hash.cmp(&b.token_data_id_hash));
         all_current_collection_datas
             .sort_by(|a, b| a.collection_data_id_hash.cmp(&b.collection_data_id_hash));
+        all_current_token_claims.sort_by(|a, b| {
+            (
+                &a.token_data_id_hash,
+                &a.property_version,
+                &a.from_address,
+                &a.to_address,
+            )
+                .cmp(&(
+                    &b.token_data_id_hash,
+                    &b.property_version,
+                    &b.from_address,
+                    &a.to_address,
+                ))
+        });
+        all_current_token_listings.sort_by(|a, b| {
+            (
+                &a.token_data_id_hash,
+                &a.property_version,
+                &a.lister_address,
+            )
+                .cmp(&(
+                    &b.token_data_id_hash,
+                    &b.property_version,
+                    &b.lister_address,
+                ))
+        });
+        all_current_token_escrows.sort_by(|a, b| {
+            (&a.token_data_id_hash, &a.property_version, &a.owner_address).cmp(&(
+                &b.token_data_id_hash,
+                &b.property_version,
+                &b.owner_address,
+            ))
+        });
 
         let mut conn = self.get_conn();
         let tx_result = insert_to_db(
@@ -397,13 +684,24 @@ impl TransactionProcessor for TokenTransactionProcessor {
             self.name(),
             start_version,
             end_version,
-            all_tokens,
-            all_token_ownerships,
-            all_token_datas,
-            all_collection_datas,
-            all_current_token_ownerships,
-            all_current_token_datas,
-            all_current_collection_datas,
+            (
+                all_tokens,
+                all_token_ownerships,
+                all_token_datas,
+                all_collection_datas,
+            ),
+            (
+                all_current_token_ownerships,
+                all_current_token_datas,
+                all_current_collection_datas,
+            ),
+            all_token_activities,
+            all_current_token_claims,
+            (
+                all_current_token_listings,
+                all_token_escrows,
+                all_current_token_escrows,
+            ),
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

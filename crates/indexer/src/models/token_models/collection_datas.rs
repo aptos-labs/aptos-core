@@ -5,10 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use crate::{
-    schema::{collection_datas, current_collection_datas},
-    util::{hash_str, truncate_str},
-};
+use crate::schema::{collection_datas, current_collection_datas};
 use anyhow::Context;
 use aptos_api_types::WriteTableItem as APIWriteTableItem;
 use bigdecimal::BigDecimal;
@@ -83,13 +80,11 @@ impl CollectionData {
                                 "version {} failed! collection creator resource was missing, table handle {} not in map {:?}",
                                 txn_version, TableMetadataForToken::standardize_handle(&table_handle), table_handle_to_owner,
                             ))?;
-            let collection_data_id = CollectionDataIdType {
-                creator: creator_address,
-                name: collection_data.name,
-            };
-            let collection_data_id_hash = hash_str(&collection_data_id.to_string());
-            let collection_name = truncate_str(&collection_data_id.name, 128);
-            let metadata_uri = truncate_str(&collection_data.uri, 512);
+            let collection_data_id =
+                CollectionDataIdType::new(creator_address, collection_data.get_name().to_string());
+            let collection_data_id_hash = collection_data_id.to_hash();
+            let collection_name = collection_data.get_name_trunc();
+            let metadata_uri = collection_data.get_uri_trunc();
 
             Ok(Some((
                 Self {
