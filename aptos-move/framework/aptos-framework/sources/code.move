@@ -95,18 +95,18 @@ module aptos_framework::code {
     /// The developer is responsible for not breaking memory layout of any resources he already
     /// stored on chain.
     public fun upgrade_policy_arbitrary(): UpgradePolicy {
-        UpgradePolicy{policy: 0}
+        UpgradePolicy { policy: 0 }
     }
 
     /// Whether a compatibility check should be performed for upgrades. The check only passes if
     /// a new module has (a) the same public functions (b) for existing resources, no layout change.
     public fun upgrade_policy_compat(): UpgradePolicy {
-        UpgradePolicy{policy: 1}
+        UpgradePolicy { policy: 1 }
     }
 
     /// Whether the modules in the package are immutable and cannot be upgraded.
     public fun upgrade_policy_immutable(): UpgradePolicy {
-        UpgradePolicy{policy: 2}
+        UpgradePolicy { policy: 2 }
     }
 
     /// Whether the upgrade policy can be changed. In general, the policy can be only
@@ -121,7 +121,7 @@ module aptos_framework::code {
         system_addresses::assert_aptos_framework(aptos_framework);
         let addr = signer::address_of(package_owner);
         if (!exists<PackageRegistry>(addr)) {
-            move_to(package_owner, PackageRegistry{packages: vector[metadata]})
+            move_to(package_owner, PackageRegistry { packages: vector[metadata] })
         } else {
             vector::push_back(&mut borrow_global_mut<PackageRegistry>(addr).packages, metadata)
         }
@@ -138,7 +138,7 @@ module aptos_framework::code {
 
         let addr = signer::address_of(owner);
         if (!exists<PackageRegistry>(addr)) {
-            move_to(owner, PackageRegistry{packages: vector::empty()})
+            move_to(owner, PackageRegistry { packages: vector::empty() })
         };
 
         // Checks for valid dependencies to other packages
@@ -178,8 +178,8 @@ module aptos_framework::code {
         if (features::code_dependency_check_enabled())
             request_publish_with_allowed_deps(addr, module_names, allowed_deps, code, policy.policy)
         else
-            // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
-            // compatible code.
+        // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
+        // compatible code.
             request_publish(addr, module_names, code, policy.policy)
     }
 
@@ -195,10 +195,10 @@ module aptos_framework::code {
 
     /// Checks whether the given package is upgradable, and returns true if a compatibility check is needed.
     fun check_upgradability(
-            old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
+        old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
         assert!(old_pack.upgrade_policy.policy < upgrade_policy_immutable().policy,
             error::invalid_argument(EUPGRADE_IMMUTABLE));
-        assert!(can_change_upgrade_policy_to( old_pack.upgrade_policy, new_pack.upgrade_policy),
+        assert!(can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy),
             error::invalid_argument(EUPGRADE_WEAKER_POLICY));
         let old_modules = get_module_names(old_pack);
         let i = 0;
@@ -243,7 +243,7 @@ module aptos_framework::code {
                 // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
                 let account = dep.account;
                 let module_name = string::utf8(b"");
-                vector::push_back(&mut allowed_module_deps, AllowedDep{account, module_name});
+                vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
                 i = i + 1;
                 continue
             };
@@ -272,7 +272,7 @@ module aptos_framework::code {
                     while (k < r) {
                         let account = dep.account;
                         let module_name = vector::borrow(&dep_pack.modules, k).name;
-                        vector::push_back(&mut allowed_module_deps, AllowedDep{account, module_name});
+                        vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
                         k = k + 1;
                     };
                     break
@@ -290,7 +290,7 @@ module aptos_framework::code {
     /// requires to be upgradable for maintenance and evolution, and is configured to be `compatible`.
     fun is_policy_exempted_address(addr: address): bool {
         addr == @1 || addr == @2 || addr == @3 || addr == @4 || addr == @5 ||
-        addr == @6 || addr == @7 || addr == @8 || addr == @9 || addr == @10
+            addr == @6 || addr == @7 || addr == @8 || addr == @9 || addr == @10
     }
 
     /// Get the names of the modules in a package.

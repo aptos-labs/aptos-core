@@ -32,7 +32,7 @@ module aptos_std::math64 {
             1
         } else {
             let p = 1;
-            while(e > 1) {
+            while (e > 1) {
                 if (e % 2 == 1) {
                     p = p * n;
                 };

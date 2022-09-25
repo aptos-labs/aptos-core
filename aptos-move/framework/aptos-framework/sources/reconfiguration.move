@@ -73,7 +73,7 @@ module aptos_framework::reconfiguration {
     fun disable_reconfiguration(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
-        move_to(aptos_framework, DisableReconfiguration {} )
+        move_to(aptos_framework, DisableReconfiguration {})
     }
 
     /// Private function to resume reconfiguration.

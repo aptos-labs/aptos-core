@@ -250,7 +250,6 @@ module aptos_token::token_transfers {
         token::create_token_script(
             creator,
             *&collection_name,
-
             string::utf8(b"Token: Hello, Token"),
             string::utf8(b"Hello, Token"),
             amount,

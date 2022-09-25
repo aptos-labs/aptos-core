@@ -41,7 +41,9 @@ module aptos_framework::account {
     }
 
     struct CapabilityOffer<phantom T> has store { for: Option<address> }
+
     struct RotationCapability has drop, store { account: address }
+
     struct SignerCapability has drop, store { account: address }
 
     struct OriginatingAddress has key {
@@ -55,8 +57,10 @@ module aptos_framework::account {
     /// context because they include the TXN's unique sequence number.
     struct RotationProofChallenge has copy, drop {
         sequence_number: u64,
-        originator: address, // originating address
-        current_auth_key: address, // current auth key
+        originator: address,
+        // originating address
+        current_auth_key: address,
+        // current auth key
         new_public_key: vector<u8>,
     }
 
@@ -173,7 +177,7 @@ module aptos_framework::account {
         borrow_global<Account>(addr).guid_creation_num
     }
 
-    public fun get_sequence_number(addr: address) : u64 acquires Account {
+    public fun get_sequence_number(addr: address): u64 acquires Account {
         borrow_global<Account>(addr).sequence_number
     }
 
@@ -189,7 +193,7 @@ module aptos_framework::account {
         account_resource.sequence_number = old_sequence_number + 1;
     }
 
-    public fun get_authentication_key(addr: address) : vector<u8> acquires Account {
+    public fun get_authentication_key(addr: address): vector<u8> acquires Account {
         *&borrow_global<Account>(addr).authentication_key
     }
 
@@ -204,7 +208,7 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    fun verify_key_rotation_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge) : vector<u8> {
+    fun verify_key_rotation_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
         if (scheme == ED25519_SCHEME) {
             let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
             let sig = ed25519::new_signature_from_bytes(signature);
@@ -352,7 +356,7 @@ module aptos_framework::account {
     }
 
     /// Return a signer of the offerer, if there's an existing signer/rotation capability offer at the offerer's address
-    public fun create_authorized_signer(account: &signer, offerer_address: address) : signer acquires Account {
+    public fun create_authorized_signer(account: &signer, offerer_address: address): signer acquires Account {
         assert!(exists_at(offerer_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
         // Check if there's an existing signer capability offer from the offerer
@@ -387,15 +391,15 @@ module aptos_framework::account {
     public(friend) fun create_framework_reserved_account(addr: address): (signer, SignerCapability) {
         assert!(
             addr == @0x1 ||
-            addr == @0x2 ||
-            addr == @0x3 ||
-            addr == @0x4 ||
-            addr == @0x5 ||
-            addr == @0x6 ||
-            addr == @0x7 ||
-            addr == @0x8 ||
-            addr == @0x9 ||
-            addr == @0xa,
+                addr == @0x2 ||
+                addr == @0x3 ||
+                addr == @0x4 ||
+                addr == @0x5 ||
+                addr == @0x6 ||
+                addr == @0x7 ||
+                addr == @0x8 ||
+                addr == @0x9 ||
+                addr == @0xa,
             error::permission_denied(ENO_VALID_FRAMEWORK_RESERVED_ADDRESS),
         );
         let signer = create_account_unchecked(addr);
@@ -457,7 +461,7 @@ module aptos_framework::account {
     }
 
     #[test_only]
-    struct DummyResource has key { }
+    struct DummyResource has key {}
 
     #[test(user = @0x1)]
     public entry fun test_module_capability(user: signer) acquires DummyResource {
@@ -467,7 +471,7 @@ module aptos_framework::account {
         let resource_account_from_cap = create_signer_with_capability(&signer_cap);
         assert!(&resource_account == &resource_account_from_cap, 1);
 
-        move_to(&resource_account_from_cap, DummyResource { });
+        move_to(&resource_account_from_cap, DummyResource {});
         borrow_global<DummyResource>(signer::address_of(&resource_account));
     }
 
@@ -531,7 +535,7 @@ module aptos_framework::account {
     #[expected_failure(abort_code = 262151)]
     public entry fun test_empty_signature(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
-        let test_signature  = vector::empty<u8>();
+        let test_signature = vector::empty<u8>();
         let pk = x"0000000000000000000000000000000000000000000000000000000000000000";
         rotate_authentication_key(&alice, ED25519_SCHEME, pk, ED25519_SCHEME, pk, test_signature, test_signature);
     }
@@ -545,19 +549,19 @@ module aptos_framework::account {
         alice
     }
 
-/*
-TODO bring back with generic rotation capability
-    #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 65544)]
-    public entry fun test_invalid_offer_rotation_capability(bob: signer) acquires Account {
-        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
-        let alice = create_account_from_ed25519_public_key(pk);
-        create_account(signer::address_of(&bob));
+    /*
+    TODO bring back with generic rotation capability
+        #[test(bob = @0x345)]
+        #[expected_failure(abort_code = 65544)]
+        public entry fun test_invalid_offer_rotation_capability(bob: signer) acquires Account {
+            let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
+            let alice = create_account_from_ed25519_public_key(pk);
+            create_account(signer::address_of(&bob));
 
-        let invalid_signature = x"78f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
-        offer_rotation_capability_ed25519(&alice, invalid_signature, pk, signer::address_of(&bob));
-    }
-*/
+            let invalid_signature = x"78f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
+            offer_rotation_capability_ed25519(&alice, invalid_signature, pk, signer::address_of(&bob));
+        }
+    */
 
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 65544)]
@@ -588,7 +592,7 @@ TODO bring back with generic rotation capability
         assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
     }
 
-    #[test(bob = @0x345, charlie=@0x567)]
+    #[test(bob = @0x345, charlie = @0x567)]
     #[expected_failure(abort_code = 393230)]
     public entry fun test_invalid_check_signer_capability_and_create_authorized_signer(bob: signer, charlie: signer) acquires Account {
         let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
@@ -615,7 +619,7 @@ TODO bring back with generic rotation capability
         revoke_signer_capability(&alice, signer::address_of(&bob));
     }
 
-    #[test(bob = @0x345, charlie=@0x567)]
+    #[test(bob = @0x345, charlie = @0x567)]
     #[expected_failure(abort_code = 393230)]
     public entry fun test_invalid_revoke_signer_capability(bob: signer, charlie: signer) acquires Account {
         let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";

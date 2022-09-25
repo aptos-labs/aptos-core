@@ -108,7 +108,7 @@ module aptos_framework::storage_gas {
             x <= BASIS_POINT_DENOMINATION && y <= BASIS_POINT_DENOMINATION,
             error::invalid_argument(EINVALID_POINT_RANGE)
         );
-        Point {x, y}
+        Point { x, y }
     }
 
     public fun new_gas_curve(min_gas: u64, max_gas: u64, points: vector<Point>): GasCurve {
@@ -153,7 +153,7 @@ module aptos_framework::storage_gas {
         );
 
         let item_config = UsageGasConfig {
-            target_usage: 1000000000,  // 1 billion
+            target_usage: 1000000000, // 1 billion
             read_curve: base_8192_exponential_curve(80000, 80000 * 100),
             create_curve: base_8192_exponential_curve(2000000, 2000000 * 100),
             write_curve: base_8192_exponential_curve(400000, 400000 * 100),
@@ -192,15 +192,15 @@ module aptos_framework::storage_gas {
         while ({
             spec {
                 invariant forall j in 0..i: {
-                    let cur = if (j == 0) { Point {x: 0, y: 0} } else { points[j - 1] };
-                    let next = if (j == len) { Point {x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION} } else { points[j] };
+                    let cur = if (j == 0) { Point { x: 0, y: 0 } } else { points[j - 1] };
+                    let next = if (j == len) { Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION } } else { points[j] };
                     cur.x < next.x && cur.y <= next.y
                 };
             };
             i <= len
         }) {
-            let cur = if (i == 0) { &Point {x: 0, y: 0} } else { vector::borrow(points, i - 1) };
-            let next = if (i == len) { &Point {x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION} } else { vector::borrow(points, i) };
+            let cur = if (i == 0) { &Point { x: 0, y: 0 } } else { vector::borrow(points, i - 1) };
+            let next = if (i == len) { &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION } } else { vector::borrow(points, i) };
             assert!(cur.x < next.x && cur.y <= next.y, error::invalid_argument(EINVALID_MONOTONICALLY_NON_DECREASING_CURVE));
             i = i + 1;
         }
@@ -214,11 +214,11 @@ module aptos_framework::storage_gas {
 
         // Check the corner case that current_usage_bps drops before the first point.
         let (left, right) = if (num_points == 0) {
-            (&Point {x: 0, y: 0}, &Point {x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION})
+            (&Point { x: 0, y: 0 }, &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION })
         } else if (current_usage_bps < vector::borrow(points, 0).x) {
             (&Point { x: 0, y: 0 }, vector::borrow(points, 0))
         } else if (vector::borrow(points, num_points - 1).x <= current_usage_bps) {
-            (vector::borrow(points, num_points-1), &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION })
+            (vector::borrow(points, num_points - 1), &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION })
         } else {
             let (i, j) = (0, num_points - 2);
             while ({
@@ -226,7 +226,7 @@ module aptos_framework::storage_gas {
                     invariant i <= j;
                     invariant j < num_points - 1;
                     invariant points[i].x <= current_usage_bps;
-                    invariant current_usage_bps < points[j+1].x;
+                    invariant current_usage_bps < points[j + 1].x;
                 };
                 i < j
             }) {
@@ -234,7 +234,7 @@ module aptos_framework::storage_gas {
                 if (current_usage_bps < vector::borrow(points, mid).x) {
                     spec {
                         // j is strictly decreasing.
-                        assert mid-1 < j;
+                        assert mid - 1 < j;
                     };
                     j = mid - 1;
                 } else {
@@ -315,7 +315,7 @@ module aptos_framework::storage_gas {
             let old_standard_curve_gas = 1;
             while (i <= target + 7) {
                 assert!(calculate_gas(target, i, &constant_curve) == 5, 0);
-                assert!(calculate_gas(target, i, &linear_curve) == (if (i < target) {1 + 999 * (i * BASIS_POINT_DENOMINATION / target) / BASIS_POINT_DENOMINATION} else {1000}), 0);
+                assert!(calculate_gas(target, i, &linear_curve) == (if (i < target) { 1 + 999 * (i * BASIS_POINT_DENOMINATION / target) / BASIS_POINT_DENOMINATION } else { 1000 }), 0);
                 let new_standard_curve_gas = calculate_gas(target, i, &standard_curve);
                 assert!(new_standard_curve_gas >= old_standard_curve_gas, 0);
                 old_standard_curve_gas = new_standard_curve_gas;

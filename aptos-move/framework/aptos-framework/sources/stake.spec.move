@@ -1,5 +1,4 @@
 spec aptos_framework::stake {
-
     // -----------------
     // Global invariants
     // -----------------
@@ -59,19 +58,19 @@ spec aptos_framework::stake {
         requires num_successful_proposals <= num_total_proposals;
         aborts_if false;
         ensures old(stake.value) > 0 ==>
-                result == spec_rewards_amount(
-                    old(stake.value),
-                    num_successful_proposals,
-                    num_total_proposals,
-                    rewards_rate,
-                    rewards_rate_denominator);
+            result == spec_rewards_amount(
+                old(stake.value),
+                num_successful_proposals,
+                num_total_proposals,
+                rewards_rate,
+                rewards_rate_denominator);
         ensures old(stake.value) > 0 ==>
-                stake.value == old(stake.value) + spec_rewards_amount(
-                    old(stake.value),
-                    num_successful_proposals,
-                    num_total_proposals,
-                    rewards_rate,
-                    rewards_rate_denominator);
+            stake.value == old(stake.value) + spec_rewards_amount(
+                old(stake.value),
+                num_successful_proposals,
+                num_total_proposals,
+                rewards_rate,
+                rewards_rate_denominator);
         ensures old(stake.value) == 0 ==> result == 0;
         ensures old(stake.value) == 0 ==> stake.value == old(stake.value);
     }
@@ -109,7 +108,7 @@ spec aptos_framework::stake {
     }
 
     spec append {
-        pragma opaque, verify=false;
+        pragma opaque, verify = false;
         aborts_if false;
         ensures len(v1) == old(len(v1) + len(v2));
         ensures len(v2) == 0;
@@ -141,8 +140,8 @@ spec aptos_framework::stake {
         ensures result == VALIDATOR_STATUS_PENDING_INACTIVE ==> spec_contains(validator_set.pending_inactive, pool_address);
         ensures result == VALIDATOR_STATUS_INACTIVE ==> (
             !spec_contains(validator_set.pending_active, pool_address)
-            && !spec_contains(validator_set.active_validators, pool_address)
-            && !spec_contains(validator_set.pending_inactive, pool_address)
+                && !spec_contains(validator_set.active_validators, pool_address)
+                && !spec_contains(validator_set.pending_inactive, pool_address)
         );
     }
 
@@ -205,7 +204,7 @@ spec aptos_framework::stake {
         let validator_set = global<ValidatorSet>(@aptos_framework);
         !spec_contains(validator_set.pending_active, pool_address)
             && (spec_contains(validator_set.active_validators, pool_address)
-                || spec_contains(validator_set.pending_inactive, pool_address))
+            || spec_contains(validator_set.pending_inactive, pool_address))
     }
 
     // These resources are required to successfully execute `on_new_epoch`, which cannot
