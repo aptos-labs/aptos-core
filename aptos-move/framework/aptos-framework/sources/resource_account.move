@@ -67,6 +67,7 @@ module aptos_framework::resource_account {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
     use aptos_std::simple_map::{Self, SimpleMap};
+    use aptos_std::table::{Self, Table};
 
     /// Container resource not found in account
     const ECONTAINER_NOT_PUBLISHED: u64 = 1;
@@ -75,6 +76,10 @@ module aptos_framework::resource_account {
 
     struct Container has key {
         store: SimpleMap<address, account::SignerCapability>,
+    }
+
+    struct BlobStore has key {
+        store: Table<address, vector<u8>>,
     }
 
     /// Creates a new resource account and rotates the authentication key to either
@@ -117,21 +122,47 @@ module aptos_framework::resource_account {
     }
 
     /// Creates a new resource account, publishes the package under this account transaction under
-    /// this account and leaves the signer cap readily available for pickup.
+    /// this account, and leaves the signer cap readily available for pickup.
     public entry fun create_resource_account_and_publish_package(
         origin: &signer,
         seed: vector<u8>,
         metadata_serialized: vector<u8>,
         code: vector<vector<u8>>,
-    ) acquires Container {
+    ) acquires BlobStore, Container {
+        create_resource_account_and_publish_package_with_data(origin, seed, metadata_serialized, code, vector::empty());
+    }
+
+    /// Creates a new resource account, publishes the package under this account transaction under
+    /// this account with metadata, and leaves the signer cap readily available for pickup.
+    public entry fun create_resource_account_and_publish_package_with_data(
+        origin: &signer,
+        seed: vector<u8>,
+        metadata_serialized: vector<u8>,
+        code: vector<vector<u8>>,
+        data_blob: vector<u8>,
+    ) acquires BlobStore, Container {
         let (resource, resource_signer_cap) = account::create_resource_account(origin, seed);
-        aptos_framework::code::publish_package_txn(&resource, metadata_serialized, code);
+
+        if (!vector::is_empty(&data_blob)) {
+            let origin_addr = signer::address_of(origin);
+            if (!exists<BlobStore>(origin_addr)) {
+                move_to(origin, BlobStore { store: table::new() });
+            };
+
+            let blob_store = borrow_global_mut<BlobStore>(origin_addr);
+            let resource_addr = signer::address_of(&resource);
+            table::add(&mut blob_store.store, resource_addr, data_blob);
+        };
+
+        let publisher = account::create_signer_with_capability(&resource_signer_cap);
         rotate_account_authentication_key_and_store_capability(
             origin,
             resource,
             resource_signer_cap,
             ZERO_AUTH_KEY,
         );
+
+        aptos_framework::code::publish_package_txn(&publisher, metadata_serialized, code);
     }
 
     fun rotate_account_authentication_key_and_store_capability(
@@ -163,7 +194,18 @@ module aptos_framework::resource_account {
     public fun retrieve_resource_account_cap(
         resource: &signer,
         source_addr: address,
-    ): account::SignerCapability acquires Container {
+    ): account::SignerCapability acquires BlobStore, Container {
+        let (resource_signer_cap, _) = retrieve_resource_account_cap_and_data(resource, source_addr);
+        resource_signer_cap
+    }
+
+    /// When called by the resource account, it will retrieve the capability associated with that
+    /// account and rotate the account's auth key to 0x0 making the account inaccessible without
+    /// the SignerCapability.
+    public fun retrieve_resource_account_cap_and_data(
+        resource: &signer,
+        source_addr: address,
+    ): (account::SignerCapability, vector<u8>) acquires BlobStore, Container {
         assert!(exists<Container>(source_addr), error::not_found(ECONTAINER_NOT_PUBLISHED));
 
         let resource_addr = signer::address_of(resource);
@@ -181,11 +223,23 @@ module aptos_framework::resource_account {
 
         let resource = account::create_signer_with_capability(&resource_signer_cap);
         account::rotate_authentication_key_internal(&resource, ZERO_AUTH_KEY);
-        resource_signer_cap
+
+        let data = if (exists<BlobStore>(source_addr)) {
+            let blob_store = borrow_global_mut<BlobStore>(source_addr);
+            if (table::contains(&blob_store.store, resource_addr)) {
+                table::remove(&mut blob_store.store, resource_addr)
+            } else {
+                vector::empty()
+            }
+        } else {
+            vector::empty()
+        };
+
+        (resource_signer_cap, data)
     }
 
     #[test(user = @0x1111)]
-    public entry fun test_create_account_and_retrieve_cap(user: signer) acquires Container {
+    public entry fun test_create_account_and_retrieve_cap(user: signer) acquires BlobStore, Container {
         let user_addr = signer::address_of(&user);
         account::create_account(user_addr);
 

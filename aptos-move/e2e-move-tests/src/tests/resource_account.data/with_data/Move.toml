@@ -1,0 +1,9 @@
+[package]
+name = "resource_account"
+version = "0.0.0"
+
+[addresses]
+resource_account = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../../../framework/aptos-framework" }

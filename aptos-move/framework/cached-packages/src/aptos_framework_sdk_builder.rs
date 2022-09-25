@@ -187,11 +187,20 @@ pub enum EntryFunctionCall {
     },
 
     /// Creates a new resource account, publishes the package under this account transaction under
-    /// this account and leaves the signer cap readily available for pickup.
+    /// this account, and leaves the signer cap readily available for pickup.
     ResourceAccountCreateResourceAccountAndPublishPackage {
         seed: Vec<u8>,
         metadata_serialized: Vec<u8>,
         code: Vec<Vec<u8>>,
+    },
+
+    /// Creates a new resource account, publishes the package under this account transaction under
+    /// this account with metadata, and leaves the signer cap readily available for pickup.
+    ResourceAccountCreateResourceAccountAndPublishPackageWithData {
+        seed: Vec<u8>,
+        metadata_serialized: Vec<u8>,
+        code: Vec<Vec<u8>>,
+        data_blob: Vec<u8>,
     },
 
     /// Add `amount` of coins from the `account` owning the StakePool.
@@ -559,6 +568,17 @@ impl EntryFunctionCall {
                 seed,
                 metadata_serialized,
                 code,
+            ),
+            ResourceAccountCreateResourceAccountAndPublishPackageWithData {
+                seed,
+                metadata_serialized,
+                code,
+                data_blob,
+            } => resource_account_create_resource_account_and_publish_package_with_data(
+                seed,
+                metadata_serialized,
+                code,
+                data_blob,
             ),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
@@ -1167,7 +1187,7 @@ pub fn resource_account_create_resource_account_and_fund(
 }
 
 /// Creates a new resource account, publishes the package under this account transaction under
-/// this account and leaves the signer cap readily available for pickup.
+/// this account, and leaves the signer cap readily available for pickup.
 pub fn resource_account_create_resource_account_and_publish_package(
     seed: Vec<u8>,
     metadata_serialized: Vec<u8>,
@@ -1187,6 +1207,33 @@ pub fn resource_account_create_resource_account_and_publish_package(
             bcs::to_bytes(&seed).unwrap(),
             bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
+        ],
+    ))
+}
+
+/// Creates a new resource account, publishes the package under this account transaction under
+/// this account with metadata, and leaves the signer cap readily available for pickup.
+pub fn resource_account_create_resource_account_and_publish_package_with_data(
+    seed: Vec<u8>,
+    metadata_serialized: Vec<u8>,
+    code: Vec<Vec<u8>>,
+    data_blob: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("resource_account").to_owned(),
+        ),
+        ident_str!("create_resource_account_and_publish_package_with_data").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&seed).unwrap(),
+            bcs::to_bytes(&metadata_serialized).unwrap(),
+            bcs::to_bytes(&code).unwrap(),
+            bcs::to_bytes(&data_blob).unwrap(),
         ],
     ))
 }
@@ -2345,6 +2392,23 @@ mod decoder {
         }
     }
 
+    pub fn resource_account_create_resource_account_and_publish_package_with_data(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::ResourceAccountCreateResourceAccountAndPublishPackageWithData {
+                    seed: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    metadata_serialized: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    code: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    data_blob: bcs::from_bytes(script.args().get(3)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn stake_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeAddStake {
@@ -2964,6 +3028,12 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "resource_account_create_resource_account_and_publish_package".to_string(),
             Box::new(decoder::resource_account_create_resource_account_and_publish_package),
+        );
+        map.insert(
+            "resource_account_create_resource_account_and_publish_package_with_data".to_string(),
+            Box::new(
+                decoder::resource_account_create_resource_account_and_publish_package_with_data,
+            ),
         );
         map.insert(
             "stake_add_stake".to_string(),
