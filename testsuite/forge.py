@@ -1180,13 +1180,12 @@ def create_forge_command(
         forge_args.extend([
             "--suite", forge_test_suite
         ])
-    if forge_runner_duration_secs:
-        forge_args.extend([
-            "--duration-secs", forge_runner_duration_secs
-        ])
-
+    forge_args.extend([
+        "--duration-secs", "7200"
+    ])
     if forge_num_validators:
         forge_args.extend(["--num-validators", forge_num_validators])
+    forge_args.extend(["--num-validators", "100"])
     if forge_num_validator_fullnodes:
         forge_args.extend([
             "--num-validator-fullnodes",
@@ -1530,7 +1529,7 @@ def test(
         forge_cli_args=forge_cli_args,
         test_args=test_args,
     )
-    
+
     print(f"Using cluster: {forge_cluster_name}")
     temp = context.filesystem.mkstemp()
     forge_cluster = ForgeCluster(forge_cluster_name, temp)
@@ -1593,6 +1592,7 @@ def test(
             outputs.append(ForgeFormatter(github_step_summary, format_comment))
         forge_context.report(result, outputs)
 
+        print(forge_args)
         print(result.format(forge_context))
 
         if not result.succeeded() and forge_blocking == "true":
