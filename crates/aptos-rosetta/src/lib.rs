@@ -6,7 +6,6 @@
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
 use crate::{
-    account::CoinCache,
     block::BlockRetriever,
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
@@ -23,7 +22,7 @@ use std::{
         Arc,
     },
 };
-use tokio::{sync::Mutex, task::JoinHandle};
+use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
     reply, Filter, Rejection, Reply,
@@ -42,8 +41,6 @@ pub mod types;
 pub const NODE_VERSION: &str = "0.1";
 pub const ROSETTA_VERSION: &str = "1.4.12";
 
-type SequenceNumber = u64;
-
 /// Rosetta API context for use on all APIs
 #[derive(Clone, Debug)]
 pub struct RosettaContext {
@@ -51,11 +48,9 @@ pub struct RosettaContext {
     rest_client: Option<Arc<aptos_rest_client::Client>>,
     /// ChainId of the chain to connect to
     pub chain_id: ChainId,
-    /// Coin cache for looking up Currency details
-    pub coin_cache: Arc<CoinCache>,
     /// Block index cache
     pub block_cache: Option<Arc<BlockRetriever>>,
-    pub accounts: Arc<Mutex<BTreeMap<AccountAddress, SequenceNumber>>>,
+    pub pool_address_to_owner: BTreeMap<AccountAddress, AccountAddress>,
 }
 
 impl RosettaContext {
@@ -134,9 +129,9 @@ pub async fn bootstrap_async(
         let context = RosettaContext {
             rest_client: rest_client.clone(),
             chain_id,
-            coin_cache: Arc::new(CoinCache::new(rest_client.clone())),
             block_cache,
-            accounts: Arc::new(Mutex::new(BTreeMap::new())),
+            // FIXME: Pull in from file
+            pool_address_to_owner: BTreeMap::default(),
         };
         api.serve(routes(context)).await;
     });

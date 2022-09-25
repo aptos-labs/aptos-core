@@ -13,22 +13,15 @@ use crate::{
         with_context,
     },
     error::{ApiError, ApiResult},
-    types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency, CurrencyMetadata},
+    types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency},
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
-use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::account_config::{AccountResource, CoinInfoResource, CoinStoreResource};
+use aptos_types::account_config::{AccountResource, CoinStoreResource};
 use aptos_types::stake_pool::StakePool;
-use once_cell::sync::Lazy;
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::str::FromStr;
-use std::{
-    collections::HashSet,
-    sync::{Arc, RwLock},
-};
 use warp::Filter;
 
 /// Account routes e.g. balance
@@ -75,7 +68,6 @@ async fn account_balance(
     let balance_version = block_info.last_version;
 
     let (sequence_number, balances) = get_balances(
-        server_context.coin_cache.clone(),
         &rest_client,
         request.account_identifier,
         balance_version,
@@ -94,7 +86,6 @@ async fn account_balance(
 
 /// Retrieve the balances for an account
 async fn get_balances(
-    coin_cache: Arc<CoinCache>,
     rest_client: &aptos_rest_client::Client,
     account: AccountIdentifier,
     version: u64,
@@ -128,12 +119,10 @@ async fn get_balances(
                         let coin_store: CoinStoreResource = bcs::from_bytes(&bytes)?;
                         if let Some(coin_type) = struct_tag.type_params.first() {
                             // Only display supported coins
-                            if let Some(currency) =
-                                coin_cache.get_currency(coin_type, Some(version)).await?
-                            {
+                            if coin_type == &native_coin_tag() {
                                 balances.push(Amount {
                                     value: coin_store.coin().to_string(),
-                                    currency,
+                                    currency: native_coin(),
                                 });
                             }
                         }
@@ -270,144 +259,8 @@ fn get_stake_balance_from_stake_pool(
     }
 
     // TODO: Represent inactive, and pending as separate?
-    let balance = stake_pool.active
-        + stake_pool.inactive
-        + stake_pool.pending_active
-        + stake_pool.pending_inactive;
     Ok(Amount {
-        value: balance.to_string(),
+        value: stake_pool.get_total_staked_amount().to_string(),
         currency: native_coin(),
     })
-}
-
-/// Only coins supported by Rosetta
-///
-/// TODO: Allow passing in known supported coins in some sort of config file
-pub static SUPPORTED_COINS: Lazy<Vec<TypeTag>> = Lazy::new(|| vec![native_coin_tag()]);
-
-/// A cache for currencies, so we don't have to keep looking up the status of it
-#[derive(Debug)]
-pub struct CoinCache {
-    rest_client: Option<Arc<aptos_rest_client::Client>>,
-    currencies: RwLock<BTreeMap<TypeTag, Option<Currency>>>,
-}
-
-impl CoinCache {
-    pub fn new(rest_client: Option<Arc<aptos_rest_client::Client>>) -> Self {
-        Self {
-            rest_client,
-            currencies: RwLock::new(BTreeMap::new()),
-        }
-    }
-
-    pub fn get_currency_from_cache(&self, coin: &TypeTag) -> Option<Currency> {
-        // Short circuit for the default coin
-        if coin == &native_coin_tag() {
-            return Some(native_coin());
-        }
-
-        let currencies = self
-            .currencies
-            .read()
-            .expect("Can't recover from poisoned lock on coin cache");
-
-        if let Some(currency) = currencies.get(coin) {
-            currency.clone()
-        } else {
-            None
-        }
-    }
-
-    /// Retrieve a currency and cache it if applicable
-    pub async fn get_currency(
-        &self,
-        coin: &TypeTag,
-        version: Option<u64>,
-    ) -> ApiResult<Option<Currency>> {
-        // Short circuit for the default coin
-        if coin == &native_coin_tag() {
-            return Ok(Some(native_coin()));
-        }
-
-        // Unsupported coins should be ignored, as symbol may be used as an identifier
-        if !SUPPORTED_COINS.contains(coin) {
-            return Ok(None);
-        }
-
-        {
-            let currencies = self
-                .currencies
-                .read()
-                .expect("Can't recover from poisoned lock on coin cache");
-            if let Some(currency) = currencies.get(coin) {
-                return Ok(currency.clone());
-            }
-        }
-
-        let currency = self
-            .get_currency_inner(coin, version)
-            .await
-            .map_err(|err| {
-                ApiError::CoinTypeFailedToBeFetched(Some(format!(
-                    "Failed to retrieve coin type {} {}",
-                    coin, err
-                )))
-            })?;
-        self.currencies
-            .write()
-            .expect("Can't recover from poisoned lock on coin cache")
-            .insert(coin.clone(), currency.clone());
-        Ok(currency)
-    }
-
-    /// Pulls currency information from onchain
-    pub async fn get_currency_inner(
-        &self,
-        coin: &TypeTag,
-        version: Option<u64>,
-    ) -> ApiResult<Option<Currency>> {
-        let struct_tag = match coin {
-            TypeTag::Struct(ref tag) => tag,
-            // This is a poorly formed coin, and we'll just skip over it
-            _ => return Ok(None),
-        };
-
-        // Retrieve the coin type
-        const ENCODE_CHARS: &AsciiSet = &CONTROLS.add(b'<').add(b'>');
-        let address = struct_tag.address;
-        let resource_tag = format!("0x1::coin::CoinInfo<{}>", struct_tag);
-        let encoded_resource_tag = utf8_percent_encode(&resource_tag, ENCODE_CHARS).to_string();
-
-        let response = if let Some(version) = version {
-            self.rest_client
-                .as_ref()
-                .expect("Should have rest client to check coin cache")
-                .get_account_resource_at_version_bcs::<CoinInfoResource>(
-                    address,
-                    &encoded_resource_tag,
-                    version,
-                )
-                .await
-        } else {
-            self.rest_client
-                .as_ref()
-                .expect("Should have rest client to check coin cache")
-                .get_account_resource_bcs::<CoinInfoResource>(address, &encoded_resource_tag)
-                .await
-        };
-
-        // At this point if we've retrieved it and it's bad, we error out
-        let coin_info = response?.into_inner();
-
-        // TODO: The symbol has to come from a trusted list, as the move type is the real indicator
-        Ok(Some(Currency {
-            symbol: coin_info
-                .symbol()
-                .unwrap_or_else(|err| format!("Invalid Symbol: {}", err)),
-            decimals: coin_info.decimals(),
-            metadata: Some(CurrencyMetadata {
-                move_type: struct_tag.to_string(),
-            }),
-        }))
-    }
 }
