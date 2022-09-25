@@ -1048,13 +1048,12 @@ def create_forge_command(
         forge_args.extend([
             "--suite", forge_test_suite
         ])
-    if forge_runner_duration_secs:
-        forge_args.extend([
-            "--duration-secs", forge_runner_duration_secs
-        ])
-
+    forge_args.extend([
+        "--duration-secs", "7200"
+    ])
     if forge_num_validators:
         forge_args.extend(["--num-validators", forge_num_validators])
+    forge_args.extend(["--num-validators", "100"])
     if forge_num_validator_fullnodes:
         forge_args.extend([
             "--num-validator-fullnodes",
@@ -1082,6 +1081,7 @@ def create_forge_command(
         forge_args.append("--keep")
     if forge_enable_haproxy == "true":
         forge_args.append("--enable-haproxy")
+    forge_args.append("--enable-haproxy")
 
     if test_args:
         forge_args.extend(test_args)
@@ -1328,6 +1328,7 @@ def test(
             outputs.append(ForgeFormatter(github_step_summary, format_comment))
         context.report(result, outputs)
 
+        print(forge_args)
         print(result.format(context))
 
         if not result.succeeded() and forge_blocking == "true":
