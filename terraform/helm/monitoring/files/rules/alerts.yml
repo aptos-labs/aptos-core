@@ -87,20 +87,41 @@ groups:
     annotations:
 
   # Storage core metrics
-  - alert: Validator Low Disk Space
-    expr: (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~".*validator-e.*"} - kubelet_volume_stats_used_bytes) / 1024 / 1024 / 1024 < 50
-    for: 5m
+  - alert: Validator Low Disk Space (warning)
+    expr: (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~".*(validator|fullnode)-e.*"} - kubelet_volume_stats_used_bytes) / 1024 / 1024 / 1024 < 200
+    for: 1h
     labels:
       severity: warning
-      summary: "Less than 50 GB of free space on Validator DB volume."
+      summary: "Less than 200 GB of free space on Aptos Node."
     annotations:
-  - alert: Validator Very Low Disk Space
-    expr: (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~".*validator-e.*"} - kubelet_volume_stats_used_bytes) / 1024 / 1024 / 1024 < 20
+      description: "(This is a warning, deal with it in working hours.) A validator or fullnode pod has less than 200 GB of disk space. Take these steps:
+        1. If only a few nodes have this issue, it might be that they are not typically spec'd or customized differently, \
+          it's most likely a expansion of the volume is needed soon. Talk to the PE team. Otherwise, it's a bigger issue.
+        2. Pass this issue on to the storage team. If you are the storage team, read on.
+        3. Go to the dashboard and look for the stacked up column family sizes. \
+          If the total size on that chart can't justify low free disk space, we need to log in to a node to see if something other than the AptosDB is eating up disk. \
+          Start from things under /opt/aptos/data.
+        3 Otherwise, if the total size on that chart is the majority of the disk consumption, zoom out and look for anomalies -- sudden increases overall or on a few \
+          specific Column Families, etc. Also check average size of each type of data. Reason about the anomaly with changes in recent releases in mind.
+        4 If everything made sense, it's a bigger issue, somehow our gas schedule didn't stop state explosion before an alert is triggered. Our recommended disk \
+          spec and/or default pruning configuration, as well as storage gas schedule need updates. Discuss with the ecosystem team and send out a PR on the docs site, \
+          form a plan to inform the node operator community and prepare for a on-chain proposal to update the gas schedule."
+  - alert: Validator Very Low Disk Space (critical)
+    expr: (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~".*(validator|fullnode)-e.*"} - kubelet_volume_stats_used_bytes) / 1024 / 1024 / 1024 < 50
     for: 5m
     labels:
       severity: critical
-      summary: "Less than 20 GB of free space on Validator DB volume."
+      summary: "Less than 50 GB of free space on Aptos Node."
     annotations:
+      description: "A validator or fullnode pod has less than 50 GB of disk space -- that's dangerously low. \
+        1. A warning level alert of disk space less than 200GB should've fired a few days ago at least, search on slack and understand why it's not dealt with.
+        2. Search in the code for the runbook of the warning alert, quickly go through that too determine if it's a bug. Involve the storage team and other team accordingly.
+      If no useful information is found, evaluate the trend of disk usage increasing, how long can we run further? If it can't last the night, you have these options to mitigate this:
+        1. Expand the disk if it's a cloud volume.
+        2. Shorten the pruner windows. Before that, find the latest version of these https://github.com/aptos-labs/aptos-core/blob/48cc64df8a64f2d13012c10d8bd5bf25d94f19dc/config/src/config/storage_config.rs#L166-L218 \
+          and read carefully the comments on the prune window config entries -- set safe values.
+        3. If you believe this is happening on nodes that are not run by us, involve the PE / Community / Ecosystem teams to coordinate efforts needed on those nodes.
+      "
   - alert: AptosDB API Success Rate
     expr: sum by(kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count{result="Ok"}[1m])) / sum by(kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count[1m])) < 0.99  # 99%
     for: 5m
@@ -108,6 +129,13 @@ groups:
       severity: error
       summary: "AptosDB API success rate dropped."
     annotations:
+      description: "AptosDB APIs started to return Error.
+      This must be looked at together with alerts / dashboards of upper level components -- it unfortunately can be either the cause or victim of issues over there. Things you can do:
+        1. Go to the storage dashboard and see if the errors are on specific APIs.
+        2. Look at logs and see storage related errors, understand if it's hardware / dependency errors or logical errors in our code.
+        3. Previous steps should narrow down the possibilities of the issue, at this point if it's still not clear, read the code to understand if the error is caused by a bug or a change of input pattern.
+        4. See if changes in recent releases can cause this issue.
+      "
   - alert: RocksDB Read Latency
     expr: sum by (kubernetes_pod_name) (rate(aptos_schemadb_get_latency_seconds_sum[1m])) / sum by (kubernetes_pod_name) (rate(aptos_schemadb_get_latency_seconds_count[1m])) > 0.001  # 1 millisecond
     for: 5m
@@ -115,7 +143,14 @@ groups:
       severity: warning
       summary: "RocksDB read latency raised."
     annotations:
+      description: "RocksDB read latency raised, which indicates bad performance.
+      If alerts on other components are not fired, this is probably not urgent. But things you can do:
+        1. On the system dashboard, see if we get a flat line on the IOPs panel -- it can be disk being throttled. It's either the node is not spec'd as expected, or we are using more IOPs than expected.
+        2. Check out the traffic pattern on various dashboards, is there a sudden increase in traffic? Verify that on the storage dashboard by looking at the number of API calls, per API if needed.
+        3. Check the system dashboard to see if we are bottle necked by the memory (we rely heavily on the filesystem cache) or the CPU. It might be helpful to restart one of the nodes that's having this issue.
 
+        9. After all those, our threshold was set strictly initially, so if everything looks fine, we can change the alarm threshold.
+      "
   # Logging alerts
   - alert: Logs Being Dropped
     expr: 1 < (rate(aptos_struct_log_queue_error[1m]) + rate(aptos_struct_log_send_error[1m]))
