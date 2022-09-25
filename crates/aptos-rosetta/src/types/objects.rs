@@ -178,7 +178,7 @@ impl Operation {
         operation_type: OperationType,
         operation_index: u64,
         status: Option<OperationStatusType>,
-        address: AccountAddress,
+        account: AccountIdentifier,
         amount: Option<Amount>,
         metadata: Option<OperationMetadata>,
     ) -> Operation {
@@ -188,7 +188,7 @@ impl Operation {
             },
             operation_type: operation_type.to_string(),
             status: status.map(|inner| inner.to_string()),
-            account: Some(address.into()),
+            account: Some(account),
             amount,
             metadata,
         }
@@ -204,7 +204,7 @@ impl Operation {
             OperationType::CreateAccount,
             operation_index,
             status,
-            address,
+            AccountIdentifier::base_account(address),
             None,
             Some(OperationMetadata::create_account(sender)),
         )
@@ -213,7 +213,7 @@ impl Operation {
     pub fn deposit(
         operation_index: u64,
         status: Option<OperationStatusType>,
-        address: AccountAddress,
+        account: AccountIdentifier,
         currency: Currency,
         amount: u64,
     ) -> Operation {
@@ -221,7 +221,7 @@ impl Operation {
             OperationType::Deposit,
             operation_index,
             status,
-            address,
+            account,
             Some(Amount {
                 value: amount.to_string(),
                 currency,
@@ -233,7 +233,7 @@ impl Operation {
     pub fn withdraw(
         operation_index: u64,
         status: Option<OperationStatusType>,
-        address: AccountAddress,
+        account: AccountIdentifier,
         currency: Currency,
         amount: u64,
     ) -> Operation {
@@ -241,7 +241,7 @@ impl Operation {
             OperationType::Withdraw,
             operation_index,
             status,
-            address,
+            account,
             Some(Amount {
                 value: format!("-{}", amount),
                 currency,
@@ -260,7 +260,7 @@ impl Operation {
             OperationType::Fee,
             operation_index,
             Some(OperationStatusType::Success),
-            address,
+            AccountIdentifier::base_account(address),
             Some(Amount {
                 value: format!("-{}", gas_used.saturating_mul(gas_price_per_unit)),
                 currency: native_coin(),
@@ -272,14 +272,14 @@ impl Operation {
     pub fn set_operator(
         operation_index: u64,
         status: Option<OperationStatusType>,
-        address: AccountAddress,
+        owner: AccountAddress,
         new_operator: AccountAddress,
     ) -> Operation {
         Operation::new(
             OperationType::SetOperator,
             operation_index,
             status,
-            address,
+            AccountIdentifier::base_account(owner),
             None,
             Some(OperationMetadata::set_operator(new_operator)),
         )
@@ -288,14 +288,14 @@ impl Operation {
     pub fn set_voter(
         operation_index: u64,
         status: Option<OperationStatusType>,
-        address: AccountAddress,
+        owner: AccountAddress,
         new_voter: AccountAddress,
     ) -> Operation {
         Operation::new(
             OperationType::SetVoter,
             operation_index,
             status,
-            address,
+            AccountIdentifier::base_account(owner),
             None,
             Some(OperationMetadata::set_voter(new_voter)),
         )
@@ -345,21 +345,22 @@ pub struct OperationMetadata {
 impl OperationMetadata {
     pub fn create_account(sender: AccountAddress) -> Self {
         OperationMetadata {
-            sender: Some(sender.into()),
+            sender: Some(AccountIdentifier::base_account(sender)),
             ..Default::default()
         }
     }
 
     pub fn set_operator(new_operator: AccountAddress) -> Self {
+        // FIXME: move to subaccount usage
         OperationMetadata {
-            new_operator: Some(new_operator.into()),
+            new_operator: Some(AccountIdentifier::base_account(new_operator)),
             ..Default::default()
         }
     }
 
     pub fn set_voter(new_voter: AccountAddress) -> Self {
         OperationMetadata {
-            new_voter: Some(new_voter.into()),
+            new_voter: Some(AccountIdentifier::base_account(new_voter)),
             ..Default::default()
         }
     }
@@ -672,14 +673,14 @@ fn parse_transfer_from_txn_payload(
         operations.push(Operation::withdraw(
             operation_index,
             Some(OperationStatusType::Failure),
-            sender,
+            AccountIdentifier::base_account(sender),
             currency.clone(),
             amount,
         ));
         operations.push(Operation::deposit(
             operation_index + 1,
             Some(OperationStatusType::Failure),
-            receiver,
+            AccountIdentifier::base_account(receiver),
             currency,
             amount,
         ));
@@ -898,7 +899,7 @@ async fn parse_coinstore_changes(
             operations.push(Operation::withdraw(
                 operation_index,
                 Some(OperationStatusType::Success),
-                address,
+                AccountIdentifier::base_account(address),
                 currency.clone(),
                 amount,
             ));
@@ -910,7 +911,7 @@ async fn parse_coinstore_changes(
             operations.push(Operation::deposit(
                 operation_index,
                 Some(OperationStatusType::Success),
-                address,
+                AccountIdentifier::base_account(address),
                 currency.clone(),
                 amount,
             ));
