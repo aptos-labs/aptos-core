@@ -175,7 +175,7 @@ impl Arbitrary for NodeType {
 pub struct Child {
     /// The hash value of this child node.
     pub hash: HashValue,
-    /// `version`, the `nibble_path` of the ['NodeKey`] of this [`InternalNode`] the child belongs
+    /// `version`, the `nibble_path` of the [`NodeKey`] of this [`InternalNode`] the child belongs
     /// to and the child's index constitute the [`NodeKey`] to uniquely identify this child node
     /// from the storage. Used by `[`NodeKey::gen_child_node_key`].
     pub version: Version,

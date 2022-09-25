@@ -172,7 +172,7 @@ Configuration for the CLI works like this:
   ```
 
 :::tip Default configuration
-If you did not set any global configuration, then the `./.aptos/config.yaml` in the current working dorectory is used for configuration.
+If you did not set any global configuration, then the `./.aptos/config.yaml` in the current working directory is used for configuration.
 :::
 
 ### Setting up shell completion

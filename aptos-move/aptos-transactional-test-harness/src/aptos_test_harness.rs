@@ -441,7 +441,7 @@ impl<'a> AptosTestAdapter<'a> {
         let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
         let max_number_of_gas_units =
             TransactionGasParameters::initial().maximum_number_of_gas_units;
-        let gas_unit_price = gas_unit_price.unwrap_or(1);
+        let gas_unit_price = gas_unit_price.unwrap_or(1000);
         let max_gas_amount = match max_gas_amount {
             Some(max_gas_amount) => max_gas_amount,
             None => {

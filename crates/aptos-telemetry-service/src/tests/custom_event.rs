@@ -28,12 +28,13 @@ async fn test_custom_event() {
 
     test_context
         .inner
-        .validator_cache()
+        .peers()
+        .validators()
         .write()
         .insert(chain_id, (epoch, PeerSet::default()));
 
     let jwt_token = create_jwt_token(
-        test_context.inner.clone(),
+        test_context.inner.jwt_service(),
         chain_id,
         peer_id,
         node_type,

@@ -31,8 +31,8 @@ use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Builder;
 
-const WARMUP_DURATION_FRACTION: f32 = 0.05;
-const COOLDOWN_DURATION_FRACTION: f32 = 0.05;
+const WARMUP_DURATION_FRACTION: f32 = 0.07;
+const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
 
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,

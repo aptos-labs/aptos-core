@@ -24,17 +24,14 @@ mod tests {
         },
         FaucetClient,
     };
-    use aptos_sdk::{
-        transaction_builder::aptos_stdlib::EntryFunctionCall,
-        types::{
-            account_address::AccountAddress,
-            chain_id::ChainId,
-            transaction::{
-                authenticator::AuthenticationKey, SignedTransaction, Transaction,
-                TransactionPayload::Script,
-            },
-            LocalAccount,
+    use aptos_sdk::types::{
+        account_address::AccountAddress,
+        chain_id::ChainId,
+        transaction::{
+            authenticator::AuthenticationKey, SignedTransaction, Transaction, TransactionArgument,
+            TransactionPayload::Script,
         },
+        LocalAccount,
     };
     use aptos_warp_webserver::Response;
     use serde::Serialize;
@@ -43,7 +40,7 @@ mod tests {
         convert::{Infallible, TryFrom, TryInto},
         sync::{Arc, Mutex},
     };
-    use tokio::task::{yield_now, JoinHandle};
+    use tokio::task::JoinHandle;
     use url::Url;
     use warp::{
         body::BodyDeserializeError,
@@ -187,33 +184,22 @@ mod tests {
         assert_eq!(txn.chain_id(), ChainId::test());
 
         if let Script(script) = txn.payload() {
-            panic!("unexpected type of script: {:?}", script.args())
-        }
-        if let Some(entry_function) = EntryFunctionCall::decode(txn.payload()) {
-            match entry_function {
-                EntryFunctionCall::AptosAccountCreateAccount {
-                    auth_key: address, ..
-                } => {
-                    let mut writer = accounts.write();
-                    let previous = writer.insert(address, AccountState::new(0));
-                    assert!(previous.is_none(), "should not create account twice");
-                }
-                EntryFunctionCall::AptosCoinMint {
-                    dst_addr, amount, ..
-                } => {
-                    // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)
-                    // If the account doesn't exist yet, we sleep for 100ms to let the other request finish
-                    if accounts.write().get_mut(&dst_addr).is_none() {
-                        yield_now().await;
-                    }
-                    let mut writer = accounts.write();
-                    let account = writer
-                        .get_mut(&dst_addr)
-                        .expect("account should be created");
-                    account.balance += amount;
-                }
-                script => panic!("unexpected type of entry function: {:?}", script),
-            }
+            let dst_addr = if let TransactionArgument::Address(addr) = script.args()[0] {
+                addr
+            } else {
+                panic!("unexpected type of script: {:?}", script);
+            };
+            let amount = if let TransactionArgument::U64(amount) = script.args()[1] {
+                amount
+            } else {
+                panic!("unexpected type of script: {:?}", script);
+            };
+
+            accounts
+                .write()
+                .entry(dst_addr)
+                .and_modify(|account| account.balance += amount)
+                .or_insert_with(|| AccountState::new(amount));
         }
 
         let pending_txn = PendingTransaction {
@@ -310,8 +296,7 @@ mod tests {
             .path(format!("/mint?auth_key={}&amount={}", auth_key, amount).as_str())
             .reply(&filter)
             .await;
-        let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
-        assert_eq!(values.len(), 2);
+        serde_json::from_slice::<Vec<HashValue>>(resp.body()).unwrap();
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
             "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
@@ -333,8 +318,7 @@ mod tests {
             .path(format!("/mint?pub_key={}&amount={}", pub_key, amount).as_str())
             .reply(&filter)
             .await;
-        let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
-        assert_eq!(values.len(), 2);
+        serde_json::from_slice::<Vec<HashValue>>(resp.body()).unwrap();
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
             "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835".to_owned(),
@@ -357,8 +341,7 @@ mod tests {
             .reply(&filter)
             .await;
 
-        let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
-        assert_eq!(values.len(), 2);
+        serde_json::from_slice::<Vec<HashValue>>(resp.body()).unwrap();
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
             "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
@@ -381,8 +364,7 @@ mod tests {
             .reply(&filter)
             .await;
 
-        let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
-        assert_eq!(values.len(), 2);
+        serde_json::from_slice::<Vec<HashValue>>(resp.body()).unwrap();
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
             "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
@@ -412,8 +394,7 @@ mod tests {
             .await;
         let body = resp.body();
         let bytes = hex::decode(body).expect("hex encoded response body");
-        let txns: Vec<SignedTransaction> = bcs::from_bytes(&bytes).expect("valid bcs vec");
-        assert_eq!(txns.len(), 2);
+        bcs::from_bytes::<Vec<SignedTransaction>>(&bytes).expect("valid bcs vec");
 
         let reader = accounts.read();
         let addr = AccountAddress::try_from(

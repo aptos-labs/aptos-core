@@ -201,6 +201,9 @@ impl Mempool {
             block_size = block.len(),
             byte_size = total_bytes,
         );
+
+        counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
+        counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
         for transaction in &block {
             self.log_latency(
                 transaction.sender(),

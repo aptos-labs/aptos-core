@@ -1,29 +1,27 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
-    path::PathBuf, time::Duration,
-};
-
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::x25519;
-use aptos_types::{chain_id::ChainId, PeerId};
-use clap::Parser;
-use gcp_bigquery_client::Client;
-use reqwest::Url;
-use serde::{Deserialize, Serialize};
-use tracing::info;
-use warp::{Filter, Reply};
-
-pub use crate::error::ServiceError;
 use crate::{
     clients::humio,
-    clients::victoria_metrics_api::Client as MetricsClient,
-    context::Context,
+    clients::{big_query, victoria_metrics_api::Client as MetricsClient},
+    context::{ClientTuple, Context, JsonWebTokenService, PeerStoreTuple},
     index::routes,
-    validator_cache::{PeerSetCache, PeerSetCacheUpdater},
+    validator_cache::PeerSetCacheUpdater,
 };
+
+use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
+use aptos_types::{chain_id::ChainId, PeerId};
+
+use clap::Parser;
+use gcp_bigquery_client::Client as BigQueryClient;
+use reqwest::Url;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
+    path::PathBuf, sync::Arc, time::Duration,
+};
+use tracing::info;
+use warp::{Filter, Reply};
 
 mod auth;
 mod clients;
@@ -60,40 +58,74 @@ impl AptosTelemetryServiceArgs {
             });
         info!("Using config {:?}", &config);
 
-        let gcp_bigquery_client = Client::from_service_account_key_file(
+        let server_private_key = x25519::PrivateKey::from_encoded_string(
+            env::var("SERVER_PRIVATE_KEY")
+                .expect("environment variable SERVER_PRIVATE_KEY must be set")
+                .as_str(),
+        )
+        .expect("unable to form x25519::Private key from environment variable SERVER_PRIVATE_KEY");
+
+        let bigquery_client = BigQueryClient::from_service_account_key_file(
             env::var("GOOGLE_APPLICATION_CREDENTIALS")
                 .expect("environment variable GOOGLE_APPLICATION_CREDENTIALS must be set")
                 .as_str(),
         )
         .await;
+        let bigquery_client = big_query::TableWriteClient::new(
+            bigquery_client,
+            config.custom_event_config.project_id.clone(),
+            config.custom_event_config.dataset_id.clone(),
+            config.custom_event_config.table_id.clone(),
+        );
 
         let victoria_metrics_client = MetricsClient::new(
             Url::parse(&config.victoria_metrics_base_url)
                 .expect("base url must be provided for victoria metrics"),
-            config.victoria_metrics_token.clone(),
+            env::var("VICTORIA_METRICS_AUTH_TOKEN")
+                .expect("environment variable VICTORIA_METRICS_AUTH_TOKEN must be set"),
         );
 
         let humio_client = humio::IngestClient::new(
             Url::parse(&config.humio_url).unwrap(),
-            config.humio_auth_token.clone(),
+            env::var("HUMIO_INGEST_TOKEN")
+                .expect("environment variable HUMIO_INGEST_TOKEN must be set"),
         );
-        let validators_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
-        let vfns_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
+
+        let jwt_service = JsonWebTokenService::from_base64_secret(
+            env::var("JWT_SIGNING_KEY")
+                .expect("environment variable JWT_SIGNING_KEY must be set")
+                .as_str(),
+        );
+
+        let validators = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
+        let validator_fullnodes = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
+        let public_fullnodes = config.pfn_allowlist.clone();
+        let chain_set = config
+            .trusted_full_node_addresses
+            .iter()
+            .map(|pair| pair.0.to_owned())
+            .collect();
 
         let context = Context::new(
-            &config,
-            validators_cache.clone(),
-            vfns_cache.clone(),
-            config.pfn_allowlist.clone(),
+            server_private_key,
+            PeerStoreTuple::new(
+                validators.clone(),
+                validator_fullnodes.clone(),
+                public_fullnodes,
+            ),
+            Some(ClientTuple::new(
+                bigquery_client,
+                victoria_metrics_client,
+                humio_client,
+            )),
+            chain_set,
+            jwt_service,
             config.log_env_map.clone(),
-            Some(gcp_bigquery_client),
-            Some(victoria_metrics_client),
-            humio_client,
         );
 
         PeerSetCacheUpdater::new(
-            validators_cache,
-            vfns_cache,
+            validators,
+            validator_fullnodes,
             config.trusted_full_node_addresses.clone(),
             Duration::from_secs(config.update_interval),
         )
@@ -121,7 +153,7 @@ impl AptosTelemetryServiceArgs {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TelemetryServiceConfig {
     pub address: SocketAddr,
@@ -129,16 +161,15 @@ pub struct TelemetryServiceConfig {
     pub tls_cert_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_key_path: Option<String>,
+
     pub trusted_full_node_addresses: HashMap<ChainId, String>,
-    pub server_private_key: ConfigKey<x25519::PrivateKey>,
-    pub jwt_signing_key: String,
     pub update_interval: u64,
-    pub gcp_bq_config: GCPBigQueryConfig,
-    pub victoria_metrics_base_url: String,
-    pub victoria_metrics_token: String,
-    pub humio_url: String,
-    pub humio_auth_token: String,
     pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
+
+    pub custom_event_config: CustomEventConfig,
+    pub victoria_metrics_base_url: String,
+    pub humio_url: String,
+
     pub log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
 }
 
@@ -172,7 +203,7 @@ impl TelemetryServiceConfig {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct GCPBigQueryConfig {
+pub struct CustomEventConfig {
     pub project_id: String,
     pub dataset_id: String,
     pub table_id: String,

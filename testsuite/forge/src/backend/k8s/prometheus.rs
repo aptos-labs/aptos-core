@@ -6,13 +6,29 @@ use crate::Result;
 use anyhow::bail;
 use aptos_logger::info;
 use prometheus_http_query::{response::PromqlResult, Client as PrometheusClient};
-use std::{collections::BTreeMap, convert::TryFrom};
+use reqwest::{header, Client as HttpClient};
+use std::collections::BTreeMap;
 
 pub fn get_prometheus_client() -> Result<PrometheusClient> {
     let prom_url =
         std::env::var("PROMETHEUS_URL").unwrap_or_else(|_| "http://127.0.0.1:9090".to_string());
     info!("Attempting to create prometheus client with: {} ", prom_url);
-    match PrometheusClient::try_from(prom_url) {
+
+    // add auth header if specified
+    let mut headers = header::HeaderMap::new();
+    if let Ok(token) = std::env::var("PROMETHEUS_TOKEN") {
+        if let Ok(mut auth_value) =
+            header::HeaderValue::from_str(format!("Bearer {}", token.as_str()).as_str())
+        {
+            auth_value.set_sensitive(true);
+            headers.insert(header::AUTHORIZATION, auth_value);
+        } else {
+            bail!("Invalid prometheus token");
+        }
+    }
+
+    let client = HttpClient::builder().default_headers(headers).build()?;
+    match PrometheusClient::from(client, &prom_url) {
         Ok(c) => Ok(c),
         Err(e) => bail!("Failed to create client {}", e),
     }

@@ -44,6 +44,10 @@ module aptos_framework::voting {
     const EPROPOSAL_ALREADY_RESOLVED: u64 = 3;
     /// Proposal cannot contain an empty execution script hash
     const EPROPOSAL_EMPTY_EXECUTION_HASH: u64 = 4;
+    /// Proposal's voting period has already ended.
+    const EPROPOSAL_VOTING_ALREADY_ENDED: u64 = 5;
+    /// Voting forum has already been registered.
+    const EVOTING_FORUM_ALREADY_REGISTERED: u64 = 6;
 
     /// ProposalStateEnum representing proposal state.
     const PROPOSAL_STATE_PENDING: u64 = 0;
@@ -135,6 +139,9 @@ module aptos_framework::voting {
     }
 
     public fun register<ProposalType: store>(account: &signer) {
+        let addr = signer::address_of(account);
+        assert!(!exists<VotingForum<ProposalType>>(addr), error::already_exists(EVOTING_FORUM_ALREADY_REGISTERED));
+
         let voting_forum = VotingForum<ProposalType> {
             next_proposal_id: 0,
             proposals: table::new<u64, Proposal<ProposalType>>(),
@@ -149,7 +156,7 @@ module aptos_framework::voting {
         event::emit_event<RegisterForumEvent>(
             &mut voting_forum.events.register_forum_events,
             RegisterForumEvent {
-                hosting_account: signer::address_of(account),
+                hosting_account: addr,
                 proposal_type_info: type_info::type_of<ProposalType>(),
             },
         );
@@ -231,6 +238,14 @@ module aptos_framework::voting {
     ) acquires VotingForum {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        // Voting might still be possible after the proposal has enough yes votes to be resolved early. This would only
+        // lead to possible proposal resolution failure if the resolve early threshold is not definitive (e.g. < 50% + 1
+        // of the total voting token's supply). In this case, more voting might actually still be desirable.
+        // Governance mechanisms built on this voting module can apply additional rules on when voting is closed as
+        // appropriate.
+        assert!(!is_voting_period_over(proposal), error::invalid_state(EPROPOSAL_VOTING_ALREADY_ENDED));
+        assert!(!proposal.is_resolved, error::invalid_state(EPROPOSAL_ALREADY_RESOLVED));
+
         if (should_pass) {
             proposal.yes_votes = proposal.yes_votes + (num_votes as u128);
         } else {
@@ -253,11 +268,11 @@ module aptos_framework::voting {
         proposal_id: u64,
     ): ProposalType acquires VotingForum {
         let proposal_state = get_proposal_state<ProposalType>(voting_forum_address, proposal_id);
-        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_argument(EPROPOSAL_CANNOT_BE_RESOLVED));
+        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_state(EPROPOSAL_CANNOT_BE_RESOLVED));
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
-        assert!(!proposal.is_resolved, error::invalid_argument(EPROPOSAL_ALREADY_RESOLVED));
+        assert!(!proposal.is_resolved, error::invalid_state(EPROPOSAL_ALREADY_RESOLVED));
 
         let resolved_early = can_be_resolved_early(proposal);
         proposal.is_resolved = true;
@@ -281,16 +296,10 @@ module aptos_framework::voting {
         option::extract(&mut proposal.execution_content)
     }
 
-    /// Return true if the voting on the given proposal has already concluded.
-    /// This would be the case if the proposal's expiration time has passed or if the early resolution threshold
-    /// (if specified) has been reached.
-    ///
-    /// @param voting_forum_address The address of the forum where the proposals are stored.
-    /// @param proposal_id The proposal id.
     public fun is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
-        can_be_resolved_early(proposal) || timestamp::now_seconds() >= proposal.expiration_secs
+        can_be_resolved_early(proposal) || is_voting_period_over(proposal)
     }
 
     /// Return true if the proposal has reached early resolution threshold (if specified).
@@ -359,11 +368,19 @@ module aptos_framework::voting {
         proposal.is_resolved
     }
 
+    /// Return true if the voting period of the given proposal has already ended.
+    fun is_voting_period_over<ProposalType: store>(proposal: &Proposal<ProposalType>): bool {
+        timestamp::now_seconds() >= proposal.expiration_secs
+    }
+
     #[test_only]
     use aptos_std::simple_map;
 
     #[test_only]
     struct TestProposal has store {}
+
+    #[test_only]
+    const VOTING_DURATION_SECS: u64 = 100000;
 
     #[test_only]
     public fun create_test_proposal(
@@ -384,7 +401,7 @@ module aptos_framework::voting {
             proposal,
             execution_hash,
             10,
-            100000,
+            timestamp::now_seconds() + VOTING_DURATION_SECS,
             early_resolution_threshold,
             simple_map::create<String, vector<u8>>(),
         );
@@ -431,7 +448,7 @@ module aptos_framework::voting {
         let TestProposal {} = proof;
 
         // Resolve.
-        timestamp::update_global_time_for_test(100001000000);
+        timestamp::fast_forward_seconds(VOTING_DURATION_SECS);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_SUCCEEDED, 1);
         let proposal = resolve<TestProposal>(governance_address, proposal_id);
         let voting_forum = borrow_global<VotingForum<TestProposal>>(governance_address);
@@ -441,7 +458,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x10003)]
+    #[expected_failure(abort_code = 0x30003)]
     public entry fun test_cannot_resolve_twice(aptos_framework: signer, governance: signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
@@ -458,7 +475,7 @@ module aptos_framework::voting {
         let TestProposal {} = proof;
 
         // Resolve.
-        timestamp::update_global_time_for_test(100001000000);
+        timestamp::fast_forward_seconds(VOTING_DURATION_SECS);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_SUCCEEDED, 1);
         let TestProposal {} = resolve<TestProposal>(governance_address, proposal_id);
 
@@ -493,7 +510,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 0x30002)]
     public entry fun test_voting_failed(aptos_framework: signer, governance: signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
@@ -510,14 +527,30 @@ module aptos_framework::voting {
         let TestProposal {} = proof;
 
         // Resolve.
-        timestamp::update_global_time_for_test(100001000000);
+        timestamp::fast_forward_seconds(VOTING_DURATION_SECS);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_FAILED, 1);
         let proposal = resolve<TestProposal>(governance_address, proposal_id);
         let TestProposal {} = proposal;
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 0x30005)]
+    public entry fun test_cannot_vote_after_voting_period_is_over(
+        aptos_framework: signer, governance: signer) acquires VotingForum {
+        account::create_account_for_test(@aptos_framework);
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        let governance_address = signer::address_of(&governance);
+        account::create_account_for_test(governance_address);
+        let proposal_id = create_test_proposal(&governance, option::none<u128>());
+        // Voting period is over. Voting should now fail.
+        timestamp::fast_forward_seconds(VOTING_DURATION_SECS);
+        let proof = TestProposal {};
+        vote<TestProposal>(&proof, governance_address, proposal_id, 10, true);
+        let TestProposal {} = proof;
+    }
+
+    #[test(aptos_framework = @aptos_framework, governance = @0x123)]
+    #[expected_failure(abort_code = 0x30002)]
     public entry fun test_voting_failed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
@@ -534,7 +567,7 @@ module aptos_framework::voting {
         let TestProposal {} = proof;
 
         // Resolve.
-        timestamp::update_global_time_for_test(100001000000);
+        timestamp::fast_forward_seconds(VOTING_DURATION_SECS);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_FAILED, 1);
         let proposal = resolve<TestProposal>(governance_address, proposal_id);
         let TestProposal {} = proposal;

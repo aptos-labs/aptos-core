@@ -30,10 +30,10 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - main
       - auto
       - canary
+      - chaotic
       - devnet
       - testnet
-      - testnet-stable
-      - chaotic
+      - mainnet
 
 # cancel redundant builds
 concurrency:
