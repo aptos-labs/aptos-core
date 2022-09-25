@@ -883,7 +883,7 @@ async fn parse_coinstore_changes(
 
     // Retrieve the coin type
     let currency = coin_cache
-        .get_currency(coin_type.clone(), Some(version))
+        .get_currency(&coin_type, Some(version))
         .await
         .map_err(|err| {
             ApiError::CoinTypeFailedToBeFetched(Some(format!(

@@ -4,7 +4,7 @@
 use crate::{account_address::AccountAddress, event::EventHandle};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct StakePool {
     pub active: u64,
     pub inactive: u64,

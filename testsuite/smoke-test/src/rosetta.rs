@@ -12,7 +12,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
 use aptos_crypto::{HashValue, PrivateKey};
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_rest_client::aptos_api_types::{TransactionOnChainData, UserTransaction};
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{Response, Transaction};
 use aptos_rosetta::common::BlockHash;
 use aptos_rosetta::types::{
     AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
@@ -28,12 +28,13 @@ use aptos_rosetta::{
     ROSETTA_VERSION,
 };
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_sdk::types::LocalAccount;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::on_chain_config::GasScheduleV2;
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cached_packages::aptos_stdlib;
-use forge::{LocalSwarm, Node, NodeExt, Swarm};
+use forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -143,9 +144,14 @@ async fn test_block_transactions() {
     let chain_id = swarm.chain_id();
 
     // At time 0, there should be 0 balance
-    let response = get_balance(&rosetta_client, chain_id, account_1, Some(0))
-        .await
-        .unwrap();
+    let response = get_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::base_account(account_1),
+        Some(0),
+    )
+    .await
+    .unwrap();
     assert_eq!(
         response.block_identifier,
         BlockIdentifier {
@@ -243,16 +249,41 @@ async fn test_network() {
 
 #[tokio::test]
 async fn test_account_balance() {
-    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
+    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 3).await;
 
     let account_1 = cli.account_id(0);
     let account_2 = cli.account_id(1);
+    let account_3 = cli.account_id(2);
     let chain_id = swarm.chain_id();
+    let root_address = swarm.aptos_public_info().root_account().address();
+    let root_sequence_number = swarm
+        .aptos_public_info()
+        .client()
+        .get_account_bcs(root_address)
+        .await
+        .unwrap()
+        .into_inner()
+        .sequence_number();
+    *swarm
+        .aptos_public_info()
+        .root_account()
+        .sequence_number_mut() = root_sequence_number;
 
-    // At time 0, there should be 0 balance
-    let response = get_balance(&rosetta_client, chain_id, account_1, Some(0))
+    let mut account_4 = swarm
+        .aptos_public_info()
+        .create_and_fund_user_account(10_000_000)
         .await
         .unwrap();
+
+    // At time 0, there should be no balance
+    let response = get_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::base_account(account_1),
+        Some(0),
+    )
+    .await
+    .unwrap();
     assert_eq!(
         response.block_identifier,
         BlockIdentifier {
@@ -270,12 +301,24 @@ async fn test_account_balance() {
     let mut account_2_balance = DEFAULT_FUNDED_COINS;
     // At some time both accounts should exist with initial amounts
     try_until_ok(Duration::from_secs(5), DEFAULT_INTERVAL_DURATION, || {
-        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 0)
+        account_has_balance(
+            &rosetta_client,
+            chain_id,
+            AccountIdentifier::base_account(account_1),
+            account_1_balance,
+            0,
+        )
     })
     .await
     .unwrap();
     try_until_ok_default(|| {
-        account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance, 0)
+        account_has_balance(
+            &rosetta_client,
+            chain_id,
+            AccountIdentifier::base_account(account_2),
+            account_2_balance,
+            0,
+        )
     })
     .await
     .unwrap();
@@ -288,12 +331,24 @@ async fn test_account_balance() {
         .unwrap();
     account_1_balance -= TRANSFER_AMOUNT + response.gas_used * response.gas_unit_price;
     account_2_balance += TRANSFER_AMOUNT;
-    account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 1)
-        .await
-        .unwrap();
-    account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance, 0)
-        .await
-        .unwrap();
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::base_account(account_1),
+        account_1_balance,
+        1,
+    )
+    .await
+    .unwrap();
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::base_account(account_2),
+        account_2_balance,
+        0,
+    )
+    .await
+    .unwrap();
 
     // Failed transaction spends gas
     let _ = cli
@@ -319,31 +374,104 @@ async fn test_account_balance() {
     let failed_txn = txns.last().unwrap();
     if let Transaction::UserTransaction(txn) = failed_txn {
         account_1_balance -= txn.request.gas_unit_price.0 * txn.info.gas_used.0;
-        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 2)
-            .await
-            .unwrap();
+        account_has_balance(
+            &rosetta_client,
+            chain_id,
+            AccountIdentifier::base_account(account_1),
+            account_1_balance,
+            2,
+        )
+        .await
+        .unwrap();
     }
 
     // Check that the balance hasn't changed (and should be 0) in the invalid account
     account_has_balance(
         &rosetta_client,
         chain_id,
-        AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+        AccountIdentifier::base_account(AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap()),
         0,
         0,
     )
     .await
     .unwrap();
+
+    // Let's now check the staking balance with the original staking contract
+    cli.fund_account(2, Some(10_000_000)).await.unwrap();
+    cli.initialize_stake_owner(2, 1_000_000, None, None)
+        .await
+        .unwrap();
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::total_stake_account(account_3),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+
+    create_staking_contract(
+        &swarm.aptos_public_info(),
+        &mut account_4,
+        account_1,
+        account_2,
+        1_000_000,
+        10,
+    )
+    .await;
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::total_stake_account(account_4.address()),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::operator_stake_account(account_4.address(), account_1),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+}
+
+async fn create_staking_contract(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    voter: AccountAddress,
+    amount: u64,
+    commission_percentage: u64,
+) -> Response<Transaction> {
+    let staking_contract_creation = info
+        .transaction_factory()
+        .payload(aptos_stdlib::staking_contract_create_staking_contract(
+            operator,
+            voter,
+            amount,
+            commission_percentage,
+            vec![],
+        ))
+        .sequence_number(1);
+
+    let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap()
 }
 
 async fn account_has_balance(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
-    account: AccountAddress,
+    account_identifier: AccountIdentifier,
     expected_balance: u64,
     expected_sequence_number: u64,
 ) -> anyhow::Result<u64> {
-    let response = get_balance(rosetta_client, chain_id, account, None).await?;
+    let response = get_balance(rosetta_client, chain_id, account_identifier.clone(), None).await?;
     assert_eq!(
         expected_sequence_number,
         response.metadata.sequence_number.0
@@ -355,7 +483,8 @@ async fn account_has_balance(
         Ok(response.block_identifier.index)
     } else {
         Err(anyhow!(
-            "Failed to find account with {} {:?}, received {:?}",
+            "Failed to find account {:?} with {} {:?}, received {:?}",
+            account_identifier,
             expected_balance,
             native_coin(),
             response
@@ -366,12 +495,12 @@ async fn account_has_balance(
 async fn get_balance(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
-    account: AccountAddress,
+    account_identifier: AccountIdentifier,
     index: Option<u64>,
 ) -> anyhow::Result<AccountBalanceResponse> {
     let request = AccountBalanceRequest {
         network_identifier: chain_id.into(),
-        account_identifier: AccountIdentifier::base_account(account),
+        account_identifier,
         block_identifier: Some(PartialBlockIdentifier { index, hash: None }),
         currencies: Some(vec![native_coin()]),
     };
@@ -395,7 +524,6 @@ async fn test_transfer() {
         .coin
         .value
         .0;
-    println!("{}", sender_balance);
     let network = NetworkIdentifier::from(chain_id);
 
     // Wait until the Rosetta service is ready
