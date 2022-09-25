@@ -24,6 +24,7 @@ use aptos_types::stake_pool::StakePool;
 use once_cell::sync::Lazy;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::collections::BTreeMap;
+use std::str::FromStr;
 use std::{
     collections::HashSet,
     sync::{Arc, RwLock},
@@ -139,27 +140,10 @@ async fn get_balances(
                     }
                 }
                 (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE) => {
-                    if account.is_base_account() {
-                        continue;
-                    }
-
                     let stake_pool: StakePool = bcs::from_bytes(&bytes)?;
-                    // If the operator address is different, skip
-                    if account.is_operator_stake()
-                        && account.operator_address()? != stake_pool.operator_address
-                    {
-                        continue;
+                    if let Ok(balance) = get_stake_balance_from_stake_pool(&stake_pool, &account) {
+                        balances.push(balance);
                     }
-
-                    // TODO: Represent inactive, and pending as separate?
-                    let balance = stake_pool.active
-                        + stake_pool.inactive
-                        + stake_pool.pending_active
-                        + stake_pool.pending_inactive;
-                    balances.push(Amount {
-                        value: balance.to_string(),
-                        currency: native_coin(),
-                    })
                 }
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE) => {
                     if account.is_base_account() {
@@ -171,8 +155,25 @@ async fn get_balances(
                         // For total stake, collect all underlying staking contracts and combine
                         let mut total_stake: Option<u64> = None;
                         for (_operator, contract) in store.staking_contracts {
-                            total_stake =
-                                Some(total_stake.unwrap_or_default() + contract.principal);
+                            if let Ok(response) = rest_client
+                                .get_account_resource_bcs::<StakePool>(
+                                    contract.pool_address,
+                                    "0x1::stake::StakePool",
+                                )
+                                .await
+                            {
+                                let stake_pool = response.into_inner();
+
+                                // Any stake pools that match, retrieve that.  Then update the total
+                                if let Ok(balance) =
+                                    get_stake_balance_from_stake_pool(&stake_pool, &account)
+                                {
+                                    total_stake = Some(
+                                        total_stake.unwrap_or_default()
+                                            + u64::from_str(&balance.value).unwrap_or_default(),
+                                    );
+                                }
+                            }
                         }
 
                         if let Some(balance) = total_stake {
@@ -185,10 +186,22 @@ async fn get_balances(
                         // For operator stake, filter on operator address
                         let operator_address = account.operator_address()?;
                         if let Some(contract) = store.staking_contracts.get(&operator_address) {
-                            balances.push(Amount {
-                                value: contract.principal.to_string(),
-                                currency: native_coin(),
-                            })
+                            if let Ok(response) = rest_client
+                                .get_account_resource_bcs::<StakePool>(
+                                    contract.pool_address,
+                                    "0x1::stake::StakePool",
+                                )
+                                .await
+                            {
+                                let stake_pool = response.into_inner();
+
+                                // Any stake pools that match, retrieve that.  Then update the total
+                                if let Ok(balance) =
+                                    get_stake_balance_from_stake_pool(&stake_pool, &account)
+                                {
+                                    balances.push(balance)
+                                }
+                            }
                         }
                     }
                 }
@@ -236,6 +249,36 @@ async fn get_balances(
             }],
         ))
     }
+}
+
+/// Retrieves total stake balances from an individual stake pool
+fn get_stake_balance_from_stake_pool(
+    stake_pool: &StakePool,
+    account: &AccountIdentifier,
+) -> ApiResult<Amount> {
+    // Stake isn't allowed for base accounts
+    if account.is_base_account() {
+        return Err(ApiError::InvalidInput(Some(
+            "Stake pool not supported for base account".to_string(),
+        )));
+    }
+
+    // If the operator address is different, skip
+    if account.is_operator_stake() && account.operator_address()? != stake_pool.operator_address {
+        return Err(ApiError::InvalidInput(Some(
+            "Stake pool not for matching operator".to_string(),
+        )));
+    }
+
+    // TODO: Represent inactive, and pending as separate?
+    let balance = stake_pool.active
+        + stake_pool.inactive
+        + stake_pool.pending_active
+        + stake_pool.pending_inactive;
+    Ok(Amount {
+        value: balance.to_string(),
+        currency: native_coin(),
+    })
 }
 
 /// Only coins supported by Rosetta
