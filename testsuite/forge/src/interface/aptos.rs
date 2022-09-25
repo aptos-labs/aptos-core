@@ -139,7 +139,7 @@ impl<'t> AptosPublicInfo<'t> {
     }
 
     pub fn root_account(&mut self) -> &mut LocalAccount {
-        &mut self.root_account
+        self.root_account
     }
 
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
