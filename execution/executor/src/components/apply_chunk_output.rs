@@ -143,6 +143,10 @@ impl ApplyChunkOutput {
         state_updates_vec: Vec<HashMap<StateKey, Option<StateValue>>>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
     ) -> (Vec<(Transaction, TransactionData)>, Vec<HashValue>) {
+        // these are guaranteed by caller side logic
+        assert_eq!(to_keep.len(), state_updates_vec.len());
+        assert_eq!(to_keep.len(), state_checkpoint_hashes.len());
+
         let mut to_commit = vec![];
         let mut txn_info_hashes = vec![];
         for (((txn, txn_output), state_checkpoint_hash), state_updates) in itertools::zip_eq(
