@@ -27,3 +27,6 @@ once_cell = "1.13.0"
 rand = "0.7.3"
 tokio = { version = "1.21.0", features = ["macros", "rt-multi-thread"] }
 url = "2.2.2"
+
+[features]
+cloneable-private-keys = ["aptos-crypto/cloneable-private-keys"]
