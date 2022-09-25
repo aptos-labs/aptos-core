@@ -896,6 +896,35 @@ pub struct ArgWithType {
     pub(crate) arg: Vec<u8>,
 }
 
+impl ArgWithType {
+    pub fn address(account_address: AccountAddress) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Address,
+            arg: bcs::to_bytes(&account_address).unwrap(),
+        }
+    }
+
+    pub fn u64(arg: u64) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::U64,
+            arg: bcs::to_bytes(&arg).unwrap(),
+        }
+    }
+
+    pub fn bytes(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Raw,
+            arg: bcs::to_bytes(&arg).unwrap(),
+        }
+    }
+    pub fn raw(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Raw,
+            arg,
+        }
+    }
+}
+
 impl FromStr for ArgWithType {
     type Err = CliError;
 

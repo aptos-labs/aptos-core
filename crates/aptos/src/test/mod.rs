@@ -528,6 +528,31 @@ impl CliTestFramework {
         .await
     }
 
+    pub async fn create_stake_pool(
+        &self,
+        owner_index: usize,
+        operator_index: usize,
+        voter_index: usize,
+        amount: u64,
+        commission_percentage: u64,
+    ) -> CliTypedResult<TransactionSummary> {
+        RunFunction {
+            function_id: MemberId::from_str("0x1::staking_contract::create_staking_contract")
+                .unwrap(),
+            args: vec![
+                ArgWithType::address(self.account_id(operator_index)),
+                ArgWithType::address(self.account_id(voter_index)),
+                ArgWithType::u64(amount),
+                ArgWithType::u64(commission_percentage),
+                ArgWithType::bytes(vec![]),
+            ],
+            type_args: vec![],
+            txn_options: self.transaction_options(owner_index, None),
+        }
+        .execute()
+        .await
+    }
+
     pub async fn set_operator(
         &self,
         owner_index: usize,

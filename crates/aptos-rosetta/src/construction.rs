@@ -483,7 +483,7 @@ async fn construction_parse(
                     STAKING_CONTRACT_MODULE,
                     SWITCH_OPERATOR_WITH_SAME_COMMISSION,
                 ) => parse_set_operator_operation(sender, &type_args, &args)?,
-                (AccountAddress::ONE, STAKE_MODULE, UPDATE_VOTER) => {
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
                 }
                 _ => {
