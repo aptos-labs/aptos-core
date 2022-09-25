@@ -5,11 +5,7 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
-use crate::types::{
-    ACCOUNT_MODULE, ACCOUNT_RESOURCE, APTOS_ACCOUNT_MODULE, COIN_MODULE, COIN_STORE_RESOURCE,
-    CREATE_ACCOUNT_FUNCTION, SET_OPERATOR_FUNCTION, SET_VOTER_FUNCTION, STAKE_MODULE,
-    STAKE_POOL_RESOURCE, TRANSFER_FUNCTION,
-};
+use crate::types::move_types::*;
 use crate::{
     common::{is_native_coin, native_coin},
     error::ApiResult,
@@ -770,10 +766,10 @@ async fn parse_operations_from_write_set(
         struct_tag.type_params.len(),
     ) {
         (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE, 0) => {
-            parse_account_changes(version, address, data, maybe_sender, operation_index)
+            parse_account_resource_changes(version, address, data, maybe_sender, operation_index)
         }
         (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE, 0) => {
-            parse_stakepool_changes(version, address, data, events, operation_index)
+            parse_stake_pool_resource_changes(version, address, data, events, operation_index)
         }
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
@@ -802,7 +798,7 @@ async fn parse_operations_from_write_set(
     }
 }
 
-fn parse_account_changes(
+fn parse_account_resource_changes(
     version: u64,
     address: AccountAddress,
     data: &[u8],
@@ -832,7 +828,7 @@ fn parse_account_changes(
     Ok(operations)
 }
 
-fn parse_stakepool_changes(
+fn parse_stake_pool_resource_changes(
     version: u64,
     address: AccountAddress,
     data: &[u8],
