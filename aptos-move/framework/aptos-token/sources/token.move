@@ -417,7 +417,7 @@ module aptos_token::token {
         property_map::update_property_map(&mut token_data.default_properties, keys, values, types);
     }
 
-    public fun  mutate_one_token(
+    public fun mutate_one_token(
         account: &signer,
         token_owner: address,
         token_id: TokenId,
@@ -1126,7 +1126,7 @@ module aptos_token::token {
         let token_store = borrow_global_mut<TokenStore>(owner);
         event::emit_event<BurnTokenEvent>(
             &mut token_store.burn_events,
-            BurnTokenEvent { id: token_id, amount: burned_amount},
+            BurnTokenEvent { id: token_id, amount: burned_amount },
         );
 
         if (token_data.maximum > 0) {
@@ -1134,7 +1134,7 @@ module aptos_token::token {
 
             // Delete the token_data if supply drops to 0.
             if (token_data.supply == 0) {
-                let TokenData{
+                let TokenData {
                     maximum: _,
                     largest_property_version: _,
                     supply: _,
@@ -1179,7 +1179,7 @@ module aptos_token::token {
         );
 
         assert!(
-            property_map::contains_key(&token_data.default_properties,  &string::utf8(BURNABLE_BY_OWNER)),
+            property_map::contains_key(&token_data.default_properties, &string::utf8(BURNABLE_BY_OWNER)),
             error::permission_denied(EOWNER_CANNOT_BURN_TOKEN)
         );
         let burn_by_owner_flag = property_map::read_bool(&token_data.default_properties, &string::utf8(BURNABLE_BY_OWNER));
@@ -1448,7 +1448,6 @@ module aptos_token::token {
             vector<bool>[false, false, false, false, false],
         );
         assert!(balance_of(signer::address_of(&owner), token_id) == 0, 1);
-        account::create_account_for_test(signer::address_of(&owner));
 
         direct_transfer(&creator, &owner, token_id, 1);
         let token = withdraw_token(&owner, token_id, 1);
@@ -1492,9 +1491,9 @@ module aptos_token::token {
             mutate_setting
         );
 
-        let default_keys = if(vector::length<String>(&property_keys) == 0) {vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")]} else {property_keys};
-        let default_vals = if (vector::length<vector<u8>>(&property_values) == 0) {vector<vector<u8>>[bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5)] } else {property_values};
-        let default_types = if (vector::length<String>(&property_types) == 0) {vector<String>[string::utf8(b"u64"), string::utf8(b"u64")] } else {property_types};
+        let default_keys = if (vector::length<String>(&property_keys) == 0) { vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")] } else { property_keys };
+        let default_vals = if (vector::length<vector<u8>>(&property_values) == 0) { vector<vector<u8>>[bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5)] } else { property_values };
+        let default_types = if (vector::length<String>(&property_types) == 0) { vector<String>[string::utf8(b"u64"), string::utf8(b"u64")] } else { property_types };
         let mutate_setting = token_mutate_setting;
         create_token_script(
             creator,
@@ -1833,7 +1832,6 @@ module aptos_token::token {
             vector<String>[],
             vector<bool>[false, false, false],
             vector<bool>[false, false, false, false, false],
-
         );
         let owner_addr = signer::address_of(owner);
         opt_in_direct_transfer(owner, true);
@@ -1905,11 +1903,10 @@ module aptos_token::token {
         opt_in_direct_transfer(owner, true);
         initialize_token_store(owner);
         transfer(creator, token_id, signer::address_of(owner), 2);
-        burn_by_creator(creator, signer::address_of(owner), get_collection_name(), get_token_name(), 0,1);
-
+        burn_by_creator(creator, signer::address_of(owner), get_collection_name(), get_token_name(), 0, 1);
     }
 
-    #[test(creator=@0xcafe, owner=@0x456)]
+    #[test(creator = @0xcafe, owner = @0x456)]
     #[expected_failure(abort_code = 327710)]
     fun test_burn_token_by_owner_without_burnable_config(
         creator: &signer,
@@ -1933,10 +1930,10 @@ module aptos_token::token {
         initialize_token_store(owner);
         transfer(creator, token_id, signer::address_of(owner), 2);
 
-        burn(owner, signer::address_of(creator), get_collection_name(), get_token_name(), 0,1);
+        burn(owner, signer::address_of(creator), get_collection_name(), get_token_name(), 0, 1);
     }
 
-    #[test(creator=@0xcafe, owner=@0x456)]
+    #[test(creator = @0xcafe, owner = @0x456)]
     fun test_burn_token_by_owner_and_creator(
         creator: &signer,
         owner: &signer,
@@ -1950,7 +1947,7 @@ module aptos_token::token {
             4,
             4,
             vector<String>[string::utf8(BURNABLE_BY_CREATOR), string::utf8(BURNABLE_BY_OWNER)],
-            vector<vector<u8>>[bcs::to_bytes<bool>(&true),  bcs::to_bytes<bool>(&true)],
+            vector<vector<u8>>[bcs::to_bytes<bool>(&true), bcs::to_bytes<bool>(&true)],
             vector<String>[string::utf8(b"bool"), string::utf8(b"bool")],
             vector<bool>[false, false, false],
             vector<bool>[false, false, false, false, false],
@@ -1959,11 +1956,11 @@ module aptos_token::token {
         initialize_token_store(owner);
         transfer(creator, token_id, signer::address_of(owner), 2);
         burn_by_creator(creator, signer::address_of(owner), get_collection_name(), get_token_name(), 0, 1);
-        burn(owner, signer::address_of(creator), get_collection_name(), get_token_name(), 0,1);
+        burn(owner, signer::address_of(creator), get_collection_name(), get_token_name(), 0, 1);
         assert!(balance_of(signer::address_of(owner), token_id) == 0, 1);
     }
 
-    #[test(creator=@0xcafe, owner=@0x456)]
+    #[test(creator = @0xcafe, owner = @0x456)]
     fun test_mutate_default_token_properties(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2002,12 +1999,12 @@ module aptos_token::token {
         );
 
         let all_token_data = &borrow_global<Collections>(signer::address_of(creator)).token_data;
-        assert!(table::contains(all_token_data,  token_id.token_data_id), 1);
+        assert!(table::contains(all_token_data, token_id.token_data_id), 1);
         let props = &table::borrow(all_token_data, token_id.token_data_id).default_properties;
         assert!(property_map::read_u64(props, &string::utf8(b"attack")) == 1, 1);
     }
 
-    #[test(creator=@0xcafe)]
+    #[test(creator = @0xcafe)]
     fun test_mutate_token_uri(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2025,7 +2022,6 @@ module aptos_token::token {
             vector<bool>[false, true, false, false, false],
         );
         mutate_tokendata_uri(creator, token_id.token_data_id, string::utf8(b"new_url"));
-        assert!(get_tokendata_uri(signer::address_of(creator),  token_id.token_data_id) == string::utf8(b"new_url"), 1);
+        assert!(get_tokendata_uri(signer::address_of(creator), token_id.token_data_id) == string::utf8(b"new_url"), 1);
     }
-
 }
