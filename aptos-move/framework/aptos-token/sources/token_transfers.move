@@ -102,7 +102,7 @@ module aptos_token::token_transfers {
         event::emit_event<TokenOfferEvent>(
             &mut borrow_global_mut<PendingClaims>(sender_addr).offer_events,
             TokenOfferEvent {
-                to_address: sender_addr,
+                to_address: receiver,
                 token_id,
                 amount,
             },
@@ -173,7 +173,7 @@ module aptos_token::token_transfers {
         event::emit_event<TokenCancelOfferEvent>(
             &mut borrow_global_mut<PendingClaims>(sender_addr).cancel_offer_events,
             TokenCancelOfferEvent {
-                to_address: sender_addr,
+                to_address: receiver,
                 token_id,
                 amount,
             },

@@ -163,7 +163,8 @@ module aptos_token::property_map {
         simple_map::remove(&mut map.map, key)
     }
 
-    /// update the property in the existing property map
+    /// Update the property in the existing property map
+    /// Allow updating existing keys' value and add new key-value pairs
     public fun update_property_map(
         map: &mut PropertyMap,
         keys: vector<String>,
@@ -182,7 +183,11 @@ module aptos_token::property_map {
                 value: *vector::borrow( &values, i),
                 type: *vector::borrow(&types, i),
             };
-            update_property_value(map, vector::borrow(&keys, i), prop_val);
+            if (contains_key(map, vector::borrow(&keys, i))){
+                update_property_value(map, vector::borrow(&keys, i), prop_val);
+            } else {
+                add(map, *vector::borrow(&keys, i), prop_val);
+            };
             i = i + 1;
         }
     }

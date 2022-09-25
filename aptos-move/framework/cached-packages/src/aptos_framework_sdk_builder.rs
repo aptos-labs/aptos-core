@@ -440,6 +440,11 @@ pub enum EntryFunctionCall {
         commission_percentage: u64,
     },
 
+    VestingUpdateOperatorWithSameCommission {
+        contract_address: AccountAddress,
+        new_operator: AccountAddress,
+    },
+
     VestingUpdateVoter {
         contract_address: AccountAddress,
         new_voter: AccountAddress,
@@ -701,6 +706,10 @@ impl EntryFunctionCall {
                 new_operator,
                 commission_percentage,
             } => vesting_update_operator(contract_address, new_operator, commission_percentage),
+            VestingUpdateOperatorWithSameCommission {
+                contract_address,
+                new_operator,
+            } => vesting_update_operator_with_same_commission(contract_address, new_operator),
             VestingUpdateVoter {
                 contract_address,
                 new_voter,
@@ -2013,6 +2022,27 @@ pub fn vesting_update_operator(
     ))
 }
 
+pub fn vesting_update_operator_with_same_commission(
+    contract_address: AccountAddress,
+    new_operator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("update_operator_with_same_commission").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&new_operator).unwrap(),
+        ],
+    ))
+}
+
 pub fn vesting_update_voter(
     contract_address: AccountAddress,
     new_voter: AccountAddress,
@@ -2804,6 +2834,19 @@ mod decoder {
         }
     }
 
+    pub fn vesting_update_operator_with_same_commission(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingUpdateOperatorWithSameCommission {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_update_voter(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUpdateVoter {
@@ -3086,6 +3129,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_update_operator".to_string(),
             Box::new(decoder::vesting_update_operator),
+        );
+        map.insert(
+            "vesting_update_operator_with_same_commission".to_string(),
+            Box::new(decoder::vesting_update_operator_with_same_commission),
         );
         map.insert(
             "vesting_update_voter".to_string(),

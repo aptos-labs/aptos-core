@@ -78,7 +78,7 @@ At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88
 
 ### Account identifiers
 
-Currently, Aptos only supports a single, unified identifier for an account. Accounts on Aptos are universally represented as a 32-byte hex string. A hex string shorter than 32-bytes should is also valid, in those scenarios, the hex string is padded with leading zeroes, e.g., `0x1` => `0x0000000000000...01`.
+Currently, Aptos only supports a single, unified identifier for an account. Accounts on Aptos are universally represented as a 32-byte hex string. A hex string shorter than 32-bytes is also valid: in those scenarios, the hex string is padded with leading zeroes, e.g., `0x1` => `0x0000000000000...01`.
 
 ### Creating an account address
 

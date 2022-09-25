@@ -342,8 +342,8 @@ async fn fn_to_val_test() {
 
         // NOTE: Always return node at end, or it will be dropped and channels closed
         let pfn_future = async move {
-            pfn.connect(pfn_vfn_network, vfn_metadata);
             pfn.add_txns_via_client(ALL_TXNS).await;
+            pfn.connect(pfn_vfn_network, vfn_metadata);
 
             // Forward to VFN
             pfn.send_next_network_msg(pfn_vfn_network).await;

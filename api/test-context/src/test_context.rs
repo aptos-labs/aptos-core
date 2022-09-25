@@ -213,6 +213,14 @@ impl TestContext {
         self.golden_output.as_ref().unwrap().log(&msg);
     }
 
+    pub fn last_updated_gas_schedule(&self) -> Option<u64> {
+        self.context.last_updated_gas_schedule()
+    }
+
+    pub fn last_updated_gas_estimation(&self) -> Option<u64> {
+        self.context.last_updated_gas_estimation()
+    }
+
     /// Prune well-known excessively large entries from a resource array response.
     /// TODO: we can't dump all resources of an account as golden output. As functionality
     /// grows this becomes too much. Need a way to filter only the resources which folks want.

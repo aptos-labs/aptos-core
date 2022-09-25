@@ -24,7 +24,17 @@ spec:
     - name: FORGE_TRIGGERED_BY
       value: github-actions
     - name: PROMETHEUS_URL
-      value: http://aptos-node-mon-aptos-monitoring-prometheus.default.svc:9090
+      valueFrom:
+        secretKeyRef:
+          name: prometheus-read-only
+          key: url
+          optional: true
+    - name: PROMETHEUS_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: prometheus-read-only
+          key: token
+          optional: true
     # - name: RUST_LOG
     #   value: debug
   affinity:
@@ -47,4 +57,3 @@ spec:
   - effect: NoExecute
     key: aptos.org/nodepool
     value: validators
-  

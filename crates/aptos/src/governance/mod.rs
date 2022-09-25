@@ -392,8 +392,12 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
 #[derive(Parser)]
 pub struct CompileScriptFunction {
     /// Path to the Move script for the proposal
-    #[clap(long, parse(from_os_str))]
-    pub script_path: PathBuf,
+    #[clap(long, group = "script", parse(from_os_str))]
+    pub script_path: Option<PathBuf>,
+
+    /// Path to the Move script for the proposal
+    #[clap(long, group = "script", parse(from_os_str))]
+    pub compiled_script_path: Option<PathBuf>,
 
     #[clap(flatten)]
     pub(crate) framework_package_args: FrameworkPackageArgs,
@@ -405,14 +409,30 @@ impl CompileScriptFunction {
         script_name: &str,
         prompt_options: PromptOptions,
     ) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        if let Some(compiled_script_path) = &self.compiled_script_path {
+            let bytes = std::fs::read(compiled_script_path).map_err(|e| {
+                CliError::IO(format!("Unable to read {:?}", self.compiled_script_path), e)
+            })?;
+            let hash = HashValue::sha3_256_of(bytes.as_slice());
+            return Ok((bytes, hash));
+        }
+
         // Check script file
-        let script_path = self.script_path.as_path();
-        if !self.script_path.exists() {
+        let script_path = self
+            .script_path
+            .as_ref()
+            .ok_or_else(|| {
+                CliError::CommandArgumentError(
+                    "Must choose either --compiled-script-path or --script-path".to_string(),
+                )
+            })?
+            .as_path();
+        if !script_path.exists() {
             return Err(CliError::CommandArgumentError(format!(
                 "{} does not exist",
                 script_path.display()
             )));
-        } else if self.script_path.is_dir() {
+        } else if script_path.is_dir() {
             return Err(CliError::CommandArgumentError(format!(
                 "{} is a directory",
                 script_path.display()
