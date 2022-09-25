@@ -33,7 +33,7 @@ pub struct AccountIdentifier {
 impl AccountIdentifier {
     /// Convert [`AccountIdentifier`] to an [`AccountAddress`]
     pub fn account_address(&self) -> ApiResult<AccountAddress> {
-        self.try_into()
+        str_to_account_address(self.address.as_str())
     }
 
     pub fn base_account(address: AccountAddress) -> Self {
@@ -87,14 +87,6 @@ impl AccountIdentifier {
                 "Can't get operator address of a non-operator stake account".to_string(),
             )))
         }
-    }
-}
-
-impl TryFrom<&AccountIdentifier> for AccountAddress {
-    type Error = ApiError;
-
-    fn try_from(account: &AccountIdentifier) -> Result<Self, Self::Error> {
-        str_to_account_address(account.address.as_str())
     }
 }
 
