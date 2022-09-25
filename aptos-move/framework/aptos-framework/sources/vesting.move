@@ -397,7 +397,6 @@ module aptos_framework::vesting {
             staking: StakingInfo { pool_address, operator, voter, commission_percentage },
             remaining_grant: grant_amount,
             signer_cap: contract_signer_cap,
-
             update_operator_events: new_event_handle<UpdateOperatorEvent>(&contract_signer),
             update_voter_events: new_event_handle<UpdateVoterEvent>(&contract_signer),
             reset_lockup_events: new_event_handle<ResetLockupEvent>(&contract_signer),
@@ -703,7 +702,7 @@ module aptos_framework::vesting {
         let addr = signer::address_of(account);
         assert!(
             addr == vesting_contract.admin ||
-            addr == get_role_holder(contract_address, utf8(ROLE_BENEFICIARY_RESETTER)),
+                addr == get_role_holder(contract_address, utf8(ROLE_BENEFICIARY_RESETTER)),
             error::permission_denied(EPERMISSION_DENIED),
         );
 
@@ -874,7 +873,6 @@ module aptos_framework::vesting {
         withdrawal_address: address,
         commission_percentage: u64,
     ): address acquires AdminStore {
-
         let vesting_schedule = create_vesting_schedule(
             vector[
                 fixed_point32::create_from_rational(3, 48),
@@ -1135,7 +1133,7 @@ module aptos_framework::vesting {
         let shareholder_address = signer::address_of(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
-            admin,&vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
+            admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);

@@ -203,7 +203,6 @@ module aptos_framework::resource_account {
 
     #[test(framework = @0x1, user = @0x1234)]
     public entry fun with_coin(framework: signer, user: signer) acquires Container {
-
         let user_addr = signer::address_of(&user);
         aptos_framework::aptos_account::create_account(copy user_addr);
 
