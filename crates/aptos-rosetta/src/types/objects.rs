@@ -272,7 +272,8 @@ impl Operation {
         operation_index: u64,
         status: Option<OperationStatusType>,
         owner: AccountAddress,
-        new_operator: AccountAddress,
+        old_operator: AccountIdentifier,
+        new_operator: AccountIdentifier,
     ) -> Operation {
         Operation::new(
             OperationType::SetOperator,
@@ -280,7 +281,7 @@ impl Operation {
             status,
             AccountIdentifier::base_account(owner),
             None,
-            Some(OperationMetadata::set_operator(new_operator)),
+            Some(OperationMetadata::set_operator(old_operator, new_operator)),
         )
     }
 
@@ -288,7 +289,8 @@ impl Operation {
         operation_index: u64,
         status: Option<OperationStatusType>,
         owner: AccountAddress,
-        new_voter: AccountAddress,
+        operator: AccountIdentifier,
+        new_voter: AccountIdentifier,
     ) -> Operation {
         Operation::new(
             OperationType::SetVoter,
@@ -296,7 +298,7 @@ impl Operation {
             status,
             AccountIdentifier::base_account(owner),
             None,
-            Some(OperationMetadata::set_voter(new_voter)),
+            Some(OperationMetadata::set_voter(operator, new_voter)),
         )
     }
 }
@@ -336,6 +338,10 @@ pub struct OperationMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sender: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub operator: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub old_operator: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub new_operator: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_voter: Option<AccountIdentifier>,
@@ -349,17 +355,18 @@ impl OperationMetadata {
         }
     }
 
-    pub fn set_operator(new_operator: AccountAddress) -> Self {
-        // FIXME: move to subaccount usage
+    pub fn set_operator(old_operator: AccountIdentifier, new_operator: AccountIdentifier) -> Self {
         OperationMetadata {
-            new_operator: Some(AccountIdentifier::base_account(new_operator)),
+            old_operator: Some(old_operator),
+            new_operator: Some(new_operator),
             ..Default::default()
         }
     }
 
-    pub fn set_voter(new_voter: AccountAddress) -> Self {
+    pub fn set_voter(operator: AccountIdentifier, new_voter: AccountIdentifier) -> Self {
         OperationMetadata {
-            new_voter: Some(AccountIdentifier::base_account(new_voter)),
+            operator: Some(operator),
+            new_voter: Some(new_voter),
             ..Default::default()
         }
     }
@@ -623,7 +630,8 @@ fn parse_failed_operations_from_txn_payload(
                         operation_index,
                         Some(OperationStatusType::Failure),
                         sender,
-                        new_operator,
+                        AccountIdentifier::unknown(),
+                        AccountIdentifier::base_account(new_operator),
                     ));
                 } else {
                     warn!("Failed to parse set operator {:?}", inner);
@@ -639,7 +647,8 @@ fn parse_failed_operations_from_txn_payload(
                         operation_index,
                         Some(OperationStatusType::Failure),
                         sender,
-                        new_voter,
+                        AccountIdentifier::unknown(),
+                        AccountIdentifier::base_account(new_voter),
                     ));
                 } else {
                     warn!("Failed to parse set voter {:?}", inner);
@@ -971,12 +980,12 @@ fn parse_stake_pool_resource_changes(
             // We do this after balance transfers so the balance changes are easier
             let final_staked_amount = stakepool.get_total_staked_amount();
             for event in set_operator_events {
-                // FIXME: add old operator as well to set operator
                 operations.push(Operation::set_operator(
                     operation_index,
                     Some(OperationStatusType::Success),
                     *owner_address,
-                    event.new_operator,
+                    AccountIdentifier::base_account(event.old_operator),
+                    AccountIdentifier::base_account(event.new_operator),
                 ));
                 operation_index += 1;
 

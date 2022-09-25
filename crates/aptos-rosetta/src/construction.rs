@@ -592,7 +592,13 @@ fn parse_set_operator_operation(
     if let Some(encoded_new_operator) = args.first() {
         let new_operator: AccountAddress = bcs::from_bytes(encoded_new_operator)?;
 
-        Ok(vec![Operation::set_operator(0, None, sender, new_operator)])
+        Ok(vec![Operation::set_operator(
+            0,
+            None,
+            sender,
+            AccountIdentifier::unknown(),
+            AccountIdentifier::base_account(new_operator),
+        )])
     } else {
         Err(ApiError::InvalidOperations(Some(
             "Set operator doesn't have a operator argument".to_string(),
@@ -615,7 +621,13 @@ fn parse_set_voter_operation(
     if let Some(new_voter) = args.first() {
         let new_voter: AccountAddress = bcs::from_bytes(new_voter)?;
 
-        Ok(vec![Operation::set_voter(0, None, sender, new_voter)])
+        Ok(vec![Operation::set_voter(
+            0,
+            None,
+            sender,
+            AccountIdentifier::unknown(),
+            AccountIdentifier::base_account(new_voter),
+        )])
     } else {
         Err(ApiError::InvalidOperations(Some(
             "Set voter doesn't have a voter argument".to_string(),
