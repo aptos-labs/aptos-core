@@ -1245,6 +1245,45 @@ async fn parse_operations(
                     );
                 }
             }
+            OperationType::StakingReward => {
+                let account = operation
+                    .account
+                    .as_ref()
+                    .expect("There should be an account in a stake reward operation")
+                    .account_address()
+                    .expect("Account address should be parsable");
+
+                if actual_successful {
+                    assert_eq!(OperationStatusType::Success, status);
+                    let account_balances = balances.entry(account).or_insert_with(|| {
+                        let mut map = BTreeMap::new();
+                        map.insert(block_height, 0);
+                        map
+                    });
+                    let (_, latest_balance) = account_balances.iter().last().unwrap();
+                    let amount = operation
+                        .amount
+                        .as_ref()
+                        .expect("Should have an amount in a stake reward operation");
+                    assert_eq!(
+                        amount.currency,
+                        native_coin(),
+                        "Balance should be the native coin"
+                    );
+                    let delta =
+                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+
+                    // Add with panic on overflow in case of too high of a balance
+                    let new_balance = *latest_balance + delta as i128;
+                    account_balances.insert(block_height, new_balance);
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed stake reward operation"
+                    );
+                }
+            }
             OperationType::SetOperator => {
                 if actual_successful {
                     assert_eq!(

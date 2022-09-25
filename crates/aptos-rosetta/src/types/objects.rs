@@ -209,6 +209,26 @@ impl Operation {
         )
     }
 
+    pub fn staking_reward(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        account: AccountIdentifier,
+        currency: Currency,
+        amount: u64,
+    ) -> Operation {
+        Operation::new(
+            OperationType::StakingReward,
+            operation_index,
+            status,
+            account,
+            Some(Amount {
+                value: amount.to_string(),
+                currency,
+            }),
+            None,
+        )
+    }
+
     pub fn deposit(
         operation_index: u64,
         status: Option<OperationStatusType>,
@@ -935,7 +955,7 @@ fn parse_stake_pool_resource_changes(
 
             // For every distribute rewards events, add to the staking pools
             for event in distribute_rewards_events {
-                operations.push(Operation::deposit(
+                operations.push(Operation::staking_reward(
                     operation_index,
                     Some(OperationStatusType::Success),
                     total_stake_account.clone(),
@@ -943,7 +963,7 @@ fn parse_stake_pool_resource_changes(
                     event.rewards_amount,
                 ));
                 operation_index += 1;
-                operations.push(Operation::deposit(
+                operations.push(Operation::staking_reward(
                     operation_index,
                     Some(OperationStatusType::Success),
                     operator_stake_account.clone(),
