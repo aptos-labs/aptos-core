@@ -4,8 +4,9 @@
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
 use cached_packages::aptos_stdlib;
-use framework::{BuildOptions, BuiltPackage};
+use framework::{natives::code::UpgradePolicy, BuildOptions, BuiltPackage};
 use move_deps::move_core_types::parser::parse_struct_tag;
+use package_builder::PackageBuilder;
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -59,10 +60,46 @@ fn resource_account_with_data() {
     let module_data =
         parse_struct_tag(&format!("0x{}::core::ModuleData", resource_address)).unwrap();
     let resource = h
-        .read_resource::<ModuleData>(&resource_address, module_data.clone())
+        .read_resource::<ModuleData>(&resource_address, module_data)
         .unwrap();
     assert_eq!(resource.u64_value, u64_value);
     assert_eq!(resource.u8_value, u8_value);
     assert_eq!(resource.address_value, *account.address());
     assert_eq!(resource.signer_cap, resource_address);
+}
+
+#[test]
+fn resource_account_with_code() {
+    let mut h = MoveHarness::new();
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let resource_address = aptos_types::account_address::create_resource_address(
+        *account.address(),
+        vec![].as_slice(),
+    );
+
+    let mut pack = PackageBuilder::new("Package1").with_policy(UpgradePolicy::compat());
+    let code = format!("module 0x{}::m {{ public fun f() {{}} }}", resource_address);
+    pack.add_source("m", &code);
+    let pack_dir = pack.write_to_temp().unwrap();
+    let package = framework::BuiltPackage::build(
+        pack_dir.path().to_owned(),
+        framework::BuildOptions::default(),
+    )
+    .expect("building package must succeed");
+
+    let code = package.extract_code();
+    let metadata = package
+        .extract_metadata()
+        .expect("extracting package metadata must succeed");
+    let bcs_metadata = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
+
+    let result = h.run_transaction_payload(
+        &account,
+        cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+            vec![],
+            bcs_metadata,
+            code,
+        ),
+    );
+    assert_success!(result);
 }
