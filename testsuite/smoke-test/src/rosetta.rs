@@ -53,6 +53,9 @@ pub async fn setup_test(
     num_accounts: usize,
 ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
     let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.epoch_duration_secs = 5;
+        }))
         .with_aptos()
         .build_with_cli(num_accounts)
         .await;
@@ -854,9 +857,9 @@ async fn test_block() {
 
     // Add a ton of coins, and set an operator
     cli.fund_account(3, Some(10_000_000)).await.unwrap();
-    cli.initialize_stake_owner(3, 1_000_000, None, None)
-        .await
-        .unwrap();
+    cli.create_stake_pool(3, 3, 1, 1_000_000, 0).await.unwrap();
+
+    // Set the operator
     set_operator_and_wait(
         &rosetta_client,
         &rest_client,
@@ -872,8 +875,21 @@ async fn test_block() {
     .await
     .expect("Set operator should work!");
 
-    // Also fail to set an operator
-    cli.set_operator(1, 3).await.unwrap_err();
+    // Also fail to set an operator (since the operator already changed)
+    set_operator_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_3,
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap_err();
 
     // Successfully, and fail setting a voter
     set_voter_and_wait(
@@ -889,8 +905,21 @@ async fn test_block() {
         None,
     )
     .await
-    .expect("Set operator should work!");
-    cli.set_delegated_voter(1, 3).await.unwrap_err();
+    .expect("Set voter should work!");
+    set_voter_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_3,
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect_err("Set voter shouldn't work with the wrong operator!");
 
     // This one will fail (and skip estimation of gas)
     let maybe_final_txn = transfer_and_wait(
