@@ -1,14 +1,15 @@
 [package]
 name = "aptos-telemetry-service"
 version = "0.1.0"
-edition = "2021"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Web service to receive telemetry from nodes and ingest it to backends"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Workspace inherited keys
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
 
 [dependencies]
 aptos-config = { path = "../../config" }
