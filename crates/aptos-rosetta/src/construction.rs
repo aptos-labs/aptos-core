@@ -50,6 +50,7 @@ use aptos_types::{
         authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
     },
 };
+use serde::de::DeserializeOwned;
 use std::convert::TryFrom;
 use std::time::{SystemTime, UNIX_EPOCH};
 use warp::Filter;
@@ -477,10 +478,12 @@ async fn construction_parse(
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
                 }
-                (AccountAddress::ONE, STAKE_MODULE, SET_OPERATOR_FUNCTION) => {
-                    parse_set_operator_operation(sender, &type_args, &args)?
-                }
-                (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) => {
+                (
+                    AccountAddress::ONE,
+                    STAKING_CONTRACT_MODULE,
+                    SWITCH_OPERATOR_WITH_SAME_COMMISSION,
+                ) => parse_set_operator_operation(sender, &type_args, &args)?,
+                (AccountAddress::ONE, STAKE_MODULE, UPDATE_VOTER) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
                 }
                 _ => {
@@ -642,7 +645,24 @@ fn parse_account_transfer_operation(
     Ok(operations)
 }
 
-fn parse_set_operator_operation(
+pub fn parse_function_arg<T: DeserializeOwned>(
+    name: &str,
+    args: &[Vec<u8>],
+    index: usize,
+) -> ApiResult<T> {
+    if let Some(arg) = args.get(index) {
+        if let Ok(arg) = bcs::from_bytes::<T>(arg) {
+            return Ok(arg);
+        }
+    }
+
+    Err(ApiError::InvalidInput(Some(format!(
+        "Argument {} of {} failed to parse",
+        index, name
+    ))))
+}
+
+pub fn parse_set_operator_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
     args: &[Vec<u8>],
@@ -654,25 +674,18 @@ fn parse_set_operator_operation(
         ))));
     }
 
-    // Set operator
-    if let Some(encoded_new_operator) = args.first() {
-        let new_operator: AccountAddress = bcs::from_bytes(encoded_new_operator)?;
-
-        Ok(vec![Operation::set_operator(
-            0,
-            None,
-            sender,
-            AccountIdentifier::unknown(),
-            AccountIdentifier::base_account(new_operator),
-        )])
-    } else {
-        Err(ApiError::InvalidOperations(Some(
-            "Set operator doesn't have a operator argument".to_string(),
-        )))
-    }
+    let old_operator = parse_function_arg("set_operator", args, 0)?;
+    let new_operator = parse_function_arg("set_operator", args, 1)?;
+    Ok(vec![Operation::set_operator(
+        0,
+        None,
+        sender,
+        AccountIdentifier::base_account(old_operator),
+        AccountIdentifier::base_account(new_operator),
+    )])
 }
 
-fn parse_set_voter_operation(
+pub fn parse_set_voter_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
     args: &[Vec<u8>],
@@ -684,21 +697,15 @@ fn parse_set_voter_operation(
         ))));
     }
 
-    if let Some(new_voter) = args.first() {
-        let new_voter: AccountAddress = bcs::from_bytes(new_voter)?;
-
-        Ok(vec![Operation::set_voter(
-            0,
-            None,
-            sender,
-            AccountIdentifier::unknown(),
-            AccountIdentifier::base_account(new_voter),
-        )])
-    } else {
-        Err(ApiError::InvalidOperations(Some(
-            "Set voter doesn't have a voter argument".to_string(),
-        )))
-    }
+    let operator = parse_function_arg("set_voter", args, 0)?;
+    let new_voter = parse_function_arg("set_voter", args, 1)?;
+    Ok(vec![Operation::set_voter(
+        0,
+        None,
+        sender,
+        AccountIdentifier::base_account(operator),
+        AccountIdentifier::base_account(new_voter),
+    )])
 }
 
 /// Construction payloads command (OFFLINE)

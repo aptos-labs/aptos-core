@@ -6,6 +6,7 @@
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
 use crate::common::native_coin_tag;
+use crate::construction::{parse_set_operator_operation, parse_set_voter_operation};
 use crate::types::move_types::*;
 use crate::{
     common::{is_native_coin, native_coin},
@@ -640,36 +641,28 @@ fn parse_failed_operations_from_txn_payload(
                     warn!("Failed to parse create account {:?}", inner);
                 }
             }
-            (AccountAddress::ONE, STAKE_MODULE, SET_OPERATOR_FUNCTION) => {
-                if let Some(Ok(new_operator)) = inner
-                    .args()
-                    .get(0)
-                    .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
+            (
+                AccountAddress::ONE,
+                STAKING_CONTRACT_MODULE,
+                SWITCH_OPERATOR_WITH_SAME_COMMISSION,
+            ) => {
+                if let Ok(mut ops) =
+                    parse_set_operator_operation(sender, inner.ty_args(), inner.args())
                 {
-                    operations.push(Operation::set_operator(
-                        operation_index,
-                        Some(OperationStatusType::Failure),
-                        sender,
-                        AccountIdentifier::unknown(),
-                        AccountIdentifier::base_account(new_operator),
-                    ));
+                    let mut operation = ops.remove(0);
+                    operation.status = Some(OperationStatusType::Failure.to_string());
+                    operations.push(operation);
                 } else {
                     warn!("Failed to parse set operator {:?}", inner);
                 }
             }
-            (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) => {
-                if let Some(Ok(new_voter)) = inner
-                    .args()
-                    .get(0)
-                    .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER) => {
+                if let Ok(mut ops) =
+                    parse_set_voter_operation(sender, inner.ty_args(), inner.args())
                 {
-                    operations.push(Operation::set_voter(
-                        operation_index,
-                        Some(OperationStatusType::Failure),
-                        sender,
-                        AccountIdentifier::unknown(),
-                        AccountIdentifier::base_account(new_voter),
-                    ));
+                    let mut operation = ops.remove(0);
+                    operation.status = Some(OperationStatusType::Failure.to_string());
+                    operations.push(operation);
                 } else {
                     warn!("Failed to parse set voter {:?}", inner);
                 }
