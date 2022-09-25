@@ -13,7 +13,7 @@ repository.workspace = true
 
 [dependencies]
 aptos-types = { path = "../../../types" }
-bcs = "0.1.3"
+bcs.workspace = true
 framework = { path = ".." }
 include_dir = { version = "0.7.2", features = ["glob"] }
 move-deps = { path = "../../move-deps", features = ["address32"] }

@@ -12,7 +12,7 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true
 futures = "0.3.21"
 
 aptos-infallible = { path = "../../crates/aptos-infallible" }

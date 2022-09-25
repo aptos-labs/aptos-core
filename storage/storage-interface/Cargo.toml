@@ -12,8 +12,8 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = "0.1.3"
+anyhow.workspace = true
+bcs.workspace = true
 crossbeam-channel = "0.5.4"
 once_cell = "1.10.0"
 parking_lot = "0.12.0"

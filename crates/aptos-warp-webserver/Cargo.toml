@@ -12,11 +12,11 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true
 aptos-api-types = { path = "../../api/types" }
 aptos-config = { path = "../../config" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-bcs = "0.1.3"
+bcs.workspace = true
 hyper = "0.14.18"
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }

@@ -12,9 +12,9 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
-bcs = "0.1.3"
+anyhow.workspace = true
+async-trait.workspace = true
+bcs.workspace = true
 diesel = { version = "2.0.0", features = [
     "chrono",
     "postgres",

@@ -12,8 +12,8 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = "0.1.3"
+anyhow.workspace = true
+bcs.workspace = true
 get_if_addrs = { version = "0.5.3", default-features = false }
 mirai-annotations = "1.12.0"
 poem-openapi = { version = "2.0.10", features = ["url"] }

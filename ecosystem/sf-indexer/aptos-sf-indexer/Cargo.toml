@@ -10,7 +10,7 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
@@ -21,9 +21,9 @@ aptos-types = { path = "../../../types" }
 inspection-service = { path = "../../../crates/inspection-service" }
 
 async-stream = "0.3"
-async-trait = "0.1.53"
+async-trait.workspace = true
 bigdecimal = { version = "0.1.2", features = ["serde"] }
-bytes = "1.1.0"
+bytes.workspace = true
 chrono = { version = "0.4.19", default-features = false, features = ["clock", "serde"] }
 clap = "3.1.17"
 diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }

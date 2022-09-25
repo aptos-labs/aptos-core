@@ -41,7 +41,7 @@ edition = "2021"
 aptos-types = {{ path = "../aptos-types", version = "0.1.0" }}
 serde_bytes = "0.11.6"
 serde = {{ version = "1.0.114", features = ["derive"] }}
-bcs = "0.1.3"
+bcs.workspace = true
 once_cell = "1.10.0"
 
 [[bin]]

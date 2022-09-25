@@ -12,7 +12,7 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true
 aptos-api = { path = "../", package = "aptos-api" }
 aptos-api-types = { path = "../types", package = "aptos-api-types" }
 aptos-config = { path = "../../config" }
@@ -24,7 +24,7 @@ aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
-bytes = "1.1.0"
+bytes.workspace = true
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 executor = { path = "../../execution/executor" }
 executor-types = { path = "../../execution/executor-types" }

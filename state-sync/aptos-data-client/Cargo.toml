@@ -12,7 +12,7 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-async-trait = "0.1.53"
+async-trait.workspace = true
 futures = "0.3.21"
 itertools = "0.10.0"
 rand = "0.7.3"
@@ -35,7 +35,7 @@ storage-service-client = { path = "../storage-service/client" }
 storage-service-types = { path = "../storage-service/types" }
 
 [dev-dependencies]
-bcs = "0.1.3"
+bcs.workspace = true
 claims = "0.7"
 maplit = "1.0.2"
 tokio = { version = "1.21.0", features = ["rt", "macros"], default-features = false }

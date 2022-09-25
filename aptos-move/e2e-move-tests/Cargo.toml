@@ -12,8 +12,8 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.59"
-bcs = "0.1.3"
+anyhow.workspace = true
+bcs.workspace = true
 itertools = "0.10.0"
 project-root = "0.2.2"
 proptest = "1.0.0"

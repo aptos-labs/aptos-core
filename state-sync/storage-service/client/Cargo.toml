@@ -12,7 +12,7 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-async-trait = "0.1.53"
+async-trait.workspace = true
 thiserror = "1.0.31"
 
 aptos-config = { path = "../../../config" }

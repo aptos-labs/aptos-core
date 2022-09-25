@@ -12,7 +12,7 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = { version = "1.0.57", features = ["backtrace"] }
+anyhow = { workspace = true, features = ["backtrace"] }
 clap = "3.1.17"
 futures = "0.3.21"
 itertools = "0.10.3"

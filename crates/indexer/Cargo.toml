@@ -12,12 +12,12 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true
 aptos-api = { path = "../../api", package = "aptos-api" }
 aptos-api-types = { path = "../../api/types" }
 aptos-bitvec = { path = "../aptos-bitvec" }
 aptos-config = { path = "../../config" }
-async-trait = "0.1.53"
+async-trait.workspace = true
 bigdecimal = { version = "0.1.2", features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = [
   "clock",
