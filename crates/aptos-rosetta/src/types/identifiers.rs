@@ -36,13 +36,6 @@ impl AccountIdentifier {
         str_to_account_address(self.address.as_str())
     }
 
-    pub fn unknown() -> Self {
-        AccountIdentifier {
-            address: "unknown".to_string(),
-            sub_account: None,
-        }
-    }
-
     pub fn base_account(address: AccountAddress) -> Self {
         AccountIdentifier {
             address: to_hex_lower(&address),
