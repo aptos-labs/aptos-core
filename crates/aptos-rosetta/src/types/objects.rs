@@ -769,9 +769,6 @@ async fn parse_operations_from_write_set(
         (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE, 0) => {
             parse_account_resource_changes(version, address, data, maybe_sender, operation_index)
         }
-        (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE, 0) => {
-            parse_stake_pool_resource_changes(version, address, data, events, operation_index)
-        }
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
                 parse_coinstore_changes(
