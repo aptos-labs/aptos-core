@@ -149,6 +149,16 @@ default-members = [
     "ecosystem/node-checker",
 ]
 
+# All workspace members should inherit these keys
+# for package declarations.
+[workspace.package]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+edition = "2021"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+repository = "https://github.com/aptos-labs/aptos-core"
+
 [profile.release]
 debug = true
 overflow-checks = true
