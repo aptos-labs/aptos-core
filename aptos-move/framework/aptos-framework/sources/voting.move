@@ -48,6 +48,8 @@ module aptos_framework::voting {
     const EPROPOSAL_VOTING_ALREADY_ENDED: u64 = 5;
     /// Voting forum has already been registered.
     const EVOTING_FORUM_ALREADY_REGISTERED: u64 = 6;
+    /// Minimum vote threshold cannot be higher than early resolution threshold.
+    const EINVALID_MIN_VOTE_THRESHOLD: u64 = 7;
 
     /// ProposalStateEnum representing proposal state.
     const PROPOSAL_STATE_PENDING: u64 = 0;
@@ -184,6 +186,12 @@ module aptos_framework::voting {
         early_resolution_vote_threshold: Option<u128>,
         metadata: SimpleMap<String, vector<u8>>,
     ): u64 acquires VotingForum {
+        if (option::is_some(&early_resolution_vote_threshold)) {
+            assert!(
+                min_vote_threshold <= *option::borrow(&early_resolution_vote_threshold),
+                error::invalid_argument(EINVALID_MIN_VOTE_THRESHOLD),
+            );
+        };
         // Make sure the execution script's hash is not empty.
         assert!(vector::length(&execution_hash) > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
 
@@ -432,14 +440,14 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    public entry fun test_voting_passed(aptos_framework: signer, governance: signer) acquires VotingForum {
+    public entry fun test_voting_passed(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(&governance);
+        let governance_address = signer::address_of(governance);
         account::create_account_for_test(governance_address);
-        let proposal_id = create_test_proposal(&governance, option::none<u128>());
+        let proposal_id = create_test_proposal(governance, option::none<u128>());
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
@@ -459,14 +467,14 @@ module aptos_framework::voting {
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x30003)]
-    public entry fun test_cannot_resolve_twice(aptos_framework: signer, governance: signer) acquires VotingForum {
+    public entry fun test_cannot_resolve_twice(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(&governance);
+        let governance_address = signer::address_of(governance);
         account::create_account_for_test(governance_address);
-        let proposal_id = create_test_proposal(&governance, option::none<u128>());
+        let proposal_id = create_test_proposal(governance, option::none<u128>());
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
@@ -484,14 +492,14 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    public entry fun test_voting_passed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
+    public entry fun test_voting_passed_early(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(&governance);
+        let governance_address = signer::address_of(governance);
         account::create_account_for_test(governance_address);
-        let proposal_id = create_test_proposal(&governance, option::some(100));
+        let proposal_id = create_test_proposal(governance, option::some(100));
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
@@ -511,14 +519,14 @@ module aptos_framework::voting {
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x30002)]
-    public entry fun test_voting_failed(aptos_framework: signer, governance: signer) acquires VotingForum {
+    public entry fun test_voting_failed(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(&governance);
+        let governance_address = signer::address_of(governance);
         account::create_account_for_test(governance_address);
-        let proposal_id = create_test_proposal(&governance, option::none<u128>());
+        let proposal_id = create_test_proposal(governance, option::none<u128>());
 
         // Vote.
         let proof = TestProposal {};
@@ -551,14 +559,14 @@ module aptos_framework::voting {
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x30002)]
-    public entry fun test_voting_failed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
+    public entry fun test_voting_failed_early(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(&governance);
+        let governance_address = signer::address_of(governance);
         account::create_account_for_test(governance_address);
-        let proposal_id = create_test_proposal(&governance, option::some(100));
+        let proposal_id = create_test_proposal(governance, option::some(100));
 
         // Vote.
         let proof = TestProposal {};
@@ -571,5 +579,16 @@ module aptos_framework::voting {
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_FAILED, 1);
         let proposal = resolve<TestProposal>(governance_address, proposal_id);
         let TestProposal {} = proposal;
+    }
+
+    #[test(aptos_framework = @aptos_framework, governance = @0x123)]
+    #[expected_failure(abort_code = 0x10007)]
+    public entry fun test_cannot_set_min_threshold_higher_than_early_resolution(
+        aptos_framework: &signer, governance: &signer) acquires VotingForum {
+        account::create_account_for_test(@aptos_framework);
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(signer::address_of(governance));
+        // This should fail.
+        create_test_proposal(governance, option::some(5));
     }
 }
