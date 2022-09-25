@@ -48,16 +48,16 @@ module aptos_std::ristretto255 {
     //
 
     /// The order of the Ristretto255 group and its scalar field, in little-endian.
-    const ORDER_ELL : vector<u8> = x"edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
+    const ORDER_ELL: vector<u8> = x"edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
 
     /// `ORDER_ELL` - 1: i.e., the "largest", reduced scalar in the field
     const L_MINUS_ONE: vector<u8> = x"ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
 
     /// The maximum size in bytes of a canonically-encoded Scalar is 32 bytes.
-    const MAX_SCALAR_NUM_BYTES : u64 = 32u64;
+    const MAX_SCALAR_NUM_BYTES: u64 = 32u64;
 
     /// The maximum size in bits of a canonically-encoded Scalar is 256 bits.
-    const MAX_SCALAR_NUM_BITS : u64 = 256u64;
+    const MAX_SCALAR_NUM_BITS: u64 = 256u64;
 
     /// The maximum size in bytes of a canonically-encoded Ristretto255 point is 32 bytes.
     const MAX_POINT_NUM_BYTES: u64 = 32u64;
@@ -127,7 +127,7 @@ module aptos_std::ristretto255 {
     }
 
     /// Returns the basepoint (generator) of the Ristretto255 group
-    public fun basepoint() : RistrettoPoint {
+    public fun basepoint(): RistrettoPoint {
         let (handle, _) = point_decompress_internal(BASE_POINT);
 
         RistrettoPoint {
@@ -137,7 +137,7 @@ module aptos_std::ristretto255 {
 
     /// Multiplies the basepoint (generator) of the Ristretto255 group by a scalar and returns the result.
     /// This call is much faster than `point_mul(&basepoint(), &some_scalar)` because of precomputation tables.
-    public fun basepoint_mul(a: &Scalar) : RistrettoPoint {
+    public fun basepoint_mul(a: &Scalar): RistrettoPoint {
         RistrettoPoint {
             handle: basepoint_mul_internal(a.data)
         }
@@ -147,7 +147,7 @@ module aptos_std::ristretto255 {
     /// point, returns None.
     public fun new_compressed_point_from_bytes(bytes: vector<u8>): Option<CompressedRistretto> {
         if (point_is_canonical_internal(bytes)) {
-            std::option::some(CompressedRistretto{
+            std::option::some(CompressedRistretto {
                 data: bytes
             })
         } else {
@@ -160,7 +160,7 @@ module aptos_std::ristretto255 {
     public fun new_point_from_bytes(bytes: vector<u8>): Option<RistrettoPoint> {
         let (handle, is_canonical) = point_decompress_internal(bytes);
         if (is_canonical) {
-            std::option::some( RistrettoPoint { handle })
+            std::option::some(RistrettoPoint { handle })
         } else {
             std::option::none<RistrettoPoint>()
         }
@@ -472,9 +472,11 @@ module aptos_std::ristretto255 {
     native fun point_mul_internal(point: &RistrettoPoint, a: vector<u8>, in_place: bool): u64;
 
     native fun basepoint_mul_internal(a: vector<u8>): u64;
+
     native fun basepoint_double_mul_internal(a: vector<u8>, some_point: &RistrettoPoint, b: vector<u8>): u64;
 
     native fun point_add_internal(a: &RistrettoPoint, b: &RistrettoPoint, in_place: bool): u64;
+
     native fun point_sub_internal(a: &RistrettoPoint, b: &RistrettoPoint, in_place: bool): u64;
 
     native fun point_neg_internal(a: &RistrettoPoint, in_place: bool): u64;
@@ -573,9 +575,9 @@ module aptos_std::ristretto255 {
     const B_POINT: vector<u8> = x"fa0b3624b081c62f364d0b2839dcc76d7c3ab0e27e31beb2b9ed766575f28e76";
     const A_PLUS_B_POINT: vector<u8> = x"70cf3753475b9ff33e2f84413ed6b5052073bccc0a0a81789d3e5675dc258056";
 
-//    const NON_CANONICAL_LARGEST_ED25519_S: vector<u8> = x"f8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f";
-//    const CANONICAL_LARGEST_ED25519_S_PLUS_ONE: vector<u8> = x"7e344775474a7f9723b63a8be92ae76dffffffffffffffffffffffffffffff0f";
-//    const CANONICAL_LARGEST_ED25519_S_MINUS_ONE: vector<u8> = x"7c344775474a7f9723b63a8be92ae76dffffffffffffffffffffffffffffff0f";
+    //    const NON_CANONICAL_LARGEST_ED25519_S: vector<u8> = x"f8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f";
+    //    const CANONICAL_LARGEST_ED25519_S_PLUS_ONE: vector<u8> = x"7e344775474a7f9723b63a8be92ae76dffffffffffffffffffffffffffffff0f";
+    //    const CANONICAL_LARGEST_ED25519_S_MINUS_ONE: vector<u8> = x"7c344775474a7f9723b63a8be92ae76dffffffffffffffffffffffffffffff0f";
 
     #[test]
     fun test_point_decompression() {
@@ -807,6 +809,7 @@ module aptos_std::ristretto255 {
     fun test_multi_scalar_mul_aborts_empty_scalars() {
         multi_scalar_mul(&vector[ basepoint() ], &vector[]);
     }
+
     #[test]
     #[expected_failure]
     fun test_multi_scalar_mul_aborts_empty_points() {
@@ -1009,11 +1012,11 @@ module aptos_std::ristretto255 {
 
         let s = new_scalar_from_sha512(str);
 
-        let expected : vector<u8> = vector[
-            21,  88, 208, 252,  63, 122, 210, 152,
-            154,  38,  15,  23,  16, 167,  80, 150,
-            192, 221,  77, 226,  62,  25, 224, 148,
-            239,  48, 176,  10, 185,  69, 168,  11
+        let expected: vector<u8> = vector[
+            21, 88, 208, 252, 63, 122, 210, 152,
+            154, 38, 15, 23, 16, 167, 80, 150,
+            192, 221, 77, 226, 62, 25, 224, 148,
+            239, 48, 176, 10, 185, 69, 168, 11
         ];
 
         assert!(s.data == expected, 1)

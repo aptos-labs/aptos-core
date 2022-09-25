@@ -34,7 +34,7 @@ use aptos_sdk::{
 use clap::Parser;
 use futures::lock::Mutex;
 use reqwest::StatusCode;
-use std::{convert::Infallible, fmt, path::PathBuf, sync::Arc};
+use std::{convert::Infallible, path::PathBuf, sync::Arc};
 use url::Url;
 use warp::{http, Filter, Rejection, Reply};
 
@@ -195,21 +195,23 @@ pub fn routes(
     health
         .or(mint)
         .with(warp::log::custom(|info| {
-            let actual_ip = info
+            let forwarded_for = info
                 .request_headers()
                 .get("x-forwarded-for")
                 .map(|inner| inner.to_str().unwrap_or("-"));
+
             info!(
-                "{} \"{} {} {:?}\" {} \"{}\" \"{}\" \"{}\" {:?}",
-                OptFmt(info.remote_addr()),
-                info.method(),
-                info.path(),
-                info.version(),
-                info.status().as_u16(),
-                OptFmt(info.referer()),
-                OptFmt(info.user_agent()),
-                OptFmt(actual_ip),
-                info.elapsed(),
+                remote_addr = info.remote_addr(),
+                forwarded_for = forwarded_for,
+                host = info.host(),
+                method = format!("{}", info.method()),
+                path = info.path(),
+                version = format!("{:?}", info.version()),
+                status = format!("{}", info.status()),
+                referer = info.referer(),
+                user_agent = info.user_agent(),
+                elapsed = info.elapsed(),
+                "mint request"
             )
         }))
         .with(
@@ -239,22 +241,6 @@ async fn handle_health(service: Arc<Service>) -> Result<Box<dyn warp::Reply>, In
             err.to_string(),
             StatusCode::INTERNAL_SERVER_ERROR,
         ))),
-    }
-}
-
-//
-// Common Types
-//
-
-struct OptFmt<T>(Option<T>);
-
-impl<T: fmt::Display> fmt::Display for OptFmt<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(t) = &self.0 {
-            fmt::Display::fmt(t, f)
-        } else {
-            f.write_str("-")
-        }
     }
 }
 

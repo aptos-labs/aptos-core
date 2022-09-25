@@ -74,7 +74,6 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:build-images') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:deploy-community-platform-to-staging') ||
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
     runs-on: ubuntu-latest
@@ -194,30 +193,3 @@ jobs:
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-
-  community-platform:
-    needs: [permission-check]
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.GIT_SHA }}
-
-      - uses: ./.github/actions/gar-auth
-        with:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Login to ECR
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
-          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - uses: ./.github/actions/docker-buildx-setup
-
-      - name: Build and Push Community Platform image
-        run: |
-          cd ecosystem/platform/server
-          docker buildx bake --progress=plain --push -f ./docker-bake.hcl
