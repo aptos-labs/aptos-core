@@ -12,7 +12,7 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-telemetry-service = { path = "../../crates/aptos-telemetry-service" }
 aptos-types = { path = "../../types" }

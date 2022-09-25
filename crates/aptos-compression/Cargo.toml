@@ -20,7 +20,7 @@ aptos-logger = { path = "../aptos-logger" }
 aptos-metrics-core = { path = "../aptos-metrics-core" }
 
 [dev-dependencies]
-bcs = "0.1.3"
+bcs.workspace = true
 serde = { version = "1.0.137", default-features = false }
 
 aptos-crypto = { path = "../aptos-crypto" }

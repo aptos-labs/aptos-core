@@ -12,8 +12,8 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
-fail = "0.5.0"
+anyhow.workspace = true
+fail.workspace = true
 
 aptos-gas = { path = "../aptos-move/aptos-gas" }
 aptos-state-view = { path = "../storage/state-view" }

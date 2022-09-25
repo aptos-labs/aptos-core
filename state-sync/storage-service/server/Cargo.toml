@@ -12,8 +12,8 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-bcs = "0.1.3"
-bytes = "1.1.0"
+bcs.workspace = true
+bytes.workspace = true
 futures = "0.3.21"
 lru = "0.7.5"
 once_cell = "1.10.0"
@@ -35,7 +35,7 @@ storage-interface = { path = "../../../storage/storage-interface" }
 storage-service-types = { path = "../types" }
 
 [dev-dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true
 claims = "0.7"
 mockall = "0.11.0"
 rand = "0.7.3"

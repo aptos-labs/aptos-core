@@ -20,4 +20,4 @@ quote = "1.0.18"
 syn = { version = "1.0.92", features = ["derive"] }
 
 [dev-dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true

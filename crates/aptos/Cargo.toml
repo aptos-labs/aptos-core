@@ -12,10 +12,10 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
+anyhow.workspace = true
+async-trait.workspace = true
 base64 = "0.13.0"
-bcs = "0.1.3"
+bcs.workspace = true
 clap = "3.2.11"
 clap_complete = "3.2.3"
 dirs = "4.0.0"

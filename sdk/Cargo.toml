@@ -12,12 +12,12 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
+anyhow.workspace = true
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-global-constants = { path = "../config/global-constants" }
 aptos-rest-client = { path = "../crates/aptos-rest-client" }
 aptos-types = { path = "../types" }
-bcs = "0.1.3"
+bcs.workspace = true
 cached-packages = { path = "../aptos-move/framework/cached-packages" }
 move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
 rand_core = "0.5.1"

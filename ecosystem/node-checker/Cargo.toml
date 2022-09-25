@@ -12,8 +12,8 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
+anyhow.workspace = true
+async-trait.workspace = true
 clap = { version = "3.1.17", features = ["derive"] }
 const_format = "0.2.26"
 env_logger = "0.8.4"

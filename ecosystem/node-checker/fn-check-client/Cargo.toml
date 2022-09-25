@@ -12,7 +12,7 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.62"
+anyhow.workspace = true
 aptos-node-checker = { path = "../" }
 aptos-sdk = { path = "../../../sdk" }
 clap = "3.2.17"

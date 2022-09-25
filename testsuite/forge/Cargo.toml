@@ -12,9 +12,9 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-again = "0.1.2"
-anyhow = { version = "1.0.57", features = ["backtrace"] }
-async-trait = "0.1.53"
+again.workspace = true
+anyhow = { workspace = true, features = ["backtrace"] }
+async-trait.workspace = true
 chrono = "0.4.19"
 either = "1.6.1"
 futures = "0.3.21"

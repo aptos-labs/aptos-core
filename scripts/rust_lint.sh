@@ -27,4 +27,7 @@ set -x
 
 cargo xclippy
 cargo fmt $CHECK_ARG
-cargo sort --grouped --workspace $CHECK_ARG
+
+# TODO: once cargo sort is updated to handle
+# workspace inheritance, we will re-enable this.
+# cargo sort --grouped --workspace $CHECK_ARG

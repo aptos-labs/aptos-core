@@ -12,8 +12,8 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = "0.1.3"
+anyhow.workspace = true
+bcs.workspace = true
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 serde = { version = "1.0.137", default-features = false }
 serde_bytes = "0.11.6"

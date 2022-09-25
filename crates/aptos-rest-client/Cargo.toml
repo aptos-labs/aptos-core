@@ -16,8 +16,8 @@ default = ["dpn"]
 dpn = []
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = "0.1.3"
+anyhow.workspace = true
+bcs.workspace = true
 bytes = "1.2.1"
 futures = "0.3.17"
 hex = "0.4.3"
