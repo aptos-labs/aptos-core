@@ -54,9 +54,7 @@ impl ChangeSetExt {
         (self.delta_change_set, self.change_set)
     }
 
-    /// Squashes 2 delta change sets. Note that we use strict ordering here, i.e.
-    /// `previous` preceeds `self`.
-    pub fn squash_delta_change_set(self, previous: DeltaChangeSet) -> anyhow::Result<Self> {
+    pub fn squash_delta_change_set(self, other: DeltaChangeSet) -> anyhow::Result<Self> {
         use btree_map::Entry::*;
         use WriteOp::*;
 
@@ -67,7 +65,7 @@ impl ChangeSetExt {
         let delta_ops = delta_set.as_inner_mut();
         let write_ops = write_set.as_inner_mut();
 
-        for (key, op) in previous.into_iter() {
+        for (key, mut op) in other.into_iter() {
             if let Some(r) = write_ops.get_mut(&key) {
                 match r {
                     Creation(data) => {
@@ -85,7 +83,10 @@ impl ChangeSetExt {
             } else {
                 match delta_ops.entry(key) {
                     Occupied(entry) => {
-                        entry.into_mut().merge_onto(op)?;
+                        // In this case, we need to merge the new incoming `op` to the existing
+                        // delta, ensuring the strict ordering.
+                        op.merge_onto(*entry.get())?;
+                        *entry.into_mut() = op;
                     }
                     Vacant(entry) => {
                         entry.insert(op);

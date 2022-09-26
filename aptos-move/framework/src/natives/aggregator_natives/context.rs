@@ -122,11 +122,13 @@ impl AggregatorChangeSet {
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Write(new_data);
                         }
-                        (Merge(mut delta1), Merge(delta2)) => {
-                            delta1
-                                .merge_onto(delta2)
+                        (Merge(delta1), Merge(mut delta2)) => {
+                            // `delta1` occurred before `delta12`, therefore we must ensure we merge the latter
+                            // one to the initial delta.
+                            delta2
+                                .merge_onto(delta1)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                            *entry_mut = Merge(delta1)
+                            *entry_mut = Merge(delta2)
                         }
                         // Hashing properties guarantee that aggregator keys should
                         // not collide, making this case impossible.
