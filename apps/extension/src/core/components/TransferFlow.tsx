@@ -42,8 +42,8 @@ export interface CoinTransferFormData {
 
 function TransferFlow() {
   const {
-    amountAptNumber,
-    amountOctaNumber,
+    amountApt,
+    amountOcta,
     backOnClick,
     canSubmitForm,
     closeDrawer,
@@ -67,13 +67,13 @@ function TransferFlow() {
 
     try {
       const onChainTxn = await submitCoinTransfer({
-        amount: amountOctaNumber,
+        amount: amountOcta,
         doesRecipientExist: doesRecipientAccountExist!,
         recipient: validRecipientAddress!,
       });
 
       if (onChainTxn.success) {
-        coinTransferSuccessToast(amountAptNumber, onChainTxn);
+        coinTransferSuccessToast(amountApt, onChainTxn);
         resetForm();
         backOnClick();
         closeDrawer();

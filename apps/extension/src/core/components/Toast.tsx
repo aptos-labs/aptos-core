@@ -165,7 +165,7 @@ export const networkDoesNotExistToast = () => {
 
 // transfer
 
-export function coinTransferSuccessToast(amount: number, txn: Types.UserTransaction) {
+export function coinTransferSuccessToast(amount: string, txn: Types.UserTransaction) {
   toast({
     description: `Amount transferred: ${amount}, gas consumed: ${txn.gas_used}`,
     status: 'success',

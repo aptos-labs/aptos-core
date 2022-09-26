@@ -8,7 +8,7 @@ import { useCoinTransferSimulation } from 'core/mutations/transaction';
 import { useAccountExists, useAccountOctaCoinBalance } from 'core/queries/account';
 import { formatAddress, isAddressValid } from 'core/utils/address';
 import { bigIntMin } from 'core/utils/bigint';
-import { formatCoin, OCTA_POSITIVE_EXPONENT } from 'core/utils/coin';
+import { formatCoin, OCTA_NUMBER } from 'core/utils/coin';
 import { useCallback, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { parseMoveAbortDetails } from 'shared/move';
@@ -51,14 +51,15 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
   });
 
   // todo: this could fail if the user passes a large enough amount to overflow number
-  const amountAptNumber = parseFloat(amount?.replace(/[^0-9.]/g, '') || '0');
-  const amountOctaNumber = BigInt(
-    parseInt((amountAptNumber * OCTA_POSITIVE_EXPONENT).toString(), 10),
-  );
+  const amountApt = amount?.replace(/[^0-9.]/g, '') ?? '0';
+  const aptIntegral = amountApt.split('.')[0];
+  const aptFractional = amountApt.split('.')[1] ?? '';
+  const amountOcta = BigInt(`${aptIntegral}${aptFractional.padEnd(OCTA_NUMBER, '0')}`);
+
   const {
     debouncedValue: debouncedNumberAmountOcta,
     isLoading: debouncedAmountIsLoading,
-  } = useDebounce(amountOctaNumber, 500);
+  } = useDebounce(amountOcta, 500);
   const isBalanceEnoughBeforeFee = (debouncedNumberAmountOcta && coinBalanceOcta !== undefined)
     ? debouncedNumberAmountOcta <= coinBalanceOcta
     : undefined;
@@ -116,8 +117,8 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
   }, []);
 
   return {
-    amountAptNumber,
-    amountOctaNumber,
+    amountApt,
+    amountOcta,
     backOnClick,
     canSubmitForm,
     closeDrawer,

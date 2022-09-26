@@ -14,14 +14,14 @@ import Copyable from './Copyable';
 export default function TransferSummary() {
   const { colorMode } = useColorMode();
   const {
-    amountOctaNumber,
+    amountOcta,
     estimatedGasFeeOcta,
     validRecipientAddress,
   } = useTransferFlow();
   const collapsedAddress = validRecipientAddress ? collapseHexString(validRecipientAddress) : '';
-  const amountAPTString = formatCoin(amountOctaNumber);
+  const amountAPTString = formatCoin(amountOcta);
   const estimatedGasFeeAPTString = formatCoin(estimatedGasFeeOcta, { decimals: 8 });
-  const totalOctas = (amountOctaNumber || 0n) + BigInt(estimatedGasFeeOcta ?? 0);
+  const totalOctas = (amountOcta || 0n) + BigInt(estimatedGasFeeOcta ?? 0);
   const totalString = formatCoin(totalOctas, { decimals: 8 });
 
   return (

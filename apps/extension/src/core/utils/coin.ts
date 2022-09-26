@@ -6,9 +6,9 @@ import numeral from 'numeral';
 export const APTOS_UNIT = 'APT' as const;
 export const OCTA_UNIT = 'OCTA' as const;
 export const PLURAL_OCTA_UNIT = `${OCTA_UNIT}S` as const;
-export const OCTA_NUMBER = 8 as const;
-export const OCTA_NEGATIVE_EXPONENT = 1e-8 as const;
-export const OCTA_POSITIVE_EXPONENT = 1e8 as const;
+export const OCTA_NUMBER: number = 8 as const;
+export const OCTA_NEGATIVE_EXPONENT = 10 ** (-OCTA_NUMBER);
+export const OCTA_POSITIVE_EXPONENT = 10 ** OCTA_NUMBER;
 
 interface GenerateUnitStringParams {
   isLowercase: boolean;

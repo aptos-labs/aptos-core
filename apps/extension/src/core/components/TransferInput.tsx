@@ -55,20 +55,18 @@ const defaultMaskOptions = {
   thousandsSeparatorSymbol: ',',
 };
 
-function getAmountInputFontSize(amount?: number) {
-  // TODO: change so that it is determined by string length, not amount
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const amountStringLength = String(amount).length;
-  if (!amount || amount < 1e4) {
+function getAmountInputFontSize(amount?: string) {
+  const amountStringLength = amount?.length ?? 0;
+  if (!amount || amountStringLength < 4) {
     return 64;
   }
-  if (amount < 1e7) {
+  if (amountStringLength < 7) {
     return 48;
   }
-  if (amount < 1e10) {
+  if (amountStringLength < 10) {
     return 36;
   }
-  if (amount < 1e16) {
+  if (amountStringLength < 16) {
     return 24;
   }
   return 18;
@@ -78,7 +76,7 @@ const currencyMask = createNumberMask(defaultMaskOptions);
 
 export default function TransferInput() {
   const {
-    amountAptNumber,
+    amountApt,
     coinBalanceApt,
     estimatedGasFeeApt,
     formMethods: { register },
@@ -86,8 +84,8 @@ export default function TransferInput() {
   } = useTransferFlow();
   const { colorMode } = useColorMode();
   const amountInputFontSize = useMemo(
-    () => getAmountInputFontSize(amountAptNumber),
-    [amountAptNumber],
+    () => getAmountInputFontSize(amountApt),
+    [amountApt],
   );
 
   const {
