@@ -434,7 +434,7 @@ impl Client {
             .await?;
 
         let response = self.check_and_parse_bcs_response(response).await?;
-        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes)).unwrap())
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
     pub async fn submit_and_wait(
