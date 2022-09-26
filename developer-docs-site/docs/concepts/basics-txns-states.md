@@ -68,36 +68,6 @@ A [signed transaction](/guides/sign-a-transaction.md) on the blockchain contains
 - **Sequence number**: This is an unsigned integer that must be equal to the sender's account [sequence number](/concepts/basics-accounts#account-sequence-number) at the time of execution.
 - **Expiration time**: A timestamp after which the transaction ceases to be valid (i.e., expires).
 
-# Ledger state
-
-The Aptos blockchain's ledger state (or global [state](/reference/glossary#state)) comprises the state of all accounts in the blockchain. Each validator node in the blockchain must know the global state of the latest version of the blockchain's distributed database (versioned database) to execute any transaction.
-
-## Versioned database
-
-All of the data in the Aptos blockchain is persisted in a single-versioned distributed database. A version number is an unsigned 64-bit integer that corresponds to the number of transactions the system has executed.
-
-This versioned database allows validator nodes to:
-
-- Execute a transaction against the ledger state at the latest version.
-- Respond to client queries about ledger history at both current and previous versions.
-
-## Transactions change state
-
-![FIGURE 1.0 TRANSACTIONS CHANGE STATE](/img/docs/transactions.svg)
-<small className="figure">FIGURE 1.0 TRANSACTIONS CHANGE STATE</small>
-
-Figure 1.0 represents how executing transaction T<sub>N</sub> changes the state of the Aptos blockchain from S<sub>N-1</sub> to S<sub>N</sub>.
-
-In the figure:
-
-| Name | Description |
-| ---- | ----------- |
-| Accounts **A** and **B** | Represent Alice's and Bob's accounts on the Aptos blockchain |
-| **S<sub>N-1</sub>** | Represents the (**N-1**)th state of the blockchain. In this state, Alice's account **A** has a balance of 110 Aptos Coins, and Bob's account **B** has a balance of 52 Aptos Coins. |
-| **T<sub>N</sub>** | This is the **N**th transaction executed on the blockchain. In this example, it represents Alice sending 10 Aptos Coins to Bob. |
-| **F** | It is a deterministic function. **F** always returns the same final state for a specific initial state and a specific transaction. If the current state of the blockchain is **S<sub>N-1</sub>**, and transaction **T<sub>N</sub>** is executed on state **S<sub>N-1</sub>**, the new state of the blockchain is always **S<sub>N</sub>**. The Aptos blockchain uses the [Move language](https://move-language.github.io/move/) to implement the deterministic execution function **F**. |
-| **S<sub>N</sub>** | This is the **N**th state of the blockchain. When the transaction **T<sub>N</sub>** is applied to the blockchain, it generates the new state **S<sub>N</sub>** (an outcome of applying **F** to **S<sub>N-1</sub>** and **T<sub>N</sub>**). This causes Alice’s account balance to be reduced by 10 to 100 Aptos Coins and Bob’s account balance to be increased by 10 to 62 Aptos Coins. The new state **S<sub>N</sub>** shows these updated balances. |
-
 ## Proof
 
 The Aptos blockchain uses proof to verify the authenticity and correctness of the blockchain data.
