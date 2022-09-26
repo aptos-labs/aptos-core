@@ -22,8 +22,8 @@ use crate::{
     metrics::{
         APTOS_SCHEMADB_BATCH_COMMIT_BYTES, APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS,
         APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS, APTOS_SCHEMADB_DELETES, APTOS_SCHEMADB_GET_BYTES,
-        APTOS_SCHEMADB_GET_LATENCY_SECONDS, APTOS_SCHEMADB_INCLUSIVE_RANGE_DELETES,
-        APTOS_SCHEMADB_ITER_BYTES, APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES,
+        APTOS_SCHEMADB_GET_LATENCY_SECONDS, APTOS_SCHEMADB_ITER_BYTES,
+        APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES,
         APTOS_SCHEMADB_RANGE_DELETES,
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
@@ -47,7 +47,6 @@ enum WriteOp {
     Value { key: Vec<u8>, value: Vec<u8> },
     Deletion { key: Vec<u8> },
     DeletionRange { begin: Vec<u8>, end: Vec<u8> },
-    DeletionRangeInclusive { begin: Vec<u8>, end: Vec<u8> },
 }
 
 /// `SchemaBatch` holds a collection of updates that can be applied to a DB atomically. The updates
@@ -108,18 +107,6 @@ impl SchemaBatch {
             .entry(S::COLUMN_FAMILY_NAME)
             .or_insert_with(Vec::new)
             .push(WriteOp::DeletionRange { begin, end });
-        Ok(())
-    }
-
-    /// Adds a delete range operation that delete a range [start, end] including end
-    pub fn delete_range_inclusive<S: Schema>(&self, begin: &S::Key, end: &S::Key) -> Result<()> {
-        let begin = <S::Key as KeyCodec<S>>::encode_key(begin)?;
-        let end = <S::Key as KeyCodec<S>>::encode_key(end)?;
-        self.rows
-            .lock()
-            .entry(S::COLUMN_FAMILY_NAME)
-            .or_insert_with(Vec::new)
-            .push(WriteOp::DeletionRangeInclusive { begin, end });
         Ok(())
     }
 }
@@ -281,10 +268,6 @@ impl DB {
                     WriteOp::DeletionRange { begin, end } => {
                         db_batch.delete_range_cf(cf_handle, begin, end);
                     }
-                    WriteOp::DeletionRangeInclusive { begin, end } => {
-                        db_batch.delete_range_cf(cf_handle, begin, end);
-                        db_batch.delete_cf(cf_handle, end);
-                    }
                 }
             }
         }
@@ -306,11 +289,6 @@ impl DB {
                     }
                     WriteOp::DeletionRange { begin: _, end: _ } => {
                         APTOS_SCHEMADB_RANGE_DELETES
-                            .with_label_values(&[cf_name])
-                            .inc();
-                    }
-                    WriteOp::DeletionRangeInclusive { begin: _, end: _ } => {
-                        APTOS_SCHEMADB_INCLUSIVE_RANGE_DELETES
                             .with_label_values(&[cf_name])
                             .inc();
                     }

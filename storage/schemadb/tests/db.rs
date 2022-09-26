@@ -220,16 +220,6 @@ proptest! {
     }
 
     #[test]
-    fn test_schemabatch_delete_range_inclusive(
-        ranges_to_delete in vec(
-            (0..100u32).prop_flat_map(|begin| (Just(begin), (begin..100u32))), 0..10)
-    ) {
-         for (begin, end) in ranges_to_delete {
-            test_schemabatch_delete_range_util(begin, end, false);
-        }
-    }
-
-    #[test]
     fn test_schema_range_delete(
         ranges_to_delete in vec(
             (0..100u32).prop_flat_map(|begin| (Just(begin), (begin..100u32))), 0..10)

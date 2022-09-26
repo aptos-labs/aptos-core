@@ -151,4 +151,13 @@ mod test {
         let execution_config = ExecutionConfig::default();
         (execution_config, temp_dir)
     }
+
+    #[test]
+    fn print_default_config() {
+        use serde_yaml;
+        println!(
+            "{}",
+            serde_yaml::to_string(&ExecutionConfig::default()).unwrap()
+        );
+    }
 }
