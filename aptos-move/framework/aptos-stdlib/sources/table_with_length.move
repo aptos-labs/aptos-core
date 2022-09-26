@@ -73,6 +73,17 @@ module aptos_std::table_with_length {
         }
     }
 
+    /// Insert the pair (`key`, `value`) if there is no entry for `key`.
+    /// update the value of the entry for `key` to `value` otherwise
+    public fun upsert<K: copy + drop, V: drop>(table: &mut TableWithLength<K, V>, key: K, value: V) {
+        if (!table::contains(&table.inner, key)) {
+            add(table, copy key, value)
+        } else {
+            let ref = table::borrow_mut(&mut table.inner, key);
+            *ref = value;
+        };
+    }
+
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(table: &mut TableWithLength<K, V>, key: K): V {
@@ -84,5 +95,30 @@ module aptos_std::table_with_length {
     /// Returns true iff `table` contains an entry for `key`.
     public fun contains<K: copy + drop, V>(table: &TableWithLength<K, V>, key: K): bool {
         table::contains(&table.inner, key)
+    }
+
+    #[test]
+    fun test_upsert() {
+        let t = new<u8, u8>();
+        // Table should not have key 0 yet
+        assert!(!contains(&t, 0), 1);
+        // This should insert key 0, with value 10, and length should be 1
+        upsert(&mut t, 0, 10);
+        // Ensure the value is correctly set to 10
+        assert!(*borrow(&t, 0) == 10, 1);
+        // Ensure the length is correctly set
+        assert!(length(&t) == 1, 1);
+        // Lets upsert the value to something else, and verify it's correct
+        upsert(&mut t, 0, 23);
+        assert!(*borrow(&t, 0) == 23, 1);
+        // Since key 0 already existed, the length should not have changed
+        assert!(length(&t) == 1, 1);
+        // If we upsert a non-existing key, the length should increase
+        upsert(&mut t, 1, 7);
+        assert!(length(&t) == 2, 1);
+
+        remove(&mut t, 0);
+        remove(&mut t, 1);
+        destroy_empty(t);
     }
 }
