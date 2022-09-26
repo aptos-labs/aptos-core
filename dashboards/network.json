@@ -67,6 +67,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -147,6 +148,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
         }
@@ -225,6 +227,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
         }
@@ -303,6 +306,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_network_key_mismatch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
         }
@@ -325,642 +329,647 @@
       "title": "Traffic and Rate Limiting",
       "transparent": false,
       "type": "row",
-      "panels": [],
-      "collapsed": false
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
-      "id": 118,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "VFN Public Network Inbound Allowed bytes (bytes/s)",
-      "description": "Inbound number of bytes passed through the throttler",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
+      "panels": [
         {
-          "refId": "A",
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
-        { "format": "short", "logBase": 1, "show": false }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 2 },
+          "id": 118,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "VFN Public Network Inbound Allowed bytes (bytes/s)",
+          "description": "Inbound number of bytes passed through the throttler",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+              "legendFormat": "{{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
+            { "format": "short", "logBase": 1, "show": false }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 2 },
+          "id": 119,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "VFN Public Network Outbound Allowed bytes (bytes/s)",
+          "description": "Outbound number of bytes passed through the throttler",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+              "legendFormat": "{{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
+            { "format": "short", "logBase": 1, "show": false }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+          "id": 120,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "VFN Public Network Inbound Throttled bytes (bytes/s)",
+          "description": "Inbound number of bytes rate limited through the throttler",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+              "legendFormat": "{{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
+            { "format": "short", "logBase": 1, "show": false }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+          "id": 121,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "VFN Public Network Outbound Throttled bytes (bytes/s)",
+          "description": "Outbound number of bytes rate limited through the throttler",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+              "legendFormat": "{{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
+            { "format": "short", "logBase": 1, "show": false }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+          "id": 122,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Network Inbound bytes (bytes/s)",
+          "description": "Inbound number of bytes received on the network",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+              "expr": "rate(aptos_network_app_inbound_traffic_sum{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+              "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
+            { "format": "short", "logBase": 1, "show": false }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+          "id": 123,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Network Outbound bytes (bytes/s)",
+          "description": "Outbound number of bytes sent on the network",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+              "expr": "rate(aptos_network_app_outbound_traffic_sum{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+              "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
+            { "format": "short", "logBase": 1, "show": false }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+          "id": 124,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Network Inbound messages (messages/s)",
+          "description": "Inbound number of messages received on the network",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+              "expr": "rate(aptos_network_app_inbound_traffic_count{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+              "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "none", "logBase": 1, "show": true, "label": "messages/s" },
+            { "format": "short", "logBase": 1, "show": false }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+          "id": 125,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Network Outbound messages (messages/s)",
+          "description": "Outbound number of messages sent on the network",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+              "expr": "rate(aptos_network_app_outbound_traffic_count{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+              "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "none", "logBase": 1, "show": true, "label": "messages/s" },
+            { "format": "short", "logBase": 1, "show": false }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
           }
         }
-      }
+      ],
+      "collapsed": true
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
-      "id": 119,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "VFN Public Network Outbound Allowed bytes (bytes/s)",
-      "description": "Outbound number of bytes passed through the throttler",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
-        { "format": "short", "logBase": 1, "show": false }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
-      "id": 120,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "VFN Public Network Inbound Throttled bytes (bytes/s)",
-      "description": "Inbound number of bytes rate limited through the throttler",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
-        { "format": "short", "logBase": 1, "show": false }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
-      "id": 121,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "VFN Public Network Outbound Throttled bytes (bytes/s)",
-      "description": "Outbound number of bytes rate limited through the throttler",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
-        { "format": "short", "logBase": 1, "show": false }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
-      "id": 122,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Network Inbound bytes (bytes/s)",
-      "description": "Inbound number of bytes received on the network",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "rate(aptos_network_app_inbound_traffic_sum{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
-          "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
-        { "format": "short", "logBase": 1, "show": false }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
-      "id": 123,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Network Outbound bytes (bytes/s)",
-      "description": "Outbound number of bytes sent on the network",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "rate(aptos_network_app_outbound_traffic_sum{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
-          "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "Bps", "logBase": 1, "show": true, "label": "bytes/s" },
-        { "format": "short", "logBase": 1, "show": false }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
-      "id": 124,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Network Inbound messages (messages/s)",
-      "description": "Inbound number of messages received on the network",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "rate(aptos_network_app_inbound_traffic_count{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
-          "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "none", "logBase": 1, "show": true, "label": "messages/s" },
-        { "format": "short", "logBase": 1, "show": false }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
-      "id": 125,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Network Outbound messages (messages/s)",
-      "description": "Outbound number of messages sent on the network",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "rate(aptos_network_app_outbound_traffic_count{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
-          "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "none", "logBase": 1, "show": true, "label": "messages/s" },
-        { "format": "short", "logBase": 1, "show": false }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
       "id": 76,
       "isNew": false,
       "span": 0,
@@ -1011,6 +1020,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
             }
@@ -1089,6 +1099,7 @@
           "targets": [
             {
               "refId": "B",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
             }
@@ -1167,6 +1178,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
             }
@@ -1245,6 +1257,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
             }
@@ -1323,6 +1336,7 @@
           "targets": [
             {
               "refId": "B",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "rate(aptos_network_pending_wire_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
             }
@@ -1401,6 +1415,7 @@
           "targets": [
             {
               "refId": "B",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "rate(aptos_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
             }
@@ -1443,7 +1458,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
       "id": 38,
       "isNew": false,
       "span": 0,
@@ -1494,6 +1509,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"(declined|canceled)\"}[$AggInterval])",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}",
@@ -1538,7 +1554,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
       "id": 87,
       "isNew": false,
       "span": 0,
@@ -1589,6 +1605,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\" }[$AggInterval]))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -1667,6 +1684,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\" }[$AggInterval]))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -1745,6 +1763,7 @@
           "targets": [
             {
               "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -1823,6 +1842,7 @@
           "targets": [
             {
               "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -1901,6 +1921,7 @@
           "targets": [
             {
               "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -1979,6 +2000,7 @@
           "targets": [
             {
               "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -2057,6 +2079,7 @@
           "targets": [
             {
               "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -2135,6 +2158,7 @@
           "targets": [
             {
               "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -2177,7 +2201,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
       "id": 69,
       "isNew": false,
       "span": 0,
@@ -2189,7 +2213,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 38 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
           "id": 40,
           "isNew": false,
           "renderer": "flot",
@@ -2228,6 +2252,7 @@
           "targets": [
             {
               "refId": "D",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2269,7 +2294,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 38 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
           "id": 104,
           "isNew": false,
           "renderer": "flot",
@@ -2308,6 +2333,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"received\"}[$AggInterval]))",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2349,7 +2375,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 46 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
           "id": 61,
           "isNew": false,
           "renderer": "flot",
@@ -2388,6 +2414,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2429,7 +2456,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 46 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
           "id": 62,
           "isNew": false,
           "renderer": "flot",
@@ -2468,6 +2495,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2509,7 +2537,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 54 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
           "id": 20,
           "isNew": false,
           "renderer": "flot",
@@ -2548,6 +2576,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\",state=\"sent\"}[$AggInterval]))",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2589,7 +2618,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 54 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
           "id": 24,
           "isNew": false,
           "renderer": "flot",
@@ -2628,6 +2657,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\", state=\"received\"}[$AggInterval]))",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2669,7 +2699,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 62 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
           "id": 64,
           "isNew": false,
           "renderer": "flot",
@@ -2708,6 +2738,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -2747,7 +2778,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 62 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
           "id": 106,
           "isNew": false,
           "renderer": "flot",
@@ -2786,6 +2817,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -2825,7 +2857,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 70 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 38 },
           "id": 107,
           "isNew": false,
           "renderer": "flot",
@@ -2864,6 +2896,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -2903,7 +2936,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 70 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 38 },
           "id": 108,
           "isNew": false,
           "renderer": "flot",
@@ -2942,6 +2975,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -2981,7 +3015,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 78 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 46 },
           "id": 109,
           "isNew": false,
           "renderer": "flot",
@@ -3020,6 +3054,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -3059,7 +3094,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 78 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 46 },
           "id": 110,
           "isNew": false,
           "renderer": "flot",
@@ -3098,6 +3133,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -3140,7 +3176,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
       "id": 67,
       "isNew": false,
       "span": 0,
@@ -3152,7 +3188,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
           "id": 16,
           "isNew": false,
           "renderer": "flot",
@@ -3191,6 +3227,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -3232,7 +3269,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
           "id": 22,
           "isNew": false,
           "renderer": "flot",
@@ -3271,6 +3308,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -3312,7 +3350,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
           "id": 58,
           "isNew": false,
           "renderer": "flot",
@@ -3351,6 +3389,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -3390,7 +3429,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editable": false,
           "error": false,
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
           "id": 60,
           "isNew": false,
           "renderer": "flot",
@@ -3429,6 +3468,7 @@
           "targets": [
             {
               "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}"
             }
@@ -3466,6 +3506,299 @@
         }
       ],
       "collapsed": true
+    },
+    {
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "id": 127,
+      "isNew": false,
+      "span": 0,
+      "title": "HAProxy",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "id": 129,
+      "isNew": false,
+      "span": 0,
+      "title": "Pool Used Bytes",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by(kubernetes_pod_name) (haproxy_process_pool_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "id": 133,
+      "isNew": false,
+      "span": 0,
+      "title": "Current backend sessions",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by(kubernetes_pod_name) (haproxy_backend_current_sessions{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "id": 130,
+      "isNew": false,
+      "span": 0,
+      "title": "Idle time",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by(kubernetes_pod_name) (haproxy_process_idle_time_percent{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 1,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "id": 131,
+      "isNew": false,
+      "span": 0,
+      "title": "Frontend connections rate/s",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by(kubernetes_pod_name) (rate(haproxy_frontend_connections_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\", kubernetes_pod_name=~\".*\", role=\"haproxy\"}[$__rate_interval]))",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "id": 132,
+      "isNew": false,
+      "span": 0,
+      "title": "Frontend denied connections rate/s",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by(kubernetes_pod_name) (rate(haproxy_frontend_denied_connections_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\", kubernetes_pod_name=~\".*\", role=\"haproxy\"}[$__rate_interval]))",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
     }
   ],
   "rows": null,
@@ -3636,7 +3969,26 @@
     "list": [
       {
         "name": "Annotations \u0026 Alerts",
-        "datasource": "-- Grafana --",
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      },
+      {
+        "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "datasource", "uid": "grafana" },
         "showLine": false,
         "iconColor": "rgba(0, 211, 255, 1)",
         "lineColor": "",
@@ -3655,9 +4007,9 @@
       }
     ]
   },
-  "refresh": false,
-  "schemaVersion": 35,
-  "version": 1,
+  "refresh": "10s",
+  "schemaVersion": 37,
+  "version": 4,
   "links": [
     {
       "title": "Other Dashboards",
