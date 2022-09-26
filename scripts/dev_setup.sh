@@ -885,6 +885,7 @@ fi
 
 if [[ "$INSTALL_PROTOC" == "true" ]]; then
   if [[ "$INSTALL_BUILD_TOOLS" == "false" ]]; then
+    install_pkg unzip "$PACKAGE_MANAGER"
     install_protoc
   fi
 fi
