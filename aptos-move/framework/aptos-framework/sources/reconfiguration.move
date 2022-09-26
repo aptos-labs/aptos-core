@@ -36,7 +36,7 @@ module aptos_framework::reconfiguration {
         events: event::EventHandle<NewEpochEvent>,
     }
 
-    /// Reconfiguration will be disabled if this resource is published under the 
+    /// Reconfiguration will be disabled if this resource is published under the
     /// aptos_framework system address
     struct DisableReconfiguration has key {}
 
