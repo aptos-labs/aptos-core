@@ -289,11 +289,11 @@ module aptos_framework::stake {
         let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
         if (option::is_some(&find_validator(&validator_set.pending_active, pool_address))) {
             VALIDATOR_STATUS_PENDING_ACTIVE
-        } else if (option::is_some(&find_validator(&validator_set.active_validators, pool_address))) {
-            VALIDATOR_STATUS_ACTIVE
         } else if (option::is_some(&find_validator(&validator_set.pending_inactive, pool_address))) {
             VALIDATOR_STATUS_PENDING_INACTIVE
-        } else {
+        } else if (option::is_some(&find_validator(&validator_set.active_validators, pool_address))) {
+            VALIDATOR_STATUS_ACTIVE
+        }  else {
             VALIDATOR_STATUS_INACTIVE
         }
     }
