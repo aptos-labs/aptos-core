@@ -12,7 +12,6 @@ Start here to get into the core concepts of the Aptos blockchain.
 - ### [Accounts](basics-accounts.md)
 - ### [Events](basics-events.md)
 - ### [Gas and Transaction Fees](basics-gas-txn-fee.md)
-- ### [Proof](basics-merkle-proof.md)
 - ### [Fullnodes](basics-fullnodes.md)
 - ### [Validator Nodes](basics-validator-nodes.md)
 - ### [Node Networks and Synchronization](basics-node-networks-sync.md)
