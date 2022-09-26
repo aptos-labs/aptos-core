@@ -12,7 +12,8 @@ spec aptos_framework::state_storage {
         aborts_if false;
     }
 
-    spec get_state_storage_usage_only_at_epoch_beginning { // TODO: temporary mockup.
+    spec get_state_storage_usage_only_at_epoch_beginning {
+        // TODO: temporary mockup.
         pragma opaque;
         aborts_if false;
     }

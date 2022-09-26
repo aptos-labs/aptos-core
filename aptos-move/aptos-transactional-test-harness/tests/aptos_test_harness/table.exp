@@ -11,26 +11,7 @@ Events:
 return values: 0
 
 task 2 'run'. lines 9-9:
-Events:
-{
-    key:     0500000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
-    seq_num: 0
-    type:    0x3::token::CreateTokenDataEvent
-    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00640000000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6000000000000000000000000000000000a6765656b5f746f6b656e0000000000000000"
-}
-{
-    key:     0700000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
-    seq_num: 0
-    type:    0x3::token::DepositEvent
-    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000a00000000000000"
-}
-{
-    key:     0600000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
-    seq_num: 0
-    type:    0x3::token::MintTokenEvent
-    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e0a00000000000000"
-}mutable inputs after call: local#0: 0
-return values: 0
+Error: Transaction discarded. VMStatus: status MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS of type Validation
 
 task 3 'view'. lines 11-11:
 key 0x3::token::Collections {
@@ -50,7 +31,7 @@ key 0x3::token::Collections {
         }
     }
     create_token_data_events: store 0x1::event::EventHandle<0x3::token::CreateTokenDataEvent> {
-        counter: 1
+        counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
                 creation_num: 5
@@ -59,7 +40,7 @@ key 0x3::token::Collections {
         }
     }
     mint_token_events: store 0x1::event::EventHandle<0x3::token::MintTokenEvent> {
-        counter: 1
+        counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
                 creation_num: 6
@@ -70,39 +51,13 @@ key 0x3::token::Collections {
 }
 
 task 4 'view_table'. lines 13-15:
-{"description":"","maximum":"100","mutability_config":{"description":false,"maximum":false,"uri":false},"name":"aptos_punks","supply":"1","uri":""}
+{"description":"","maximum":"100","mutability_config":{"description":false,"maximum":false,"uri":false},"name":"aptos_punks","supply":"0","uri":""}
 
 task 5 'run'. lines 16-18:
-Events:
-{
-    key:     0800000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
-    seq_num: 0
-    type:    0x3::token::WithdrawEvent
-    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
-}
-{
-    key:     0b00000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
-    seq_num: 0
-    type:    0x3::token_transfers::TokenOfferEvent
-    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
-}mutable inputs after call: local#0: 0
-return values: 0
+Error: Transaction discarded. VMStatus: status MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS of type Validation
 
 task 6 'run'. lines 19-19:
-Events:
-{
-    key:     04000000000000009c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aa
-    seq_num: 0
-    type:    0x3::token::DepositEvent
-    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
-}
-{
-    key:     0d00000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
-    seq_num: 0
-    type:    0x3::token_transfers::TokenClaimEvent
-    data:    "9c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aaf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
-}mutable inputs after call: local#0: 0
-return values: 0
+Error: Failed to execute transaction. ExecutionStatus: status MISSING_DATA of type Execution
 
 task 7 'view_table'. lines 21-21:
-{"default_properties":{"map":{"data":[]}},"description":"","largest_property_version":"0","maximum":"100","mutability_config":{"description":false,"maximum":false,"properties":false,"royalty":false,"uri":false},"name":"geek_token","royalty":{"payee_address":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","royalty_points_denominator":"0","royalty_points_numerator":"0"},"supply":"10","uri":""}
+Error: Failed to fetch table item.

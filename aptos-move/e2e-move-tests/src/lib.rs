@@ -13,6 +13,9 @@ use move_deps::move_package::source_package::parsed_manifest::CustomDepInfo;
 use move_deps::move_symbol_pool::Symbol;
 pub use stake::*;
 
+#[cfg(test)]
+mod tests;
+
 pub(crate) struct AptosPackageHooks {}
 
 impl PackageHooks for AptosPackageHooks {

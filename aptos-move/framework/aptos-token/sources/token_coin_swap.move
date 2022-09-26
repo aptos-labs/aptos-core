@@ -177,7 +177,7 @@ module aptos_token::token_coin_swap {
         deposit_token_to_escrow(token_owner, token_id, token, locked_until_secs);
         // add the exchange info TokenCoinSwap list
         initialize_token_listing<CoinType>(token_owner);
-        let swap = TokenCoinSwap<CoinType>{
+        let swap = TokenCoinSwap<CoinType> {
             token_amount,
             min_price_per_token: min_coin_per_token
         };
@@ -201,8 +201,8 @@ module aptos_token::token_coin_swap {
     /// Initalize the token listing for a token owner
     fun initialize_token_listing<CoinType>(token_owner: &signer) {
         let addr = signer::address_of(token_owner);
-        if ( !exists<TokenListings<CoinType>>(addr) ) {
-            let token_listing = TokenListings<CoinType>{
+        if (!exists<TokenListings<CoinType>>(addr)) {
+            let token_listing = TokenListings<CoinType> {
                 listings: table::new<TokenId, TokenCoinSwap<CoinType>>(),
                 listing_events: account::new_event_handle<TokenListingEvent>(token_owner),
                 swap_events: account::new_event_handle<TokenSwapEvent>(token_owner),
@@ -214,8 +214,8 @@ module aptos_token::token_coin_swap {
     /// Intialize the token escrow
     fun initialize_token_store_escrow(token_owner: &signer) {
         let addr = signer::address_of(token_owner);
-        if ( !exists<TokenStoreEscrow>(addr) ) {
-            let token_store_escrow = TokenStoreEscrow{
+        if (!exists<TokenStoreEscrow>(addr)) {
+            let token_store_escrow = TokenStoreEscrow {
                 token_escrows: table::new<TokenId, TokenEscrow>()
             };
             move_to(token_owner, token_store_escrow);
@@ -235,7 +235,7 @@ module aptos_token::token_coin_swap {
             let dst = &mut table::borrow_mut(tokens_in_escrow, token_id).token;
             merge(dst, tokens);
         } else {
-            let token_escrow = TokenEscrow{
+            let token_escrow = TokenEscrow {
                 token: tokens,
                 locked_until_secs
             };
@@ -295,7 +295,17 @@ module aptos_token::token_coin_swap {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         timestamp::update_global_time_for_test(10000000);
         aptos_framework::account::create_account_for_test(signer::address_of(&token_owner));
-        let token_id = token::create_collection_and_token(&token_owner, 100, 100, 100);
+        let token_id = token::create_collection_and_token(
+            &token_owner,
+            100,
+            100,
+            100,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
         aptos_framework::account::create_account_for_test(signer::address_of(&coin_owner));
         token::initialize_token_store(&coin_owner);
         coin::create_fake_money(&coin_owner, &token_owner, 100);

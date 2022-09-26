@@ -397,7 +397,6 @@ module aptos_framework::vesting {
             staking: StakingInfo { pool_address, operator, voter, commission_percentage },
             remaining_grant: grant_amount,
             signer_cap: contract_signer_cap,
-
             update_operator_events: new_event_handle<UpdateOperatorEvent>(&contract_signer),
             update_voter_events: new_event_handle<UpdateVoterEvent>(&contract_signer),
             reset_lockup_events: new_event_handle<ResetLockupEvent>(&contract_signer),
@@ -605,6 +604,15 @@ module aptos_framework::vesting {
         );
     }
 
+    public entry fun update_operator_with_same_commission(
+        admin: &signer,
+        contract_address: address,
+        new_operator: address,
+    ) acquires VestingContract {
+        let commission_percentage = operator_commission_percentage(contract_address);
+        update_operator(admin, contract_address, new_operator, commission_percentage);
+    }
+
     public entry fun update_voter(
         admin: &signer,
         contract_address: address,
@@ -694,7 +702,7 @@ module aptos_framework::vesting {
         let addr = signer::address_of(account);
         assert!(
             addr == vesting_contract.admin ||
-            addr == get_role_holder(contract_address, utf8(ROLE_BENEFICIARY_RESETTER)),
+                addr == get_role_holder(contract_address, utf8(ROLE_BENEFICIARY_RESETTER)),
             error::permission_denied(EPERMISSION_DENIED),
         );
 
@@ -865,7 +873,6 @@ module aptos_framework::vesting {
         withdrawal_address: address,
         commission_percentage: u64,
     ): address acquires AdminStore {
-
         let vesting_schedule = create_vesting_schedule(
             vector[
                 fixed_point32::create_from_rational(3, 48),
@@ -1126,7 +1133,7 @@ module aptos_framework::vesting {
         let shareholder_address = signer::address_of(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
-            admin,&vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
+            admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
@@ -1215,6 +1222,22 @@ module aptos_framework::vesting {
         // Rounding error leads to a dust amount of 1 transferred to the staker.
         assert!(coin::balance<AptosCoin>(shareholder_address) == staker_rewards + 1, 0);
         assert!(coin::balance<AptosCoin>(operator_address) == commission - 1, 1);
+    }
+
+    #[test(aptos_framework = @0x1, admin = @0x123, operator = @0x345)]
+    public entry fun test_update_operator_with_same_commission(
+        aptos_framework: &signer,
+        admin: &signer,
+        operator: &signer,
+    ) acquires AdminStore, VestingContract {
+        let admin_address = signer::address_of(admin);
+        let operator_address = signer::address_of(operator);
+        setup(aptos_framework, &vector[admin_address, @11, operator_address]);
+        let contract_address = setup_vesting_contract(
+            admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address, 10);
+
+        update_operator_with_same_commission(admin, contract_address, operator_address);
+        assert!(operator_commission_percentage(contract_address) == 10, 0);
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]

@@ -34,7 +34,9 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{EntryFunction, ModuleBundle, Script, TransactionPayload};
+use aptos_types::transaction::{
+    EntryFunction, ModuleBundle, Script, TransactionArgument, TransactionPayload,
+};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
 use framework::natives::code::UpgradePolicy;
@@ -786,6 +788,13 @@ pub struct RunScript {
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) compile_proposal_args: CompileScriptFunction,
+    /// Arguments combined with their type separated by spaces.
+    ///
+    /// Supported types [u8, u64, u128, bool, hex, string, address, raw]
+    ///
+    /// Example: `address:0x1 bool:true u8:0`
+    #[clap(long, multiple_values = true)]
+    pub(crate) args: Vec<ArgWithType>,
 }
 
 #[async_trait]
@@ -799,12 +808,17 @@ impl CliCommand<TransactionSummary> for RunScript {
             .compile_proposal_args
             .compile("RunScript", self.txn_options.prompt_options)?;
 
+        let mut args: Vec<TransactionArgument> = vec![];
+        for arg in self.args {
+            args.push(arg.try_into()?);
+        }
+
         let txn = self
             .txn_options
             .submit_transaction(TransactionPayload::Script(Script::new(
                 bytecode,
                 vec![],
-                vec![],
+                args,
             )))
             .await?;
         Ok(TransactionSummary::from(&txn))
@@ -882,6 +896,35 @@ pub struct ArgWithType {
     pub(crate) arg: Vec<u8>,
 }
 
+impl ArgWithType {
+    pub fn address(account_address: AccountAddress) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Address,
+            arg: bcs::to_bytes(&account_address).unwrap(),
+        }
+    }
+
+    pub fn u64(arg: u64) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::U64,
+            arg: bcs::to_bytes(&arg).unwrap(),
+        }
+    }
+
+    pub fn bytes(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Raw,
+            arg: bcs::to_bytes(&arg).unwrap(),
+        }
+    }
+    pub fn raw(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Raw,
+            arg,
+        }
+    }
+}
+
 impl FromStr for ArgWithType {
     type Err = CliError;
 
@@ -899,6 +942,42 @@ impl FromStr for ArgWithType {
 
         Ok(ArgWithType { _ty: ty, arg })
     }
+}
+
+impl TryInto<TransactionArgument> for ArgWithType {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<TransactionArgument, Self::Error> {
+        match self._ty {
+            FunctionArgType::Address => Ok(TransactionArgument::Address(txn_arg_parser(
+                &self.arg, "address",
+            )?)),
+            FunctionArgType::Bool => Ok(TransactionArgument::Bool(txn_arg_parser(
+                &self.arg, "bool",
+            )?)),
+            FunctionArgType::Hex => Ok(TransactionArgument::U8Vector(txn_arg_parser(
+                &self.arg, "hex",
+            )?)),
+            FunctionArgType::String => Ok(TransactionArgument::U8Vector(txn_arg_parser(
+                &self.arg, "string",
+            )?)),
+            FunctionArgType::U8 => Ok(TransactionArgument::U8(txn_arg_parser(&self.arg, "u8")?)),
+            FunctionArgType::U64 => Ok(TransactionArgument::U64(txn_arg_parser(&self.arg, "u64")?)),
+            FunctionArgType::U128 => Ok(TransactionArgument::U128(txn_arg_parser(
+                &self.arg, "u128",
+            )?)),
+            FunctionArgType::Raw => Ok(TransactionArgument::U8Vector(txn_arg_parser(
+                &self.arg, "raw",
+            )?)),
+        }
+    }
+}
+
+fn txn_arg_parser<T: serde::de::DeserializeOwned>(
+    data: &[u8],
+    label: &'static str,
+) -> Result<T, CliError> {
+    bcs::from_bytes(data).map_err(|err| CliError::UnableToParse(label, err.to_string()))
 }
 
 /// Identifier of a module member (function or struct).

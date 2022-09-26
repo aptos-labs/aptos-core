@@ -281,32 +281,24 @@ where
 
         // Adjust some fields in the default template to lower the overhead of running on a
         // local machine
-        template.state_sync.storage_service.max_concurrent_requests = 2;
-        template
-            .state_sync
-            .aptos_data_client
-            .max_num_in_flight_priority_polls = 2;
-        template
-            .state_sync
-            .aptos_data_client
-            .max_num_in_flight_regular_polls = 2;
-        template
-            .state_sync
-            .aptos_data_client
-            .summary_poll_interval_ms = 1000;
-        template
-            .state_sync
-            .storage_service
-            .storage_summary_refresh_interval_ms = 1000;
-        template
-            .state_sync
-            .state_sync_driver
-            .max_consecutive_stream_notifications = 2;
-        template.execution.concurrency_level = 2;
-        template.peer_monitoring_service.max_concurrent_requests = 2;
-        let validator_network = template.validator_network.as_mut().unwrap();
-        validator_network.max_concurrent_network_reqs = 2;
+        template.execution.concurrency_level = 1;
+        template.execution.num_proof_reading_threads = 1;
+        template.peer_monitoring_service.max_concurrent_requests = 1;
+        template.mempool.shared_mempool_max_concurrent_inbound_syncs = 1;
 
+        let validator_network = template.validator_network.as_mut().unwrap();
+        validator_network.max_concurrent_network_reqs = 1;
+        validator_network.connectivity_check_interval_ms = 10000;
+        validator_network.max_connection_delay_ms = 10000;
+        validator_network.ping_interval_ms = 10000;
+        validator_network.runtime_threads = Some(1);
+
+        let fnn = template.full_node_networks.get_mut(0).unwrap();
+        fnn.max_concurrent_network_reqs = 1;
+        fnn.connectivity_check_interval_ms = 10000;
+        fnn.max_connection_delay_ms = 10000;
+        fnn.ping_interval_ms = 10000;
+        fnn.runtime_threads = Some(1);
         // If a config path was provided, use that as the template
         if let Some(config_path) = config_path {
             if let Ok(config) = NodeConfig::load_config(config_path) {

@@ -287,7 +287,7 @@ module aptos_framework::staking_config {
         voting_power_increase_limit: u64,
     ) {
         if (!exists<StakingConfig>(@aptos_framework)) {
-            move_to(aptos_framework, StakingConfig{
+            move_to(aptos_framework, StakingConfig {
                 minimum_stake,
                 maximum_stake,
                 recurring_lockup_duration_secs,

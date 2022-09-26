@@ -20,6 +20,7 @@ module aptos_std::type_info {
     }
 
     public native fun type_of<T>(): TypeInfo;
+
     public native fun type_name<T>(): string::String;
 
     #[test]

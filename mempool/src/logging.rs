@@ -57,11 +57,11 @@ impl TxnsLog {
         account: AccountAddress,
         seq_num: u64,
         status: &str,
-        timestamp: Option<SystemTime>,
+        timestamp: SystemTime,
     ) {
         if self.txns.len() < self.max_displayed {
             self.txns
-                .push((account, seq_num, Some(status.to_string()), timestamp));
+                .push((account, seq_num, Some(status.to_string()), Some(timestamp)));
         }
         self.len += 1;
     }

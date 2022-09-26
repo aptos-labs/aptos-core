@@ -79,6 +79,12 @@ fn test_message_board() {
 }
 
 #[test]
+fn test_minter() {
+    let named_address = BTreeMap::new();
+    run_tests_for_pkg("minter_script", named_address);
+}
+
+#[test]
 fn test_shared_account() {
     let named_address = BTreeMap::from([(
         String::from("shared_account"),

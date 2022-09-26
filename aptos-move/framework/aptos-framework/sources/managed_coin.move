@@ -66,7 +66,7 @@ module aptos_framework::managed_coin {
             monitor_supply,
         );
 
-        move_to(account, Capabilities<CoinType>{
+        move_to(account, Capabilities<CoinType> {
             burn_cap,
             freeze_cap,
             mint_cap,
@@ -108,7 +108,7 @@ module aptos_framework::managed_coin {
     use aptos_framework::aggregator_factory;
 
     #[test_only]
-    struct FakeMoney { }
+    struct FakeMoney {}
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
     public entry fun test_end_to_end(

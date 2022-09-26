@@ -199,8 +199,20 @@ impl RosettaClient {
 
         // A transfer operation is made up of a withdraw and a deposit
         let operations = vec![
-            Operation::withdraw(0, None, sender, native_coin(), amount),
-            Operation::deposit(1, None, receiver, native_coin(), amount),
+            Operation::withdraw(
+                0,
+                None,
+                AccountIdentifier::base_account(sender),
+                native_coin(),
+                amount,
+            ),
+            Operation::deposit(
+                1,
+                None,
+                AccountIdentifier::base_account(receiver),
+                native_coin(),
+                amount,
+            ),
         ];
 
         self.submit_operations(
@@ -220,6 +232,7 @@ impl RosettaClient {
         &self,
         network_identifier: &NetworkIdentifier,
         private_key: &Ed25519PrivateKey,
+        old_operator: AccountAddress,
         new_operator: AccountAddress,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
@@ -233,7 +246,13 @@ impl RosettaClient {
         keys.insert(sender, private_key);
 
         // A transfer operation is made up of a withdraw and a deposit
-        let operations = vec![Operation::set_operator(0, None, sender, new_operator)];
+        let operations = vec![Operation::set_operator(
+            0,
+            None,
+            sender,
+            AccountIdentifier::base_account(old_operator),
+            AccountIdentifier::base_account(new_operator),
+        )];
 
         self.submit_operations(
             sender,
@@ -252,6 +271,7 @@ impl RosettaClient {
         &self,
         network_identifier: &NetworkIdentifier,
         private_key: &Ed25519PrivateKey,
+        operator: AccountAddress,
         new_voter: AccountAddress,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
@@ -265,7 +285,13 @@ impl RosettaClient {
         keys.insert(sender, private_key);
 
         // A transfer operation is made up of a withdraw and a deposit
-        let operations = vec![Operation::set_voter(0, None, sender, new_voter)];
+        let operations = vec![Operation::set_voter(
+            0,
+            None,
+            sender,
+            AccountIdentifier::base_account(operator),
+            AccountIdentifier::base_account(new_voter),
+        )];
 
         self.submit_operations(
             sender,

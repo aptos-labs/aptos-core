@@ -483,7 +483,6 @@ module aptos_framework::stake {
             locked_until_secs: 0,
             operator_address: owner_address,
             delegated_voter: owner_address,
-
             // Events.
             initialize_validator_events: account::new_event_handle<RegisterValidatorCandidateEvent>(owner),
             set_operator_events: account::new_event_handle<SetOperatorEvent>(owner),
@@ -783,9 +782,9 @@ module aptos_framework::stake {
 
         // Validate the current validator set size has not exceeded the limit.
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
+        vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address, stake_pool, *validator_config));
         let validator_set_size = vector::length(&validator_set.active_validators) + vector::length(&validator_set.pending_active);
         assert!(validator_set_size <= MAX_VALIDATOR_SET_SIZE, error::invalid_argument(EVALIDATOR_SET_TOO_LARGE));
-        vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address, stake_pool, *validator_config));
 
         event::emit_event(
             &mut stake_pool.join_validator_set_events,
@@ -911,7 +910,6 @@ module aptos_framework::stake {
             } else {
                 validator_set.total_joining_power = 0;
             };
-
         } else {
             // Validate that the validator is already part of the validator set.
             let maybe_active_index = find_validator(&validator_set.active_validators, pool_address);
@@ -1121,7 +1119,7 @@ module aptos_framework::stake {
 
         let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(staking_config);
         let rewards_active = distribute_rewards(
-             &mut stake_pool.active,
+            &mut stake_pool.active,
             num_successful_proposals,
             num_total_proposals,
             rewards_rate,
@@ -2086,7 +2084,7 @@ module aptos_framework::stake {
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
-        initialize_test_validator(validator, 0, false ,false);
+        initialize_test_validator(validator, 0, false, false);
         let owner_cap = extract_owner_cap(validator);
 
         // Add stake when the validator is not yet activated.

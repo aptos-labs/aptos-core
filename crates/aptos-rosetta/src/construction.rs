@@ -50,6 +50,7 @@ use aptos_types::{
         authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
     },
 };
+use serde::de::DeserializeOwned;
 use std::convert::TryFrom;
 use std::time::{SystemTime, UNIX_EPOCH};
 use warp::Filter;
@@ -195,7 +196,7 @@ async fn construction_derive(
     let address = AuthenticationKey::ed25519(&public_key).derived_address();
 
     Ok(ConstructionDeriveResponse {
-        account_identifier: address.into(),
+        account_identifier: AccountIdentifier::base_account(address),
     })
 }
 
@@ -247,6 +248,71 @@ async fn construction_metadata(
         response.inner().sequence_number
     };
 
+    // We have to cheat the set operator and set voter operations right here
+    let mut internal_operation = request.options.internal_operation;
+
+    match &mut internal_operation {
+        InternalOperation::SetOperator(op) => {
+            // If there was no old operator set, and there is only one, we should use that
+            if op.old_operator.is_none() {
+                let store = rest_client
+                    .get_account_resource_bcs::<Store>(op.owner, "0x1::staking_contract::Store")
+                    .await?
+                    .into_inner();
+                if store.staking_contracts.len() != 1 {
+                    let operators: Vec<_> = store
+                        .staking_contracts
+                        .iter()
+                        .map(|(operator, _)| operator)
+                        .collect();
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Account has more than one operator, operator must be specified from: {:?}",
+                        operators
+                    ))));
+                } else {
+                    op.old_operator = Some(
+                        *store
+                            .staking_contracts
+                            .iter()
+                            .next()
+                            .map(|inner| inner.0)
+                            .unwrap(),
+                    );
+                }
+            }
+        }
+        InternalOperation::SetVoter(op) => {
+            // If there was no operator set, and there is only one, we should use that
+            if op.operator.is_none() {
+                let store = rest_client
+                    .get_account_resource_bcs::<Store>(op.owner, "0x1::staking_contract::Store")
+                    .await?
+                    .into_inner();
+                if store.staking_contracts.len() != 1 {
+                    let operators: Vec<_> = store
+                        .staking_contracts
+                        .iter()
+                        .map(|(operator, _)| operator)
+                        .collect();
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Account has more than one operator, operator must be specified from: {:?}",
+                        operators
+                    ))));
+                } else {
+                    op.operator = Some(
+                        *store
+                            .staking_contracts
+                            .iter()
+                            .next()
+                            .map(|inner| inner.0)
+                            .unwrap(),
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
+
     // If both are present, we skip simulation
     let (suggested_fee, gas_unit_price, max_gas_amount) =
         if let (Some(gas_unit_price), Some(max_gas_amount)) = (
@@ -265,7 +331,7 @@ async fn construction_metadata(
             }
 
             // Build up the transaction
-            let (txn_payload, sender) = request.options.internal_operation.payload()?;
+            let (txn_payload, sender) = internal_operation.payload()?;
             let unsigned_transaction = transaction_factory
                 .payload(txn_payload)
                 .sender(sender)
@@ -348,6 +414,7 @@ async fn construction_metadata(
             max_gas_amount: max_gas_amount.into(),
             gas_price_per_unit: gas_unit_price.into(),
             expiry_time_secs: request.options.expiry_time_secs,
+            internal_operation,
         },
         suggested_fee: vec![suggested_fee],
     })
@@ -371,10 +438,11 @@ async fn construction_parse(
             unsigned_transaction: None,
             signed_transaction: Some(signed_txn.clone()),
         });
-        let mut account_identifier_signers: Vec<_> = vec![signed_txn.sender().into()];
+        let mut account_identifier_signers: Vec<_> =
+            vec![AccountIdentifier::base_account(signed_txn.sender())];
 
         for account in signed_txn.authenticator().secondary_signer_addreses() {
-            account_identifier_signers.push(account.into())
+            account_identifier_signers.push(AccountIdentifier::base_account(account))
         }
 
         (
@@ -410,10 +478,12 @@ async fn construction_parse(
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
                 }
-                (AccountAddress::ONE, STAKE_MODULE, SET_OPERATOR_FUNCTION) => {
-                    parse_set_operator_operation(sender, &type_args, &args)?
-                }
-                (AccountAddress::ONE, STAKE_MODULE, SET_VOTER_FUNCTION) => {
+                (
+                    AccountAddress::ONE,
+                    STAKING_CONTRACT_MODULE,
+                    SWITCH_OPERATOR_WITH_SAME_COMMISSION,
+                ) => parse_set_operator_operation(sender, &type_args, &args)?,
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
                 }
                 _ => {
@@ -513,11 +583,17 @@ fn parse_transfer_operation(
     operations.push(Operation::withdraw(
         0,
         None,
-        sender,
+        AccountIdentifier::base_account(sender),
         currency.clone(),
         amount,
     ));
-    operations.push(Operation::deposit(1, None, receiver, currency, amount));
+    operations.push(Operation::deposit(
+        1,
+        None,
+        AccountIdentifier::base_account(receiver),
+        currency,
+        amount,
+    ));
     Ok(operations)
 }
 
@@ -552,12 +628,41 @@ fn parse_account_transfer_operation(
         )));
     };
 
-    operations.push(Operation::withdraw(0, None, sender, native_coin(), amount));
-    operations.push(Operation::deposit(1, None, receiver, native_coin(), amount));
+    operations.push(Operation::withdraw(
+        0,
+        None,
+        AccountIdentifier::base_account(sender),
+        native_coin(),
+        amount,
+    ));
+    operations.push(Operation::deposit(
+        1,
+        None,
+        AccountIdentifier::base_account(receiver),
+        native_coin(),
+        amount,
+    ));
     Ok(operations)
 }
 
-fn parse_set_operator_operation(
+pub fn parse_function_arg<T: DeserializeOwned>(
+    name: &str,
+    args: &[Vec<u8>],
+    index: usize,
+) -> ApiResult<T> {
+    if let Some(arg) = args.get(index) {
+        if let Ok(arg) = bcs::from_bytes::<T>(arg) {
+            return Ok(arg);
+        }
+    }
+
+    Err(ApiError::InvalidInput(Some(format!(
+        "Argument {} of {} failed to parse",
+        index, name
+    ))))
+}
+
+pub fn parse_set_operator_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
     args: &[Vec<u8>],
@@ -569,19 +674,18 @@ fn parse_set_operator_operation(
         ))));
     }
 
-    // Set operator
-    if let Some(encoded_operator) = args.first() {
-        let operator: AccountAddress = bcs::from_bytes(encoded_operator)?;
-
-        Ok(vec![Operation::set_operator(0, None, sender, operator)])
-    } else {
-        Err(ApiError::InvalidOperations(Some(
-            "Set operator doesn't have a operator argument".to_string(),
-        )))
-    }
+    let old_operator = parse_function_arg("set_operator", args, 0)?;
+    let new_operator = parse_function_arg("set_operator", args, 1)?;
+    Ok(vec![Operation::set_operator(
+        0,
+        None,
+        sender,
+        AccountIdentifier::base_account(old_operator),
+        AccountIdentifier::base_account(new_operator),
+    )])
 }
 
-fn parse_set_voter_operation(
+pub fn parse_set_voter_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
     args: &[Vec<u8>],
@@ -593,15 +697,15 @@ fn parse_set_voter_operation(
         ))));
     }
 
-    if let Some(encoded_operator) = args.first() {
-        let operator: AccountAddress = bcs::from_bytes(encoded_operator)?;
-
-        Ok(vec![Operation::set_voter(0, None, sender, operator)])
-    } else {
-        Err(ApiError::InvalidOperations(Some(
-            "Set voter doesn't have a voter argument".to_string(),
-        )))
-    }
+    let operator = parse_function_arg("set_voter", args, 0)?;
+    let new_voter = parse_function_arg("set_voter", args, 1)?;
+    Ok(vec![Operation::set_voter(
+        0,
+        None,
+        sender,
+        AccountIdentifier::base_account(operator),
+        AccountIdentifier::base_account(new_voter),
+    )])
 }
 
 /// Construction payloads command (OFFLINE)
@@ -617,12 +721,72 @@ async fn construction_payloads(
     check_network(request.network_identifier, &server_context)?;
 
     // Retrieve the real operation we're doing
-    let operation = InternalOperation::extract(&request.operations)?;
+    let mut operation = InternalOperation::extract(&request.operations)?;
     let metadata = if let Some(ref metadata) = request.metadata {
         metadata
     } else {
         return Err(ApiError::MissingPayloadMetadata);
     };
+
+    // This is a hack to ensure that the payloads actually have overridden operators if not provided
+    match &mut operation {
+        InternalOperation::CreateAccount(_) => {
+            if operation != metadata.internal_operation {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "CreateAccount operation doesn't match metadata {:?} vs {:?}",
+                    operation, metadata.internal_operation
+                ))));
+            }
+        }
+        InternalOperation::Transfer(_) => {
+            if operation != metadata.internal_operation {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Transfer operation doesn't match metadata {:?} vs {:?}",
+                    operation, metadata.internal_operation
+                ))));
+            }
+        }
+        InternalOperation::SetOperator(inner) => {
+            if let InternalOperation::SetOperator(ref metadata_op) = metadata.internal_operation {
+                if inner.owner == metadata_op.owner
+                    && inner.new_operator == metadata_op.new_operator
+                {
+                    if inner.old_operator.is_none() {
+                        inner.old_operator = metadata_op.old_operator;
+                    }
+                } else {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Set operator operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Set operator operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        }
+        InternalOperation::SetVoter(inner) => {
+            if let InternalOperation::SetVoter(ref metadata_op) = metadata.internal_operation {
+                if inner.owner == metadata_op.owner && inner.new_voter == metadata_op.new_voter {
+                    if inner.operator.is_none() {
+                        inner.operator = metadata_op.operator;
+                    }
+                } else {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Set voter operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Set voter operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        }
+    }
 
     // Encode operation
     let (txn_payload, sender) = operation.payload()?;
@@ -650,7 +814,7 @@ async fn construction_payloads(
         )))
     })?);
     let payload = SigningPayload {
-        account_identifier: AccountIdentifier::from(sender),
+        account_identifier: AccountIdentifier::base_account(sender),
         hex_bytes: signing_message,
         signature_type: Some(SignatureType::Ed25519),
     };
@@ -675,7 +839,7 @@ async fn construction_preprocess(
     check_network(request.network_identifier, &server_context)?;
 
     let internal_operation = InternalOperation::extract(&request.operations)?;
-    let required_public_keys = vec![internal_operation.sender().into()];
+    let required_public_keys = vec![AccountIdentifier::base_account(internal_operation.sender())];
 
     if let Some(max_gas) = request
         .metadata

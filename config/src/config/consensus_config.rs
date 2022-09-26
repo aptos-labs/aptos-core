@@ -35,8 +35,10 @@ pub struct ConsensusConfig {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
-            max_block_txns: 3500,
-            max_block_bytes: 5 * 1024 * 1024, // 5MB
+            max_block_txns: 2500,
+            // defaulting to under 0.5s to broadcast the proposal to 100 validators
+            // over 1gbps link
+            max_block_bytes: 600 * 1024, // 600 KB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
@@ -50,7 +52,7 @@ impl Default for ConsensusConfig {
             channel_size: 100, // hard-coded
             use_quorum_store: true,
             quorum_store_pull_timeout_ms: 1000,
-            quorum_store_poll_count: 5,
+            quorum_store_poll_count: 10,
             intra_consensus_channel_buffer_size: 10,
         }
     }

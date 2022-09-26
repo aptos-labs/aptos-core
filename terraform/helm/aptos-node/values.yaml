@@ -86,21 +86,11 @@ validator:
     consensus: {}
     execution: {}
     full_node_networks: []
-    inspection_service: {}
-    logger: {}
-    mempool:
-      shared_mempool_max_concurrent_inbound_syncs: 16 # default 4
-      max_broadcasts_per_peer: 2 # default 1
-      default_failovers: 0 # default 3
-    metrics: {}
-    peer_monitoring_service: {}
+    mempool: {}
     api: {}
-    state_sync: {}
-    firehose_stream: {}
     storage: {}
-    test: {}
     validator_network: {}
-    failpoints: {}
+
   # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
   enableNetworkPolicy: true
 

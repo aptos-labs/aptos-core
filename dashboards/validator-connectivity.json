@@ -129,7 +129,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"aptos-procs\", role=\"validator\"} == 0",
+          "expr": "up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=\"validator\"} == 0",
           "instant": true,
           "format": "table"
         }
@@ -554,7 +554,7 @@
     ]
   },
   "schemaVersion": 36,
-  "version": 1,
+  "version": 2,
   "links": [
     {
       "title": "Other Dashboards",
