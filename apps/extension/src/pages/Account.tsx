@@ -5,6 +5,7 @@ import {
   Box,
   Divider,
   Heading,
+  Spinner,
   VStack,
 } from '@chakra-ui/react';
 import React, { useMemo } from 'react';
@@ -51,10 +52,11 @@ function Account() {
         </Heading>
         <Divider />
         <Heading fontSize="lg">Between you</Heading>
-        <TransactionList
-          isLoading={activity.isLoading || activity.isFetchingNextPage}
-          transactions={transactions}
-        />
+        {
+          activity.isLoading || activity.isFetchingNextPage
+            ? <Spinner />
+            : <TransactionList transactions={transactions} />
+        }
         <NextPageLoader query={activity} />
       </VStack>
     </WalletLayout>

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { VStack } from '@chakra-ui/react';
+import { Spinner, VStack } from '@chakra-ui/react';
 import React, { useMemo } from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import NextPageLoader from 'core/components/NextPageLoader';
@@ -18,11 +18,12 @@ function Activity() {
 
   return (
     <WalletLayout title="Activity">
-      <VStack width="100%" p={4} alignItems="start">
-        <TransactionList
-          isLoading={activity.isLoading || activity.isFetchingNextPage}
-          transactions={transactions}
-        />
+      <VStack width="100%" p={4}>
+        {
+          activity.isLoading || activity.isFetchingNextPage
+            ? <Spinner />
+            : <TransactionList transactions={transactions} />
+        }
         <NextPageLoader query={activity} />
       </VStack>
     </WalletLayout>

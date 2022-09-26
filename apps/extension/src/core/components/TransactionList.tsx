@@ -5,7 +5,6 @@ import React from 'react';
 import {
   Box,
   Center,
-  Spinner,
   Text,
   useColorMode,
   VStack,
@@ -26,25 +25,20 @@ function NoActivity() {
 }
 
 interface TransactionListProps {
-  isLoading?: boolean,
-  transactions?: Types.UserTransaction[]
+  transactions: Types.UserTransaction[] | undefined
 }
 
 export function TransactionList({
-  isLoading,
   transactions,
 }: TransactionListProps) {
   const hasTransactions = transactions !== undefined && transactions.length > 0;
-
   return (
     <VStack w="100%" spacing={3}>
-      { (!isLoading && !hasTransactions) ? <NoActivity /> : null }
       {
         hasTransactions
           ? transactions.map((t) => <TransactionListItem key={t.version} transaction={t} />)
-          : null
+          : <NoActivity />
       }
-      { isLoading ? <Spinner /> : null }
     </VStack>
   );
 }

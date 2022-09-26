@@ -1,12 +1,17 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import {
-  Box, Button,
+  Box,
+  Button,
   Center,
-  Grid, Heading, Text, useColorMode, VStack,
+  Grid,
+  Heading,
+  Spinner,
+  Text,
+  VStack,
+  useColorMode,
 } from '@chakra-ui/react';
 import React, { useMemo } from 'react';
 import AvatarImage from 'core/AvatarImage';
@@ -148,8 +153,12 @@ export default function WalletAssets() {
       >
         RECENT TRANSACTIONS
       </Heading>
-      <Box w="100%">
-        <TransactionList isLoading={activity.isLoading} transactions={transactions} />
+      <VStack w="100%" spacing={0}>
+        {
+          activity.isLoading
+            ? <Spinner />
+            : <TransactionList transactions={transactions} />
+        }
         {
           activity.hasNextPage
             ? (
@@ -167,7 +176,7 @@ export default function WalletAssets() {
             )
             : null
         }
-      </Box>
+      </VStack>
     </VStack>
   );
 }
