@@ -67,3 +67,45 @@ A [signed transaction](/guides/sign-a-transaction.md) on the blockchain contains
 - **Maximum gas amount**: The [maximum gas amount](/concepts/basics-gas-txn-fee#gas-and-transaction-fee-on-the-aptos-blockchain) is the maximum gas units the transaction is allowed to consume.
 - **Sequence number**: This is an unsigned integer that must be equal to the sender's account [sequence number](/concepts/basics-accounts#account-sequence-number) at the time of execution.
 - **Expiration time**: A timestamp after which the transaction ceases to be valid (i.e., expires).
+
+# Ledger state
+
+The Aptos blockchain's ledger state (or global [state](/reference/glossary#state)) comprises the state of all accounts in the blockchain. Each validator node in the blockchain must know the global state of the latest version of the blockchain's distributed database (versioned database) to execute any transaction.
+
+## Versioned database
+
+All of the data in the Aptos blockchain is persisted in a single-versioned distributed database. A version number is an unsigned 64-bit integer that corresponds to the number of transactions the system has executed.
+
+This versioned database allows validator nodes to:
+
+- Execute a transaction against the ledger state at the latest version.
+- Respond to client queries about ledger history at both current and previous versions.
+
+## Transactions change state
+
+![FIGURE 1.0 TRANSACTIONS CHANGE STATE](/img/docs/transactions.svg)
+<small className="figure">FIGURE 1.0 TRANSACTIONS CHANGE STATE</small>
+
+Figure 1.0 represents how executing transaction T<sub>N</sub> changes the state of the Aptos blockchain from S<sub>N-1</sub> to S<sub>N</sub>.
+
+In the figure:
+
+| Name | Description |
+| ---- | ----------- |
+| Accounts **A** and **B** | Represent Alice's and Bob's accounts on the Aptos blockchain |
+| **S<sub>N-1</sub>** | Represents the (**N-1**)th state of the blockchain. In this state, Alice's account **A** has a balance of 110 Aptos Coins, and Bob's account **B** has a balance of 52 Aptos Coins. |
+| **T<sub>N</sub>** | This is the **N**th transaction executed on the blockchain. In this example, it represents Alice sending 10 Aptos Coins to Bob. |
+| **F** | It is a deterministic function. **F** always returns the same final state for a specific initial state and a specific transaction. If the current state of the blockchain is **S<sub>N-1</sub>**, and transaction **T<sub>N</sub>** is executed on state **S<sub>N-1</sub>**, the new state of the blockchain is always **S<sub>N</sub>**. The Aptos blockchain uses the [Move language](https://move-language.github.io/move/) to implement the deterministic execution function **F**. |
+| **S<sub>N</sub>** | This is the **N**th state of the blockchain. When the transaction **T<sub>N</sub>** is applied to the blockchain, it generates the new state **S<sub>N</sub>** (an outcome of applying **F** to **S<sub>N-1</sub>** and **T<sub>N</sub>**). This causes Alice’s account balance to be reduced by 10 to 100 Aptos Coins and Bob’s account balance to be increased by 10 to 62 Aptos Coins. The new state **S<sub>N</sub>** shows these updated balances. |
+
+## Proof
+
+The Aptos blockchain uses proof to verify the authenticity and correctness of the blockchain data.
+
+All the data in the Aptos blockchain is stored in a single-version distributed database. Each validator and fullnode's [storage](basics-validator-nodes.md#storage) is responsible for persisting the agreed upon blocks of transactions and their execution results to the database. 
+
+The blockchain is represented as an ever-growing [Merkle tree](/reference/glossary#merkle-trees), where each leaf appended to the tree represents a single transaction executed by the blockchain.
+
+All the operations executed by the blockchain and all the account states can be verified cryptographically. These cryptographic proofs ensure that:
+- The validator nodes agree on the states. 
+- The client does not need to trust the entity from which it is receiving data. For example, if a client fetches the last **n** transactions from an account, a proof can attest that no transactions were added, omitted or modified in the response. The client may also query for the state of an account, ask whether a specific transaction was processed, and so on.
