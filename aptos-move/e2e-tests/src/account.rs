@@ -26,7 +26,7 @@ use move_deps::move_core_types::{
 use vm_genesis::GENESIS_KEYPAIR;
 
 // TTL is 86400s. Initial time was set to 0.
-pub const DEFAULT_EXPIRATION_TIME: u64 = 40_000;
+pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
 
 /// Details about a Aptos account.
 ///
