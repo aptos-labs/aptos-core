@@ -5,7 +5,39 @@ slug: "whats-new-in-docs"
 
 # Whats New in Docs
 
-This page shows the key updates to the developer documentation on this site. 
+This page shows the key updates to the developer documentation on this site.
+
+## 26 September 2022
+
+- [Installing Aptos CLI](/docs/cli-tools/aptos-cli-tool/install-aptos-cli.md) provides detailed guidance for all major operating systems: Linux, macOS, and Windows.
+
+## 25 September 2022
+
+- [Transactions and States](/docs/concepts/basics-txns-states.md) matches the [Aptos Blockchain whitepaper](/docs/aptos-white-paper/index.md) in structure and content.
+
+## 23 September 2022
+
+- [Gas and Transaction Fees](/docs/concepts/basics-gas-txn-fee.md) contains sections on [prioritizing your transaction](/docs/concepts/basics-gas-txn-fee.md#prioritizing-your-transaction), [gas parameters set by governance](/docs/concepts/basics-gas-txn-fee.md#gas-parameters-set-by-governance), and [examples](/docs/concepts/basics-gas-txn-fee.md#examples) for understanding account balances, transaction fees, and transaction amounts.
+
+## 22 September 2022
+
+The [System Integrators Guide](/docs/guides/system-integrators-guide.md) contains a section on [tracking coin balance changes](/docs/guides/system-integrators-guide.md#tracking-coin-balance-changes).
+
+## 21 September 2022
+
+When [installing Aptos CLI](/docs/cli-tools/aptos-cli-tool/install-aptos-cli.md), we recommend [downloading the precompiled binary](/docs/cli-tools/aptos-cli-tool/install-aptos-cli.md#download-precompiled-binary) over [building the CLI binary from the source code](/docs/cli-tools/aptos-cli-tool/install-aptos-cli.md#advanced-users-only-build-the-cli-binary-from-the-source-code) as less error prone and much easier to get started.
+
+## 19 September 2022
+
+When [using the Aptos CLI to publish Move modules](/docs/cli-tools/aptos-cli-tool/use-aptos-cli.md#publishing-a-move-package-with-a-named-address), we note multiple modules in one package must have the same account or publishing will fail at the transaction level.
+
+## 16 September 2022
+
+When [connecting to Aptos Testnet](/docs/nodes/ait/connect-to-testnet.md), use the `testnet` rather than `testnet-stable` branch. See that document for the latest commit and Docker image tag.
+
+## 15 September 2022
+
+The [hardware requirements](/docs/nodes/ait/node-requirements.md#hardware-requirements) for Aptos nodes have grown for both Amazon Web Services and Google Cloud.
 
 ## 13 September 2022
 
