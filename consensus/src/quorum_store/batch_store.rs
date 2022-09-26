@@ -20,6 +20,7 @@ use consensus_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
@@ -107,15 +108,29 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         let batch_reader: Arc<BatchReader> = Arc::new(batch_reader);
         let batch_reader_clone = batch_reader.clone();
         let net = network_sender.clone();
-        spawn_named!("Quorum:BatchReader", async move {
-            batch_reader_clone
-                .start(
+        let metrics_monitor = tokio_metrics::TaskMonitor::new();
+
+        // print task metrics every 500ms
+        {
+            let metrics_monitor = metrics_monitor.clone();
+            tokio::spawn(async move {
+                for interval in metrics_monitor.intervals() {
+                    // pretty-print the metric interval
+                    println!("Quorum:BatchReader: {:?}", interval);
+                    // wait 500ms
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
+            });
+        }
+        _ = spawn_named!("Quorum:BatchReader", async move {
+            metrics_monitor
+                .instrument(batch_reader_clone.start(
                     batch_reader_rx,
                     net,
                     batch_request_num_peers,
                     batch_request_timeout_ms,
                     validator_verifier,
-                )
+                ))
                 .await
         });
 

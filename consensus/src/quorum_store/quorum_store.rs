@@ -76,6 +76,28 @@ pub struct QuorumStoreConfig {
     pub mempool_txn_pull_max_bytes: u64,
 }
 
+use std::future::Future;
+use std::time::Duration;
+
+pub fn spawn_monitored<T>(name: &'static str, future: T)
+where
+    T: Future + Send + 'static,
+    T::Output: Send + 'static,
+{
+    let metrics_monitor = tokio_metrics::TaskMonitor::new();
+    {
+        let metrics_monitor = metrics_monitor.clone();
+        tokio::spawn(async move {
+            for interval in metrics_monitor.intervals() {
+                // pretty-print the metric interval
+                println!("{name}{:?}", interval);
+                // wait 500ms
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        });
+        _ = spawn_named!(name, future);
+    }
+}
 impl QuorumStore {
     // TODO: pass epoch state
     pub fn new(
@@ -129,14 +151,14 @@ impl QuorumStore {
             config.db_quota,
         );
 
-        spawn_named!(
+        spawn_monitored(
             "Quorum:ProofBuilder",
-            proof_builder.start(proof_builder_rx, validator_verifier)
+            proof_builder.start(proof_builder_rx, validator_verifier),
         );
-        spawn_named!("Quorum:NetworkListener", net.start());
-        spawn_named!(
+        spawn_monitored("Quorum:NetworkListener", net.start());
+        spawn_monitored(
             "Quorum:BatchStore",
-            batch_store.start(batch_store_rx, proof_builder_tx.clone())
+            batch_store.start(batch_store_rx, proof_builder_tx.clone()),
         );
 
         debug!("QS: QuorumStore created");

@@ -26,6 +26,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use std::time::Duration;
 use storage_interface::DbReaderWriter;
 use tokio::runtime::{self, Runtime};
 
@@ -50,6 +51,16 @@ pub fn start_consensus(
         .enable_all()
         .build()
         .expect("Failed to create Tokio runtime!");
+    let runtime_monitor = tokio_metrics::RuntimeMonitor::new(&runtime.handle());
+    runtime.spawn(async move {
+        for interval in runtime_monitor.intervals() {
+            // pretty-print the metric interval
+            println!("ConsensusRuntime:{:?}", interval);
+            // wait 500ms
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
+    });
+
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let txn_notifier = Arc::new(MempoolNotifier::new(
         consensus_to_mempool_tx.clone(),
