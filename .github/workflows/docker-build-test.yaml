@@ -107,6 +107,28 @@ jobs:
       gitSha: ${{ env.GIT_SHA }}
       targetCacheId: ${{ env.TARGET_CACHE_ID }}
 
+  commit-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 100
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+
+      - name: Install Python Dependencies
+        run: pip install -r testsuite/requirements.txt
+
+      - name: Produce commit metadata
+        id: commit-metadata
+        run: |
+          if [[ -e testsuite/github_features.py ]]; then
+            python testsuite/github_features.py commit-info --github-output-key METADATA_JSON --verbose
+          fi
+    outputs:
+      METADATA_JSON: ${{ steps.commit-metadata.outputs.METADATA_JSON }}
+
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
     uses: ./.github/workflows/docker-rust-build.yaml

@@ -903,7 +903,38 @@ class Git:
 
     def last(self, limit: int = 1) -> Generator[str, None, None]:
         for i in range(limit):
-            yield self.run(["rev-parse", f"HEAD~{i}"]).unwrap().decode().strip()
+            yield self.run(
+                ["rev-parse", f"HEAD~{i}"]
+            ).unwrap().decode().strip()
+
+    def log(
+        self,
+        commit_or_range: Union[str, Tuple[str, str]],
+        format: str,
+        limit: int = 100,
+        remote: str = "origin",
+    ) -> str:
+        if isinstance(commit_or_range, tuple):
+            # Log a range of commits
+            base, head = commit_or_range
+            # Here we assume base is from remote
+            hashish = f"{remote}/{base}..{head}"
+            self.run(["fetch", remote, base]).unwrap()
+            self.run(["fetch", remote, head]).unwrap()
+            final_limit = str(limit)
+        else:
+            hashish = commit_or_range
+            self.run(["fetch", remote, commit_or_range]).unwrap()
+            final_limit = str(1)
+
+        result = self.run([
+            "log",
+            hashish,
+            "-n",
+            final_limit,
+            f"--pretty=format:{format}"
+        ])
+        return result.unwrap().decode()
 
 
 def assert_provided_image_tags_has_profile_or_features(
