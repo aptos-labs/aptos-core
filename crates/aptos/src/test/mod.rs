@@ -124,6 +124,10 @@ impl CliTestFramework {
         framework
     }
 
+    pub fn addresses(&self) -> Vec<AccountAddress> {
+        self.account_addresses.clone()
+    }
+
     async fn check_account_exists(&self, index: usize) -> bool {
         // Create account if it doesn't exist (and there's a faucet)
         let client = aptos_rest_client::Client::new(self.endpoint.clone());

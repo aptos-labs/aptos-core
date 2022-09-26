@@ -1088,6 +1088,7 @@ dependencies = [
  "reqwest",
  "serde 1.0.144",
  "serde_json",
+ "serde_yaml 0.8.26",
  "tokio",
  "url",
  "warp",

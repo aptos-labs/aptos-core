@@ -84,6 +84,7 @@ pub async fn setup_test(
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
+        cli.addresses(),
     )
     .await
     .unwrap();
@@ -134,6 +135,7 @@ async fn test_block_transactions() {
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
+        cli.addresses(),
     )
     .await
     .unwrap();
