@@ -95,8 +95,8 @@ where
                 tokio::time::sleep(Duration::from_secs(5)).await;
             }
         });
-        _ = spawn_named!(name, future);
     }
+    _ = spawn_named!(name, metrics_monitor.instrument(future));
 }
 impl QuorumStore {
     // TODO: pass epoch state
