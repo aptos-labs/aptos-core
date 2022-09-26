@@ -249,7 +249,6 @@ module aptos_token::token_coin_swap {
         let tokens_in_escrow = &mut borrow_global_mut<TokenStoreEscrow>(token_owner_addr).token_escrows;
         assert!(table::contains(tokens_in_escrow, token_id), error::not_found(ETOKEN_NOT_IN_ESCROW));
         let token_escrow = table::borrow_mut(tokens_in_escrow, token_id);
-        assert!(timestamp::now_seconds() > token_escrow.locked_until_secs, error::invalid_argument(ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME));
         if (amount == token::get_token_amount(&token_escrow.token)) {
             // destruct the token escrow to reclaim storage
             let TokenEscrow {
@@ -268,6 +267,10 @@ module aptos_token::token_coin_swap {
         token_id: TokenId,
         amount: u64
     ): Token acquires TokenStoreEscrow {
+        let tokens_in_escrow = &mut borrow_global_mut<TokenStoreEscrow>(signer::address_of(token_owner)).token_escrows;
+        assert!(table::contains(tokens_in_escrow, token_id), error::not_found(ETOKEN_NOT_IN_ESCROW));
+        let token_escrow = table::borrow_mut(tokens_in_escrow, token_id);
+        assert!(timestamp::now_seconds() > token_escrow.locked_until_secs, error::invalid_argument(ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME));
         withdraw_token_from_escrow_internal(signer::address_of(token_owner), token_id, amount)
     }
 
@@ -288,12 +291,16 @@ module aptos_token::token_coin_swap {
     }
 
     #[test(token_owner = @0xAB, coin_owner = @0x1, aptos_framework = @aptos_framework)]
-    public entry fun test_exchange_coin_for_token(token_owner: signer, coin_owner: signer, aptos_framework: signer) acquires TokenStoreEscrow, TokenListings {
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+    public entry fun test_exchange_coin_for_token_and_relist(
+        token_owner: &signer,
+        coin_owner: &signer,
+        aptos_framework: &signer
+    ) acquires TokenStoreEscrow, TokenListings {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
         timestamp::update_global_time_for_test(10000000);
-        aptos_framework::account::create_account_for_test(signer::address_of(&token_owner));
+        aptos_framework::account::create_account_for_test(signer::address_of(token_owner));
         let token_id = token::create_collection_and_token(
-            &token_owner,
+            token_owner,
             100,
             100,
             100,
@@ -303,13 +310,13 @@ module aptos_token::token_coin_swap {
             vector<bool>[false, false, false],
             vector<bool>[false, false, false, false, false],
         );
-        aptos_framework::account::create_account_for_test(signer::address_of(&coin_owner));
-        token::initialize_token_store(&coin_owner);
-        coin::create_fake_money(&coin_owner, &token_owner, 100);
+        aptos_framework::account::create_account_for_test(signer::address_of(coin_owner));
+        token::initialize_token_store(coin_owner);
+        coin::create_fake_money(coin_owner, token_owner, 100);
 
         list_token_for_swap<coin::FakeMoney>(
-            &token_owner,
-            signer::address_of(&token_owner),
+            token_owner,
+            signer::address_of(token_owner),
             token::get_collection_name(),
             token::get_token_name(),
             0,
@@ -318,23 +325,142 @@ module aptos_token::token_coin_swap {
             0
         );
         exchange_coin_for_token<coin::FakeMoney>(
-            &coin_owner,
+            coin_owner,
             51,
-            signer::address_of(&token_owner),
-            signer::address_of(&token_owner),
+            signer::address_of(token_owner),
+            signer::address_of(token_owner),
             token::get_collection_name(),
             token::get_token_name(),
             0,
-            50);
+            50,
+        );
         // coin owner only has 50 coins left
-        assert!(coin::balance<coin::FakeMoney>(signer::address_of(&coin_owner)) == 50, 1);
+        assert!(coin::balance<coin::FakeMoney>(signer::address_of(coin_owner)) == 50, 1);
         // all tokens in token escrow or transferred. Token owner has 0 token in token_store
-        assert!(token::balance_of(signer::address_of(&token_owner), token_id) == 0, 1);
+        assert!(token::balance_of(signer::address_of(token_owner), token_id) == 0, 1);
 
-        let token_listing = &borrow_global<TokenListings<coin::FakeMoney>>(signer::address_of(&token_owner)).listings;
+        let token_listing = &borrow_global<TokenListings<coin::FakeMoney>>(signer::address_of(token_owner)).listings;
 
         let token_coin_swap = table::borrow(token_listing, token_id);
         // sold 50 token only 50 tokens left
         assert!(token_coin_swap.token_amount == 50, token_coin_swap.token_amount);
+
+        // token owner cancel listing of remaining tokens
+        cancel_token_listing<coin::FakeMoney>(
+            token_owner,
+            token_id,
+            50,
+        );
+
+        // token owner relist 10 tokens with a different locktime
+        list_token_for_swap<coin::FakeMoney>(
+            token_owner,
+            signer::address_of(token_owner),
+            token::get_collection_name(),
+            token::get_token_name(),
+            0,
+            10,
+            1,
+            20000000
+        );
+
+        exchange_coin_for_token<coin::FakeMoney>(
+            coin_owner,
+            10,
+            signer::address_of(token_owner),
+            signer::address_of(token_owner),
+            token::get_collection_name(),
+            token::get_token_name(),
+            0,
+            10,
+        );
+
+        // expect buyer can buy the token at anytime
+        assert!(token::balance_of(signer::address_of(token_owner), token_id) == 40, 1);
+        assert!(coin::balance<coin::FakeMoney>(signer::address_of(coin_owner)) == 40, coin::balance<coin::FakeMoney>(signer::address_of(coin_owner)));
+    }
+
+    #[test(token_owner = @0xAB, coin_owner = @0x1, aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 65540)]
+    public fun test_escrow_lock_time(
+        token_owner: &signer,
+        coin_owner: &signer,
+        aptos_framework: &signer
+    ) acquires TokenStoreEscrow, TokenListings {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        timestamp::update_global_time_for_test(10000000);
+        aptos_framework::account::create_account_for_test(signer::address_of(token_owner));
+        let token_id = token::create_collection_and_token(
+            token_owner,
+            100,
+            100,
+            100,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        aptos_framework::account::create_account_for_test(signer::address_of(coin_owner));
+        token::initialize_token_store(coin_owner);
+        coin::create_fake_money(coin_owner, token_owner, 100);
+
+        list_token_for_swap<coin::FakeMoney>(
+            token_owner,
+            signer::address_of(token_owner),
+            token::get_collection_name(),
+            token::get_token_name(),
+            0,
+            100,
+            1,
+            20000000,
+        );
+        timestamp::update_global_time_for_test(15000000);
+        let token = withdraw_token_from_escrow(token_owner, token_id, 1);
+        deposit_token(token_owner, token);
+    }
+
+    #[test(token_owner = @0xAB, coin_owner = @0x1, aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 65540)]
+    public fun test_cancel_listing(
+        token_owner: &signer,
+        coin_owner: &signer,
+        aptos_framework: &signer
+    ) acquires TokenStoreEscrow, TokenListings {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        timestamp::update_global_time_for_test(10000000);
+        aptos_framework::account::create_account_for_test(signer::address_of(token_owner));
+        let token_id = token::create_collection_and_token(
+            token_owner,
+            100,
+            100,
+            100,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        aptos_framework::account::create_account_for_test(signer::address_of(coin_owner));
+        token::initialize_token_store(coin_owner);
+        coin::create_fake_money(coin_owner, token_owner, 100);
+
+        list_token_for_swap<coin::FakeMoney>(
+            token_owner,
+            signer::address_of(token_owner),
+            token::get_collection_name(),
+            token::get_token_name(),
+            0,
+            100,
+            1,
+            20000000,
+        );
+        timestamp::update_global_time_for_test(15000000);
+        // token owner cancel listing of remaining tokens
+        cancel_token_listing<coin::FakeMoney>(
+            token_owner,
+            token_id,
+            70,
+        );
     }
 }
