@@ -147,7 +147,7 @@ function Password() {
             }
           </FormControl>
           <Box w="100%" pb={4}>
-            <Button py={6} width="100%" type="submit" colorScheme="teal">
+            <Button py={6} width="100%" type="submit" colorScheme="salmon">
               Unlock
             </Button>
           </Box>

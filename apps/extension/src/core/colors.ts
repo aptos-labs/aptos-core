@@ -197,12 +197,22 @@ export const walletTextColor = (pathname: string) => {
 export const customColors = {
   green: {
     100: '#EDF9F8',
+    200: '#D8EEEC',
+    300: '#B8E0DD',
+    400: '#95D0CC',
+    // BRAND
     500: '#70C0BA',
+    600: '#4EB1AA',
+    700: '#49A69F',
     800: '#3E8E88',
+    900: '#306E69',
   },
   navy: {
     100: '#F1F2F3',
     200: '#DEE1E3',
+    300: '#C2C7CC',
+    400: '#B7BCBD',
+    500: '#A1A9AF',
     600: '#828C95',
     700: '#4d5c6d',
     800: '#324459',
@@ -210,10 +220,16 @@ export const customColors = {
     900: '#172B45',
   },
   salmon: {
-    300: '#FFAFAF',
+    100: '#FFBDBD',
+    200: '#FF9E9E',
+    300: '#FF8A8A',
+    400: '#FF7575',
+    50: '#FFF0F0',
     // primary
     500: '#FF5F5F',
-    600: '#E11919',
+    600: '#E15656',
     700: '#953232',
+    800: '#6F2525',
+    900: '#491818',
   },
 };
