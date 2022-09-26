@@ -102,7 +102,7 @@ export class AptosClient {
    * Queries transactions sent by given account
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query Optional pagination object
-   * @param query.start The start transaction version of the page. Default is the latest ledger version
+   * @param query.start The sequence number of the start transaction of the page. Default is 0.
    * @param query.limit The max number of transactions should be returned for the page. Default is 25.
    * @returns An array of on-chain transactions, sent by account
    */
