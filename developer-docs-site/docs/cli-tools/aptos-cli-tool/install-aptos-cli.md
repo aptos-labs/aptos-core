@@ -68,6 +68,11 @@ These instructions have been tested on Ubuntu 20.04
 These instructions have been tested on Windows 11 and Windows Server 2022
 :::
 
+:::info
+Windows support is fairly new, and some features may be not complete.  Please let us know your feedback and open
+Github issues for bugs.
+:::
+
 1. Go to the [Aptos CLI release page](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
 2. In the latest release section, you will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform.
 3. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder. For example, on Windows it is the `\Users\user\Downloads` folder.
