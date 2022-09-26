@@ -5,7 +5,9 @@ import {
   VStack, Box, Button, Flex, Grid, Tooltip, useColorMode, HStack, IconButton,
 } from '@chakra-ui/react';
 import { ArrowBackIcon } from '@chakra-ui/icons';
-import { secondaryBgColor, secondaryBackButtonBgColor } from 'core/colors';
+import {
+  secondaryBgColor, secondaryBackButtonBgColor, customColors, secondaryButtonBgColor,
+} from 'core/colors';
 import { useOnboardingState } from 'core/hooks/useOnboardingState';
 import React, {
   useCallback, useMemo, useRef, useState,
@@ -60,6 +62,7 @@ interface NextButtonProps {
 
 function CopyButton() {
   const { setValue, watch } = useFormContext<CreateWalletFormValues>();
+  const { colorMode } = useColorMode();
 
   const mnemonic = watch('mnemonic');
   const showSecretRecoveryPhrase = watch('showSecretRecoveryPhrase');
@@ -70,7 +73,11 @@ function CopyButton() {
     <Copyable value={mnemonic.join(' ')} width="100%" copiedPrompt="">
       <Button
         width="100%"
+        height="48px"
         size="md"
+        border="1px"
+        bgColor={secondaryButtonBgColor[colorMode]}
+        borderColor={customColors.navy[300]}
         onClick={() => {
           setValue('savedSecretRecoveryPhrase', true);
           setTimeout(() => {
@@ -115,13 +122,13 @@ function NextButton({
 
   const NextButtonComponent = useMemo(() => {
     const baseNextButton = (
-      <Button width="100%" size="md" onClick={nextOnClick} colorScheme="teal">
+      <Button width="100%" size="md" onClick={nextOnClick} height="48px" colorScheme="salmon">
         Continue
       </Button>
     );
 
     const disabledNextButton = (
-      <Button width="100%" isDisabled size="md" onClick={nextOnClick} colorScheme="teal">
+      <Button width="100%" isDisabled size="md" onClick={nextOnClick} colorScheme="salmon" height="48px">
         Continue
       </Button>
     );
@@ -299,7 +306,7 @@ function CreateWalletLayout({
       height="100%"
       width="100%"
       maxW="100%"
-      templateRows={`60px 1fr ${showSecretRecoveryPhrase ? 110 : 64}px`}
+      templateRows={`60px 1fr ${showSecretRecoveryPhrase ? 132 : 84}px`}
       bgColor={secondaryBgColor[colorMode]}
       position="relative"
     >
@@ -335,10 +342,12 @@ function CreateWalletLayout({
           {children}
         </form>
       </Box>
-      <Flex width="100%" justify="flex-end" alignItems="center" px={4}>
-        <VStack width="full" borderTop="1px" pt={2} borderColor={buttonBorderColor[colorMode]}>
-          <CopyButton />
-          <NextButton />
+      <Flex width="100%" justify="flex-end" alignItems="center">
+        <VStack width="full" borderTop="1px" py={4} borderColor={buttonBorderColor[colorMode]}>
+          <Flex width="100%" px={4} gap={2} flexDirection="column">
+            <CopyButton />
+            <NextButton />
+          </Flex>
         </VStack>
       </Flex>
       <Transition in={showSecretRecoveryPhrasePopup} timeout={transitionDuration} nodeRef={ref}>

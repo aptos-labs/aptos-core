@@ -236,13 +236,13 @@ function NextButton() {
 
   const NextButtonComponent = useMemo(() => {
     const baseNextButton = (
-      <Button width="100%" isLoading={isLoading} size="lg" onClick={nextOnClick} colorScheme="teal">
+      <Button width="100%" height="48px" isLoading={isLoading} onClick={nextOnClick} colorScheme="salmon">
         {buttonText}
       </Button>
     );
 
     const disabledNextButton = (
-      <Button width="100%" isLoading={isLoading} isDisabled size="lg" onClick={nextOnClick} colorScheme="teal">
+      <Button width="100%" height="48px" isLoading={isLoading} isDisabled onClick={nextOnClick} colorScheme="salmon">
         {buttonText}
       </Button>
     );
@@ -369,7 +369,7 @@ function CreateWalletViaImportLayoutFC({
       height="100%"
       width="100%"
       maxW="100%"
-      templateRows="60px 1fr 72px"
+      templateRows="60px 1fr 84px"
       bgColor={secondaryBgColor[colorMode]}
     >
       <HStack width="100%" px={4}>
@@ -406,7 +406,7 @@ function CreateWalletViaImportLayoutFC({
           {children}
         </form>
       </Box>
-      <Flex width="100%" px={4} pt={3} borderTop="1px" borderColor={buttonBorderColor[colorMode]}>
+      <Flex width="100%" px={4} pt={4} borderTop="1px" borderColor={buttonBorderColor[colorMode]}>
         <NextButton />
       </Flex>
     </Grid>

@@ -83,7 +83,7 @@ export function NoWalletAddAccountBody({
         leftIcon={<FaKey size={20} />}
         justifyContent="flex-start"
         onClick={importPrivateKeyOnClick}
-        colorScheme={isImportTypePrivateKey ? 'teal' : undefined}
+        colorScheme={isImportTypePrivateKey ? 'salmon' : undefined}
       >
         <Text fontSize={18}>Import private key</Text>
       </Button>
@@ -93,7 +93,7 @@ export function NoWalletAddAccountBody({
         leftIcon={<BsLayoutTextSidebar size={20} />}
         justifyContent="flex-start"
         onClick={importMnemonicOnClick}
-        colorScheme={isImportTypeMnemonic ? 'teal' : undefined}
+        colorScheme={isImportTypeMnemonic ? 'salmon' : undefined}
       >
         <Text fontSize={18}>Import mnemonic</Text>
       </Button>

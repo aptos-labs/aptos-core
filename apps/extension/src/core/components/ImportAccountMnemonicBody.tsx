@@ -49,7 +49,7 @@ export default function ImportAccountMnemonicBody({
       {
         hasSubmit ? (
           <Box py={2} width="100%" borderTop="1px" pt={2} borderColor={buttonBorderColor[colorMode]}>
-            <Button colorScheme="teal" width="100%" type="submit" disabled={isSubmitDisabled}>
+            <Button colorScheme="salmon" height="48px" width="100%" type="submit" disabled={isSubmitDisabled}>
               Submit
             </Button>
           </Box>

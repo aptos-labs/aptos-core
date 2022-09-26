@@ -69,7 +69,7 @@ export default function EnterSecretRecoveryPhraseBody() {
           <VStack key="first-col">
             {mnemonic.slice(0, 6).map((item, index) => (
               <InputGroup key={item} fontWeight="bold" border={borderColor[colorMode]}>
-                <InputLeftElement color="teal">{`${index + 1}.`}</InputLeftElement>
+                <InputLeftElement color="navy.600">{`${index + 1}.`}</InputLeftElement>
                 <Input onChange={(e) => handleOnInputChange(e, index)} onPaste={handleOnInputPaste} value={mnemonicValues[index] || ''} variant="outline" key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
               </InputGroup>
             ))}
@@ -77,7 +77,7 @@ export default function EnterSecretRecoveryPhraseBody() {
           <VStack key="second-col">
             {mnemonic.slice(6, 12).map((item, index) => (
               <InputGroup size="md" key={item} fontWeight="bold" border={borderColor[colorMode]}>
-                <InputLeftElement color="teal">{`${index + 7}.`}</InputLeftElement>
+                <InputLeftElement color="navy.600">{`${index + 7}.`}</InputLeftElement>
                 <Input onChange={(e) => handleOnInputChange(e, index + 6)} onPaste={handleOnInputPaste} value={mnemonicValues[index + 6] || ''} variant="outline" key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
               </InputGroup>
             ))}

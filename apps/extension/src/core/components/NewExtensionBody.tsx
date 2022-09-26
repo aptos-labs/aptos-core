@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  useColorMode,
   Box,
   VStack,
+  useColorMode,
   Heading,
   Flex,
   Text,
@@ -30,19 +30,24 @@ export default function NewExtensionBody() {
                 : <AptosBlackLogo />
             }
             </Box>
-            <Heading fontSize={28}>Welcome to Petra</Heading>
+            <Heading
+              size="lg"
+              fontWeight={700}
+            >
+              Welcome to Petra
+            </Heading>
             <Text
               pb={10}
               pt={2}
               fontSize="md"
             >
-              The most reliable way to engage on Aptos. Buy, store, and offer tokens & NFTs.
+              Guiding your web3 journey
             </Text>
           </Flex>
         </Flex>
-        <VStack spacing={4}>
+        <VStack spacing={6}>
           <ChakraLink to={Routes.createWallet.path} width="100%">
-            <Button colorScheme="teal" variant="solid" width="100%" height={14}>
+            <Button colorScheme="salmon" color="white" variant="solid" width="100%" height={14}>
               <Text
                 fontSize="xl"
               >

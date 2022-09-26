@@ -6,6 +6,7 @@ import { zxcvbnOptions } from '@zxcvbn-ts/core';
 import {
   Button, useColorMode, VStack, Box,
 } from '@chakra-ui/react';
+import { customColors } from 'core/colors';
 import { passwordOptions } from './CreatePasswordBody';
 import SecretRecoveryPhraseBody from './SecretRecoveryPhraseBody';
 import Copyable from './Copyable';
@@ -20,6 +21,11 @@ interface Props {
 const buttonBorderColor = {
   dark: 'gray.700',
   light: 'gray.200',
+};
+
+export const buttonBgColor = {
+  dark: 'gray.800',
+  light: 'white',
 };
 
 export default function CreateAccountBody(
@@ -38,6 +44,9 @@ export default function CreateAccountBody(
           <Button
             width="100%"
             type="submit"
+            border="1px"
+            bgColor={buttonBgColor[colorMode]}
+            borderColor={customColors.navy[300]}
             isLoading={isLoading}
             px={8}
             onClick={() => setCopied(true)}

@@ -36,7 +36,7 @@ export default function MnemonicInput({ register, setValue }: MnemonicInputProps
       <VStack key="first-col">
         {mnemonicValues.slice(0, 6).map((mnemonic, index) => (
           <InputGroup key={mnemonic} fontWeight="bold" border={mnemonicBorderColor[colorMode]}>
-            <InputLeftElement color="teal">{`${index + 1}.`}</InputLeftElement>
+            <InputLeftElement color="navy.600">{`${index + 1}.`}</InputLeftElement>
             <Input
               {...register(`${mnemonic}`)}
               onPaste={handleOnInputPaste}
@@ -58,7 +58,7 @@ export default function MnemonicInput({ register, setValue }: MnemonicInputProps
             fontWeight="bold"
             border={mnemonicBorderColor[colorMode]}
           >
-            <InputLeftElement color="teal">{`${index + 7}.`}</InputLeftElement>
+            <InputLeftElement color="navy.600">{`${index + 7}.`}</InputLeftElement>
             <Input
               {...register(mnemonic)}
               onPaste={handleOnInputPaste}

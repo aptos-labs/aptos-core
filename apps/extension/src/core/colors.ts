@@ -194,6 +194,11 @@ export const walletTextColor = (pathname: string) => {
   }
 };
 
+export const secondaryButtonBgColor = {
+  dark: 'gray.800',
+  light: 'white',
+};
+
 export const customColors = {
   green: {
     100: '#EDF9F8',
@@ -219,6 +224,9 @@ export const customColors = {
     // primary
     900: '#172B45',
   },
+  orange: {
+    200: '#F3A845',
+  },
   salmon: {
     100: '#FFBDBD',
     200: '#FF9E9E',
@@ -232,4 +240,9 @@ export const customColors = {
     800: '#6F2525',
     900: '#491818',
   },
+};
+
+export const stepBorderColor = {
+  dark: customColors.navy[100],
+  light: customColors.navy[900],
 };

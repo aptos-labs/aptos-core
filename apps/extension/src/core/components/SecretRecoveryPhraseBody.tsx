@@ -23,7 +23,7 @@ import {
 import { BsDot } from '@react-icons/all-files/bs/BsDot';
 import { AiFillInfoCircle } from '@react-icons/all-files/ai/AiFillInfoCircle';
 import { AiOutlineEyeInvisible } from '@react-icons/all-files/ai/AiOutlineEyeInvisible';
-import { secondaryHeaderInputBgColor } from 'core/colors';
+import { secondaryHeaderInputBgColor, customColors } from 'core/colors';
 import { type CreateWalletFormValues } from 'core/layouts/CreateWalletLayout';
 import { useFormContext } from 'react-hook-form';
 import { Transition, type TransitionStatus } from 'react-transition-group';
@@ -168,7 +168,7 @@ export default function SecretRecoveryPhraseBody() {
           <VStack key="first-column">
             {mnemonic.slice(0, 6).map((item, index) => (
               <InputGroup key={item} fontWeight="bold" border={borderColor[colorMode]}>
-                <InputLeftElement color="teal" height={inputHeight}>{`${index + 1}.`}</InputLeftElement>
+                <InputLeftElement color={customColors.navy[600]} height={inputHeight}>{`${index + 1}.`}</InputLeftElement>
                 <Input height={inputHeight} readOnly variant="outline" value={item} key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
               </InputGroup>
             ))}
@@ -176,7 +176,7 @@ export default function SecretRecoveryPhraseBody() {
           <VStack key="second-column">
             {mnemonic.slice(6, 12).map((item, index) => (
               <InputGroup size="md" key={item} fontWeight="bold" border={borderColor[colorMode]}>
-                <InputLeftElement height={inputHeight} color="teal">{`${index + 7}.`}</InputLeftElement>
+                <InputLeftElement height={inputHeight} color={customColors.navy[600]}>{`${index + 7}.`}</InputLeftElement>
                 <Input height={inputHeight} readOnly variant="outline" value={item} key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
               </InputGroup>
             ))}

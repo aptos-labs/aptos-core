@@ -17,7 +17,7 @@ import {
 import { AiOutlineEye } from '@react-icons/all-files/ai/AiOutlineEye';
 import { AiOutlineEyeInvisible } from '@react-icons/all-files/ai/AiOutlineEyeInvisible';
 import { MdCancel } from '@react-icons/all-files/md/MdCancel';
-import { secondaryTextColor } from 'core/colors';
+import { secondaryTextColor, customColors } from 'core/colors';
 import { useFormContext } from 'react-hook-form';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
@@ -123,8 +123,8 @@ export default function CreatePasswordBody() {
     <VStack align="left" pt={2}>
       <Heading fontSize="xl">Create a password</Heading>
       <Text fontSize="md">You&apos;ll use this to unlock your wallet</Text>
-      <VStack pt={8} width="100%" spacing={2} display="flex" alignItems="flex-start">
-        <Box width="100%" height="4.5rem">
+      <VStack pt={8} width="100%" spacing={4} minHeight="160px" display="flex" alignItems="flex-start">
+        <Box width="100%">
           <InputGroup>
             <Input
               size="lg"
@@ -132,7 +132,7 @@ export default function CreatePasswordBody() {
               autoComplete="false"
               variant="filled"
               isInvalid={!!passwordWarningText}
-              errorBorderColor="red.500"
+              errorBorderColor={customColors.orange[200]}
               type={showPassword ? 'text' : 'password'}
               placeholder="Enter Password"
               maxLength={64}
@@ -153,7 +153,7 @@ export default function CreatePasswordBody() {
             </InputRightElement>
           </InputGroup>
           {initialPassword.length > 0 && passwordWarningText.length > 0 ? (
-            <Text color="red.400" fontSize="xs" mt={2} width="100%">
+            <Text color={customColors.orange[200]} fontSize="xs" mt={2} width="100%">
               {passwordWarningText}
             </Text>
           ) : null}
@@ -165,6 +165,7 @@ export default function CreatePasswordBody() {
               isInvalid={!!confirmPasswordWarningText}
               autoComplete="false"
               variant="filled"
+              errorBorderColor={customColors.orange[200]}
               type={showPassword ? 'text' : 'password'}
               placeholder="Confirm Password"
               maxLength={64}
@@ -176,7 +177,7 @@ export default function CreatePasswordBody() {
             />
           </InputGroup>
           {!confirmPasswordFocused && (
-          <Text color="red.400" fontSize="xs" mt={2} width="100%">
+          <Text color={customColors.orange[200]} fontSize="xs" mt={2} width="100%">
             {confirmPasswordWarningText}
           </Text>
           )}
@@ -184,7 +185,7 @@ export default function CreatePasswordBody() {
       </VStack>
       <Box pt={4}>
         <Checkbox
-          colorScheme="teal"
+          colorScheme="salmon"
           value="terms"
           color={secondaryTextColor[colorMode]}
           {...register('termsOfService')}
@@ -194,16 +195,16 @@ export default function CreatePasswordBody() {
           <Button
             as="a"
             href="https://petra.app/Wallet_Terms.pdf"
-            color="teal.500"
+            color="navy.600"
             target="_blank"
             rel="noreferrer"
             variant="link"
           >
-            Terms of Service
+            <Text as="u">Terms of Service</Text>
           </Button>
         </Checkbox>
         {termsOfServiceWarningText && (
-          <Text color="red.400" fontSize="xs" mt={2} width="100%">
+          <Text color={customColors.orange[200]} fontSize="xs" mt={2} width="100%">
             {termsOfServiceWarningText}
           </Text>
         )}

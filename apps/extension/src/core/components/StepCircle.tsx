@@ -1,6 +1,9 @@
 import React from 'react';
-import { Circle, SquareProps, Icon } from '@chakra-ui/react';
+import {
+  Circle, SquareProps, Icon,
+} from '@chakra-ui/react';
 import { HiCheck } from '@react-icons/all-files/hi/HiCheck';
+import { customColors } from 'core/colors';
 
 interface RadioCircleProps extends SquareProps {
   isActive: boolean,
@@ -12,15 +15,15 @@ function StepCircle(props: RadioCircleProps) {
   return (
     <Circle
       size="5"
-      bg={isCompleted ? 'teal' : 'inherit'}
-      borderWidth={isCompleted ? '0' : '2px'}
-      borderColor={isActive ? 'accent' : 'inherit'}
+      background={isCompleted ? customColors.navy[900] : 'inherit'}
+      borderWidth={isCompleted ? '0' : '5px'}
+      borderColor={isActive ? 'gray.200' : 'inherit'}
       {...rest}
     >
       {isCompleted ? (
         <Icon as={HiCheck} color="white" boxSize="3" />
       ) : (
-        <Circle bg={isActive ? 'teal' : 'gray.400'} size="2" />
+        <Circle bg={isActive ? customColors.navy[900] : 'gray.400'} size="2" />
       )}
     </Circle>
   );

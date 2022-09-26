@@ -1,7 +1,8 @@
 import React from 'react';
 import {
-  Divider, HStack, StackProps, Flex,
+  Divider, HStack, StackProps, Flex, useColorMode,
 } from '@chakra-ui/react';
+import { stepBorderColor } from 'core/colors';
 import StepCircle from './StepCircle';
 
 interface StepProps extends StackProps {
@@ -14,6 +15,7 @@ function Step(props: StepProps) {
   const {
     isActive, isCompleted, isLastStep, ...stackProps
   } = props;
+  const { colorMode } = useColorMode();
 
   const incompleteStyle = isLastStep ? 'transparent' : 'inherit';
 
@@ -25,7 +27,7 @@ function Step(props: StepProps) {
           width="70%"
           orientation="horizontal"
           borderWidth="1px"
-          borderColor={isCompleted ? 'teal' : incompleteStyle}
+          borderColor={isCompleted ? stepBorderColor[colorMode] : incompleteStyle}
         />
       </Flex>
     </HStack>

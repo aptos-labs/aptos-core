@@ -111,7 +111,7 @@ function Password() {
                 onClick={handleClickResetPassword}
                 fontWeight={500}
                 fontSize="md"
-                colorScheme="teal"
+                color="navy.600"
                 variant="link"
               >
                 Reset password
@@ -126,6 +126,7 @@ function Password() {
               <Input
                 autoComplete="false"
                 variant="filled"
+                height="48px"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Password..."
                 maxLength={64}

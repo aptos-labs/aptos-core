@@ -8,6 +8,7 @@ import {
   Box, Center, Text, Button,
   useColorMode,
 } from '@chakra-ui/react';
+import { customColors } from 'core/colors';
 import type { TransitionStatus } from 'react-transition-group';
 
 const bgColorOverlay = {
@@ -161,8 +162,26 @@ function SecretPhraseConfirmationPopup({
             </Box>
           </Center>
           <Box width="100%" display="flex" flexDirection="column" gap={3}>
-            <Button variant="solid" width="100%" onClick={goPrev}>Show phrase again</Button>
-            <Button width="100%" isLoading={isLoading} colorScheme="teal" variant="solid" color="white" onClick={goNext}>Done</Button>
+            <Button
+              width="100%"
+              onClick={goPrev}
+              height="48px"
+              bgColor={bgColorPopup[colorMode]}
+              border="1px"
+              borderColor={customColors.navy[300]}
+            >
+              Show phrase again
+            </Button>
+            <Button
+              width="100%"
+              isLoading={isLoading}
+              height="48px"
+              colorScheme="salmon"
+              color="white"
+              onClick={goNext}
+            >
+              Done
+            </Button>
           </Box>
         </>
         )}
