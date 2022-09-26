@@ -804,7 +804,7 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
         .as_secs();
 
     let pods_api: Api<Pod> = Api::namespaced(kube_client.clone(), "default");
-    let lp = ListParams::default().labels("run");
+    let lp = ListParams::default().labels("app.kubernetes.io/name=forge");
 
     // delete all forge test pods over a threshold age
     let pods = pods_api
