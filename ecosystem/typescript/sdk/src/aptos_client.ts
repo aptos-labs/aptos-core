@@ -50,6 +50,8 @@ interface PaginationArgs {
 export class AptosClient {
   client: Gen.AptosGeneratedClient;
 
+  readonly nodeUrl: string;
+
   /**
    * Build a client configured to connect to an Aptos node at the given URL.
    *
@@ -65,11 +67,13 @@ export class AptosClient {
       throw new Error("Node URL cannot be empty.");
     }
     const conf = config === undefined || config === null ? {} : { ...config };
+
     if (doNotFixNodeUrl) {
-      conf.BASE = nodeUrl;
+      this.nodeUrl = nodeUrl;
     } else {
-      conf.BASE = fixNodeUrl(nodeUrl);
+      this.nodeUrl = fixNodeUrl(nodeUrl);
     }
+    conf.BASE = this.nodeUrl;
 
     // Do not carry cookies when `WITH_CREDENTIALS` is explicitly set to `false`. By default, cookies will be sent
     if (config?.WITH_CREDENTIALS === false) {
