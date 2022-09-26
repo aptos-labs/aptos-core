@@ -53,7 +53,7 @@ pub fn compress(
             increment_compression_error(COMPRESS, client);
             return Err(CompressionError(format!(
                 "Failed to compress the data: {}",
-                error.to_string()
+                error
             )));
         }
     };
@@ -100,7 +100,7 @@ pub fn decompress(
             increment_compression_error(DECOMPRESS, client);
             return Err(CompressionError(format!(
                 "Failed to decompress the data: {}",
-                error.to_string()
+                error
             )));
         }
     };
@@ -111,7 +111,7 @@ pub fn decompress(
         increment_compression_error(DECOMPRESS, client);
         return Err(CompressionError(format!(
             "Failed to decompress the data: {}",
-            error.to_string()
+            error
         )));
     };
 
