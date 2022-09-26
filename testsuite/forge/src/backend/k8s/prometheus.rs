@@ -1,22 +1,71 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Result;
+use crate::{create_k8s_client, Result};
 
 use anyhow::bail;
 use aptos_logger::info;
+use k8s_openapi::api::core::v1::Secret;
+use kube::api::Api;
 use prometheus_http_query::{response::PromqlResult, Client as PrometheusClient};
 use reqwest::{header, Client as HttpClient};
 use std::collections::BTreeMap;
 
-pub fn get_prometheus_client() -> Result<PrometheusClient> {
-    let prom_url =
-        std::env::var("PROMETHEUS_URL").unwrap_or_else(|_| "http://127.0.0.1:9090".to_string());
-    info!("Attempting to create prometheus client with: {} ", prom_url);
+pub async fn get_prometheus_client() -> Result<PrometheusClient> {
+    // read from the environment
+    let kube_client = create_k8s_client().await;
+    let secrets_api: Api<Secret> = Api::namespaced(kube_client.clone(), "default");
+
+    let prom_url_env = std::env::var("PROMETHEUS_URL");
+    let prom_token_env = std::env::var("PROMETHEUS_TOKEN");
+
+    let (prom_url, prom_token) = match (prom_url_env, prom_token_env) {
+        // if both variables are provided, use them, otherwise try inferring from environment
+        (Ok(url), Ok(token)) => {
+            println!("Creating prometheus client from environment variables");
+            (url, Some(token))
+        }
+        _ => {
+            // try reading a cluster-local secret
+            match secrets_api.get("prometheus-read-only").await {
+                Ok(secret) => {
+                    if let Some(data) = secret.data {
+                        let prom_url_k8s_secret = data.get("url");
+                        let prom_token_k8s_secret = data.get("token");
+                        match (prom_url_k8s_secret, prom_token_k8s_secret) {
+                            (Some(url), Some(token)) => {
+                                println!("Creating prometheus client from kubernetes secret");
+                                (
+                                    String::from_utf8(url.0.clone()).unwrap(),
+                                    Some(String::from_utf8(token.0.clone()).unwrap()),
+                                )
+                            }
+                            _ => {
+                                bail!("Failed to read prometheus-read-only url and token");
+                            }
+                        }
+                    } else {
+                        bail!("Failed to read prometheus-read-only secret data");
+                    }
+                }
+                Err(e) => {
+                    // There's no remote prometheus secret setup. Try reading from a local prometheus backend
+                    println!("Failed to get prometheus-read-only secret: {}", e);
+                    println!("Creating prometheus client from local");
+                    // Try reading from remote prometheus first, otherwise assume it's local
+                    if let Some(prom_url_env) = prom_url_env {
+                        (prom_url_env, None)
+                    } else {
+                        ("http://127.0.0.1:9090".to_string(), None)
+                    }
+                }
+            }
+        }
+    };
 
     // add auth header if specified
     let mut headers = header::HeaderMap::new();
-    if let Ok(token) = std::env::var("PROMETHEUS_TOKEN") {
+    if let Some(token) = prom_token {
         if let Ok(mut auth_value) =
             header::HeaderValue::from_str(format!("Bearer {}", token.as_str()).as_str())
         {
@@ -86,14 +135,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_prometheus() {
-        let client = get_prometheus_client().unwrap();
+        let client = get_prometheus_client().await.unwrap();
 
         // try a simple instant query
         // if it fails to connect to a prometheus instance, skip the test
-        let query = r#"rate(container_cpu_usage_seconds_total{pod=~".*validator.*", container="validator"}[1m])"#;
+        let query = r#"container_cpu_usage_seconds_total{chain_name=~".*forge.*", pod="aptos-node-0-validator-0", container="validator"}"#;
         let response = client.query(query, None, None).await;
         match response {
-            Ok(pres) => println!("{:?}", pres),
+            Ok(pres) => {
+                println!("{:?}", pres);
+            }
             Err(PrometheusError::Client(e)) => {
                 println!("Skipping test. Failed to create prometheus client: {}", e);
                 return;
