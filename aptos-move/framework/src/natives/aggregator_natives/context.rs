@@ -123,7 +123,7 @@ impl AggregatorChangeSet {
                             *entry_mut = Write(new_data);
                         }
                         (Merge(delta1), Merge(mut delta2)) => {
-                            // `delta1` occurred before `delta12`, therefore we must ensure we merge the latter
+                            // `delta1` occurred before `delta2`, therefore we must ensure we merge the latter
                             // one to the initial delta.
                             delta2
                                 .merge_onto(delta1)
