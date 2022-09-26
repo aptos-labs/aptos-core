@@ -522,7 +522,7 @@ impl EpochManager {
             wrapper_command_rx,
         );
 
-        tokio::spawn(quorum_store.start());
+        spawn_named!("QuorumStore", quorum_store.start());
         batch_reader
     }
 
@@ -557,12 +557,15 @@ impl EpochManager {
             qs_config.max_batch_expiry_round_gap,
             qs_config.end_batch_ms,
         );
-        tokio::spawn(quorum_store_wrapper.start(
-            network_sender,
-            consensus_to_quorum_store_rx,
-            wrapper_shutdown_rx,
-            wrapper_quorum_store_msg_rx,
-        ));
+        spawn_named!(
+            "QuorumStoreWrapper",
+            quorum_store_wrapper.start(
+                network_sender,
+                consensus_to_quorum_store_rx,
+                wrapper_shutdown_rx,
+                wrapper_quorum_store_msg_rx,
+            )
+        );
     }
 
     fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {

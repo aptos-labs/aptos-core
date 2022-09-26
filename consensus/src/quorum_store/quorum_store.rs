@@ -14,6 +14,7 @@ use crate::quorum_store::{
 };
 use crate::round_manager::VerifiedEvent;
 use aptos_logger::debug;
+use aptos_logger::spawn_named;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
@@ -128,9 +129,15 @@ impl QuorumStore {
             config.db_quota,
         );
 
-        tokio::spawn(proof_builder.start(proof_builder_rx, validator_verifier));
-        tokio::spawn(net.start());
-        tokio::spawn(batch_store.start(batch_store_rx, proof_builder_tx.clone()));
+        spawn_named!(
+            "Quorum:ProofBuilder",
+            proof_builder.start(proof_builder_rx, validator_verifier)
+        );
+        spawn_named!("Quorum:NetworkListener", net.start());
+        spawn_named!(
+            "Quorum:BatchStore",
+            batch_store.start(batch_store_rx, proof_builder_tx.clone())
+        );
 
         debug!("QS: QuorumStore created");
         (
