@@ -60,7 +60,7 @@ export default function getSettingsPaths(account: Account): SettingsListItemProp
       title: settingsItemLabel.EXPORT_PUBLIC_PRIVATE_KEY,
     },
     {
-      externalLink: `https://explorer.devnet.aptos.dev/account/${account.address}`,
+      externalLink: `https://explorer.aptoslabs.com/account/${account.address}`,
       iconAfter: FiChevronRight,
       path: null,
       title: settingsItemLabel.EXPLORER,

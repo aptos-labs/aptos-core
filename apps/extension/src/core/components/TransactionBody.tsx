@@ -46,7 +46,7 @@ function TransactionBody() {
   const txn = useTransactionDetails(version ? Number(version) : undefined);
   const userAddress = activeAccountAddress
     && HexString.ensure(activeAccountAddress).toShortString();
-  const explorerAddress = `https://explorer.devnet.aptos.dev/txn/${version}`;
+  const explorerAddress = `https://explorer.aptoslabs.com/txn/${version}`;
 
   function clickableAddress(address: MaybeHexString) {
     return address === userAddress

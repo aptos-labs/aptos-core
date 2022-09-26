@@ -34,7 +34,7 @@ export default function TransferDrawerAmount() {
   } = useTransferFlow();
 
   const { formState: { isSubmitting }, register } = formMethods;
-  const explorerAddress = `https://explorer.devnet.aptos.dev/account/${validRecipientAddress}`;
+  const explorerAddress = `https://explorer.aptoslabs.com/account/${validRecipientAddress}`;
 
   return (
     <>

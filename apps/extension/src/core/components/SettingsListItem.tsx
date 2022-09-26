@@ -158,8 +158,8 @@ export default function SettingsListItem({
     }
     if (title === 'View on Explorer') {
       const explorerAddress = activeAccount?.address
-        ? `https://explorer.devnet.aptos.dev/account/${activeAccount.address}`
-        : 'https://explorer.devnet.aptos.dev';
+        ? `https://explorer.aptoslabs.com/account/${activeAccount.address}`
+        : 'https://explorer.aptoslabs.com';
       return (
         <VStack
           as="a"

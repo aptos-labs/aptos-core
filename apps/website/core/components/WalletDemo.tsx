@@ -220,7 +220,7 @@ export default function WalletDemo() {
                                 rightIcon={<ExternalLinkIcon />}
                                 variant="unstyled"
                                 cursor="pointer"
-                                href="https://explorer.devnet.aptos.dev/account/0x1"
+                                href="https://explorer.aptoslabs.com/account/0x1"
                                 tabIndex={-1}
                               >
                                 View on explorer
