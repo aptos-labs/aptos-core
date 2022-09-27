@@ -48,6 +48,10 @@
 /crates/aptos-rosetta @gregnazario
 /crates/aptos-rosetta-cli @gregnazario
 
+# Owners for the `telemetry` related crates.
+/crates/aptos-telemetry @ibalajiarun @geekflyer
+/crates/aptos-telemetry-service @ibalajiarun @geekflyer
+
 # Owners for the `/dashboards` directory and all its subdirectories.
 /dashboards/ @aptos-labs/prod-eng
 
