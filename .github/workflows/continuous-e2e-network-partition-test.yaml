@@ -15,7 +15,6 @@ jobs:
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-network-partition
-      FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 15 minutes
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: network_partition
