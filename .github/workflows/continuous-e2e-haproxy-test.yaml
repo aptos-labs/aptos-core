@@ -1,0 +1,21 @@
+name: Continuous E2E HAProxy Test
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+jobs:
+  run-forge-haproxy:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-haproxy
+      FORGE_RUNNER_DURATION_SECS: 600
+      FORGE_ENABLE_HAPROXY: true
+      FORGE_TEST_SUITE: land_blocking
+      POST_TO_SLACK: true
