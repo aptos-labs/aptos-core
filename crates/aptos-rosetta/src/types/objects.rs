@@ -195,19 +195,25 @@ impl Operation {
     }
 
     /// TODO: This is experimental and should not be used outside of testing
-    pub fn create_staking_pool(
+    pub fn create_stake_pool(
         operation_index: u64,
         status: Option<OperationStatusType>,
-        address: AccountAddress,
-        sender: AccountAddress,
+        owner: AccountAddress,
+        operator: Option<AccountAddress>,
+        voter: Option<AccountAddress>,
+        staked_balance: Option<u64>,
     ) -> Operation {
         Operation::new(
-            OperationType::CreateAccount,
+            OperationType::InitializeStakePool,
             operation_index,
             status,
-            AccountIdentifier::base_account(address),
+            AccountIdentifier::base_account(owner),
             None,
-            Some(OperationMetadata::create_account(sender)),
+            Some(OperationMetadata::create_stake_pool(
+                operator.map(AccountIdentifier::base_account),
+                voter.map(AccountIdentifier::base_account),
+                staked_balance,
+            )),
         )
     }
 
@@ -417,6 +423,19 @@ impl OperationMetadata {
         OperationMetadata {
             operator,
             new_voter: Some(new_voter),
+            ..Default::default()
+        }
+    }
+
+    pub fn create_stake_pool(
+        new_operator: Option<AccountIdentifier>,
+        new_voter: Option<AccountIdentifier>,
+        staked_balance: Option<u64>,
+    ) -> Self {
+        OperationMetadata {
+            new_operator,
+            new_voter,
+            staked_balance: staked_balance.map(U64::from),
             ..Default::default()
         }
     }
