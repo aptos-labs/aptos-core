@@ -56,7 +56,7 @@ The [hardware requirements](/docs/nodes/ait/node-requirements.md#hardware-requir
 
 ## 29 August 2022
 
-- A new guide, [AIT-3 Leaderboard Metrics](/nodes/ait/ait3-leaderboard-metrics.md), describing the [AIT-3 Validator Status](https://aptoslabs.com/leaderboard/it3) page is released.
+- A new guide, [Leaderboard Metrics](/nodes/leaderboard-metrics), describing the [Aptos Validator Status](https://aptoslabs.com/leaderboard/it3) page is released.
 
 ## 25 August 2022
 
