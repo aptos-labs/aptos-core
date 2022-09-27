@@ -72,7 +72,7 @@ sources={{
 
 REMOVE THIS.
 
-## Connect to AIT-3 and join the validator set
+## Connect to Aptos network and join the validator set
 
 ### Detailed steps
 
