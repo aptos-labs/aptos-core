@@ -189,7 +189,7 @@ pub struct SetOperatorCommand {
     sender: Option<AccountAddress>,
     /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
-    old_operator: AccountAddress,
+    old_operator: Option<AccountAddress>,
     /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_operator: AccountAddress,
@@ -243,7 +243,7 @@ pub struct SetVoterCommand {
     sender: Option<AccountAddress>,
     /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
-    operator: AccountAddress,
+    operator: Option<AccountAddress>,
     /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_voter: AccountAddress,

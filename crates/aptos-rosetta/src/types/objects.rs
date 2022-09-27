@@ -293,7 +293,7 @@ impl Operation {
         operation_index: u64,
         status: Option<OperationStatusType>,
         owner: AccountAddress,
-        old_operator: AccountIdentifier,
+        old_operator: Option<AccountIdentifier>,
         new_operator: AccountIdentifier,
     ) -> Operation {
         Operation::new(
@@ -310,7 +310,7 @@ impl Operation {
         operation_index: u64,
         status: Option<OperationStatusType>,
         owner: AccountAddress,
-        operator: AccountIdentifier,
+        operator: Option<AccountIdentifier>,
         new_voter: AccountIdentifier,
     ) -> Operation {
         Operation::new(
@@ -376,17 +376,20 @@ impl OperationMetadata {
         }
     }
 
-    pub fn set_operator(old_operator: AccountIdentifier, new_operator: AccountIdentifier) -> Self {
+    pub fn set_operator(
+        old_operator: Option<AccountIdentifier>,
+        new_operator: AccountIdentifier,
+    ) -> Self {
         OperationMetadata {
-            old_operator: Some(old_operator),
+            old_operator,
             new_operator: Some(new_operator),
             ..Default::default()
         }
     }
 
-    pub fn set_voter(operator: AccountIdentifier, new_voter: AccountIdentifier) -> Self {
+    pub fn set_voter(operator: Option<AccountIdentifier>, new_voter: AccountIdentifier) -> Self {
         OperationMetadata {
-            operator: Some(operator),
+            operator,
             new_voter: Some(new_voter),
             ..Default::default()
         }
@@ -1006,7 +1009,7 @@ fn parse_stake_pool_resource_changes(
                     operation_index,
                     Some(OperationStatusType::Success),
                     *owner_address,
-                    AccountIdentifier::base_account(event.old_operator),
+                    Some(AccountIdentifier::base_account(event.old_operator)),
                     AccountIdentifier::base_account(event.new_operator),
                 ));
                 operation_index += 1;
@@ -1080,7 +1083,7 @@ fn parse_staking_contract_resource_changes(
                 operation_index,
                 Some(OperationStatusType::Success),
                 owner_address,
-                AccountIdentifier::base_account(event.operator),
+                Some(AccountIdentifier::base_account(event.operator)),
                 AccountIdentifier::base_account(event.new_voter),
             ));
             operation_index += 1;

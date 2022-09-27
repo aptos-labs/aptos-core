@@ -680,7 +680,7 @@ pub fn parse_set_operator_operation(
         0,
         None,
         sender,
-        AccountIdentifier::base_account(old_operator),
+        Some(AccountIdentifier::base_account(old_operator)),
         AccountIdentifier::base_account(new_operator),
     )])
 }
@@ -703,7 +703,7 @@ pub fn parse_set_voter_operation(
         0,
         None,
         sender,
-        AccountIdentifier::base_account(operator),
+        Some(AccountIdentifier::base_account(operator)),
         AccountIdentifier::base_account(new_voter),
     )])
 }
