@@ -332,7 +332,7 @@ pub async fn submit_transactions(
                             client
                                 .get_account_transactions_bcs(
                                     sender,
-                                    Some(account.into_inner().sequence_number() - 1),
+                                    Some(account.into_inner().sequence_number().saturating_sub(1)),
                                     Some(5),
                                 )
                                 .await
