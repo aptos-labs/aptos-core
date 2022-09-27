@@ -23,7 +23,12 @@ impl NetworkTest for NonZeroGasPrice {
             .collect::<Vec<_>>();
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1)?;
+        let txn_stat = generate_traffic(
+            ctx,
+            &all_validators,
+            duration,
+            aptos_global_constants::GAS_UNIT_PRICE,
+        )?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
 
