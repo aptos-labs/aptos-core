@@ -176,6 +176,7 @@ impl RosettaClient {
             sequence_number,
             max_gas,
             gas_unit_price,
+            false,
         )
         .await
     }
@@ -224,6 +225,7 @@ impl RosettaClient {
             sequence_number,
             max_gas,
             gas_unit_price,
+            false,
         )
         .await
     }
@@ -232,7 +234,7 @@ impl RosettaClient {
         &self,
         network_identifier: &NetworkIdentifier,
         private_key: &Ed25519PrivateKey,
-        old_operator: AccountAddress,
+        old_operator: Option<AccountAddress>,
         new_operator: AccountAddress,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
@@ -250,7 +252,7 @@ impl RosettaClient {
             0,
             None,
             sender,
-            AccountIdentifier::base_account(old_operator),
+            old_operator.map(AccountIdentifier::base_account),
             AccountIdentifier::base_account(new_operator),
         )];
 
@@ -263,6 +265,7 @@ impl RosettaClient {
             sequence_number,
             max_gas,
             gas_unit_price,
+            old_operator.is_none(),
         )
         .await
     }
@@ -271,7 +274,7 @@ impl RosettaClient {
         &self,
         network_identifier: &NetworkIdentifier,
         private_key: &Ed25519PrivateKey,
-        operator: AccountAddress,
+        operator: Option<AccountAddress>,
         new_voter: AccountAddress,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
@@ -289,7 +292,7 @@ impl RosettaClient {
             0,
             None,
             sender,
-            AccountIdentifier::base_account(operator),
+            operator.map(AccountIdentifier::base_account),
             AccountIdentifier::base_account(new_voter),
         )];
 
@@ -302,6 +305,7 @@ impl RosettaClient {
             sequence_number,
             max_gas,
             gas_unit_price,
+            operator.is_none(),
         )
         .await
     }
@@ -329,6 +333,8 @@ impl RosettaClient {
         sequence_number: Option<u64>,
         max_gas: Option<u64>,
         gas_unit_price: Option<u64>,
+        // Parsed operations won't match given operations
+        parse_not_same: bool,
     ) -> anyhow::Result<TransactionIdentifier> {
         // Retrieve txn metadata
         let (metadata, public_keys) = self
@@ -364,10 +370,17 @@ impl RosettaClient {
                 operations.clone(),
                 metadata.metadata,
                 public_keys,
+                parse_not_same,
             )
             .await?;
         let signed_txn = self
-            .sign_transaction(network_identifier.clone(), keys, response, operations)
+            .sign_transaction(
+                network_identifier.clone(),
+                keys,
+                response,
+                operations,
+                parse_not_same,
+            )
             .await?;
         self.submit_transaction(network_identifier, signed_txn)
             .await
@@ -446,6 +459,7 @@ impl RosettaClient {
         operations: Vec<Operation>,
         metadata: ConstructionMetadata,
         public_keys: Vec<PublicKey>,
+        parse_not_same: bool,
     ) -> anyhow::Result<ConstructionPayloadsResponse> {
         // Build the unsigned transaction
         let payloads = self
@@ -468,7 +482,7 @@ impl RosettaClient {
 
         if response.account_identifier_signers.is_some() {
             Err(anyhow!("Signers were in the unsigned transaction!"))
-        } else if operations != response.operations {
+        } else if !parse_not_same && operations != response.operations {
             Err(anyhow!(
                 "Operations were not parsed to be the same as input! Expected {:?} Got {:?}",
                 operations,
@@ -486,6 +500,7 @@ impl RosettaClient {
         keys: &HashMap<AccountAddress, &Ed25519PrivateKey>,
         unsigned_response: ConstructionPayloadsResponse,
         operations: Vec<Operation>,
+        parse_not_same: bool,
     ) -> anyhow::Result<String> {
         let mut signatures = Vec::new();
         let mut signers: Vec<AccountIdentifier> = Vec::new();
@@ -546,7 +561,7 @@ impl RosettaClient {
         }
 
         // Operations must match exactly
-        if operations != response.operations {
+        if !parse_not_same && operations != response.operations {
             Err(anyhow!(
                 "Operations were not parsed to be the same as input! Expected {:?} Got {:?}",
                 operations,
