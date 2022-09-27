@@ -17,6 +17,8 @@ This document assumes that you are using [Petra wallet](/docs/guides/install-pet
 ## Owner operations with CLI
 
 :::tip Examples using testnet
+The CLI command examples used in this section use testnet. You can use the same command for mainnet by passing the mainnet URL for the `--rest-url` parameter.
+::: 
 
 ### Initialize CLI
 
@@ -74,8 +76,8 @@ aptos stake add-stake \
 ```
 
 :::tip Max gas
-  You can adjust the above `max-gas` number. Ensure that you sent your operator enough tokens to pay for the gas fee.
-  :::
+You can adjust the above `max-gas` number. Ensure that you sent your operator enough tokens to pay for the gas fee.
+:::
 
 ### Increase stake lockup
 
