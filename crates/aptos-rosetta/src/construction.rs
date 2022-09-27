@@ -682,6 +682,7 @@ pub fn parse_set_operator_operation(
         sender,
         Some(AccountIdentifier::base_account(old_operator)),
         AccountIdentifier::base_account(new_operator),
+        None,
     )])
 }
 
