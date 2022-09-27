@@ -13,6 +13,7 @@ publish = false
 anyhow = "1.0.57"
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-node = { path = "../../aptos-node" }
 aptos-rest-client = { path = "../aptos-rest-client" }
@@ -30,6 +31,7 @@ percent-encoding = "2.1.0"
 reqwest = { version = "0.11.10", features = ["json", "cookies"] }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
+serde_yaml = "0.8.24"
 tokio = { version = "1.21.0", features = ["full", "time"] }
 url = "2.2.2"
 warp = "0.3.2"

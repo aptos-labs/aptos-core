@@ -4,6 +4,7 @@ on:
     branches:
       - devnet
       - testnet
+      - mainnet
 
 permissions:
   contents: read

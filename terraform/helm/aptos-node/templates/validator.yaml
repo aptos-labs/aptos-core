@@ -11,6 +11,7 @@ spec:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
     app.kubernetes.io/name: validator
     app.kubernetes.io/instance: validator-{{$i}}
+  type: {{ $.Values.service.validator.internal.type }}
   ports:
   - name: validator
     port: 6180
@@ -67,6 +68,8 @@ spec:
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/validator.yaml: {{ tpl ($.Files.Get "files/configs/validator.yaml") $ | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
       containers:
@@ -105,7 +108,9 @@ spec:
         - containerPort: 6181  # VFN
         - containerPort: 6182  # Public
         - containerPort: 8080
+          name: api
         - containerPort: 9101
+          name: metrics
         livenessProbe:
           tcpSocket:
             port: 9101
@@ -154,6 +159,8 @@ spec:
         configMap:
           name: {{ include "aptos-validator.fullname" $ }}-{{$i}}
       - name: genesis-config
+        # Current implementation of `forge::backend::k8s::stateful_set::{set_identity, get_identity}`
+        # depends on the position of this volume item within the parent list.
         secret:
           secretName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
       - name: aptos-data

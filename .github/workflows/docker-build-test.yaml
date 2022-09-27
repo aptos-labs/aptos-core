@@ -30,10 +30,10 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - main
       - auto
       - canary
+      - chaotic
       - devnet
       - testnet
-      - testnet-stable
-      - chaotic
+      - mainnet
 
 # cancel redundant builds
 concurrency:
@@ -74,7 +74,6 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:build-images') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:deploy-community-platform-to-staging') ||
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
     runs-on: ubuntu-latest
@@ -172,52 +171,25 @@ jobs:
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
 
   # Run e2e compat test against testnet branch
-  # forge-compat-test:
-  #   needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata]
-  #   if: |
-  #     !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
-  #       (github.event_name == 'push' && github.ref_name != 'main') ||
-  #       github.event_name == 'workflow_dispatch' ||
-  #       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-  #       github.event.pull_request.auto_merge != null ||
-  #       contains(github.event.pull_request.body, '#e2e')
-  #     )
-  #   uses: ./.github/workflows/run-forge.yaml
-  #   secrets: inherit
-  #   with:
-  #     GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-  #     FORGE_TEST_SUITE: compat
-  #     IMAGE_TAG: testnet
-  #     FORGE_RUNNER_DURATION_SECS: 300
-  #     COMMENT_HEADER: forge-compat
-  #     # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
-  #     # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
-  #     # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
-  #     FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-
-  community-platform:
-    needs: [permission-check]
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.GIT_SHA }}
-
-      - uses: ./.github/actions/gar-auth
-        with:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Login to ECR
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
-          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - uses: ./.github/actions/docker-buildx-setup
-
-      - name: Build and Push Community Platform image
-        run: |
-          cd ecosystem/platform/server
-          docker buildx bake --progress=plain --push -f ./docker-bake.hcl
+  forge-compat-test:
+    needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata]
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
+        (github.event_name == 'push' && github.ref_name != 'main') ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
+      )
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_TEST_SUITE: compat
+      IMAGE_TAG: 843b204dce971d98449b82624f4f684c7a18b991 # test against the latest build on testnet branch
+      FORGE_RUNNER_DURATION_SECS: 300
+      COMMENT_HEADER: forge-compat
+      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
+      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
+      # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
+      FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}

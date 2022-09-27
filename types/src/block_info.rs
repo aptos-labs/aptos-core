@@ -24,7 +24,7 @@ pub const GENESIS_TIMESTAMP_USECS: u64 = 0;
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct BlockInfo {
-    /// Epoch number corresponds to the set of validators that are active for this block.
+    /// The epoch to which the block belongs.
     epoch: u64,
     /// The consensus protocol is executed in rounds, which monotonically increase per epoch.
     round: Round,

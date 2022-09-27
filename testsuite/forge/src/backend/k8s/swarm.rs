@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold};
 use crate::{
-    chaos, check_for_container_restart, create_k8s_client, get_free_port, get_stateful_set_image,
+    check_for_container_restart, create_k8s_client, delete_all_chaos, get_free_port,
+    get_stateful_set_image,
+    interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold},
     node::K8sNode,
     prometheus::{self, query_with_metadata},
-    query_sequence_numbers, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
+    query_sequence_number, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
     FullNode, Node, Result, Swarm, SwarmChaos, Validator, Version, HAPROXY_SERVICE_SUFFIX,
     REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
@@ -41,14 +42,14 @@ pub struct K8sSwarm {
     kube_client: K8sClient,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
-    kube_namespace: String,
+    pub kube_namespace: String,
     keep: bool,
     chaoses: HashSet<SwarmChaos>,
     prom_client: Option<PrometheusClient>,
 }
 
 impl K8sSwarm {
-    pub async fn new(
+    pub async fn new<'b>(
         root_key: &[u8],
         image_tag: &str,
         upgrade_image_tag: &str,
@@ -63,15 +64,13 @@ impl K8sSwarm {
         let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
         let address = aptos_sdk::types::account_config::aptos_test_root_address();
-        let sequence_number = query_sequence_numbers(&client, [address].iter())
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "query_sequence_numbers on {:?} for dd account failed: {}",
-                    client,
-                    e
-                )
-            })?[0];
+        let sequence_number = query_sequence_number(&client, address).await.map_err(|e| {
+            format_err!(
+                "query_sequence_number on {:?} for dd account failed: {}",
+                client,
+                e
+            )
+        })?;
         let root_account = LocalAccount::new(address, account_key, sequence_number);
 
         let mut versions = HashMap::new();
@@ -88,7 +87,7 @@ impl K8sSwarm {
             }
         };
 
-        Ok(K8sSwarm {
+        let swarm = K8sSwarm {
             validators,
             fullnodes,
             root_account,
@@ -99,13 +98,23 @@ impl K8sSwarm {
             keep,
             chaoses: HashSet::new(),
             prom_client,
-        })
+        };
+
+        // test hitting the configured prometheus endpoint
+        let query = "container_memory_usage_bytes{pod=\"aptos-node-0-validator-0\"}";
+        let r = swarm.query_metrics(query, None, None).await?;
+        let ivs = r.as_instant().unwrap();
+        for iv in ivs {
+            info!("container_memory_usage_bytes: {}", iv.sample().value());
+        }
+
+        Ok(swarm)
     }
 
-    fn get_rest_api_url(&self) -> String {
+    fn get_rest_api_url(&self, idx: usize) -> String {
         self.validators
             .values()
-            .next()
+            .nth(idx)
             .unwrap()
             .rest_api_endpoint()
             .to_string()
@@ -239,7 +248,7 @@ impl Swarm for K8sSwarm {
     }
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
-        let rest_api_url = self.get_rest_api_url();
+        let rest_api_url = self.get_rest_api_url(0);
         ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 
@@ -250,17 +259,29 @@ impl Swarm for K8sSwarm {
     }
 
     fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()> {
-        chaos::inject_swarm_chaos(&self.kube_namespace, &chaos)?;
+        self.inject_swarm_chaos(&chaos)?;
         self.chaoses.insert(chaos);
         Ok(())
     }
 
     fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()> {
         if self.chaoses.remove(&chaos) {
-            chaos::remove_swarm_chaos(&self.kube_namespace, &chaos)?;
+            self.remove_swarm_chaos(&chaos)?;
         } else {
             bail!("Chaos {:?} not found", chaos);
         }
+        Ok(())
+    }
+
+    fn remove_all_chaos(&mut self) -> Result<()> {
+        // try removing all existing chaoses
+        for chaos in self.chaoses.clone() {
+            self.remove_swarm_chaos(&chaos)?;
+        }
+        // force remove all others
+        delete_all_chaos(&self.kube_namespace)?;
+
+        self.chaoses.clear();
         Ok(())
     }
 
@@ -328,6 +349,11 @@ impl Swarm for K8sSwarm {
         } else {
             bail!("No prom client");
         }
+    }
+
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
+        let rest_api_url = self.get_rest_api_url(idx);
+        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 }
 

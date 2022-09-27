@@ -1,22 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::error;
 use aptos_types::{chain_id::ChainId, PeerId};
-use chrono::Utc;
-use jsonwebtoken::{decode, encode, errors::Error, Algorithm, Header, Validation};
-use warp::{
-    http::header::{HeaderMap, HeaderValue, AUTHORIZATION},
-    reject, Rejection,
-};
 
+use chrono::Utc;
+use jsonwebtoken::{errors::Error, TokenData};
+use tracing::error;
+use warp::{reject, Rejection};
+
+use crate::context::JsonWebTokenService;
 use crate::{context::Context, types::auth::Claims};
 use crate::{error::ServiceError, types::common::NodeType};
 
 const BEARER: &str = "BEARER ";
 
 pub fn create_jwt_token(
-    context: Context,
+    jwt_service: &JsonWebTokenService,
     chain_id: ChainId,
     peer_id: PeerId,
     node_type: NodeType,
@@ -36,27 +35,21 @@ pub fn create_jwt_token(
         exp: expiration as usize,
         iat: issued as usize,
     };
-    let header = Header::new(Algorithm::HS512);
-    encode(&header, &claims, &context.jwt_encoding_key)
+    jwt_service.encode(claims)
 }
 
 pub async fn authorize_jwt(
     token: String,
-    (context, allow_roles): (Context, Vec<NodeType>),
+    context: Context,
+    allow_roles: Vec<NodeType>,
 ) -> anyhow::Result<Claims, Rejection> {
-    let decoded = decode::<Claims>(
-        &token,
-        &context.jwt_decoding_key,
-        &Validation::new(Algorithm::HS512),
-    )
-    .map_err(|e| {
+    let decoded: TokenData<Claims> = context.jwt_service().decode(&token).map_err(|e| {
         error!("unable to authorize jwt token: {}", e);
         reject::custom(ServiceError::unauthorized("invalid authorization token"))
     })?;
-
     let claims = decoded.claims;
 
-    let current_epoch = match context.validator_cache().read().get(&claims.chain_id) {
+    let current_epoch = match context.peers().validators().read().get(&claims.chain_id) {
         Some(info) => info.0,
         None => {
             return Err(reject::custom(ServiceError::unauthorized(
@@ -80,18 +73,14 @@ pub async fn authorize_jwt(
     }
 }
 
-pub async fn jwt_from_header(headers: HeaderMap<HeaderValue>) -> anyhow::Result<String, Rejection> {
-    let header = match headers.get(AUTHORIZATION) {
+pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<String, Rejection> {
+    let auth_header = match auth_header {
         Some(v) => v,
         None => {
             return Err(reject::custom(ServiceError::unauthorized(
-                "no authorization header present",
+                "no/invalid authorization header",
             )))
         }
-    };
-    let auth_header = match std::str::from_utf8(header.as_bytes()) {
-        Ok(v) => v,
-        Err(_) => return Err(reject::reject()),
     };
     let auth_header = auth_header.split(',').next().unwrap_or_default();
     if !auth_header
@@ -119,43 +108,37 @@ mod tests {
 
     #[tokio::test]
     async fn jwt_from_header_valid_bearer() {
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "Bearer token".parse().unwrap());
-        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+        assert_eq!(
+            jwt_from_header(Some("Bearer token".into())).await.unwrap(),
+            "token"
+        );
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "bearer token".parse().unwrap());
-        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+        assert_eq!(
+            jwt_from_header(Some("bearer token".into())).await.unwrap(),
+            "token"
+        );
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "BEARER token".parse().unwrap());
-        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+        assert_eq!(
+            jwt_from_header(Some("BEARER token".into())).await.unwrap(),
+            "token"
+        );
     }
 
     #[tokio::test]
     async fn jwt_from_header_invalid_bearer() {
-        let headers = HeaderMap::new();
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(None).await;
         assert!(jwt.is_err());
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "Bear token".parse().unwrap());
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(Some("Bear token".into())).await;
         assert!(jwt.is_err());
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "".parse().unwrap());
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(Some("".into())).await;
         assert!(jwt.is_err());
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "Bear".parse().unwrap());
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(Some("Bear".into())).await;
         assert!(jwt.is_err());
 
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, "BEARER: token".parse().unwrap());
-        let jwt = jwt_from_header(headers).await;
+        let jwt = jwt_from_header(Some("BEARER: token".into())).await;
         assert!(jwt.is_err());
     }
 
@@ -165,34 +148,32 @@ mod tests {
         {
             test_context
                 .inner
-                .validator_cache()
+                .peers()
+                .validators()
                 .write()
                 .insert(ChainId::new(25), (10, HashMap::new()));
         }
         let token = create_jwt_token(
-            test_context.inner.clone(),
+            test_context.inner.jwt_service(),
             ChainId::new(25),
             PeerId::random(),
             NodeType::Validator,
             10,
         )
         .unwrap();
-        let result = authorize_jwt(
-            token,
-            (test_context.inner.clone(), vec![NodeType::Validator]),
-        )
-        .await;
+        let result =
+            authorize_jwt(token, test_context.inner.clone(), vec![NodeType::Validator]).await;
         assert!(result.is_ok());
 
         let token = create_jwt_token(
-            test_context.inner.clone(),
+            test_context.inner.jwt_service(),
             ChainId::new(25),
             PeerId::random(),
             NodeType::ValidatorFullNode,
             10,
         )
         .unwrap();
-        let result = authorize_jwt(token, (test_context.inner, vec![NodeType::Validator])).await;
+        let result = authorize_jwt(token, test_context.inner, vec![NodeType::Validator]).await;
         assert!(result.is_err());
         assert_eq!(
             *result.err().unwrap().find::<ServiceError>().unwrap(),

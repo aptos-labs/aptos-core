@@ -1,13 +1,25 @@
 name: "Prover Test"
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - devnet
-      - testnet
-      - auto
-      - canary
+  # TODO enable this when we have time
+  # pull_request:
+  #   paths:
+  #     - '**.move'
+  #     - 'aptos-move/move-deps/Cargo.toml'
+  # push:
+  #   branches:
+  #     - main
+  #     - devnet
+  #     - testnet
+  #     - auto
+  #     - canary
+  #   paths:
+  #     - '**.move'
+  #     - 'aptos-move/move-deps/Cargo.toml'
+  # Allow triggering manually
+  workflow_dispatch:
+  # Until enabled on all PRs, run continuously at the beginning of each hour
+  schedule:
+    - cron: "0 * * * *"
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -22,6 +34,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # TODO add determinator step to only run on move files
   prover-test:
     runs-on: high-perf-docker
     steps:

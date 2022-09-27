@@ -3,22 +3,21 @@
 
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
-use aptos_logger::{debug, error};
 use aptos_rest_client::{error::RestError, Response};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, chain_id::ChainId, on_chain_config::ValidatorSet, PeerId,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
+use tracing::{debug, error};
 use url::Url;
 
-pub type EpochNum = u64;
-pub type PeerSetCache = Arc<RwLock<HashMap<ChainId, (EpochNum, PeerSet)>>>;
+use crate::types::common::EpochedPeerStore;
 
 #[derive(Clone)]
 pub struct PeerSetCacheUpdater {
-    validators: PeerSetCache,
-    validator_fullnodes: PeerSetCache,
+    validators: Arc<RwLock<EpochedPeerStore>>,
+    validator_fullnodes: Arc<RwLock<EpochedPeerStore>>,
 
     query_addresses: Arc<HashMap<ChainId, String>>,
     update_interval: time::Duration,
@@ -26,8 +25,8 @@ pub struct PeerSetCacheUpdater {
 
 impl PeerSetCacheUpdater {
     pub fn new(
-        validators: PeerSetCache,
-        validator_fullnodes: PeerSetCache,
+        validators: Arc<RwLock<EpochedPeerStore>>,
+        validator_fullnodes: Arc<RwLock<EpochedPeerStore>>,
         trusted_full_node_addresses: HashMap<ChainId, String>,
         update_interval: Duration,
     ) -> Self {
@@ -59,8 +58,6 @@ impl PeerSetCacheUpdater {
             match result {
                 Ok(response) => {
                     let (peer_addrs, state) = response.into_parts();
-
-                    println!("peers: {}", peer_addrs);
 
                     let received_chain_id = ChainId::new(state.chain_id);
                     if received_chain_id != *chain_id {

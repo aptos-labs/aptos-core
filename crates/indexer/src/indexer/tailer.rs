@@ -1,5 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+use crate::models::ledger_info::LedgerInfo;
 use crate::{
     database::{execute_with_better_error, PgDbPool},
     indexer::{
@@ -10,10 +11,8 @@ use crate::{
     },
     schema::ledger_infos::{self, dsl},
 };
-use aptos_api::context::Context as ApiContext;
-
-use crate::models::ledger_info::LedgerInfo;
 use anyhow::{ensure, Context, Result};
+use aptos_api::context::Context as ApiContext;
 use aptos_logger::{debug, info};
 use chrono::ParseError;
 use diesel::{
@@ -22,10 +21,11 @@ use diesel::{
     sql_types::{BigInt, Text},
     RunQueryDsl,
 };
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
 use std::{fmt::Debug, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
-diesel_migrations::embed_migrations!();
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(Clone)]
 pub struct Tailer {
@@ -52,14 +52,12 @@ impl Tailer {
     }
 
     pub fn run_migrations(&self) {
-        embedded_migrations::run_with_output(
-            &self
-                .connection_pool
-                .get()
-                .expect("Could not get connection for migrations"),
-            &mut std::io::stdout(),
-        )
-        .expect("migrations failed!");
+        let _ = &self
+            .connection_pool
+            .get()
+            .expect("Could not get connection for migrations")
+            .run_pending_migrations(MIGRATIONS)
+            .expect("migrations failed!");
     }
 
     /// If chain id doesn't exist, save it. Otherwise, make sure that we're indexing the same chain
@@ -68,14 +66,14 @@ impl Tailer {
             processor_name = self.processor.name(),
             "Checking if chain id is correct"
         );
-        let conn = self
+        let mut conn = self
             .connection_pool
             .get()
             .expect("DB connection should be available at this stage");
 
         let query_chain = dsl::ledger_infos
             .select(dsl::chain_id)
-            .load::<i64>(&conn)
+            .load::<i64>(&mut conn)
             .expect("Error loading chain id from db");
         let maybe_existing_chain_id = query_chain.first();
 
@@ -103,10 +101,11 @@ impl Tailer {
                     "Adding chain id to db, continue to index.."
                 );
                 execute_with_better_error(
-                    &conn,
+                    &mut conn,
                     diesel::insert_into(ledger_infos::table).values(LedgerInfo {
                         chain_id: new_chain_id,
                     }),
+                    None,
                 )
                 .context(r#"Error updating chain_id!"#)
                 .map(|_| new_chain_id as u64)
@@ -167,7 +166,7 @@ impl Tailer {
     /// Get starting version from database. Starting version is defined as the first version that's either
     /// not successful or missing from the DB.
     pub fn get_start_version(&self, processor_name: &String) -> Option<i64> {
-        let conn = self
+        let mut conn = self
             .connection_pool
             .get()
             .expect("DB connection should be available to get starting version");
@@ -235,14 +234,14 @@ impl Tailer {
           ";
         #[derive(Debug, QueryableByName)]
         pub struct Gap {
-            #[sql_type = "BigInt"]
+            #[diesel(sql_type = BigInt)]
             pub version: i64,
         }
         let mut res: Vec<Option<Gap>> = sql_query(sql)
             .bind::<Text, _>(processor_name)
             // This is the number used to determine how far we look back for gaps. Increasing it may result in slower startup
             .bind::<BigInt, _>(1500000)
-            .get_results(&conn)
+            .get_results(&mut conn)
             .unwrap();
         res.pop().unwrap().map(|g| g.version)
     }
@@ -272,7 +271,6 @@ mod test {
     };
     use aptos_api_test_context::new_test_context;
     use aptos_api_types::{LedgerInfo as APILedgerInfo, Transaction, U64};
-    use diesel::Connection;
     use serde_json::json;
 
     struct FakeFetcher {
@@ -318,30 +316,14 @@ mod test {
         }
     }
 
-    pub fn wipe_database(conn: &PgPoolConnection) {
-        for table in [
-            "collection_datas",
-            "tokens",
-            "token_datas",
-            "token_ownerships",
-            "signatures",
-            "collections",
-            "move_modules",
-            "move_resources",
-            "table_items",
-            "table_metadatas",
-            "ownerships",
-            "write_set_changes",
-            "events",
-            "user_transactions",
-            "block_metadata_transactions",
-            "transactions",
-            "processor_statuses",
-            "ledger_infos",
-            "__diesel_schema_migrations",
+    pub fn wipe_database(conn: &mut PgPoolConnection) {
+        for command in [
+            "DROP SCHEMA public CASCADE",
+            "CREATE SCHEMA public",
+            "GRANT ALL ON SCHEMA public TO postgres",
+            "GRANT ALL ON SCHEMA public TO public",
         ] {
-            conn.execute(&format!("DROP TABLE IF EXISTS {}", table))
-                .unwrap();
+            diesel::sql_query(command).execute(conn).unwrap();
         }
     }
 
@@ -349,7 +331,7 @@ mod test {
         let database_url = std::env::var("INDEXER_DATABASE_URL")
             .expect("must set 'INDEXER_DATABASE_URL' to run tests!");
         let conn_pool = new_db_pool(database_url.as_str())?;
-        wipe_database(&conn_pool.get()?);
+        wipe_database(&mut conn_pool.get()?);
 
         let test_context = new_test_context("doesnt_matter".to_string(), true);
         let context: Arc<ApiContext> = Arc::new(test_context.context);
@@ -666,7 +648,7 @@ mod test {
 
         // This is a block metadata transaction
         let (tx1, ut1, bmt1, events1, wsc1) =
-            TransactionModel::get_by_version(69158, &conn_pool.get().unwrap()).unwrap();
+            TransactionModel::get_by_version(69158, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(tx1.type_, "block_metadata_transaction");
         assert!(ut1.is_none());
         assert!(bmt1.is_some());
@@ -675,7 +657,7 @@ mod test {
 
         // This is the genesis transaction
         let (tx0, ut0, bmt0, events0, wsc0) =
-            TransactionModel::get_by_version(0, &conn_pool.get().unwrap()).unwrap();
+            TransactionModel::get_by_version(0, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(tx0.type_, "genesis_transaction");
         assert!(ut0.is_none());
         assert!(bmt0.is_none());
@@ -794,7 +776,7 @@ mod test {
 
         // This is a user transaction, so the bmt should be None
         let (tx2, ut2, bmt2, events2, wsc2) =
-            TransactionModel::get_by_version(691595, &conn_pool.get().unwrap()).unwrap();
+            TransactionModel::get_by_version(691595, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(
             tx2.hash,
             "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb"

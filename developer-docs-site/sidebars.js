@@ -19,7 +19,6 @@ const sidebars = {
     "index",
     "whats-new-in-docs",
     "guides/getting-started",
-
     {
       type: "category",
       label: "Developer Tutorials",
@@ -84,11 +83,7 @@ const sidebars = {
           link: { type: "doc", id: "guides/move-guides/index" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "guides/move-guides/move-on-aptos",
-            "guides/move-guides/upgrading-move-code",
-            "guides/move-guides/guide-move-transactional-testing",
-          ],
+          items: ["guides/move-guides/move-on-aptos", "guides/move-guides/upgrading-move-code"],
         },
       ],
     },
@@ -168,7 +163,19 @@ const sidebars = {
       label: "SDKs",
       collapsible: true,
       collapsed: true,
-      items: ["sdks/aptos-sdk-overview", "sdks/typescript-sdk", "sdks/python-sdk", "sdks/rust-sdk"],
+      link: { type: "doc", id: "sdks/index" },
+      items: [
+        "sdks/python-sdk",
+        {
+          type: "category",
+          label: "Typescript SDK",
+          link: { type: "doc", id: "sdks/ts-sdk/index" },
+          collapsible: true,
+          collapsed: true,
+          items: ["sdks/ts-sdk/typescript-sdk", "sdks/ts-sdk/typescript-sdk-overview"],
+        },
+        "sdks/rust-sdk",
+      ],
     },
     {
       type: "category",

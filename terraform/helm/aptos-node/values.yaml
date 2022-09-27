@@ -41,13 +41,8 @@ haproxy:
   affinity: {}
   limits:
     validator:
-      # -- Limit the number of connections per IP address per sec
+      # -- Limit the number of connections per IP address per minute
       connectionsPerIPPerMin: 2
-      # Sustained 100mb/s for 10 sec.
-      maxBytesOutRate10sec: 134217728
-      rateLimitSession: 256
-      tcpBufSize: 4194304
-
   config:
     # -- Whether to send Proxy Protocol v2
     send_proxy_protocol: &send_proxy_protocol false
@@ -91,21 +86,11 @@ validator:
     consensus: {}
     execution: {}
     full_node_networks: []
-    inspection_service: {}
-    logger: {}
-    mempool:
-      shared_mempool_max_concurrent_inbound_syncs: 16 # default 4
-      max_broadcasts_per_peer: 2 # default 1
-      default_failovers: 0 # default 3
-    metrics: {}
-    peer_monitoring_service: {}
+    mempool: {}
     api: {}
-    state_sync: {}
-    firehose_stream: {}
     storage: {}
-    test: {}
     validator_network: {}
-    failpoints: {}
+
   # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
   enableNetworkPolicy: true
 
@@ -173,8 +158,11 @@ service:
   domain:
   validator:
     external:
-      # -- The Kubernetes ServiceType to use for validator
+      # -- The Kubernetes ServiceType to use for validator's HAProxy
       type: LoadBalancer
+    internal:
+      # -- The Kubernetes ServiceType to use for validator
+      type: ClusterIP
     # -- The externalTrafficPolicy for the validator service
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs
@@ -185,8 +173,11 @@ service:
     enableMetricsPort: true
   fullnode:
     external:
-      # -- The Kubernetes ServiceType to use for fullnodes
+      # -- The Kubernetes ServiceType to use for fullnodes' HAProxy
       type: LoadBalancer
+    internal:
+      # -- The Kubernetes ServiceType to use for fullnodes
+      type: ClusterIP
     # -- The externalTrafficPolicy for the fullnode service
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs

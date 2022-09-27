@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
-    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    op_counters::DurationHistogram, register_counter, register_gauge, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, Counter, Gauge, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -81,32 +82,78 @@ pub static VOTE_NIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Total voting power of validators in validator set
+pub static TOTAL_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_total_voting_power",
+        "Total voting power of validators in validator set"
+    )
+    .unwrap()
+});
+
+/// Number of rounds we were collecting votes for proposer
+/// (similar to PROPOSALS_COUNT, but can be larger, if we failed in creating/sending of the proposal)
+pub static PROPOSER_COLLECTED_ROUND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_proposer_collecting_round_count",
+        "Total voting power of all votes collected for the round this node was proposer",
+    )
+    .unwrap()
+});
+
+/// Total voting power of all votes collected for the same ledger info
+/// for the rounds this node was a proposer (cumulative)
+pub static PROPOSER_COLLECTED_MOST_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_most_voting_power_sum",
+        "Total voting power of all votes collected for the same ledger info for the rounds this node was a proposer",
+    )
+    .unwrap()
+});
+
+/// Total voting power of all votes collected for all other ledger info
+/// for the rounds this node was a proposer
+pub static PROPOSER_COLLECTED_CONFLICTING_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_conflicting_voting_power_sum",
+        "Total voting power of all votes collected for all other ledger info for the rounds this node was a proposer",
+    )
+    .unwrap()
+});
+
+/// Total voting power of all votes collected for all other ledger info
+/// for the rounds this node was a proposer
+pub static PROPOSER_COLLECTED_TIMEOUT_VOTING_POWER: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_collected_timeout_voting_power_sum",
+        "Total voting power of all votes collected for the same ledger info for the rounds this node was a proposer",
+    )
+    .unwrap()
+});
+
 /// Committed proposals map when using LeaderReputation as the ProposerElection
-pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
+pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
         "aptos_committed_proposals_in_window",
         "Total number committed proposals in the current reputation window",
-        &["address"]
     )
     .unwrap()
 });
 
 /// Failed proposals map when using LeaderReputation as the ProposerElection
-pub static FAILED_PROPOSALS_IN_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
+pub static FAILED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
         "aptos_failed_proposals_in_window",
         "Total number of failed proposals in the current reputation window",
-        &["address"]
     )
     .unwrap()
 });
 
 /// Committed votes map when using LeaderReputation as the ProposerElection
-pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
+pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
         "aptos_committed_votes_in_window",
         "Total number of committed votes in the current reputation window",
-        &["address"]
     )
     .unwrap()
 });
@@ -118,6 +165,65 @@ pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
         "Total number of new block events in the current reputation window"
     )
     .unwrap()
+});
+
+/// Computed at leader election time, with some delay.
+
+/// Window sizes for which to measure chain health.
+pub static CHAIN_HEALTH_WINDOW_SIZES: [usize; 4] = [10, 30, 100, 300];
+
+/// Current (with some delay) total voting power
+pub static CHAIN_HEALTH_TOTAL_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_chain_health_total_voting_power",
+        "Total voting power of validators in validator set"
+    )
+    .unwrap()
+});
+
+/// Current (with some delay) total number of validators
+pub static CHAIN_HEALTH_TOTAL_NUM_VALIDATORS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_chain_health_total_num_validators",
+        "Total number of validators in validator set"
+    )
+    .unwrap()
+});
+
+/// Current (with some delay) voting power that participated in consensus
+/// (voted or proposed) in the given window.
+pub static CHAIN_HEALTH_PARTICIPATING_VOTING_POWER: Lazy<Vec<Gauge>> = Lazy::new(|| {
+    CHAIN_HEALTH_WINDOW_SIZES
+        .iter()
+        .map(|i| {
+            register_gauge!(
+                format!(
+                    "aptos_chain_health_participating_voting_power_last_{}_rounds",
+                    i
+                ),
+                "Total voting power of validators in validator set"
+            )
+            .unwrap()
+        })
+        .collect()
+});
+
+/// Current (with some delay) number of validators that participated in consensus
+/// (voted or proposed) in the given window.
+pub static CHAIN_HEALTH_PARTICIPATING_NUM_VALIDATORS: Lazy<Vec<IntGauge>> = Lazy::new(|| {
+    CHAIN_HEALTH_WINDOW_SIZES
+        .iter()
+        .map(|i| {
+            register_int_gauge!(
+                format!(
+                    "aptos_chain_health_participating_num_validators_last_{}_rounds",
+                    i
+                ),
+                "Total voting power of validators in validator set"
+            )
+            .unwrap()
+        })
+        .collect()
 });
 
 //////////////////////
@@ -208,11 +314,12 @@ pub static NUM_BLOCKS_IN_TREE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counter for the number of blocks in the pipeline.
-pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+/// Counter for the number of blocks in the pipeline broken down by stage.
+pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
         "aptos_consensus_num_blocks_in_pipeline",
-        "Counter for the number of blocks in the pipeline"
+        "Counter for the number of blocks in the pipeline",
+        &["stage"]
     )
     .unwrap()
 });

@@ -232,14 +232,20 @@ async fn test_post_transaction_rejected_by_mempool() {
     context.check_golden_output(resp);
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multi_agent_signed_transaction() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
+    let secondary = context.gen_account();
     let factory = context.transaction_factory();
     let mut root_account = context.root_account();
-    let secondary = context.root_account();
+
+    // Create secondary signer account
+    context
+        .commit_block(&[context.create_user_account_by(&mut root_account, &secondary)])
+        .await;
+
+    // Create a new account with a multi-agent signer
     let txn = root_account.sign_multi_agent_with_transaction_builder(
         vec![&secondary],
         factory.create_user_account(account.public_key()),
@@ -315,7 +321,7 @@ async fn test_multi_ed25519_signed_transaction() {
         .expiration_timestamp_secs(u64::MAX) // set timestamp to max to ensure static raw transaction
         .build();
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
     let txn = SignedTransaction::new_multisig(raw_txn, public_key, signature.clone());
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -524,7 +530,12 @@ async fn test_signing_message_with_payload(
         signing_msg.to_string(),
         format!(
             "0x{}",
-            hex::encode(&txn.clone().into_raw_transaction().signing_message())
+            hex::encode(
+                &txn.clone()
+                    .into_raw_transaction()
+                    .signing_message()
+                    .unwrap()
+            )
         )
     );
 
@@ -798,7 +809,53 @@ async fn test_get_txn_execute_failed_by_entry_function_validation() {
     .await
 }
 
-#[ignore] // re-enable after cleaning after compiled code
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_txn_execute_failed_by_entry_function_invalid_module_name() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.gen_account();
+    context
+        .commit_block(&vec![context.create_user_account(&account)])
+        .await;
+
+    test_submit_entry_function_api_validation(
+        context,
+        account,
+        "0x1",
+        "coin",
+        "transfer::what::what",
+        vec![APTOS_COIN_TYPE.clone()],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
+        ],
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.gen_account();
+    context
+        .commit_block(&vec![context.create_user_account(&account)])
+        .await;
+
+    test_submit_entry_function_api_validation(
+        context,
+        account,
+        "0x1",
+        "coin::coin",
+        "transfer",
+        vec![APTOS_COIN_TYPE.clone()],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
+        ],
+    )
+    .await;
+}
+
+#[ignore] // Re-enable when change is moved to new publish flow
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     let mut context = new_test_context(current_function_name!());
@@ -832,7 +889,7 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     .await
 }
 
-#[ignore]
+#[ignore] // re-enable after cleaning compiled code
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_txn_execute_failed_by_script_execution_failure() {
     let context = new_test_context(current_function_name!());
@@ -853,6 +910,50 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
     );
 
     test_transaction_vm_status(context, txn, false).await
+}
+
+async fn test_submit_entry_function_api_validation(
+    mut context: TestContext,
+    mut account: LocalAccount,
+    address: &str,
+    module_id: &str,
+    func: &str,
+    ty_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+) {
+    // This is a way to get around the Identifier checks!
+    #[derive(serde::Serialize)]
+    struct HackStruct(pub Box<str>);
+
+    // Identifiers check when you call new, but they don't check when you deserialize, surprise!
+    let module_id: Identifier =
+        serde_json::from_str(&serde_json::to_string(&HackStruct(module_id.into())).unwrap())
+            .unwrap();
+    let func: Identifier =
+        serde_json::from_str(&serde_json::to_string(&HackStruct(func.into())).unwrap()).unwrap();
+
+    let txn = account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .entry_function(EntryFunction::new(
+                ModuleId::new(
+                    AccountAddress::from_hex_literal(address).unwrap(),
+                    module_id,
+                ),
+                func,
+                ty_args,
+                args,
+            ))
+            .expiration_timestamp_secs(u64::MAX),
+    );
+
+    let body = bcs::to_bytes(&txn).unwrap();
+    // we don't validate transaction payload when submit txn into mempool.
+    let resp = context
+        .expect_status_code(400)
+        .post_bcs_txn("/transactions", body)
+        .await;
+    context.check_golden_output(resp);
 }
 
 async fn test_get_txn_execute_failed_by_invalid_entry_function(
@@ -912,7 +1013,6 @@ async fn test_transaction_vm_status(
     context.check_golden_output(resp);
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_submit_transaction_rejects_payload_too_large_bcs_txn_body() {
     let mut context = new_test_context(current_function_name!());
@@ -927,7 +1027,6 @@ async fn test_submit_transaction_rejects_payload_too_large_bcs_txn_body() {
     context.check_golden_output(resp);
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_submit_transaction_rejects_payload_too_large_json_body() {
     let mut context = new_test_context(current_function_name!());
@@ -970,9 +1069,6 @@ async fn test_submit_transaction_rejects_invalid_json() {
     context.check_golden_output(resp);
 }
 
-// TODO: Sometimes this fails because it returns a 404 instead, but only
-// when run with all the other tests, never on its own. Strange.
-#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_signing_message_rejects_payload_too_large_json_body() {
     let mut context = new_test_context(current_function_name!());
@@ -1024,6 +1120,15 @@ async fn test_create_signing_message_rejects_no_content_length_request() {
         .path(&build_path("/encode_submission"));
 
     let resp = context.expect_status_code(411).execute(req).await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation() {
+    let mut context = new_test_context(current_function_name!());
+    let resp = context.get("/estimate_gas_price").await;
+    assert!(context.last_updated_gas_schedule().is_some());
+    assert!(context.last_updated_gas_estimation().is_some());
     context.check_golden_output(resp);
 }
 

@@ -27,6 +27,7 @@ mod params;
 mod algebra;
 mod aptos_framework;
 mod gas_meter;
+pub mod gen;
 mod instr;
 mod misc;
 mod move_stdlib;
@@ -36,7 +37,7 @@ mod transaction;
 pub use algebra::*;
 pub use gas_meter::{
     AptosGasMeter, AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule,
-    NativeGasParameters, ToOnChainGasSchedule,
+    NativeGasParameters, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 pub use instr::InstructionGasParameters;
 pub use misc::{AbstractValueSizeGasParameters, MiscGasParameters};
@@ -44,4 +45,4 @@ pub use move_core_types::gas_algebra::{
     Arg, Byte, GasQuantity, InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit,
     NumArgs, NumBytes, UnitDiv,
 };
-pub use transaction::TransactionGasParameters;
+pub use transaction::{StorageGasParameters, TransactionGasParameters};

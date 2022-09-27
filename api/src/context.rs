@@ -44,6 +44,7 @@ pub struct Context {
     mp_sender: MempoolClientSender,
     pub node_config: NodeConfig,
     gas_estimation: Arc<RwLock<GasEstimationCache>>,
+    gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
 }
 
 impl std::fmt::Debug for Context {
@@ -68,6 +69,10 @@ impl Context {
                 last_updated_version: None,
                 min_gas_price: 0,
                 median_gas_price: 0,
+            })),
+            gas_schedule_cache: Arc::new(RwLock::new(GasScheduleCache {
+                last_updated_epoch: None,
+                gas_schedule_params: None,
             })),
         }
     }
@@ -229,15 +234,22 @@ impl Context {
             .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
     }
 
-    pub fn get_account_state(
+    pub fn get_account_state<E: InternalError>(
         &self,
         address: AccountAddress,
         version: u64,
-    ) -> Result<Option<AccountState>> {
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<Option<AccountState>, E> {
         AccountState::from_access_paths_and_values(
             address,
-            &self.get_state_values(address, version)?,
+            &self.get_state_values(address, version).map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+            })?,
         )
+        .context("Failed to read account state at requested version")
+        .map_err(|err| {
+            E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+        })
     }
 
     pub fn get_block_timestamp<E: InternalError>(
@@ -328,17 +340,23 @@ impl Context {
                 E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
             })?;
         let block_timestamp = new_block_event.proposed_time();
+
+        // We can only get the max_transactions page size
+        let max_txns = std::cmp::min(
+            self.node_config.api.max_transactions_page_size,
+            (last_version - first_version + 1) as u16,
+        );
         let txns = if with_transactions {
             Some(
-                self.get_transactions(
-                    first_version,
-                    (last_version - first_version + 1) as u16,
-                    ledger_version,
-                )
-                .context("Failed to read raw transactions from storage")
-                .map_err(|err| {
-                    E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
-                })?,
+                self.get_transactions(first_version, max_txns, ledger_version)
+                    .context("Failed to read raw transactions from storage")
+                    .map_err(|err| {
+                        E::internal_with_code(
+                            err,
+                            AptosErrorCode::InternalError,
+                            latest_ledger_info,
+                        )
+                    })?,
             )
         } else {
             None
@@ -612,6 +630,7 @@ impl Context {
 
             // When there's no gas prices in the last 100k transactions, we're going to set it to
             // the lowest gas price because the transaction should get through with any amount
+            gas_estimation.last_updated_version = Some(ledger_info.ledger_version.0);
             gas_estimation.median_gas_price = if gas_prices.is_empty() {
                 // Pull the min gas price
                 let gas_schedule = self.get_gas_schedule(ledger_info)?;
@@ -631,29 +650,63 @@ impl Context {
         &self,
         ledger_info: &LedgerInfo,
     ) -> Result<AptosGasParameters, E> {
-        let state_view = self
-            .db
-            .state_view_at_version(Some(ledger_info.version()))
-            .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))?;
-        let storage_adapter = StorageAdapter::new(&state_view);
+        // If it's the same epoch, used the cached results
+        {
+            let cache = self.gas_schedule_cache.read().unwrap();
+            if let (Some(ref last_updated_epoch), Some(gas_params)) =
+                (cache.last_updated_epoch, &cache.gas_schedule_params)
+            {
+                if *last_updated_epoch == ledger_info.epoch.0 {
+                    return Ok(gas_params.clone());
+                }
+            }
+        }
 
-        match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
-            let gas_schedule = gas_schedule.to_btree_map();
-            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
-        }) {
-            Some(gas_schedule) => Ok(gas_schedule),
-            None => GasSchedule::fetch_config(&storage_adapter)
-                .and_then(|gas_schedule| {
+        // Otherwise refresh the cache
+        {
+            let mut cache = self.gas_schedule_cache.write().unwrap();
+            // If a different thread updated the cache, we can exit early
+            if let (Some(ref last_updated_epoch), Some(gas_params)) =
+                (cache.last_updated_epoch, &cache.gas_schedule_params)
+            {
+                if *last_updated_epoch == ledger_info.epoch.0 {
+                    return Ok(gas_params.clone());
+                }
+            }
+
+            // Retrieve the gas schedule from storage and parse it accordingly
+            let state_view = self
+                .db
+                .state_view_at_version(Some(ledger_info.version()))
+                .map_err(|e| {
+                    E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
+                })?;
+            let storage_adapter = StorageAdapter::new(&state_view);
+
+            let gas_schedule_params =
+                match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
-                })
-                .ok_or_else(|| {
-                    E::internal_with_code(
-                        "Failed to retrieve gas schedule",
-                        AptosErrorCode::InternalError,
-                        ledger_info,
-                    )
-                }),
+                }) {
+                    Some(gas_schedule) => Ok(gas_schedule),
+                    None => GasSchedule::fetch_config(&storage_adapter)
+                        .and_then(|gas_schedule| {
+                            let gas_schedule = gas_schedule.to_btree_map();
+                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                        })
+                        .ok_or_else(|| {
+                            E::internal_with_code(
+                                "Failed to retrieve gas schedule",
+                                AptosErrorCode::InternalError,
+                                ledger_info,
+                            )
+                        }),
+                }?;
+
+            // Update the cache
+            cache.gas_schedule_params = Some(gas_schedule_params.clone());
+            cache.last_updated_epoch = Some(ledger_info.epoch.0);
+            Ok(gas_schedule_params)
         }
     }
 
@@ -676,10 +729,23 @@ impl Context {
         }
         Ok(())
     }
+
+    pub fn last_updated_gas_schedule(&self) -> Option<u64> {
+        self.gas_schedule_cache.read().unwrap().last_updated_epoch
+    }
+
+    pub fn last_updated_gas_estimation(&self) -> Option<u64> {
+        self.gas_estimation.read().unwrap().last_updated_version
+    }
 }
 
 pub struct GasEstimationCache {
     last_updated_version: Option<u64>,
     min_gas_price: u64,
     median_gas_price: u64,
+}
+
+pub struct GasScheduleCache {
+    last_updated_epoch: Option<u64>,
+    gas_schedule_params: Option<AptosGasParameters>,
 }

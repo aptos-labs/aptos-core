@@ -1,6 +1,6 @@
 [package]
 name = "aptos"
-version = "0.3.4"
+version = "0.3.5"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos tool for management of nodes and interacting with the blockchain"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -43,6 +43,7 @@ aptos-faucet = { path = "../aptos-faucet" }
 aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-genesis = { path = "../aptos-genesis" }
 aptos-github-client = { path = "../../secure/storage/github" }
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-keygen = { path = "../aptos-keygen" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
@@ -54,6 +55,7 @@ aptos-temppath = { path = "../aptos-temppath" }
 aptos-transactional-test-harness = { path = "../../aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
+vm-genesis = { path = "../../aptos-move/vm-genesis" }
 
 backup-cli = { path = "../../storage/backup/backup-cli" }
 cached-packages = { path = '../../aptos-move/framework/cached-packages' }

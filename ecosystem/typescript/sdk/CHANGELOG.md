@@ -5,7 +5,13 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+
 N/A
+
+## 1.3.14 (2022-09-20)
+
+- Enable SDK axios client to carry cookies for both the browser and node environments.
+- Added new functions `getBlockByHeight` and `getBlockByVersion`.
 
 ## 1.3.13 (2022-09-15)
 

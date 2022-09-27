@@ -3,7 +3,6 @@
 
 pub mod aggregator;
 pub mod harness;
-pub mod package_builder;
 pub mod stake;
 
 use anyhow::bail;
@@ -13,6 +12,9 @@ use move_deps::move_package::package_hooks::PackageHooks;
 use move_deps::move_package::source_package::parsed_manifest::CustomDepInfo;
 use move_deps::move_symbol_pool::Symbol;
 pub use stake::*;
+
+#[cfg(test)]
+mod tests;
 
 pub(crate) struct AptosPackageHooks {}
 

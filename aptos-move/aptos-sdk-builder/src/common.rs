@@ -113,7 +113,7 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
             _ => format!("vec{}", mangle_type(type_tag)),
         },
         Struct(tag) => match tag {
-            tag if tag == Lazy::force(&str_tag) => "u8vector".into(),
+            tag if tag == Lazy::force(&str_tag) => "string".into(),
             _ => type_not_allowed(type_tag),
         },
         Signer => type_not_allowed(type_tag),

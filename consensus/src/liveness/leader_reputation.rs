@@ -3,8 +3,10 @@
 
 use crate::{
     counters::{
-        COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW, FAILED_PROPOSALS_IN_WINDOW,
-        LEADER_REPUTATION_ROUND_HISTORY_SIZE,
+        CHAIN_HEALTH_PARTICIPATING_NUM_VALIDATORS, CHAIN_HEALTH_PARTICIPATING_VOTING_POWER,
+        CHAIN_HEALTH_TOTAL_NUM_VALIDATORS, CHAIN_HEALTH_TOTAL_VOTING_POWER,
+        CHAIN_HEALTH_WINDOW_SIZES, COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW,
+        FAILED_PROPOSALS_IN_WINDOW, LEADER_REPUTATION_ROUND_HISTORY_SIZE,
     },
     liveness::proposer_election::{choose_index, ProposerElection},
 };
@@ -18,8 +20,11 @@ use aptos_types::{
     epoch_state::EpochState,
 };
 use consensus_types::common::{Author, Round};
-use short_hex_str::AsShortHexStr;
-use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    sync::Arc,
+};
 use storage_interface::{DbReader, Order};
 
 /// Interface to query committed NewBlockEvent.
@@ -49,7 +54,7 @@ impl AptosDBBackend {
     fn refresh_db_result(
         &self,
         mut locked: MutexGuard<'_, (Vec<NewBlockEvent>, u64, bool)>,
-        lastest_db_version: u64,
+        latest_db_version: u64,
     ) -> Result<(Vec<NewBlockEvent>, u64, bool)> {
         // assumes target round is not too far from latest commit
         let limit = self.window_size + self.seek_len;
@@ -67,7 +72,7 @@ impl AptosDBBackend {
             u64::max_value(),
             Order::Descending,
             limit as u64,
-            lastest_db_version,
+            latest_db_version,
         )?;
 
         let max_returned_version = events.first().map_or(0, |first| first.transaction_version);
@@ -81,7 +86,7 @@ impl AptosDBBackend {
 
         let result = (
             new_block_events,
-            std::cmp::max(lastest_db_version, max_returned_version),
+            std::cmp::max(latest_db_version, max_returned_version),
             hit_end,
         );
         *locked = result.clone();
@@ -138,10 +143,10 @@ impl MetadataBackend for AptosDBBackend {
         let has_larger = events.first().map_or(false, |e| {
             (e.epoch(), e.round()) >= (target_epoch, target_round)
         });
-        let lastest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
+        let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
-        if !has_larger && version < lastest_db_version {
-            let fresh_db_result = self.refresh_db_result(locked, lastest_db_version);
+        if !has_larger && version < latest_db_version {
+            let fresh_db_result = self.refresh_db_result(locked, latest_db_version);
             match fresh_db_result {
                 Ok((events, _version, hit_end)) => {
                     self.get_from_db_result(target_epoch, target_round, &events, hit_end)
@@ -249,9 +254,9 @@ impl NewBlockEventAggregation {
 
     pub fn get_aggregated_metrics(
         &self,
-        epoch: u64,
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
+        author: &Author,
     ) -> (
         HashMap<Author, u32>,
         HashMap<Author, u32>,
@@ -261,21 +266,14 @@ impl NewBlockEventAggregation {
         let proposals = self.count_proposals(epoch_to_candidates, history);
         let failed_proposals = self.count_failed_proposals(epoch_to_candidates, history);
 
-        for candidate in &epoch_to_candidates[&epoch] {
-            COMMITTED_PROPOSALS_IN_WINDOW
-                .with_label_values(&[candidate.short_str().as_str()])
-                .set(*proposals.get(candidate).unwrap_or(&0) as i64);
-            FAILED_PROPOSALS_IN_WINDOW
-                .with_label_values(&[candidate.short_str().as_str()])
-                .set(*failed_proposals.get(candidate).unwrap_or(&0) as i64);
-            COMMITTED_VOTES_IN_WINDOW
-                .with_label_values(&[candidate.short_str().as_str()])
-                .set(*votes.get(candidate).unwrap_or(&0) as i64);
-        }
+        COMMITTED_PROPOSALS_IN_WINDOW.set(*proposals.get(author).unwrap_or(&0) as i64);
+        FAILED_PROPOSALS_IN_WINDOW.set(*failed_proposals.get(author).unwrap_or(&0) as i64);
+        COMMITTED_VOTES_IN_WINDOW.set(*votes.get(author).unwrap_or(&0) as i64);
 
         LEADER_REPUTATION_ROUND_HISTORY_SIZE.set(
             proposals.values().sum::<u32>() as i64 + failed_proposals.values().sum::<u32>() as i64,
         );
+
         (votes, proposals, failed_proposals)
     }
 
@@ -284,7 +282,15 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch_to_candidates, self.voter_window_size).fold(
+        Self::count_votes_custom(epoch_to_candidates, history, self.voter_window_size)
+    }
+
+    pub fn count_votes_custom(
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
+        history: &[NewBlockEvent],
+        window_size: usize,
+    ) -> HashMap<Author, u32> {
+        Self::history_iter(history, epoch_to_candidates, window_size).fold(
             HashMap::new(),
             |mut map, meta| {
                 match Self::bitvec_to_voters(
@@ -316,7 +322,15 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch_to_candidates, self.proposer_window_size).fold(
+        Self::count_proposals_custom(epoch_to_candidates, history, self.proposer_window_size)
+    }
+
+    pub fn count_proposals_custom(
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
+        history: &[NewBlockEvent],
+        window_size: usize,
+    ) -> HashMap<Author, u32> {
+        Self::history_iter(history, epoch_to_candidates, window_size).fold(
             HashMap::new(),
             |mut map, meta| {
                 let count = map.entry(meta.proposer()).or_insert(0);
@@ -379,7 +393,6 @@ impl NewBlockEventAggregation {
 ///  * and 33% (much less aggressive exclusion, with 1 failure for every 2 successes, should still reduce failed
 ///    rounds by at least 66%, and is enough to avoid byzantine attacks as well as the rest of the protocol)
 pub struct ProposerAndVoterHeuristic {
-    #[allow(unused)]
     author: Author,
     active_weight: u64,
     inactive_weight: u64,
@@ -420,7 +433,7 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
 
         let (votes, proposals, failed_proposals) =
             self.aggregation
-                .get_aggregated_metrics(epoch, epoch_to_candidates, history);
+                .get_aggregated_metrics(epoch_to_candidates, history, &self.author);
 
         epoch_to_candidates[&epoch]
             .iter()
@@ -475,12 +488,55 @@ impl LeaderReputation {
             exclude_round,
         }
     }
+
+    fn add_chain_health_metrics(&self, history: &[NewBlockEvent], round: Round) {
+        let candidates = self.epoch_to_proposers.get(&self.epoch).unwrap();
+        // use f64 counter, as total voting power is u128
+        CHAIN_HEALTH_TOTAL_VOTING_POWER.set(self.voting_powers.iter().map(|v| *v as f64).sum());
+        CHAIN_HEALTH_TOTAL_NUM_VALIDATORS.set(candidates.len() as i64);
+
+        for (counter_index, participants_window_size) in
+            CHAIN_HEALTH_WINDOW_SIZES.iter().enumerate()
+        {
+            let sample_fraction = participants_window_size / 10;
+            // Sample longer durations
+            if sample_fraction <= 1 || (round % sample_fraction as u64) == 1 {
+                let participants: HashSet<_> = NewBlockEventAggregation::count_votes_custom(
+                    &self.epoch_to_proposers,
+                    history,
+                    *participants_window_size,
+                )
+                .into_keys()
+                .chain(
+                    NewBlockEventAggregation::count_proposals_custom(
+                        &self.epoch_to_proposers,
+                        history,
+                        *participants_window_size,
+                    )
+                    .into_keys(),
+                )
+                .collect();
+
+                CHAIN_HEALTH_PARTICIPATING_VOTING_POWER[counter_index].set(
+                    candidates
+                        .iter()
+                        .zip(self.voting_powers.iter())
+                        .filter(|(c, _vp)| participants.contains(c))
+                        .map(|(_c, vp)| *vp as f64)
+                        .sum(),
+                );
+                CHAIN_HEALTH_PARTICIPATING_NUM_VALIDATORS[counter_index]
+                    .set(participants.len() as i64);
+            }
+        }
+    }
 }
 
 impl ProposerElection for LeaderReputation {
     fn get_valid_proposer(&self, round: Round) -> Author {
         let target_round = round.saturating_sub(self.exclude_round);
         let sliding_window = self.backend.get_block_metadata(self.epoch, target_round);
+        self.add_chain_health_metrics(&sliding_window, round);
         let mut weights =
             self.heuristic
                 .get_weights(self.epoch, &self.epoch_to_proposers, &sliding_window);

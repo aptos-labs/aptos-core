@@ -1,15 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
-    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
-    SwarmExt, Validator, Version,
+    interface::system_metrics::SystemMetricsThreshold, ChainInfo, FullNode, HealthCheckError,
+    LocalNode, LocalVersion, Node, Swarm, SwarmChaos, SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
-use aptos_config::config::NetworkConfig;
-use aptos_config::network_id::NetworkId;
-use aptos_config::{config::NodeConfig, keys::ConfigKey};
+use aptos_config::{
+    config::{NetworkConfig, NodeConfig},
+    keys::ConfigKey,
+    network_id::NetworkId,
+};
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
@@ -155,7 +156,7 @@ impl LocalSwarm {
             .build(rng)?;
 
         // Get the initial version to start the nodes with, either the one provided or fallback to
-        // using the the latest version
+        // using the latest version
         let initial_version_actual = initial_version.unwrap_or_else(|| {
             versions
                 .iter()
@@ -264,7 +265,7 @@ impl LocalSwarm {
         Ok(())
     }
 
-    async fn wait_for_startup(&mut self) -> Result<()> {
+    pub async fn wait_for_startup(&mut self) -> Result<()> {
         let num_attempts = 30;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
@@ -543,15 +544,14 @@ impl Swarm for LocalSwarm {
     }
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
-        ChainInfo::new(
-            &mut self.root_account,
-            self.validators
-                .values()
-                .map(|v| v.rest_api_endpoint().to_string())
-                .next()
-                .unwrap(),
-            self.chain_id,
-        )
+        let rest_api_url = self
+            .validators()
+            .next()
+            .unwrap()
+            .rest_api_endpoint()
+            .to_string();
+
+        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 
     fn logs_location(&mut self) -> String {
@@ -564,6 +564,10 @@ impl Swarm for LocalSwarm {
     }
 
     fn remove_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+        todo!()
+    }
+
+    fn remove_all_chaos(&mut self) -> Result<()> {
         todo!()
     }
 
@@ -591,6 +595,17 @@ impl Swarm for LocalSwarm {
         _threshold: SystemMetricsThreshold,
     ) -> Result<()> {
         todo!()
+    }
+
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
+        let rest_api_url = self
+            .validators()
+            .nth(idx)
+            .unwrap()
+            .rest_api_endpoint()
+            .to_string();
+
+        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 }
 

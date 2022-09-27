@@ -20,7 +20,7 @@ use crate::pruner::db_pruner::DBPruner;
 use crate::pruner::state_pruner_worker::StatePrunerWorker;
 use crate::pruner::state_store::generics::StaleNodeIndexSchemaTrait;
 use crate::pruner::state_store::StateMerklePruner;
-use crate::utils;
+use crate::pruner_utils;
 
 /// The `Pruner` is meant to be part of a `AptosDB` instance and runs in the background to prune old
 /// data.
@@ -105,7 +105,7 @@ where
     /// Creates a worker thread that waits on a channel for pruning commands.
     pub fn new(state_merkle_rocksdb: Arc<DB>, config: StateMerklePrunerConfig) -> Self {
         let state_db_clone = Arc::clone(&state_merkle_rocksdb);
-        let pruner = utils::create_state_pruner(state_db_clone);
+        let pruner = pruner_utils::create_state_pruner(state_db_clone);
 
         if config.enable {
             PRUNER_WINDOW

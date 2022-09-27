@@ -4,6 +4,7 @@
 use crate::common::types::OptionalPoolAddressArgs;
 use crate::common::utils::{create_dir_if_not_exist, current_dir, dir_default_to_current};
 use crate::genesis::git::{LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE};
+use crate::governance::CompileScriptFunction;
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions, RngArgs},
@@ -15,6 +16,8 @@ use crate::{
 use aptos_genesis::config::{Layout, OperatorConfiguration, OwnerConfiguration};
 use aptos_genesis::keys::PublicIdentity;
 use aptos_genesis::{config::HostAndPort, keys::generate_key_objects};
+use aptos_types::account_address::AccountAddress;
+use aptos_types::transaction::{Script, Transaction, WriteSetPayload};
 use async_trait::async_trait;
 use clap::Parser;
 use std::path::{Path, PathBuf};
@@ -113,6 +116,14 @@ pub struct SetValidatorConfiguration {
     /// Stake amount for stake distribution
     #[clap(long, default_value_t = 1)]
     pub(crate) stake_amount: u64,
+
+    /// Commission rate to pay operator
+    #[clap(long, default_value_t = 0)]
+    pub(crate) commission_percentage: u64,
+
+    /// Whether the validator will be joining the genesis validator set.
+    #[clap(long)]
+    pub(crate) join_during_genesis: bool,
 
     /// Path to private identity generated from GenerateKeys
     #[clap(long, parse(from_os_str))]
@@ -223,6 +234,8 @@ impl CliCommand<()> for SetValidatorConfiguration {
             operator_account_address: operator_identity.account_address,
             operator_account_public_key: operator_identity.account_public_key,
             stake_amount: self.stake_amount,
+            commission_percentage: self.commission_percentage,
+            join_during_genesis: self.join_during_genesis,
         };
 
         let directory = PathBuf::from(&self.username);
@@ -268,6 +281,51 @@ impl CliCommand<()> for GenerateLayoutTemplate {
             self.output_file.as_path(),
             &self.output_file.display().to_string(),
             to_yaml(&layout)?.as_bytes(),
+        )
+    }
+}
+
+/// Generate a WriteSet genesis compiled from a script file.
+///
+/// This will compile a piece of Move script and generate a writeset from that script.
+#[derive(Parser)]
+pub struct GenerateAdminWriteSet {
+    /// Path of the output genesis file
+    #[clap(long, parse(from_os_str))]
+    pub(crate) output_file: PathBuf,
+
+    /// Address of the account which execute this script.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) execute_as: AccountAddress,
+
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileScriptFunction,
+
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<()> for GenerateAdminWriteSet {
+    fn command_name(&self) -> &'static str {
+        "GenerateAdminWriteSet"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        check_if_file_exists(self.output_file.as_path(), self.prompt_options)?;
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile("GenerateAdminWriteSet", self.prompt_options)?;
+
+        let txn = Transaction::GenesisTransaction(WriteSetPayload::Script {
+            execute_as: self.execute_as,
+            script: Script::new(bytecode, vec![], vec![]),
+        });
+
+        write_to_user_only_file(
+            self.output_file.as_path(),
+            &self.output_file.display().to_string(),
+            &bcs::to_bytes(&txn).map_err(CliError::from)?,
         )
     }
 }

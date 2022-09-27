@@ -11,6 +11,7 @@ use aptos_crypto::{
 };
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::debug;
+use aptos_telemetry_service::types::index::IndexResponse;
 use aptos_telemetry_service::types::{
     auth::{AuthRequest, AuthResponse},
     telemetry::TelemetryDump,
@@ -100,7 +101,7 @@ impl TelemetrySender {
         let response = self
             .send_authenticated_request(
                 self.client
-                    .post(format!("{}/push-metrics", self.base_url))
+                    .post(format!("{}/api/v1/ingest/metrics", self.base_url))
                     .header(CONTENT_ENCODING, "gzip")
                     .body(compressed_bytes),
             )
@@ -164,7 +165,7 @@ impl TelemetrySender {
         let response = self
             .send_authenticated_request(
                 self.client
-                    .post(format!("{}/log_ingest", self.base_url))
+                    .post(format!("{}/api/v1/ingest/logs", self.base_url))
                     .header(CONTENT_ENCODING, "gzip")
                     .body(compressed_bytes),
             )
@@ -195,7 +196,7 @@ impl TelemetrySender {
         let response = self
             .send_authenticated_request(
                 self.client
-                    .post(format!("{}/custom_event", self.base_url))
+                    .post(format!("{}/api/v1/ingest/custom-event", self.base_url))
                     .json::<TelemetryDump>(telemetry_dump),
             )
             .await?;
@@ -217,12 +218,16 @@ impl TelemetrySender {
     }
 
     async fn get_public_key_from_server(&self) -> Result<x25519::PublicKey, anyhow::Error> {
-        let response = self.client.get(self.base_url.to_string()).send().await?;
+        let response = self
+            .client
+            .get(format!("{}/api/v1/", self.base_url))
+            .send()
+            .await?;
 
         match error_for_status_with_body(response).await {
             Ok(response) => {
-                let public_key = response.json::<x25519::PublicKey>().await?;
-                Ok(public_key)
+                let response_payload = response.json::<IndexResponse>().await?;
+                Ok(response_payload.public_key)
             }
             Err(err) => Err(anyhow!("Error getting server public key. {}", err)),
         }
@@ -287,7 +292,7 @@ impl TelemetrySender {
 
         let response = self
             .client
-            .post(format!("{}/auth", self.base_url))
+            .post(format!("{}/api/v1/auth", self.base_url))
             .json::<AuthRequest>(&auth_request)
             .send()
             .await?;
@@ -316,7 +321,10 @@ impl TelemetrySender {
         debug!("checking chain access for chain id {}", chain_id);
         let response = self
             .client
-            .get(format!("{}/chain-access/{}", self.base_url, chain_id))
+            .get(format!(
+                "{}/api/v1/chain-access/{}",
+                self.base_url, chain_id
+            ))
             .send()
             .await;
 
@@ -331,6 +339,29 @@ impl TelemetrySender {
             Err(e) => {
                 debug!("Unable to check chain access {}", e);
                 true
+            }
+        }
+    }
+
+    pub(crate) async fn get_telemetry_log_env(&self) -> Option<String> {
+        let response = self
+            .send_authenticated_request(
+                self.client
+                    .get(format!("{}/api/v1/config/env/telemetry-log", self.base_url)),
+            )
+            .await;
+
+        match response {
+            Ok(response) => match error_for_status_with_body(response).await {
+                Ok(response) => response.json::<Option<String>>().await.unwrap_or_default(),
+                Err(e) => {
+                    debug!("Unable to get telemetry log env: {}", e);
+                    None
+                }
+            },
+            Err(e) => {
+                debug!("Unable to check chain access {}", e);
+                None
             }
         }
     }
@@ -359,8 +390,10 @@ mod tests {
 
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method("GET").path("/");
-            then.status(200).json_body_obj(&private_key.public_key());
+            when.method("GET").path("/api/v1/");
+            then.status(200).json_body_obj(&IndexResponse {
+                public_key: private_key.public_key(),
+            });
         });
 
         let node_config = NodeConfig::default();
@@ -408,7 +441,7 @@ mod tests {
         let mock = server.mock(|when, then| {
             when.method("POST")
                 .header("Authorization", "Bearer SECRET_JWT_TOKEN")
-                .path("/custom_event")
+                .path("/api/v1/ingest/custom-event")
                 .json_body_obj(&telemetry_dump);
             then.status(200);
         });
@@ -448,7 +481,7 @@ mod tests {
 
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method("POST").path("/custom_event");
+            when.method("POST").path("/api/v1/ingest/custom-event");
             then.status(401);
         });
 
@@ -505,7 +538,7 @@ mod tests {
         let mock = server.mock(|when, then| {
             when.method("POST")
                 .header("Authorization", "Bearer SECRET_JWT_TOKEN")
-                .path("/push-metrics")
+                .path("/api/v1/ingest/metrics")
                 .body(String::from_utf8_lossy(&expected_compressed_bytes));
             then.status(200);
         });
@@ -536,7 +569,7 @@ mod tests {
         let mock = server.mock(|when, then| {
             when.method("POST")
                 .header("Authorization", "Bearer SECRET_JWT_TOKEN")
-                .path("/log_ingest")
+                .path("/api/v1/ingest/logs")
                 .body(String::from_utf8_lossy(&expected_compressed_bytes));
             then.status(200);
         });
@@ -556,7 +589,7 @@ mod tests {
     async fn test_check_chain_access() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method("GET").path("/chain-access/24");
+            when.method("GET").path("/api/v1/chain-access/24");
             then.status(200).json_body(true);
         });
 

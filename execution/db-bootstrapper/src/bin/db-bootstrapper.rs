@@ -58,13 +58,14 @@ fn main() -> Result<()> {
         TARGET_SNAPSHOT_SIZE,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )
-    .with_context(|| format_err!("Failed to open DB."))?;
+    .expect("Failed to open DB.");
     let db = DbReaderWriter::new(db);
 
     let executed_trees = db
         .reader
         .get_latest_executed_trees()
         .with_context(|| format_err!("Failed to get latest tree state."))?;
+    println!("Db has {} transactions", executed_trees.num_transactions());
     if let Some(waypoint) = opt.waypoint_to_verify {
         ensure!(
             waypoint.version() == executed_trees.num_transactions(),

@@ -317,6 +317,12 @@ pub enum EntryFunctionCall {
         new_commission_percentage: u64,
     },
 
+    /// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+    StakingContractSwitchOperatorWithSameCommission {
+        old_operator: AccountAddress,
+        new_operator: AccountAddress,
+    },
+
     /// Unlock all accumulated rewards since the last recorded principals.
     StakingContractUnlockRewards {
         operator: AccountAddress,
@@ -331,6 +337,44 @@ pub enum EntryFunctionCall {
 
     /// Convenient function to allow the staker to update the voter address in a staking contract they made.
     StakingContractUpdateVoter {
+        operator: AccountAddress,
+        new_voter: AccountAddress,
+    },
+
+    StakingProxySetOperator {
+        old_operator: AccountAddress,
+        new_operator: AccountAddress,
+    },
+
+    StakingProxySetStakePoolOperator {
+        new_operator: AccountAddress,
+    },
+
+    StakingProxySetStakePoolVoter {
+        new_voter: AccountAddress,
+    },
+
+    StakingProxySetStakingContractOperator {
+        old_operator: AccountAddress,
+        new_operator: AccountAddress,
+    },
+
+    StakingProxySetStakingContractVoter {
+        operator: AccountAddress,
+        new_voter: AccountAddress,
+    },
+
+    StakingProxySetVestingContractOperator {
+        old_operator: AccountAddress,
+        new_operator: AccountAddress,
+    },
+
+    StakingProxySetVestingContractVoter {
+        operator: AccountAddress,
+        new_voter: AccountAddress,
+    },
+
+    StakingProxySetVoter {
         operator: AccountAddress,
         new_voter: AccountAddress,
     },
@@ -352,6 +396,13 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
     },
 
+    /// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
+    /// account.
+    VestingResetBeneficiary {
+        contract_address: AccountAddress,
+        shareholder: AccountAddress,
+    },
+
     VestingResetLockup {
         contract_address: AccountAddress,
     },
@@ -360,6 +411,17 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
         shareholder: AccountAddress,
         new_beneficiary: AccountAddress,
+    },
+
+    VestingSetBeneficiaryResetter {
+        contract_address: AccountAddress,
+        beneficiary_resetter: AccountAddress,
+    },
+
+    VestingSetManagementRole {
+        contract_address: AccountAddress,
+        role: Vec<u8>,
+        role_holder: AccountAddress,
     },
 
     /// Terminate the vesting contract and send all funds back to the withdrawal address.
@@ -376,6 +438,11 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
         new_operator: AccountAddress,
         commission_percentage: u64,
+    },
+
+    VestingUpdateOperatorWithSameCommission {
+        contract_address: AccountAddress,
+        new_operator: AccountAddress,
     },
 
     VestingUpdateVoter {
@@ -566,6 +633,10 @@ impl EntryFunctionCall {
                 new_operator,
                 new_commission_percentage,
             ),
+            StakingContractSwitchOperatorWithSameCommission {
+                old_operator,
+                new_operator,
+            } => staking_contract_switch_operator_with_same_commission(old_operator, new_operator),
             StakingContractUnlockRewards { operator } => staking_contract_unlock_rewards(operator),
             StakingContractUnlockStake { operator, amount } => {
                 staking_contract_unlock_stake(operator, amount)
@@ -574,15 +645,58 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_contract_update_voter(operator, new_voter),
+            StakingProxySetOperator {
+                old_operator,
+                new_operator,
+            } => staking_proxy_set_operator(old_operator, new_operator),
+            StakingProxySetStakePoolOperator { new_operator } => {
+                staking_proxy_set_stake_pool_operator(new_operator)
+            }
+            StakingProxySetStakePoolVoter { new_voter } => {
+                staking_proxy_set_stake_pool_voter(new_voter)
+            }
+            StakingProxySetStakingContractOperator {
+                old_operator,
+                new_operator,
+            } => staking_proxy_set_staking_contract_operator(old_operator, new_operator),
+            StakingProxySetStakingContractVoter {
+                operator,
+                new_voter,
+            } => staking_proxy_set_staking_contract_voter(operator, new_voter),
+            StakingProxySetVestingContractOperator {
+                old_operator,
+                new_operator,
+            } => staking_proxy_set_vesting_contract_operator(old_operator, new_operator),
+            StakingProxySetVestingContractVoter {
+                operator,
+                new_voter,
+            } => staking_proxy_set_vesting_contract_voter(operator, new_voter),
+            StakingProxySetVoter {
+                operator,
+                new_voter,
+            } => staking_proxy_set_voter(operator, new_voter),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
             VestingDistribute { contract_address } => vesting_distribute(contract_address),
+            VestingResetBeneficiary {
+                contract_address,
+                shareholder,
+            } => vesting_reset_beneficiary(contract_address, shareholder),
             VestingResetLockup { contract_address } => vesting_reset_lockup(contract_address),
             VestingSetBeneficiary {
                 contract_address,
                 shareholder,
                 new_beneficiary,
             } => vesting_set_beneficiary(contract_address, shareholder, new_beneficiary),
+            VestingSetBeneficiaryResetter {
+                contract_address,
+                beneficiary_resetter,
+            } => vesting_set_beneficiary_resetter(contract_address, beneficiary_resetter),
+            VestingSetManagementRole {
+                contract_address,
+                role,
+                role_holder,
+            } => vesting_set_management_role(contract_address, role, role_holder),
             VestingTerminateVestingContract { contract_address } => {
                 vesting_terminate_vesting_contract(contract_address)
             }
@@ -592,6 +706,10 @@ impl EntryFunctionCall {
                 new_operator,
                 commission_percentage,
             } => vesting_update_operator(contract_address, new_operator, commission_percentage),
+            VestingUpdateOperatorWithSameCommission {
+                contract_address,
+                new_operator,
+            } => vesting_update_operator_with_same_commission(contract_address, new_operator),
             VestingUpdateVoter {
                 contract_address,
                 new_voter,
@@ -1458,6 +1576,28 @@ pub fn staking_contract_switch_operator(
     ))
 }
 
+/// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+pub fn staking_contract_switch_operator_with_same_commission(
+    old_operator: AccountAddress,
+    new_operator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_contract").to_owned(),
+        ),
+        ident_str!("switch_operator_with_same_commission").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&old_operator).unwrap(),
+            bcs::to_bytes(&new_operator).unwrap(),
+        ],
+    ))
+}
+
 /// Unlock all accumulated rewards since the last recorded principals.
 pub fn staking_contract_unlock_rewards(operator: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -1516,6 +1656,162 @@ pub fn staking_contract_update_voter(
     ))
 }
 
+pub fn staking_proxy_set_operator(
+    old_operator: AccountAddress,
+    new_operator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_proxy").to_owned(),
+        ),
+        ident_str!("set_operator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&old_operator).unwrap(),
+            bcs::to_bytes(&new_operator).unwrap(),
+        ],
+    ))
+}
+
+pub fn staking_proxy_set_stake_pool_operator(new_operator: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_proxy").to_owned(),
+        ),
+        ident_str!("set_stake_pool_operator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_operator).unwrap()],
+    ))
+}
+
+pub fn staking_proxy_set_stake_pool_voter(new_voter: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_proxy").to_owned(),
+        ),
+        ident_str!("set_stake_pool_voter").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_voter).unwrap()],
+    ))
+}
+
+pub fn staking_proxy_set_staking_contract_operator(
+    old_operator: AccountAddress,
+    new_operator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_proxy").to_owned(),
+        ),
+        ident_str!("set_staking_contract_operator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&old_operator).unwrap(),
+            bcs::to_bytes(&new_operator).unwrap(),
+        ],
+    ))
+}
+
+pub fn staking_proxy_set_staking_contract_voter(
+    operator: AccountAddress,
+    new_voter: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_proxy").to_owned(),
+        ),
+        ident_str!("set_staking_contract_voter").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&new_voter).unwrap(),
+        ],
+    ))
+}
+
+pub fn staking_proxy_set_vesting_contract_operator(
+    old_operator: AccountAddress,
+    new_operator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_proxy").to_owned(),
+        ),
+        ident_str!("set_vesting_contract_operator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&old_operator).unwrap(),
+            bcs::to_bytes(&new_operator).unwrap(),
+        ],
+    ))
+}
+
+pub fn staking_proxy_set_vesting_contract_voter(
+    operator: AccountAddress,
+    new_voter: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_proxy").to_owned(),
+        ),
+        ident_str!("set_vesting_contract_voter").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&new_voter).unwrap(),
+        ],
+    ))
+}
+
+pub fn staking_proxy_set_voter(
+    operator: AccountAddress,
+    new_voter: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_proxy").to_owned(),
+        ),
+        ident_str!("set_voter").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&new_voter).unwrap(),
+        ],
+    ))
+}
+
 /// Updates the major version to a larger version.
 /// This can be called by on chain governance.
 pub fn version_set_version(major: u64) -> TransactionPayload {
@@ -1566,6 +1862,29 @@ pub fn vesting_distribute(contract_address: AccountAddress) -> TransactionPayloa
     ))
 }
 
+/// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
+/// account.
+pub fn vesting_reset_beneficiary(
+    contract_address: AccountAddress,
+    shareholder: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("reset_beneficiary").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&shareholder).unwrap(),
+        ],
+    ))
+}
+
 pub fn vesting_reset_lockup(contract_address: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1600,6 +1919,50 @@ pub fn vesting_set_beneficiary(
             bcs::to_bytes(&contract_address).unwrap(),
             bcs::to_bytes(&shareholder).unwrap(),
             bcs::to_bytes(&new_beneficiary).unwrap(),
+        ],
+    ))
+}
+
+pub fn vesting_set_beneficiary_resetter(
+    contract_address: AccountAddress,
+    beneficiary_resetter: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("set_beneficiary_resetter").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&beneficiary_resetter).unwrap(),
+        ],
+    ))
+}
+
+pub fn vesting_set_management_role(
+    contract_address: AccountAddress,
+    role: Vec<u8>,
+    role_holder: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("set_management_role").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&role).unwrap(),
+            bcs::to_bytes(&role_holder).unwrap(),
         ],
     ))
 }
@@ -1655,6 +2018,27 @@ pub fn vesting_update_operator(
             bcs::to_bytes(&contract_address).unwrap(),
             bcs::to_bytes(&new_operator).unwrap(),
             bcs::to_bytes(&commission_percentage).unwrap(),
+        ],
+    ))
+}
+
+pub fn vesting_update_operator_with_same_commission(
+    contract_address: AccountAddress,
+    new_operator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("update_operator_with_same_commission").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&new_operator).unwrap(),
         ],
     ))
 }
@@ -2177,6 +2561,21 @@ mod decoder {
         }
     }
 
+    pub fn staking_contract_switch_operator_with_same_commission(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::StakingContractSwitchOperatorWithSameCommission {
+                    old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn staking_contract_unlock_rewards(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -2215,6 +2614,104 @@ mod decoder {
         }
     }
 
+    pub fn staking_proxy_set_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingProxySetOperator {
+                old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_proxy_set_stake_pool_operator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingProxySetStakePoolOperator {
+                new_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_proxy_set_stake_pool_voter(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingProxySetStakePoolVoter {
+                new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_proxy_set_staking_contract_operator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingProxySetStakingContractOperator {
+                old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_proxy_set_staking_contract_voter(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingProxySetStakingContractVoter {
+                operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_proxy_set_vesting_contract_operator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingProxySetVestingContractOperator {
+                old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_proxy_set_vesting_contract_voter(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingProxySetVestingContractVoter {
+                operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn staking_proxy_set_voter(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingProxySetVoter {
+                operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn version_set_version(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetVersion {
@@ -2245,6 +2742,17 @@ mod decoder {
         }
     }
 
+    pub fn vesting_reset_beneficiary(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingResetBeneficiary {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                shareholder: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_reset_lockup(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingResetLockup {
@@ -2261,6 +2769,31 @@ mod decoder {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 shareholder: bcs::from_bytes(script.args().get(1)?).ok()?,
                 new_beneficiary: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn vesting_set_beneficiary_resetter(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingSetBeneficiaryResetter {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                beneficiary_resetter: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn vesting_set_management_role(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingSetManagementRole {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                role: bcs::from_bytes(script.args().get(1)?).ok()?,
+                role_holder: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None
@@ -2295,6 +2828,19 @@ mod decoder {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 commission_percentage: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn vesting_update_operator_with_same_commission(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingUpdateOperatorWithSameCommission {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -2493,6 +3039,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::staking_contract_switch_operator),
         );
         map.insert(
+            "staking_contract_switch_operator_with_same_commission".to_string(),
+            Box::new(decoder::staking_contract_switch_operator_with_same_commission),
+        );
+        map.insert(
             "staking_contract_unlock_rewards".to_string(),
             Box::new(decoder::staking_contract_unlock_rewards),
         );
@@ -2503,6 +3053,38 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_contract_update_voter".to_string(),
             Box::new(decoder::staking_contract_update_voter),
+        );
+        map.insert(
+            "staking_proxy_set_operator".to_string(),
+            Box::new(decoder::staking_proxy_set_operator),
+        );
+        map.insert(
+            "staking_proxy_set_stake_pool_operator".to_string(),
+            Box::new(decoder::staking_proxy_set_stake_pool_operator),
+        );
+        map.insert(
+            "staking_proxy_set_stake_pool_voter".to_string(),
+            Box::new(decoder::staking_proxy_set_stake_pool_voter),
+        );
+        map.insert(
+            "staking_proxy_set_staking_contract_operator".to_string(),
+            Box::new(decoder::staking_proxy_set_staking_contract_operator),
+        );
+        map.insert(
+            "staking_proxy_set_staking_contract_voter".to_string(),
+            Box::new(decoder::staking_proxy_set_staking_contract_voter),
+        );
+        map.insert(
+            "staking_proxy_set_vesting_contract_operator".to_string(),
+            Box::new(decoder::staking_proxy_set_vesting_contract_operator),
+        );
+        map.insert(
+            "staking_proxy_set_vesting_contract_voter".to_string(),
+            Box::new(decoder::staking_proxy_set_vesting_contract_voter),
+        );
+        map.insert(
+            "staking_proxy_set_voter".to_string(),
+            Box::new(decoder::staking_proxy_set_voter),
         );
         map.insert(
             "version_set_version".to_string(),
@@ -2517,12 +3099,24 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::vesting_distribute),
         );
         map.insert(
+            "vesting_reset_beneficiary".to_string(),
+            Box::new(decoder::vesting_reset_beneficiary),
+        );
+        map.insert(
             "vesting_reset_lockup".to_string(),
             Box::new(decoder::vesting_reset_lockup),
         );
         map.insert(
             "vesting_set_beneficiary".to_string(),
             Box::new(decoder::vesting_set_beneficiary),
+        );
+        map.insert(
+            "vesting_set_beneficiary_resetter".to_string(),
+            Box::new(decoder::vesting_set_beneficiary_resetter),
+        );
+        map.insert(
+            "vesting_set_management_role".to_string(),
+            Box::new(decoder::vesting_set_management_role),
         );
         map.insert(
             "vesting_terminate_vesting_contract".to_string(),
@@ -2535,6 +3129,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_update_operator".to_string(),
             Box::new(decoder::vesting_update_operator),
+        );
+        map.insert(
+            "vesting_update_operator_with_same_commission".to_string(),
+            Box::new(decoder::vesting_update_operator_with_same_commission),
         );
         map.insert(
             "vesting_update_voter".to_string(),

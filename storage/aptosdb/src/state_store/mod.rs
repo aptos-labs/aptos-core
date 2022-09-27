@@ -98,8 +98,8 @@ impl Deref for StateStore {
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
-// want another trait, `StateReader`, which is a subset of `DbReaer` here but Rust does not support trait
-// upcasting coercion for now. Should change it to a different trait once upcasting is stablized.
+// want another trait, `StateReader`, which is a subset of `DbReader` here but Rust does not support trait
+// upcasting coercion for now. Should change it to a different trait once upcasting is stabilized.
 // ref: https://github.com/rust-lang/rust/issues/65991
 impl DbReader for StateDb {
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -710,16 +710,19 @@ impl StateStore {
         })
     }
 
+    // state sync doesn't query for the progress, but keeps its record by itself.
+    // TODO: change to async comment once it does like https://github.com/aptos-labs/aptos-core/blob/159b00f3d53e4327523052c1b99dd9889bf13b03/storage/backup/backup-cli/src/backup_types/state_snapshot/restore.rs#L147 or overlap at least two chunks.
     pub fn get_snapshot_receiver(
         self: &Arc<Self>,
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
-        Ok(Box::new(StateSnapshotRestore::new_overwrite(
+        Ok(Box::new(StateSnapshotRestore::new(
             &self.state_merkle_db,
             self,
             version,
             expected_root_hash,
+            false, /* async_commit */
         )?))
     }
 

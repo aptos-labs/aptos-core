@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::smoke_test_environment::SwarmBuilder;
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
         transfer_and_reconfig, transfer_coins,
@@ -11,6 +11,7 @@ use crate::{
     workspace_builder::workspace_root,
 };
 use anyhow::{bail, Result};
+use aptos_logger::info;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
 use backup_cli::metadata::view::BackupStorageState;
@@ -22,16 +23,20 @@ use std::{
     time::{Duration, Instant},
 };
 
-const MAX_WAIT_SECS: u64 = 60;
+const MAX_WAIT_SECS: u64 = 180;
 
 #[tokio::test]
 async fn test_db_restore() {
     // pre-build tools
+    ::aptos_logger::Logger::new().init();
+    info!("---------- 0. test_db_restore started.");
     workspace_builder::get_bin("db-backup");
     workspace_builder::get_bin("db-restore");
     workspace_builder::get_bin("db-backup-verify");
+    info!("---------- 1. pre-building finished.");
 
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = SwarmBuilder::new_local(4).with_aptos().build().await;
+    info!("---------- 1.1 swarm built, sending some transactions.");
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let client_1 = swarm
         .validator(validator_peer_ids[1])
@@ -43,12 +48,14 @@ async fn test_db_restore() {
     let mut account_0 = create_and_fund_account(&mut swarm, 1000000).await;
     let account_1 = create_and_fund_account(&mut swarm, 1000000).await;
 
+    info!("---------- 1.2 wait for nodes to catch up.");
     // we need to wait for all nodes to see it, as client_1 is different node from the
     // one creating accounts above
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(30))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
+    info!("---------- 1.3 caught up.");
 
     assert_balance(&client_1, &account_0, 1000000).await;
     assert_balance(&client_1, &account_1, 1000000).await;
@@ -68,8 +75,8 @@ async fn test_db_restore() {
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
-    expected_balance_0 -= 20;
-    expected_balance_1 += 20;
+    expected_balance_0 -= 6;
+    expected_balance_1 += 6;
 
     transfer_and_reconfig(
         &client_1,
@@ -77,7 +84,7 @@ async fn test_db_restore() {
         swarm.chain_info().root_account,
         &mut account_0,
         &account_1,
-        10,
+        3,
     )
     .await;
     // we are at least at epoch 2
@@ -93,16 +100,17 @@ async fn test_db_restore() {
         swarm.chain_info().root_account,
         &mut account_0,
         &account_1,
-        10,
+        3,
     )
     .await;
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
+    info!("---------- 2. reached at least epoch 2, starting backup coordinator.");
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
     let port = node1_config.storage.backup_service_address.port();
-    let backup_path = db_backup(port, 2, 20, 10, 1, &[]);
+    let backup_path = db_backup(port, 2, 10, 2, 1, &[]);
 
     // take down node 0
     let node_to_restart = validator_peer_ids[0];
@@ -117,11 +125,12 @@ async fn test_db_restore() {
     let db_dir = node0_config.storage.dir();
     fs::remove_dir_all(db_dir.clone()).unwrap();
 
+    info!("---------- 3. stopped node 0, gonna restore DB.");
     // restore db from backup
     db_restore(backup_path.path(), db_dir.as_path(), &[]);
 
-    expected_balance_0 -= 20;
-    expected_balance_1 += 20;
+    expected_balance_0 -= 3;
+    expected_balance_1 += 3;
 
     transfer_and_reconfig(
         &client_1,
@@ -129,13 +138,14 @@ async fn test_db_restore() {
         swarm.chain_info().root_account,
         &mut account_0,
         &account_1,
-        20,
+        3,
     )
     .await;
 
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
+    info!("---------- 4. Gonna restart node 0.");
     // start node 0 on top of restored db
     swarm
         .validator_mut(node_to_restart)
@@ -148,6 +158,7 @@ async fn test_db_restore() {
         .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
+    info!("---------- 5. Node 0 is health, verify it's caught up.");
     // verify it's caught up
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
@@ -158,6 +169,7 @@ async fn test_db_restore() {
 
     assert_balance(&client_0, &account_0, expected_balance_0).await;
     assert_balance(&client_0, &account_1, expected_balance_1).await;
+    info!("6. Done");
 }
 
 fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
@@ -188,7 +200,7 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     if !output.status.success() {
         panic!("db-backup-verify failed, output: {:?}", output);
     }
-    println!("Backup verified in {} seconds.", now.elapsed().as_secs());
+    info!("Backup verified in {} seconds.", now.elapsed().as_secs());
 }
 
 fn wait_for_backups(
@@ -204,7 +216,7 @@ fn wait_for_backups(
         // the verify should always succeed.
         db_backup_verify(backup_path, trusted_waypoints);
 
-        println!(
+        info!(
             "{}th wait for the backup to reach epoch {}, version {}.",
             i, target_epoch, target_version,
         );
@@ -226,13 +238,20 @@ fn wait_for_backups(
         if state.latest_epoch_ending_epoch.is_some()
             && state.latest_transaction_version.is_some()
             && state.latest_state_snapshot_epoch.is_some()
+            && state.latest_state_snapshot_epoch.is_some()
             && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
             && state.latest_transaction_version.unwrap() >= target_version
+            && state.latest_transaction_version.unwrap()
+                >= state.latest_state_snapshot_version.unwrap()
         {
-            println!("Backup created in {} seconds.", now.elapsed().as_secs());
+            info!(
+                "Backup created in {} seconds. backup storage state: {}",
+                now.elapsed().as_secs(),
+                state
+            );
             return Ok(());
         }
-        println!("Backup storage state: {}", state);
+        info!("Backup storage state: {}", state);
         std::thread::sleep(Duration::from_secs(1));
     }
 
@@ -323,5 +342,5 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
     if !output.status.success() {
         panic!("db-restore failed, output: {:?}", output);
     }
-    println!("Backup restored in {} seconds.", now.elapsed().as_secs());
+    info!("Backup restored in {} seconds.", now.elapsed().as_secs());
 }

@@ -14,15 +14,15 @@ use clap::Parser;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-/// Command to transfer coins between accounts
+/// Command to transfer APT coins between accounts
 ///
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
-    /// Address of account you want to send coins to
+    /// Address of account you want to send APT coins to
     #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
-    /// Amount of coins to transfer
+    /// Amount of Octas (10^-8 APT) to transfer
     #[clap(long)]
     pub(crate) amount: u64,
 
@@ -38,10 +38,10 @@ impl CliCommand<TransferSummary> for TransferCoins {
 
     async fn execute(self) -> CliTypedResult<TransferSummary> {
         self.txn_options
-            .submit_transaction(
-                aptos_stdlib::aptos_coin_transfer(self.account, self.amount),
-                Some(self.amount),
-            )
+            .submit_transaction(aptos_stdlib::aptos_account_transfer(
+                self.account,
+                self.amount,
+            ))
             .await
             .map(TransferSummary::from)
     }

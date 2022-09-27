@@ -13,7 +13,13 @@ edition = "2021"
 anyhow = "1.0.57"
 async-trait = "0.1.53"
 bcs = "0.1.3"
-diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel = { version = "2.0.0", features = [
+    "chrono",
+    "postgres",
+    "r2d2",
+    "numeric",
+    "serde_json",
+] }
 hex = "0.4.3"
 proptest = "1.0.0"
 reqwest = { version = "0.11.10", features = ["json"] }
@@ -24,7 +30,8 @@ aptos = { path = "../../crates/aptos", features = ["fuzzing"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-faucet = { path = "../../crates/aptos-faucet" }
-aptos-gas = { path = "../../aptos-move/aptos-gas" }
+aptos-gas = { path = "../../aptos-move/aptos-gas", features = ["testing"] }
+aptos-global-constants = { path = "../../config/global-constants", features = ["testing"] }
 aptos-indexer = { path = "../../crates/indexer" }
 aptos-keygen = { path = "../../crates/aptos-keygen" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
@@ -35,7 +42,7 @@ aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["fuzzing"] }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 consensus = { path = "../../consensus" }
-forge = { path = "../forge" }
+forge = { path = "../forge", features = ["testing"] }
 framework = { path = "../../aptos-move/framework" }
 move-deps = { path = "../../aptos-move/move-deps" }
 
@@ -49,7 +56,6 @@ regex = "1.5.5"
 serde_yaml = "0.8.24"
 
 aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
-aptos-global-constants = { path = "../../config/global-constants" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-secure-storage = { path = "../../secure/storage", features = ["testing"] }

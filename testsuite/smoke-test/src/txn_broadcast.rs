@@ -10,10 +10,8 @@ use std::time::{Duration, Instant};
 
 const MAX_WAIT_SECS: u64 = 60;
 
-//TODO: debug me and re-enable the test!
 /// Checks txn goes through consensus even if the local validator is not creating proposals.
 /// This behavior should be true with both mempool and quorum store.
-#[ignore]
 #[tokio::test]
 async fn test_txn_broadcast() {
     let mut swarm = SwarmBuilder::new_local(4)

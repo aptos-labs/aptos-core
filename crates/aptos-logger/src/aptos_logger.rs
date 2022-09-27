@@ -33,15 +33,18 @@ use std::{
     thread,
 };
 use strum_macros::EnumString;
+use tokio::time;
 
 const RUST_LOG: &str = "RUST_LOG";
 const RUST_LOG_REMOTE: &str = "RUST_LOG_REMOTE";
-const RUST_LOG_TELEMETRY: &str = "RUST_LOG_TELEMETRY";
+pub const RUST_LOG_TELEMETRY: &str = "RUST_LOG_TELEMETRY";
 const RUST_LOG_FORMAT: &str = "RUST_LOG_FORMAT";
 /// Default size of log write channel, if the channel is full, logs will be dropped
 pub const CHANNEL_SIZE: usize = 10000;
 const NUM_SEND_RETRIES: u8 = 1;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
+const FILTER_REFRESH_INTERVAL: Duration =
+    Duration::from_secs(5 /* minutes */ * 60 /* seconds */);
 
 #[derive(EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -112,7 +115,8 @@ impl LogEntry {
                     Value::Serde(s) => match serde_json::to_value(s) {
                         Ok(value) => value,
                         Err(e) => {
-                            eprintln!("error serializing structured log: {}", e);
+                            // Log and skip the value that can't be serialized
+                            eprintln!("error serializing structured log: {} for key {:?}", e, key);
                             return;
                         }
                     },
@@ -312,58 +316,60 @@ impl AptosDataBuilder {
         self.build();
     }
 
-    pub fn build(&mut self) -> Arc<AptosData> {
-        let filter = {
-            let local_filter = {
-                let mut filter_builder = Filter::builder();
+    fn build_filter(&self) -> FilterTuple {
+        let local_filter = {
+            let mut filter_builder = Filter::builder();
 
-                if env::var(RUST_LOG).is_ok() {
+            if env::var(RUST_LOG).is_ok() {
+                filter_builder.with_env(RUST_LOG);
+            } else {
+                filter_builder.filter_level(self.level.into());
+            }
+
+            filter_builder.build()
+        };
+        let remote_filter = {
+            let mut filter_builder = Filter::builder();
+
+            if self.is_async && self.address.is_some() {
+                if env::var(RUST_LOG_REMOTE).is_ok() {
+                    filter_builder.with_env(RUST_LOG_REMOTE);
+                } else if env::var(RUST_LOG).is_ok() {
                     filter_builder.with_env(RUST_LOG);
                 } else {
-                    filter_builder.filter_level(self.level.into());
+                    filter_builder.filter_level(self.remote_level.into());
                 }
-
-                filter_builder.build()
-            };
-            let remote_filter = {
-                let mut filter_builder = Filter::builder();
-
-                if self.is_async && self.address.is_some() {
-                    if env::var(RUST_LOG_REMOTE).is_ok() {
-                        filter_builder.with_env(RUST_LOG_REMOTE);
-                    } else if env::var(RUST_LOG).is_ok() {
-                        filter_builder.with_env(RUST_LOG);
-                    } else {
-                        filter_builder.filter_level(self.remote_level.into());
-                    }
-                } else {
-                    filter_builder.filter_level(LevelFilter::Off);
-                }
-
-                filter_builder.build()
-            };
-            let telemetry_filter = {
-                let mut filter_builder = Filter::builder();
-
-                if self.is_async && self.remote_log_tx.is_some() {
-                    if env::var(RUST_LOG_TELEMETRY).is_ok() {
-                        filter_builder.with_env(RUST_LOG_TELEMETRY);
-                    } else {
-                        filter_builder.filter_level(self.telemetry_level.into());
-                    }
-                } else {
-                    filter_builder.filter_level(LevelFilter::Off);
-                }
-
-                filter_builder.build()
-            };
-
-            FilterTuple {
-                local_filter,
-                remote_filter,
-                telemetry_filter,
+            } else {
+                filter_builder.filter_level(LevelFilter::Off);
             }
+
+            filter_builder.build()
         };
+        let telemetry_filter = {
+            let mut filter_builder = Filter::builder();
+
+            if self.is_async && self.remote_log_tx.is_some() {
+                if env::var(RUST_LOG_TELEMETRY).is_ok() {
+                    filter_builder.with_env(RUST_LOG_TELEMETRY);
+                } else {
+                    filter_builder.filter_level(self.telemetry_level.into());
+                }
+            } else {
+                filter_builder.filter_level(LevelFilter::Off);
+            }
+
+            filter_builder.build()
+        };
+
+        FilterTuple {
+            local_filter,
+            remote_filter,
+            telemetry_filter,
+        }
+    }
+
+    fn build_logger(&mut self) -> Arc<AptosData> {
+        let filter = self.build_filter();
 
         if let Ok(log_format) = env::var(RUST_LOG_FORMAT) {
             let log_format = LogFormat::from_str(&log_format).unwrap();
@@ -373,11 +379,11 @@ impl AptosDataBuilder {
             }
         }
 
-        let logger = if self.is_async {
+        if self.is_async {
             let (sender, receiver) = sync::mpsc::sync_channel(self.channel_size);
             let mut remote_tx = None;
-            if let Some(tx) = self.remote_log_tx.take() {
-                remote_tx = Some(tx);
+            if let Some(tx) = &self.remote_log_tx {
+                remote_tx = Some(tx.clone());
             }
 
             let logger = Arc::new(AptosData {
@@ -407,7 +413,11 @@ impl AptosDataBuilder {
                 enable_telemetry_flush: self.enable_telemetry_flush,
                 formatter: self.custom_format.take().unwrap_or(text_format),
             })
-        };
+        }
+    }
+
+    pub fn build(&mut self) -> Arc<AptosData> {
+        let logger = self.build_logger();
 
         let console_port = if cfg!(feature = "aptos-console") {
             self.console_port
@@ -421,7 +431,7 @@ impl AptosDataBuilder {
 }
 
 /// A combination of `Filter`s to control where logs are written
-struct FilterTuple {
+pub struct FilterTuple {
     /// The local printer `Filter` to control what is logged in text output
     local_filter: Filter,
     /// The remote logging `Filter` to control what is sent to external logging
@@ -469,7 +479,11 @@ impl AptosData {
             .build();
     }
 
-    pub fn set_filter(&self, filter: Filter) {
+    pub fn set_filter(&self, filter_tuple: FilterTuple) {
+        *self.filter.write() = filter_tuple;
+    }
+
+    pub fn set_local_filter(&self, filter: Filter) {
         self.filter.write().local_filter = filter;
     }
 
@@ -751,12 +765,47 @@ fn json_format(entry: &LogEntry) -> Result<String, fmt::Error> {
     }
 }
 
+/// Periodically rebuilds the filter and replaces the current logger filter.
+/// This is useful for dynamically changing log levels at runtime via existing
+/// environment variables such as `RUST_LOG_TELEMETRY`.
+pub struct LoggerFilterUpdater {
+    logger: Arc<AptosData>,
+    logger_builder: AptosDataBuilder,
+}
+
+impl LoggerFilterUpdater {
+    pub fn new(logger: Arc<AptosData>, logger_builder: AptosDataBuilder) -> Self {
+        Self {
+            logger,
+            logger_builder,
+        }
+    }
+
+    pub async fn run(self) {
+        let mut interval = time::interval(FILTER_REFRESH_INTERVAL);
+        loop {
+            interval.tick().await;
+
+            self.update_filter();
+        }
+    }
+
+    fn update_filter(&self) {
+        // TODO: check for change to env var before rebuilding filter.
+        let filter = self.logger_builder.build_filter();
+        self.logger.set_filter(filter);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::LogEntry;
+    use super::{AptosData, LogEntry};
     use crate::{
-        aptos_logger::json_format, debug, error, info, logger::Logger, trace, warn, Event, Key,
-        KeyValue, Level, Metadata, Schema, Value, Visitor,
+        aptos_logger::{json_format, RUST_LOG_TELEMETRY},
+        debug, error, info,
+        logger::Logger,
+        trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
+        Schema, Value, Visitor,
     };
     use chrono::{DateTime, Utc};
     #[cfg(test)]
@@ -970,5 +1019,82 @@ mod tests {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "DisplayStruct!")
         }
+    }
+
+    fn new_async_logger() -> (AptosDataBuilder, Arc<AptosData>) {
+        let mut logger_builder = AptosDataBuilder::new();
+        let (remote_log_tx, _) = futures::channel::mpsc::channel(10);
+        let logger = logger_builder
+            .remote_log_tx(remote_log_tx)
+            .is_async(true)
+            .build_logger();
+        (logger_builder, logger)
+    }
+
+    #[test]
+    fn test_logger_filter_updater() {
+        let (logger_builder, logger) = new_async_logger();
+        let debug_metadata = &Metadata::new(Level::Debug, "target", "module_path", "source_path");
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug");
+
+        let updater = LoggerFilterUpdater::new(logger.clone(), logger_builder);
+        updater.update_filter();
+
+        assert!(logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+    }
+
+    #[test]
+    fn test_logger_filter_updater_invalid_value() {
+        let (logger_builder, logger) = new_async_logger();
+
+        let debug_metadata = &Metadata::new(Level::Debug, "target", "module_path", "source_path");
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug;hyper=off"); // log values should be separated by commas not semicolons.
+
+        let updater = LoggerFilterUpdater::new(logger.clone(), logger_builder);
+        updater.update_filter();
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug,hyper=off"); // log values should be separated by commas not semicolons.
+        updater.update_filter();
+
+        assert!(logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(&Metadata::new(
+                Level::Error,
+                "target",
+                "hyper",
+                "source_path"
+            )));
     }
 }

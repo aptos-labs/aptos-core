@@ -312,22 +312,15 @@ impl Account {
 
     /// Retrieves the account state
     pub fn account_state(&self) -> Result<AccountState, BasicErrorWith404> {
-        let state = self
-            .context
-            .get_account_state(self.address.into(), self.ledger_version)
-            .context("Failed to read account state at requested version")
-            .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
-                )
-            })?
+        self.context
+            .get_account_state(
+                self.address.into(),
+                self.ledger_version,
+                &self.latest_ledger_info,
+            )?
             .ok_or_else(|| {
                 account_not_found(self.address, self.ledger_version, &self.latest_ledger_info)
-            })?;
-
-        Ok(state)
+            })
     }
 
     // Events specific stuff.

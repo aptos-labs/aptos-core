@@ -88,9 +88,12 @@ There will be some apis that certain wallets may add but there should be a few a
 ```typescript
 // Common Args and Responses
 
+// For single-signer account, there is one publicKey and minKeysRequired is null.
+// For multi-signer account, there are multiple publicKeys and minKeysRequired value.
 interface PublicAccount {
-    string address;
-    string publicKey;
+    address: string;
+    publicKey: string | string[];
+    minKeysRequired?: number; // for multi-signer account
 }
 
 // The important thing to return here is the transaction hash the dapp can wait for it
@@ -139,14 +142,15 @@ export interface SignMessagePayload {
 }
 
 export interface SignMessageResponse {
-  address: string;
-  application: string;
-  chainId: number;
+  address?: string;
+  application?: string;
+  chainId?: number;
   fullMessage: string; // The message that was generated to sign
   message: string; // The message passed in by the user
   nonce: string,
   prefix: string, // Should always be APTOS
-  signature: string; // The signed full message
+  signature: string | string[]; // The signed full message
+  bitmap?: Uint8Array; // a 4-byte (32 bits) bit-vector of length N
 }
 ```
 
@@ -165,6 +169,10 @@ application: badsite.firebase.google.com
 nonce: 1234034
 message: Welcome to dapp!
 ```
+
+If the wallet is single-signer account, there is one signature and `bitmap` is null.
+
+If the wallet is multi-signers account, there are multiple `signature` and `bitmap` value. `bitmap` masks which public key has signed message.
 
 ### Event listening (In progress)
 

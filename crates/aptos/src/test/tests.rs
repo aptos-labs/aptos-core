@@ -32,6 +32,7 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "genesis", "generate-layout-template", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "genesis", "set-validator-configuration", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "genesis", "setup-git", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "genesis", "generate-admin-write-set", "--help"]).await;
 
     assert_cmd_not_panic(&["aptos", "governance"]).await;
     assert_cmd_not_panic(&["aptos", "governance", "execute-proposal", "--help"]).await;
@@ -61,6 +62,7 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "move", "transactional-test", "--help"]).await;
 
     assert_cmd_not_panic(&["aptos", "node"]).await;
+    assert_cmd_not_panic(&["aptos", "node", "get-pool-address", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "node", "analyze-validator-performance", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "node", "bootstrap-db-from-backup", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "node", "initialize-validator", "--help"]).await;

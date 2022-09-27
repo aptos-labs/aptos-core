@@ -24,9 +24,11 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
+use aptos_types::account_address::{create_vesting_pool_address, default_stake_pool_address};
 use aptos_types::chain_id::ChainId;
 use aptos_types::network_address::NetworkAddress;
 use aptos_types::on_chain_config::{ConsensusScheme, ValidatorSet};
+use aptos_types::stake_pool::StakePool;
 use aptos_types::validator_config::ValidatorConfig;
 use aptos_types::validator_info::ValidatorInfo;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
@@ -57,6 +59,7 @@ use tokio::time::Instant;
 /// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
+    GetPoolAddress(GetPoolAddress),
     InitializeValidator(InitializeValidator),
     JoinValidatorSet(JoinValidatorSet),
     LeaveValidatorSet(LeaveValidatorSet),
@@ -74,6 +77,7 @@ impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
         match self {
+            GetPoolAddress(tool) => tool.execute_serialized().await,
             InitializeValidator(tool) => tool.execute_serialized().await,
             JoinValidatorSet(tool) => tool.execute_serialized().await,
             LeaveValidatorSet(tool) => tool.execute_serialized().await,
@@ -231,6 +235,66 @@ impl ValidatorNetworkAddressesArgs {
     }
 }
 
+#[derive(Parser)]
+pub struct GetPoolAddress {
+    // The owner address that directly or indirectly owns the stake pool.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) owner_address: AccountAddress,
+    // Optional. The operator address. If not specified, the address from profile config will be
+    // used.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) operator_address: Option<AccountAddress>,
+    // Optional. The employee account index if the owner is an admin of multiple employee vesting accounts.
+    // This would be required if the owner is an admin of employee vesting accounts.
+    #[clap(long)]
+    pub(crate) employee_account_index: Option<u64>,
+    // Configurations for where queries will be sent to.
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    // Configurations for CLI profile to use.
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+}
+
+#[async_trait]
+impl CliCommand<AccountAddress> for GetPoolAddress {
+    fn command_name(&self) -> &'static str {
+        "GetPoolAddress"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<AccountAddress> {
+        let owner_address = self.owner_address;
+
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let stake_pool_exists = client
+            .get_account_resource_bcs::<StakePool>(owner_address, "0x1::stake::StakePool")
+            .await
+            .is_ok();
+        let stake_pool_address = if stake_pool_exists {
+            owner_address
+        } else {
+            let staking_contract_store_exists = client
+                .get_resource::<Vec<u8>>(owner_address, "0x1::staking_contract::Store")
+                .await
+                .is_ok();
+            let operator_address = self
+                .operator_address
+                .unwrap_or(self.profile_options.account_address()?);
+            if staking_contract_store_exists {
+                default_stake_pool_address(owner_address, operator_address)
+            } else {
+                create_vesting_pool_address(
+                    owner_address,
+                    operator_address,
+                    self.employee_account_index.unwrap(),
+                    &[],
+                )
+            }
+        };
+        Ok(stake_pool_address)
+    }
+}
+
 /// Register the current account as a validator node operator of it's own owned stake.
 ///
 /// Use InitializeStakeOwner whenever stake owner
@@ -284,16 +348,13 @@ impl CliCommand<TransactionSummary> for InitializeValidator {
             };
 
         self.txn_options
-            .submit_transaction(
-                aptos_stdlib::stake_initialize_validator(
-                    consensus_public_key.to_bytes().to_vec(),
-                    consensus_proof_of_possession.to_bytes().to_vec(),
-                    // BCS encode, so that we can hide the original type
-                    bcs::to_bytes(&validator_network_addresses)?,
-                    bcs::to_bytes(&full_node_network_addresses)?,
-                ),
-                None,
-            )
+            .submit_transaction(aptos_stdlib::stake_initialize_validator(
+                consensus_public_key.to_bytes().to_vec(),
+                consensus_proof_of_possession.to_bytes().to_vec(),
+                // BCS encode, so that we can hide the original type
+                bcs::to_bytes(&validator_network_addresses)?,
+                bcs::to_bytes(&full_node_network_addresses)?,
+            ))
             .await
             .map(|inner| inner.into())
     }
@@ -351,7 +412,7 @@ impl CliCommand<TransactionSummary> for JoinValidatorSet {
             .address_fallback_to_txn(&self.txn_options)?;
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_join_validator_set(address), None)
+            .submit_transaction(aptos_stdlib::stake_join_validator_set(address))
             .await
             .map(|inner| inner.into())
     }
@@ -378,7 +439,7 @@ impl CliCommand<TransactionSummary> for LeaveValidatorSet {
             .address_fallback_to_txn(&self.txn_options)?;
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_leave_validator_set(address), None)
+            .submit_transaction(aptos_stdlib::stake_leave_validator_set(address))
             .await
             .map(|inner| inner.into())
     }
@@ -611,7 +672,7 @@ const TESTNET_FOLDER: &str = "testnet";
 /// Run local testnet
 ///
 /// This local testnet will run it's own Genesis and run as a single node
-/// network locally.  Optionally, a faucet can be added for minting coins.
+/// network locally.  Optionally, a faucet can be added for minting APT coins.
 #[derive(Parser)]
 pub struct RunLocalTestnet {
     /// An overridable config template for the test node
@@ -799,14 +860,11 @@ impl CliCommand<TransactionSummary> for UpdateConsensusKey {
             .validator_consensus_key_args
             .get_consensus_proof_of_possession(&operator_config)?;
         self.txn_options
-            .submit_transaction(
-                aptos_stdlib::stake_rotate_consensus_key(
-                    address,
-                    consensus_public_key.to_bytes().to_vec(),
-                    consensus_proof_of_possession.to_bytes().to_vec(),
-                ),
-                None,
-            )
+            .submit_transaction(aptos_stdlib::stake_rotate_consensus_key(
+                address,
+                consensus_public_key.to_bytes().to_vec(),
+                consensus_proof_of_possession.to_bytes().to_vec(),
+            ))
             .await
             .map(|inner| inner.into())
     }
@@ -860,15 +918,12 @@ impl CliCommand<TransactionSummary> for UpdateValidatorNetworkAddresses {
             };
 
         self.txn_options
-            .submit_transaction(
-                aptos_stdlib::stake_update_network_and_fullnode_addresses(
-                    address,
-                    // BCS encode, so that we can hide the original type
-                    bcs::to_bytes(&validator_network_addresses)?,
-                    bcs::to_bytes(&full_node_network_addresses)?,
-                ),
-                None,
-            )
+            .submit_transaction(aptos_stdlib::stake_update_network_and_fullnode_addresses(
+                address,
+                // BCS encode, so that we can hide the original type
+                bcs::to_bytes(&validator_network_addresses)?,
+                bcs::to_bytes(&full_node_network_addresses)?,
+            ))
             .await
             .map(|inner| inner.into())
     }

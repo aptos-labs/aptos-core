@@ -13,10 +13,10 @@ module aptos_std::multi_ed25519 {
     //
 
     /// Wrong number of bytes were given as input when deserializing an Ed25519 public key.
-    const E_WRONG_PUBKEY_SIZE : u64 = 1;
+    const E_WRONG_PUBKEY_SIZE: u64 = 1;
 
     /// Wrong number of bytes were given as input when deserializing an Ed25519 signature.
-    const E_WRONG_SIGNATURE_SIZE : u64 = 2;
+    const E_WRONG_SIGNATURE_SIZE: u64 = 2;
 
     //
     // Constants
@@ -24,15 +24,15 @@ module aptos_std::multi_ed25519 {
 
     /// The identifier of the MultiEd25519 signature scheme, which is used when deriving Aptos authentication keys by hashing
     /// it together with an MultiEd25519 public key.
-    const SIGNATURE_SCHEME_ID : u8 = 1;
+    const SIGNATURE_SCHEME_ID: u8 = 1;
 
     /// The size of an individual Ed25519 public key, in bytes.
     /// (A MultiEd25519 public key consists of several of these, plus the threshold.)
-    const INDIVIDUAL_PUBLIC_KEY_NUM_BYTES : u64 = 32;
+    const INDIVIDUAL_PUBLIC_KEY_NUM_BYTES: u64 = 32;
 
     /// The size of an individual Ed25519 signature, in bytes.
     /// (A MultiEd25519 signature consists of several of these, plus the signer bitmap.)
-    const INDIVIDUAL_SIGNATURE_NUM_BYTES : u64 = 64;
+    const INDIVIDUAL_SIGNATURE_NUM_BYTES: u64 = 64;
 
     /// When serializing a MultiEd25519 public key, the threshold k will be encoded using this many bytes.
     const THRESHOLD_SIZE_BYTES: u64 = 1;
@@ -86,8 +86,8 @@ module aptos_std::multi_ed25519 {
 
     /// Parses the input bytes as a *validated* MultiEd25519 public key.
     public fun new_validated_public_key_from_bytes(bytes: vector<u8>): Option<ValidatedPublicKey> {
-        if(vector::length(&bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES &&
-           public_key_validate_internal(bytes)) {
+        if (vector::length(&bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES &&
+            public_key_validate_internal(bytes)) {
             option::some(ValidatedPublicKey {
                 bytes
             })

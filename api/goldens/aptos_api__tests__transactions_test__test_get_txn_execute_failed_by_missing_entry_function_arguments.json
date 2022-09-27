@@ -4,7 +4,7 @@
   "state_change_hash": "",
   "event_root_hash": "",
   "state_checkpoint_hash": null,
-  "gas_used": "1",
+  "gas_used": "150",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error LINKER_ERROR",
   "accumulator_root_hash": "",
@@ -53,7 +53,7 @@
   ],
   "sender": "0xa550c18",
   "sequence_number": "0",
-  "max_gas_amount": "2000",
+  "max_gas_amount": "100000",
   "gas_unit_price": "0",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
@@ -68,7 +68,7 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x20519c59568843d1472d9ea292348a2942d36d36bde61cabe892cb6678193f6d283547b337a4b63f1999e8a252c84b12c0d806843741820878c0d29eca7b3b0c",
+    "signature": "0xbb3f5e0909024e36fe0b9ffaa575db23fa1ae5bd39b57165cb3ecf490734df20ee12580cc61b2d6230e1c46cc5b1e0d1046d537ea8b0bebfcc4cbada2799bc00",
     "type": "ed25519_signature"
   },
   "events": [],

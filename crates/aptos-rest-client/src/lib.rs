@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+extern crate core;
+
 pub mod aptos;
 pub mod error;
 pub mod faucet;
@@ -23,8 +25,9 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::{
     deserialize_from_string,
     mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
-    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData,
-    TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
+    AptosError, BcsBlock, Block, Bytecode, ExplainVMStatus, GasEstimation, HexEncodedBytes,
+    MoveModuleId, TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult,
+    UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -33,13 +36,16 @@ use aptos_types::{
     contract_event::EventWithVersion,
     transaction::{ExecutionStatus, SignedTransaction},
 };
-use move_deps::move_core_types::language_storage::StructTag;
+use futures::executor::block_on;
+use move_deps::move_binary_format::CompiledModule;
+use move_deps::move_core_types::language_storage::{ModuleId, StructTag};
 use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::future::Future;
+use std::rc::Rc;
 use std::time::Duration;
 use tokio::time::Instant;
 use url::Url;
@@ -143,6 +149,54 @@ impl Client {
         ))?;
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    /// This will get all the transactions from the block in successive calls
+    /// and will handle the successive calls
+    ///
+    /// Note: This could take a long time to run
+    pub async fn get_full_block_by_height_bcs(
+        &self,
+        height: u64,
+        page_size: u16,
+    ) -> AptosResult<Response<BcsBlock>> {
+        let (mut block, state) = self
+            .get_block_by_height_bcs(height, true)
+            .await?
+            .into_parts();
+
+        let mut current_version = block.first_version;
+
+        // Set the current version to the last known transaction
+        if let Some(ref txns) = block.transactions {
+            if let Some(txn) = txns.last() {
+                current_version = txn.version + 1;
+            }
+        } else {
+            return Err(RestError::Unknown(anyhow!(
+                "No transactions were returned in the block"
+            )));
+        }
+
+        // Add in all transactions by paging through the other transactions
+        while current_version <= block.last_version {
+            let page_end_version =
+                std::cmp::min(block.last_version, current_version + page_size as u64 - 1);
+
+            let transactions = self
+                .get_transactions_bcs(
+                    Some(current_version),
+                    Some((page_end_version - current_version + 1) as u16),
+                )
+                .await?
+                .into_inner();
+            if let Some(txn) = transactions.last() {
+                current_version = txn.version + 1;
+            };
+            block.transactions.as_mut().unwrap().extend(transactions);
+        }
+
+        Ok(Response::new(block, state))
     }
 
     pub async fn get_block_by_version(
@@ -287,6 +341,31 @@ impl Client {
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
+    pub async fn simulate_bcs_with_gas_estimation(
+        &self,
+        txn: &SignedTransaction,
+        estimate_max_gas_amount: bool,
+        estimate_max_gas_unit_price: bool,
+    ) -> AptosResult<Response<TransactionOnChainData>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path(&format!(
+            "transactions/simulate?estimate_max_gas_amount={}&estimate_gas_unit_price={}",
+            estimate_max_gas_amount, estimate_max_gas_unit_price
+        ))?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
+    }
+
     pub async fn submit(
         &self,
         txn: &SignedTransaction,
@@ -355,7 +434,7 @@ impl Client {
             .await?;
 
         let response = self.check_and_parse_bcs_response(response).await?;
-        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes)).unwrap())
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
     pub async fn submit_and_wait(
@@ -1178,5 +1257,22 @@ async fn parse_error(response: reqwest::Response) -> RestError {
     match response.json::<AptosError>().await {
         Ok(error) => (error, maybe_state, status_code).into(),
         Err(e) => RestError::Http(status_code, e),
+    }
+}
+
+pub struct GasEstimationParams {
+    pub estimated_gas_used: u64,
+    pub estimated_gas_price: u64,
+}
+
+impl ExplainVMStatus for Client {
+    // TODO: Add some caching
+    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
+        let bytes =
+            block_on(self.get_account_module_bcs(*module_id.address(), module_id.name().as_str()))?
+                .into_inner();
+
+        let compiled_module = CompiledModule::deserialize(bytes.as_ref())?;
+        Ok(Rc::new(compiled_module) as Rc<dyn Bytecode>)
     }
 }

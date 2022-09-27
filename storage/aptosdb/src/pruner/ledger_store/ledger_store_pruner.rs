@@ -13,13 +13,13 @@ use crate::{
             transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
         },
     },
+    pruner_utils,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataValue},
         transaction::TransactionSchema,
     },
-    utils, EventStore, StateStore, TransactionStore,
+    EventStore, StateStore, TransactionStore,
 };
-
 use aptos_logger::warn;
 use aptos_types::transaction::{AtomicVersion, Version};
 use schemadb::{ReadOptions, SchemaBatch, DB};
@@ -156,7 +156,7 @@ impl LedgerPruner {
         let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
         let max_version = 1; // We should only be pruning a single version
 
-        let ledger_pruner = utils::create_ledger_pruner(ledger_db, state_store);
+        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_db, state_store);
         ledger_pruner.set_target_version(target_version);
         ledger_pruner.prune_inner(max_version, db_batch)?;
 
@@ -172,7 +172,7 @@ impl LedgerPruner {
 
         // Current target version might be less than the target version to ensure we don't prune
         // more than max_version in one go.
-        let current_target_version = self.get_currrent_batch_target(max_versions as Version);
+        let current_target_version = self.get_current_batch_target(max_versions as Version);
 
         self.transaction_store_pruner.prune(
             db_batch,

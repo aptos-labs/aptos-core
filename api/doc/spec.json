@@ -3,7 +3,7 @@
   "info": {
     "title": "Aptos Node API",
     "description": "The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "contact": {
       "name": "Aptos Labs",
       "url": "https://github.com/aptos-labs/aptos-core"
@@ -1909,7 +1909,7 @@
           "Blocks"
         ],
         "summary": "Get blocks by height",
-        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information.\n\nIf the block is pruned, it will return a 410",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information.\n\nTransactions are limited by max default transactions size.  If not all transactions\nare present, the user will need to query for the rest of the transactions via the\nget transactions API.\n\nIf the block is pruned, it will return a 410",
         "parameters": [
           {
             "name": "block_height",
@@ -2438,7 +2438,7 @@
           "Blocks"
         ],
         "summary": "Get blocks by version",
-        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information given a version in the block.\n\nIf the block has been pruned, it will return a 410",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information given a version in the block.\n\nTransactions are limited by max default transactions size.  If not all transactions\nare present, the user will need to query for the rest of the transactions via the\nget transactions API.\n\nIf the block has been pruned, it will return a 410",
         "parameters": [
           {
             "name": "version",
@@ -9855,6 +9855,30 @@
         ],
         "summary": "Simulate transaction",
         "description": "The output of the transaction will have the exact transaction outputs and events that running\nan actual signed transaction would have.  However, it will not have the associated state\nhashes, as they are not updated in storage.  This can be used to estimate the maximum gas\nunits for a submitted transaction.\n\nTo use this, you must:\n- Create a SignedTransaction with a zero-padded signature.\n- Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.\n\nTo use this endpoint with BCS, you must submit a SignedTransaction\nencoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.",
+        "parameters": [
+          {
+            "name": "estimate_max_gas_amount",
+            "schema": {
+              "type": "boolean"
+            },
+            "in": "query",
+            "description": "If set to true, the max gas value in the transaction will be ignored\nand the maximum possible gas will be used",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "estimate_gas_unit_price",
+            "schema": {
+              "type": "boolean"
+            },
+            "in": "query",
+            "description": "If set to true, the gas unit price in the transaction will be ignored\nand the estimated value will be used",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

@@ -8,6 +8,7 @@ use crate::types::{
 };
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::chain_id::ChainId;
+use aptos_types::transaction::{RawTransaction, SignedTransaction};
 use serde::{Deserialize, Serialize};
 
 /// Request for an account's currency balance either now, or historically
@@ -231,6 +232,9 @@ pub struct ConstructionMetadata {
     /// Unix timestamp of expiry time, defaults to 30 seconds from the payload request
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry_time_secs: Option<U64>,
+    /// Because we need information from metadata to have the real operation
+    /// We don't have to parse any fields in the `Payloads` call
+    pub internal_operation: InternalOperation,
 }
 
 /// Request to parse a signed or unsigned transaction into operations
@@ -260,6 +264,16 @@ pub struct ConstructionParseResponse {
     /// The signers of the transaction, if it was a [`aptos_types::transaction::SignedTransaction`]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account_identifier_signers: Option<Vec<AccountIdentifier>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ConstructionParseMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ConstructionParseMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unsigned_transaction: Option<RawTransaction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signed_transaction: Option<SignedTransaction>,
 }
 
 /// Request to build payloads from the operations to sign

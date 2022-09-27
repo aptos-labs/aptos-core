@@ -58,11 +58,8 @@ Currently, three different upgrade policies are supported:
     before. New functions can be added.
 - `immutable`: the code is not upgradable and guaranteed to stay the same 
   forever.
-- `arbitrary`: the code can be arbitrarily upgraded, without any compatibility
-  checks.
 
-Those policies are ordered regarding strength such that `arbitrary <
-compatible < immutable`.
+Those policies are ordered regarding strength such that `compatible < immutable`.
 The policy of a package on chain can only get stronger, not weaker. Moreover,
 the policy of all dependencies of a package must be stronger or equal to
 the policy of the given package. For example, an `immutable` package
@@ -72,13 +69,6 @@ under the hood. There is one exception to the above rule: framework packages
 installed at addresses `0x1` to `0xa` are exempted from the dependency check.
 This is necessary so one can define an `immutable` package based on the standard
 libraries, which have the `compatible` policy.
-
-In addition to the rules above, there is one further rule for `arbitrary`
-packages: a dependency to a package with upgrade policy `arbitrary` must
-be within the same account (the two packages must be at the same address). 
-This restriction is intended to protect users from misuse via sharing of
-such packages. A single account can work with `arbitrary` without
-restrictions, but sharing of such code is not allowed.
 
 ## Security considerations for dependencies
 
@@ -105,9 +95,6 @@ care.
   The highest level of assurance is that the package is governed by a DAO where 
   no single user can initiate an upgrade, but a vote or similar has 
   to be taken. This is for example the case for the Aptos framework.
-- Dependencies to `arbitrary` packages are technically only allowed in the 
-  same account, so the decision to upgrade and responsibility to ensure 
-  compatibility is on the account owner.
    
 ## Programmatic upgrade
 

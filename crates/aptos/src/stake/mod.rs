@@ -37,12 +37,12 @@ impl StakeTool {
     }
 }
 
-/// Stake coins to the stake pool
+/// Stake APT coins to the stake pool
 ///
-/// This command allows stake pool owners to add coins to their stake.
+/// This command allows stake pool owners to add APT coins to their stake.
 #[derive(Parser)]
 pub struct AddStake {
-    /// Amount of coins to add to stake
+    /// Amount of Octas (10^-8 APT) to add to stake
     #[clap(long)]
     pub amount: u64,
 
@@ -58,21 +58,18 @@ impl CliCommand<TransactionSummary> for AddStake {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(
-                aptos_stdlib::stake_add_stake(self.amount),
-                Some(self.amount),
-            )
+            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
             .await
             .map(|inner| inner.into())
     }
 }
 
-/// Unlock staked coins
+/// Unlock staked APT coins
 ///
-/// Coins can only be unlocked if they no longer have an applied lockup period
+/// APT coins can only be unlocked if they no longer have an applied lockup period
 #[derive(Parser)]
 pub struct UnlockStake {
-    /// Amount of coins to unlock
+    /// Amount of Octas (10^-8 APT) to unlock
     #[clap(long)]
     pub amount: u64,
 
@@ -88,19 +85,19 @@ impl CliCommand<TransactionSummary> for UnlockStake {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_unlock(self.amount), None)
+            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
             .await
             .map(|inner| inner.into())
     }
 }
 
-/// Withdraw unlocked staked coins
+/// Withdraw unlocked staked APT coins
 ///
 /// This allows users to withdraw stake back into their CoinStore.
 /// Before calling `WithdrawStake`, `UnlockStake` must be called first.
 #[derive(Parser)]
 pub struct WithdrawStake {
-    /// Amount of coins to withdraw
+    /// Amount of Octas (10^-8 APT) to withdraw
     #[clap(long)]
     pub amount: u64,
 
@@ -116,13 +113,13 @@ impl CliCommand<TransactionSummary> for WithdrawStake {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.node_op_options
-            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount), None)
+            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
             .await
             .map(|inner| inner.into())
     }
 }
 
-/// Increase lockup of all staked coins in the stake pool
+/// Increase lockup of all staked APT coins in the stake pool
 ///
 /// Lockup may need to be increased in order to vote on a proposal.
 #[derive(Parser)]
@@ -139,7 +136,7 @@ impl CliCommand<TransactionSummary> for IncreaseLockup {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_increase_lockup(), None)
+            .submit_transaction(aptos_stdlib::stake_increase_lockup())
             .await
             .map(|inner| inner.into())
     }
@@ -151,7 +148,7 @@ impl CliCommand<TransactionSummary> for IncreaseLockup {
 /// stake pool to an operator, or delegate voting to a different account.
 #[derive(Parser)]
 pub struct InitializeStakeOwner {
-    /// Initial amount of coins to be staked
+    /// Initial amount of Octas (10^-8 APT) to be staked
     #[clap(long)]
     pub initial_stake_amount: u64,
 
@@ -180,14 +177,11 @@ impl CliCommand<TransactionSummary> for InitializeStakeOwner {
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let owner_address = self.txn_options.sender_address()?;
         self.txn_options
-            .submit_transaction(
-                aptos_stdlib::stake_initialize_stake_owner(
-                    self.initial_stake_amount,
-                    self.operator_address.unwrap_or(owner_address),
-                    self.voter_address.unwrap_or(owner_address),
-                ),
-                Some(self.initial_stake_amount),
-            )
+            .submit_transaction(aptos_stdlib::stake_initialize_stake_owner(
+                self.initial_stake_amount,
+                self.operator_address.unwrap_or(owner_address),
+                self.voter_address.unwrap_or(owner_address),
+            ))
             .await
             .map(|inner| inner.into())
     }
@@ -214,10 +208,7 @@ impl CliCommand<TransactionSummary> for SetOperator {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(
-                aptos_stdlib::stake_set_operator(self.operator_address),
-                None,
-            )
+            .submit_transaction(aptos_stdlib::stake_set_operator(self.operator_address))
             .await
             .map(|inner| inner.into())
     }
@@ -244,10 +235,7 @@ impl CliCommand<TransactionSummary> for SetDelegatedVoter {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(
-                aptos_stdlib::stake_set_delegated_voter(self.voter_address),
-                None,
-            )
+            .submit_transaction(aptos_stdlib::stake_set_delegated_voter(self.voter_address))
             .await
             .map(|inner| inner.into())
     }

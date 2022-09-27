@@ -27,6 +27,7 @@ mod pruner;
 mod state_merkle_db;
 mod state_store;
 mod transaction_store;
+mod utils;
 mod versioned_node_cache;
 
 #[cfg(test)]
@@ -47,7 +48,7 @@ use crate::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::{pruner_manager::PrunerManager, utils},
+    pruner::{pruner_manager::PrunerManager, pruner_utils},
     schema::*,
     state_store::StateStore,
     transaction_store::TransactionStore,
@@ -89,7 +90,6 @@ use aptos_types::{
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
         TransactionWithProof, Version,
     },
-    write_set::WriteSet,
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use aptosdb_indexer::Indexer;
@@ -121,6 +121,8 @@ use storage_interface::{
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 
+// This is last line of defense against large queries slipping through external facing interfaces,
+// like the API and State Sync, etc.
 const MAX_LIMIT: u64 = 10000;
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
@@ -329,13 +331,13 @@ impl AptosDB {
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
                     ledger_db_path.clone(),
-                    "ledger_db_ro",
+                    LEDGER_DB_NAME,
                     ledger_db_column_families(),
                 )?,
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, true),
                     state_merkle_db_path.clone(),
-                    "state_merkle_db_ro",
+                    STATE_MERKLE_DB_NAME,
                     state_merkle_db_column_families(),
                 )?,
             )
@@ -344,13 +346,13 @@ impl AptosDB {
                 DB::open_cf(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
                     ledger_db_path.clone(),
-                    "ledger_db",
+                    LEDGER_DB_NAME,
                     gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
                 )?,
                 DB::open_cf(
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
                     state_merkle_db_path.clone(),
-                    "state_merkle_db",
+                    STATE_MERKLE_DB_NAME,
                     gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
                 )?,
             )
@@ -432,7 +434,8 @@ impl AptosDB {
         let state_merkle_db_secondary_path =
             secondary_db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
 
-        // Secondary needs `max_open_files = -1` per https://github.com/facebook/rocksdb/wiki/Secondary-instance
+        // Secondary needs `max_open_files = -1` per
+        // https://github.com/facebook/rocksdb/wiki/Read-only-and-Secondary-instances
         rocksdb_configs.ledger_db_config.max_open_files = -1;
         rocksdb_configs.state_merkle_db_config.max_open_files = -1;
 
@@ -932,7 +935,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// This API is best-effort in that it CANNOT provide absense proof.
+    /// This API is best-effort in that it CANNOT provide absence proof.
     fn get_transaction_by_hash(
         &self,
         hash: HashValue,
@@ -1125,23 +1128,6 @@ impl DbReader for AptosDB {
                 Some(start_version),
                 proof,
             ))
-        })
-    }
-
-    /// Returns write sets for range [begin_version, end_version).
-    ///
-    /// Used by the executor to build in memory state after a state checkpoint.
-    /// Any missing write set in the entire range results in an error.
-    fn get_write_sets(
-        &self,
-        begin_version: Version,
-        end_version: Version,
-    ) -> Result<Vec<WriteSet>> {
-        gauged_api("get_write_sets", || {
-            self.error_if_ledger_pruned("Write set", begin_version)?;
-
-            self.transaction_store
-                .get_write_sets(begin_version, end_version)
         })
     }
 
@@ -1488,7 +1474,7 @@ impl DbWriter for AptosDB {
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
-    /// Note that even if `txns_to_commit` is empty, `frist_version` is checked to be
+    /// Note that even if `txns_to_commit` is empty, `first_version` is checked to be
     /// `ledger_info_with_sigs.ledger_info.version + 1` if `ledger_info_with_sigs` is not `None`.
     fn save_transactions(
         &self,
@@ -1618,19 +1604,19 @@ impl DbWriter for AptosDB {
                     .maybe_set_pruner_target_db_version(last_version);
             }
 
+            // Note: this must happen after txns have been saved to db because types can be newly
+            // created in this same chunk of transactions.
+            if let Some(indexer) = &self.indexer {
+                let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
+                indexer.index(self.state_store.clone(), first_version, &write_sets)?;
+            }
+
             // Once everything is successfully persisted, update the latest in-memory ledger info.
             if let Some(x) = ledger_info_with_sigs {
                 self.ledger_store.set_latest_ledger_info(x.clone());
 
                 LEDGER_VERSION.set(x.ledger_info().version() as i64);
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
-            }
-
-            // Note: this must happen after txns have been saved to db because types can be newly
-            // created in this same chunk of transactions.
-            if let Some(indexer) = &self.indexer {
-                let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
-                indexer.index(self.state_store.clone(), first_version, &write_sets)?;
             }
 
             Ok(())

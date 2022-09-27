@@ -6,7 +6,7 @@ use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
-use aptos_types::on_chain_config::{FeatureFlag, GasSchedule};
+use aptos_types::on_chain_config::{FeatureFlag, GasScheduleV2};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -352,9 +352,11 @@ impl MoveHarness {
                 }
             })
             .collect::<Vec<_>>();
-        // TODO(Gas): use GasScheduleV2 for the next testnet release
-        let schedule_bytes = bcs::to_bytes(&GasSchedule { entries }).expect("bcs");
-        // set_gas_schedule is not a transaction, so directly call as function
+        let gas_schedule = GasScheduleV2 {
+            feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
+            entries,
+        };
+        let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
         self.executor.exec(
             "gas_schedule",
             "set_gas_schedule",

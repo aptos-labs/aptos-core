@@ -4,8 +4,8 @@
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
     op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
-    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    register_int_counter, register_int_counter_vec, register_int_gauge_vec, Histogram,
+    HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 use short_hex_str::AsShortHexStr;
@@ -167,6 +167,15 @@ pub fn mempool_service_transactions(label: &'static str, num: usize) {
         .with_label_values(&[label])
         .observe(num as f64)
 }
+
+/// Histogram for the byte size of transactions processed in get_block
+pub static MEMPOOL_SERVICE_BYTES_GET_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_service_bytes_get_block",
+        "Histogram for the number of txns per (mempool returned for proposal) blocks."
+    )
+    .unwrap()
+});
 
 /// Counter for tracking latency of mempool processing requests from consensus/state sync
 /// A 'fail' result means the mempool's callback response to consensus/state sync failed.

@@ -18,6 +18,7 @@ serde_json = "1.0.81"
 tokio = { version = "1.21.0", features = ["full"] }
 
 aptos = { path = "../../crates/aptos" }
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }

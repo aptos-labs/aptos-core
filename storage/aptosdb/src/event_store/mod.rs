@@ -6,6 +6,7 @@
 #![allow(unused)]
 
 use super::AptosDB;
+use crate::utils::iterators::EventsByVersionIter;
 use crate::{
     errors::AptosDbError,
     schema::{
@@ -73,13 +74,13 @@ impl EventStore {
         let mut iter = self.db.iter::<EventSchema>(Default::default())?;
         iter.seek(&start_version)?;
 
-        Ok(EventsByVersionIter {
-            inner: iter.peekable(),
-            expected_next_version: start_version,
-            end_version: start_version
+        Ok(EventsByVersionIter::new(
+            iter,
+            start_version,
+            start_version
                 .checked_add(num_versions as u64)
                 .ok_or_else(|| format_err!("Too many versions requested."))?,
-        })
+        ))
     }
 
     pub fn get_event_by_version_and_index(
@@ -176,7 +177,7 @@ impl EventStore {
                 let msg = if cur_seq == start_seq_num {
                     "First requested event is probably pruned."
                 } else {
-                    "DB corruption: Sequence number not continous."
+                    "DB corruption: Sequence number not continuous."
                 };
                 bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
             }
@@ -321,13 +322,16 @@ impl EventStore {
                 batch.put::<EventByVersionSchema>(
                     &(*event.key(), version, event.sequence_number()),
                     &(idx as u64),
-                )?;
-                Ok(())
+                )
             })?;
 
         // EventAccumulatorSchema updates
         let event_hashes: Vec<HashValue> = events.iter().map(ContractEvent::hash).collect();
-        let (root_hash, writes) = EmptyAccumulator::append(&EmptyReader, 0, &event_hashes)?;
+        let (root_hash, writes) = MerkleAccumulator::<EmptyReader, EventAccumulatorHasher>::append(
+            &EmptyReader,
+            0,
+            &event_hashes,
+        )?;
         writes.into_iter().try_for_each(|(pos, hash)| {
             batch.put::<EventAccumulatorSchema>(&(version, pos), &hash)
         })?;
@@ -413,7 +417,7 @@ impl EventStore {
             },
             ledger_version,
         )?.ok_or_else(|| format_err!(
-            "No new block found beyond timestmap {}, so can't determine the last version before it.",
+            "No new block found beyond timestamp {}, so can't determine the last version before it.",
             timestamp,
         ))?;
 
@@ -429,35 +433,6 @@ impl EventStore {
         version
             .checked_sub(1)
             .ok_or_else(|| format_err!("A block with non-zero seq num started at version 0."))
-    }
-
-    /// Prunes the events by key store for a set of events
-    pub fn prune_events_by_key(
-        &self,
-        candidate_events: &[ContractEvent],
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<()> {
-        let mut sequence_range_by_event_keys: HashMap<EventKey, (u64, u64)> = HashMap::new();
-
-        candidate_events.iter().for_each(|event| {
-            let event_key = event.key();
-            // Events should be sorted by sequence numbers, so the first sequence number for the
-            // event key should be the minimum
-            match sequence_range_by_event_keys.entry(*event_key) {
-                Entry::Occupied(mut occupied) => {
-                    occupied.insert((occupied.get().0, event.sequence_number()));
-                }
-                Entry::Vacant(vacant) => {
-                    vacant.insert((event.sequence_number(), event.sequence_number()));
-                }
-            }
-        });
-
-        for (event_key, (min, max)) in sequence_range_by_event_keys {
-            db_batch
-                .delete_range_inclusive::<EventByKeySchema>(&(event_key, min), &(event_key, max));
-        }
-        Ok(())
     }
 
     /// Prunes events by accumulator store for a range of version in [begin, end)
@@ -527,8 +502,6 @@ impl EventStore {
     }
 }
 
-type Accumulator<'a> = MerkleAccumulator<EventHashReader<'a>, EventAccumulatorHasher>;
-
 struct EventHashReader<'a> {
     store: &'a EventStore,
     version: Version,
@@ -549,54 +522,12 @@ impl<'a> HashReader for EventHashReader<'a> {
     }
 }
 
-type EmptyAccumulator = MerkleAccumulator<EmptyReader, EventAccumulatorHasher>;
-
 struct EmptyReader;
 
 // Asserts `get()` is never called.
 impl HashReader for EmptyReader {
     fn get(&self, _position: Position) -> Result<HashValue> {
         unreachable!()
-    }
-}
-
-pub struct EventsByVersionIter<'a> {
-    inner: Peekable<SchemaIterator<'a, EventSchema>>,
-    expected_next_version: Version,
-    end_version: Version,
-}
-
-impl<'a> EventsByVersionIter<'a> {
-    fn next_impl(&mut self) -> Result<Option<Vec<ContractEvent>>> {
-        if self.expected_next_version >= self.end_version {
-            return Ok(None);
-        }
-
-        let mut ret = Vec::new();
-        while let Some(res) = self.inner.peek() {
-            let ((version, _index), _event) = res
-                .as_ref()
-                .map_err(|e| format_err!("Hit error iterating events: {}", e))?;
-            if *version != self.expected_next_version {
-                break;
-            }
-            let ((_version, _index), event) =
-                self.inner.next().transpose()?.expect("Known to exist.");
-            ret.push(event);
-        }
-        self.expected_next_version = self
-            .expected_next_version
-            .checked_add(1)
-            .ok_or_else(|| format_err!("expected version overflowed."))?;
-        Ok(Some(ret))
-    }
-}
-
-impl<'a> Iterator for EventsByVersionIter<'a> {
-    type Item = Result<Vec<ContractEvent>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next_impl().transpose()
     }
 }
 

@@ -213,6 +213,14 @@ impl TestContext {
         self.golden_output.as_ref().unwrap().log(&msg);
     }
 
+    pub fn last_updated_gas_schedule(&self) -> Option<u64> {
+        self.context.last_updated_gas_schedule()
+    }
+
+    pub fn last_updated_gas_estimation(&self) -> Option<u64> {
+        self.context.last_updated_gas_estimation()
+    }
+
     /// Prune well-known excessively large entries from a resource array response.
     /// TODO: we can't dump all resources of an account as golden output. As functionality
     /// grows this becomes too much. Need a way to filter only the resources which folks want.
@@ -248,17 +256,27 @@ impl TestContext {
     // Resource may appear in many different places, so make a convenient stripper
     fn resource_replacer(val: &Value) -> Value {
         let mut nval = val.clone();
-        nval["data"] = match val["type"].as_str().unwrap() {
-            "0x1::code::PackageRegistry" => Value::String("package registry omitted".to_string()),
+
+        // Skip things that change, plus bytecode and others that don't have a type
+        nval["data"] = match val["type"].as_str() {
+            Some("0x1::code::PackageRegistry") => {
+                Value::String("package registry omitted".to_string())
+            }
             // Ideally this wouldn't be stripped, but it changes by minor changes to the
             // Move modules, which leads to a bad devx.
-            "0x1::state_storage::StateStorageUsage" => {
+            Some("0x1::state_storage::StateStorageUsage") => {
                 Value::String("state storage omitted".to_string())
             }
-            "0x1::state_storage::GasParameter" => {
+            Some("0x1::state_storage::GasParameter") => {
                 Value::String("state storage gas parameter omitted".to_string())
             }
-            _ => val["data"].clone(),
+            _ => {
+                if val["bytecode"].as_str().is_some() {
+                    Value::String("bytecode omitted".to_string())
+                } else {
+                    val["data"].clone()
+                }
+            }
         };
         nval
     }

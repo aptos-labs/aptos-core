@@ -213,6 +213,26 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
         // delete_k8s_collection(services.clone(), "Services", selector).await?;
     }
 
+    delete_all_chaos(kube_namespace)?;
+
+    Ok(())
+}
+
+pub(crate) fn delete_all_chaos(kube_namespace: &str) -> Result<()> {
+    // clear everything manually, in case there are some dangling
+    let delete_networkchaos = ["-n", kube_namespace, "delete", "networkchaos", "--all"];
+    info!("{:?}", delete_networkchaos);
+    let delete_networkchaos_output = Command::new(KUBECTL_BIN)
+        .stdout(Stdio::inherit())
+        .args(&delete_networkchaos)
+        .output()
+        .expect("failed to delete all NetworkChaos");
+    if !delete_networkchaos_output.status.success() {
+        bail!(
+            "{}",
+            String::from_utf8(delete_networkchaos_output.stderr).unwrap()
+        );
+    }
     Ok(())
 }
 

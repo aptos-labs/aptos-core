@@ -35,8 +35,8 @@ import { NODE_URL, FAUCET_URL } from "./common";
 
   // Fund accounts.
   // :!:>section_3
-  await faucetClient.fundAccount(alice.address(), 20_000);
-  await faucetClient.fundAccount(bob.address(), 20_000); // <:!:section_3
+  await faucetClient.fundAccount(alice.address(), 100_000_000);
+  await faucetClient.fundAccount(bob.address(), 100_000_000); // <:!:section_3
 
   console.log("=== Initial Coin Balances ===");
   console.log(`Alice: ${await coinClient.checkBalance(alice)}`);

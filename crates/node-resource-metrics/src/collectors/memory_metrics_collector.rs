@@ -7,11 +7,12 @@ use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
     core::{Collector, Desc, Describer},
+    proto::MetricFamily,
     Opts,
 };
 use sysinfo::{RefreshKind, System, SystemExt};
 
-use super::common::NAMESPACE;
+use crate::collectors::common::{MeasureLatency, NAMESPACE};
 
 const MEM_METRICS_COUNT: usize = 6;
 
@@ -99,7 +100,9 @@ impl Collector for MemoryMetricsCollector {
         ]
     }
 
-    fn collect(&self) -> Vec<prometheus::proto::MetricFamily> {
+    fn collect(&self) -> Vec<MetricFamily> {
+        let _measure = MeasureLatency::new("memory".into());
+
         let mut system = self.system.lock();
         system.refresh_memory();
 

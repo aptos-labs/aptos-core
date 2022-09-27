@@ -6,7 +6,7 @@
 
 use crate::{
     algebra::Gas, instr::InstructionGasParameters, misc::MiscGasParameters,
-    transaction::TransactionGasParameters,
+    transaction::StorageGasParameters, transaction::TransactionGasParameters,
 };
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
@@ -20,6 +20,8 @@ use move_vm_types::{
     views::{TypeView, ValueView},
 };
 use std::collections::BTreeMap;
+
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 1;
 
 /// A trait for converting from a map representation of the on-chain gas schedule.
 pub trait FromOnChainGasSchedule: Sized {
@@ -145,18 +147,33 @@ impl InitialGasSchedule for AptosGasParameters {
 
 /// The official gas meter used inside the Aptos VM.
 /// It maintains an internal gas counter, measured in internal gas units, and carries an environment
-/// consisting all the gas parameters, which it can lookup when performing gas calcuations.
+/// consisting all the gas parameters, which it can lookup when performing gas calculations.
 pub struct AptosGasMeter {
+    feature_version: u64,
     gas_params: AptosGasParameters,
+    storage_gas_params: Option<StorageGasParameters>,
     balance: InternalGas,
 }
 
 impl AptosGasMeter {
-    pub fn new(gas_params: AptosGasParameters, balance: impl Into<Gas>) -> Self {
+    pub fn new(
+        gas_feature_version: u64,
+        gas_params: AptosGasParameters,
+        storage_gas_params: Option<StorageGasParameters>,
+        balance: impl Into<Gas>,
+    ) -> Self {
+        assert!(
+            (gas_feature_version == 0 && storage_gas_params.is_none())
+                || (gas_feature_version > 0 && storage_gas_params.is_some()),
+            "Invalid gas meter configuration"
+        );
+
         let balance = balance.into().to_unit_with_params(&gas_params.txn);
 
         Self {
+            feature_version: gas_feature_version,
             gas_params,
+            storage_gas_params,
             balance,
         }
     }
@@ -195,13 +212,27 @@ impl GasMeter for AptosGasMeter {
 
     #[inline]
     fn charge_load_resource(&mut self, loaded: Option<NumBytes>) -> PartialVMResult<()> {
-        let txn_params = &self.gas_params.txn;
+        let cost = match self.feature_version {
+            0 => {
+                let txn_params = &self.gas_params.txn;
 
-        let cost = txn_params.load_data_base
-            + match loaded {
-                Some(num_bytes) => txn_params.load_data_per_byte * num_bytes,
-                None => txn_params.load_data_failure,
-            };
+                txn_params.load_data_base
+                    + match loaded {
+                        Some(num_bytes) => txn_params.load_data_per_byte * num_bytes,
+                        None => txn_params.load_data_failure,
+                    }
+            }
+            _ => {
+                let storage_params = self.storage_gas_params.as_ref().unwrap();
+
+                // TODO(Gas): Rewrite this in a better way.
+                storage_params.per_item_read * (NumArgs::from(1))
+                    + match loaded {
+                        Some(num_bytes) => storage_params.per_byte_read * num_bytes,
+                        None => 0.into(),
+                    }
+            }
+        };
 
         self.charge(cost)
     }
@@ -479,7 +510,14 @@ impl AptosGasMeter {
         &mut self,
         ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
     ) -> VMResult<()> {
-        let cost = self.gas_params.txn.calculate_write_set_gas(ops);
+        let cost = match self.feature_version {
+            0 => self.gas_params.txn.calculate_write_set_gas(ops),
+            _ => self
+                .storage_gas_params
+                .as_ref()
+                .unwrap()
+                .calculate_write_set_gas(ops),
+        };
         self.charge(cost).map_err(|e| e.finish(Location::Undefined))
     }
 }

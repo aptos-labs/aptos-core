@@ -7,7 +7,7 @@
 //! and [`LeafNode`] as building blocks of a 256-bit
 //! [`JellyfishMerkleTree`](crate::JellyfishMerkleTree). [`InternalNode`] represents a 4-level
 //! binary tree to optimize for IOPS: it compresses a tree with 31 nodes into one node with 16
-//! chidren at the lowest level. [`LeafNode`] stores the full key and the value associated.
+//! children at the lowest level. [`LeafNode`] stores the full key and the value associated.
 
 #[cfg(test)]
 mod node_type_test;
@@ -175,7 +175,7 @@ impl Arbitrary for NodeType {
 pub struct Child {
     /// The hash value of this child node.
     pub hash: HashValue,
-    /// `version`, the `nibble_path` of the ['NodeKey`] of this [`InternalNode`] the child belongs
+    /// `version`, the `nibble_path` of the [`NodeKey`] of this [`InternalNode`] the child belongs
     /// to and the child's index constitute the [`NodeKey`] to uniquely identify this child node
     /// from the storage. Used by `[`NodeKey::gen_child_node_key`].
     pub version: Version,
@@ -242,11 +242,11 @@ pub struct InternalNode {
 /// height
 /// ```
 ///
-/// As illustrated above, at nibble height 0, `0..F` in hex denote 16 chidren hashes.  Each `#`
+/// As illustrated above, at nibble height 0, `0..F` in hex denote 16 children hashes.  Each `#`
 /// means the hash of its two direct children, which will be used to generate the hash of its
 /// parent with the hash of its sibling. Finally, we can get the hash of this internal node.
 ///
-/// However, if an internal node doesn't have all 16 chidren exist at height 0 but just a few of
+/// However, if an internal node doesn't have all 16 children exist at height 0 but just a few of
 /// them, we have a modified hashing rule on top of what is stated above:
 /// 1. From top to bottom, a node will be replaced by a leaf child if the subtree rooted at this
 /// node has only one child at height 0 and it is a leaf child.
@@ -655,7 +655,7 @@ pub struct LeafNode<K> {
     account_key: HashValue,
     // The hash of the value.
     value_hash: HashValue,
-    // The key and version thats points to the value
+    // The key and version that points to the value
     value_index: (K, Version),
 }
 

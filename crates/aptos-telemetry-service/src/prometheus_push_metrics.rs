@@ -3,14 +3,16 @@
 
 use crate::{
     auth::with_auth,
+    constants::MAX_CONTENT_LENGTH,
     context::Context,
     types::{auth::Claims, common::NodeType},
 };
-use aptos_logger::{debug, error};
-use reqwest::StatusCode;
+use reqwest::{header::CONTENT_ENCODING, StatusCode};
+use tracing::{debug, error};
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reply, Filter, Rejection, Reply};
 
-pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
+/// TODO: Cleanup after v1 API is ramped up
+pub fn metrics_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("push-metrics")
         .and(warp::post())
         .and(context.clone().filter())
@@ -22,6 +24,27 @@ pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
                 NodeType::PublicFullNode,
             ],
         ))
+        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
+        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
+        .and(warp::body::bytes())
+        .and_then(handle_metrics_ingest)
+        .boxed()
+}
+
+pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("ingest" / "metrics")
+        .and(warp::post())
+        .and(context.clone().filter())
+        .and(with_auth(
+            context,
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+            ],
+        ))
+        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
+        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
         .and(warp::body::bytes())
         .and_then(handle_metrics_ingest)
         .boxed()
@@ -30,14 +53,16 @@ pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
 pub async fn handle_metrics_ingest(
     context: Context,
     claims: Claims,
+    encoding: Option<String>,
     metrics_body: Bytes,
 ) -> anyhow::Result<impl Reply, Rejection> {
+    debug!("handling prometheus metrics ingest");
+
     let extra_labels = claims_to_extra_labels(&claims);
 
     let res = context
-        .victoria_metrics_client
-        .unwrap()
-        .post_prometheus_metrics(metrics_body, extra_labels)
+        .metrics_client()
+        .post_prometheus_metrics(metrics_body, extra_labels, encoding.unwrap_or_default())
         .await;
 
     match res {

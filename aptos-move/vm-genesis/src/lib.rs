@@ -79,6 +79,79 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
     (private_key, public_key)
 });
 
+pub fn encode_aptos_mainnet_genesis_transaction(
+    accounts: &[AccountMap],
+    employees: &[EmployeeAccountMap],
+    validators: &[ValidatorWithCommissionRate],
+    framework: &ReleaseBundle,
+    chain_id: ChainId,
+    genesis_config: &GenesisConfiguration,
+) -> Transaction {
+    assert!(!genesis_config.is_test, "This is mainnet!");
+    validate_genesis_config(genesis_config);
+
+    // Create a Move VM session so we can invoke on-chain genesis intializations.
+    let mut state_view = GenesisStateView::new();
+    for (module_bytes, module) in framework.code_and_compiled_modules() {
+        state_view.add_module(&module.self_id(), module_bytes);
+    }
+    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let move_vm = MoveVmExt::new(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+    )
+    .unwrap();
+    let id1 = HashValue::zero();
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+
+    // On-chain genesis process.
+    let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
+    initialize(&mut session, consensus_config, chain_id, genesis_config);
+    initialize_aptos_coin(&mut session);
+    initialize_on_chain_governance(&mut session, genesis_config);
+    create_accounts(&mut session, accounts);
+    create_employee_validators(&mut session, employees);
+    create_and_initialize_validators_with_commission(&mut session, validators);
+    set_genesis_end(&mut session);
+
+    // Reconfiguration should happen after all on-chain invocations.
+    emit_new_block_and_epoch_event(&mut session);
+
+    let mut session1_out = session.finish().unwrap();
+
+    // Publish the framework, using a different session id, in case both scripts creates tables
+    let state_view = GenesisStateView::new();
+    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+
+    let mut id2_arr = [0u8; 32];
+    id2_arr[31] = 1;
+    let id2 = HashValue::new(id2_arr);
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
+    publish_framework(&mut session, framework);
+    let session2_out = session.finish().unwrap();
+
+    session1_out.squash(session2_out).unwrap();
+
+    let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
+    let (delta_change_set, change_set) = change_set_ext.into_inner();
+
+    // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
+    // not deltas. The second session only publishes the framework module bundle, which should not
+    // produce deltas either.
+    assert!(
+        delta_change_set.is_empty(),
+        "non-empty delta change set in genesis"
+    );
+
+    assert!(!change_set
+        .write_set()
+        .iter()
+        .any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(change_set.events());
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
+}
+
 pub fn encode_genesis_transaction(
     aptos_root_key: Ed25519PublicKey,
     validators: &[Validator],
@@ -95,7 +168,6 @@ pub fn encode_genesis_transaction(
         consensus_config,
         chain_id,
         &genesis_config,
-        true,
     )))
 }
 
@@ -106,7 +178,6 @@ pub fn encode_genesis_change_set(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
-    use_gas_schedule_v2: bool,
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
@@ -126,13 +197,7 @@ pub fn encode_genesis_change_set(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     // On-chain genesis process.
-    initialize(
-        &mut session,
-        consensus_config,
-        chain_id,
-        genesis_config,
-        use_gas_schedule_v2,
-    );
+    initialize(&mut session, consensus_config, chain_id, genesis_config);
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
@@ -166,15 +231,10 @@ pub fn encode_genesis_change_set(
     let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
-    // Publishing stdlib should not produce any deltas.
-    // Proof: First session output is obtained during genesis when we initialize
-    // the data. This implies that all values which are aggregators know their
-    // real values, and therefore map to write ops and not deltas. For example,
-    // `create_and_initialize_validators` mints aptos coins which has aggregatable
-    // supply, but since supply is initialized during the same session there will
-    // be no deltas. The second session pusblishes framework module bundle which
-    // does not produce deltas either.
-    debug_assert!(
+    // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
+    // not deltas. The second session only publishes the framework module bundle, which should not
+    // produce deltas either.
+    assert!(
         delta_change_set.is_empty(),
         "non-empty delta change set in genesis"
     );
@@ -251,29 +311,18 @@ fn exec_function(
         });
 }
 
-const LATEST_GAS_FEATURE_VERSION: u64 = 1;
-
 fn initialize(
     session: &mut SessionExt<impl MoveResolver>,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
-    use_gas_schedule_v2: bool,
 ) {
-    let genesis_gas_params = AptosGasParameters::initial();
-    // TODO(Gas): The `use_gas_schedule_v2` flag is a hack to get tests working for the previous
-    //            testnet release.
-    //            We should get rid of it after we make another testnet release.
-    let gas_schedule_blob = if use_gas_schedule_v2 {
-        let gas_schedule = GasScheduleV2 {
-            feature_version: LATEST_GAS_FEATURE_VERSION,
-            entries: genesis_gas_params.to_on_chain_gas_schedule(),
-        };
-        bcs::to_bytes(&gas_schedule).expect("Failure serializing genesis gas schedule")
-    } else {
-        bcs::to_bytes(&genesis_gas_params.to_on_chain_gas_schedule())
-            .expect("Failure serializing genesis gas schedule")
+    let gas_schedule = GasScheduleV2 {
+        feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
+        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(),
     };
+    let gas_schedule_blob =
+        bcs::to_bytes(&gas_schedule).expect("Failure serializing genesis gas schedule");
 
     let consensus_config_bytes =
         bcs::to_bytes(&consensus_config).expect("Failure serializing genesis consensus config");
@@ -368,6 +417,36 @@ fn initialize_on_chain_governance(
     );
 }
 
+fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountMap]) {
+    let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(accounts_bytes);
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_accounts",
+        vec![],
+        serialized_values,
+    );
+}
+
+fn create_employee_validators(
+    session: &mut SessionExt<impl MoveResolver>,
+    employees: &[EmployeeAccountMap],
+) {
+    let employees_bytes = bcs::to_bytes(employees).expect("AccountMaps can be serialized");
+    let mut serialized_values = serialize_values(&[]);
+    serialized_values.push(employees_bytes);
+
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_employee_validators",
+        vec![],
+        serialized_values,
+    );
+}
+
 /// Creates and initializes each validator owner and validator operator. This method creates all
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
@@ -382,6 +461,25 @@ fn create_and_initialize_validators(
         session,
         GENESIS_MODULE_NAME,
         "create_initialize_validators",
+        vec![],
+        serialized_values,
+    );
+}
+
+fn create_and_initialize_validators_with_commission(
+    session: &mut SessionExt<impl MoveResolver>,
+    validators: &[ValidatorWithCommissionRate],
+) {
+    let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
+    let mut serialized_values = serialize_values(&vec![
+        MoveValue::Signer(CORE_CODE_ADDRESS),
+        MoveValue::Bool(true),
+    ]);
+    serialized_values.push(validators_bytes);
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_initialize_validators_with_commission",
         vec![],
         serialized_values,
     );
@@ -486,30 +584,28 @@ pub enum GenesisOptions {
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
-    let (framework, use_gas_schedule_v2) = match genesis_options {
-        GenesisOptions::Head => (cached_packages::head_release_bundle(), true),
-        GenesisOptions::Testnet => (framework::testnet_release_bundle(), false),
+    let framework = match genesis_options {
+        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => framework::testnet_release_bundle(),
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
-            (framework::testnet_release_bundle(), false)
+            framework::testnet_release_bundle()
         }
     };
 
-    generate_test_genesis(framework, Some(1), use_gas_schedule_v2).0
+    generate_test_genesis(framework, Some(1)).0
 }
 
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
-    let (framework, use_gas_schedule_v2) = match genesis_options {
-        GenesisOptions::Head => (cached_packages::head_release_bundle(), true),
-        GenesisOptions::Testnet => (framework::testnet_release_bundle(), false),
-        GenesisOptions::Mainnet => {
-            // We don't yet have mainnet, so returning testnet here
-            (framework::testnet_release_bundle(), false)
-        }
+    let framework = match genesis_options {
+        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        // We don't yet have mainnet, so returning testnet here
+        GenesisOptions::Mainnet => framework::testnet_release_bundle(),
     };
 
-    generate_mainnet_genesis(framework, Some(1), use_gas_schedule_v2).0
+    generate_mainnet_genesis(framework, Some(1)).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -520,12 +616,13 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(cached_packages::head_release_bundle(), count, true)
+    generate_test_genesis(cached_packages::head_release_bundle(), count)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Validator {
-    /// The Aptos account address of the validator.
+    /// The Aptos account address of the validator or the admin in the case of a commissioned or
+    /// vesting managed validator.
     pub owner_address: AccountAddress,
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
     /// its own operator).
@@ -596,7 +693,6 @@ impl TestValidator {
 pub fn generate_test_genesis(
     framework: &ReleaseBundle,
     count: Option<usize>,
-    use_gas_schedule_v2: bool,
 ) -> (ChangeSet, Vec<TestValidator>) {
     let test_validators = TestValidator::new_test_set(count, Some(100_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
@@ -622,7 +718,6 @@ pub fn generate_test_genesis(
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
         },
-        use_gas_schedule_v2,
     );
     (genesis, test_validators)
 }
@@ -630,7 +725,6 @@ pub fn generate_test_genesis(
 pub fn generate_mainnet_genesis(
     framework: &ReleaseBundle,
     count: Option<usize>,
-    use_gas_schedule_v2: bool,
 ) -> (ChangeSet, Vec<TestValidator>) {
     // TODO: Update to have custom validators/accounts with initial balances at genesis.
     let test_validators = TestValidator::new_test_set(count, Some(1_000_000_000_000_000));
@@ -643,24 +737,51 @@ pub fn generate_mainnet_genesis(
         framework,
         OnChainConsensusConfig::default(),
         ChainId::test(),
-        // TODO: Update once mainnet numbers are decided. These numbers are just placeholders.
-        &GenesisConfiguration {
-            allow_new_validators: true,
-            epoch_duration_secs: 2 * 3600, // 2 hours
-            is_test: false,
-            min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
-            // 400M APT
-            min_voting_threshold: (400_000_000 * APTOS_COINS_BASE_WITH_DECIMALS as u128),
-            max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M APT.
-            recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
-            required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
-            rewards_apy_percentage: 10,
-            voting_duration_secs: 7 * 24 * 3600, // 7 days
-            voting_power_increase_limit: 30,
-        },
-        use_gas_schedule_v2,
+        &mainnet_genesis_config(),
     );
     (genesis, test_validators)
+}
+
+fn mainnet_genesis_config() -> GenesisConfiguration {
+    // TODO: Update once mainnet numbers are decided. These numbers are just placeholders.
+    GenesisConfiguration {
+        allow_new_validators: true,
+        epoch_duration_secs: 2 * 3600, // 2 hours
+        is_test: false,
+        min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+        // 400M APT
+        min_voting_threshold: (400_000_000 * APTOS_COINS_BASE_WITH_DECIMALS as u128),
+        max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M APT.
+        recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
+        required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+        rewards_apy_percentage: 10,
+        voting_duration_secs: 7 * 24 * 3600, // 7 days
+        voting_power_increase_limit: 30,
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountMap {
+    pub account_address: AccountAddress,
+    pub balance: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmployeeAccountMap {
+    pub accounts: Vec<AccountAddress>,
+    pub validator: ValidatorWithCommissionRate,
+    pub vesting_schedule_numerators: Vec<u64>,
+    pub vesting_schedule_denominator: u64,
+    // Address that can reset the beneficiary for any shareholder.
+    pub beneficiary_resetter: AccountAddress,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidatorWithCommissionRate {
+    pub validator: Validator,
+    pub validator_commission_percentage: u64,
+    /// Whether the validator should be joining the genesis validator set.
+    pub join_during_genesis: bool,
 }
 
 #[test]
@@ -682,4 +803,251 @@ pub fn test_genesis_module_publishing() {
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
     publish_framework(&mut session, cached_packages::head_release_bundle());
+}
+
+#[test]
+pub fn test_mainnet_end_to_end() {
+    use aptos_types::{
+        account_address,
+        on_chain_config::{OnChainConfig, ValidatorSet},
+        state_store::state_key::StateKey,
+        write_set::{TransactionWrite, WriteSet},
+    };
+
+    let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
+    let non_validator_balance = 10 * APTOS_COINS_BASE_WITH_DECIMALS;
+
+    // currently just test that all functions have the right interface
+    let account44 = AccountAddress::from_hex_literal("0x44").unwrap();
+    let account45 = AccountAddress::from_hex_literal("0x45").unwrap();
+    let account46 = AccountAddress::from_hex_literal("0x46").unwrap();
+    let account47 = AccountAddress::from_hex_literal("0x47").unwrap();
+    let account48 = AccountAddress::from_hex_literal("0x48").unwrap();
+    let account49 = AccountAddress::from_hex_literal("0x49").unwrap();
+    let operator0 = AccountAddress::from_hex_literal("0x100").unwrap();
+    let operator1 = AccountAddress::from_hex_literal("0x101").unwrap();
+    let operator2 = AccountAddress::from_hex_literal("0x102").unwrap();
+    let operator3 = AccountAddress::from_hex_literal("0x103").unwrap();
+    let operator4 = AccountAddress::from_hex_literal("0x104").unwrap();
+    let operator5 = AccountAddress::from_hex_literal("0x105").unwrap();
+    let voter0 = AccountAddress::from_hex_literal("0x200").unwrap();
+    let voter1 = AccountAddress::from_hex_literal("0x201").unwrap();
+    let voter2 = AccountAddress::from_hex_literal("0x202").unwrap();
+    let voter3 = AccountAddress::from_hex_literal("0x203").unwrap();
+    let admin0 = AccountAddress::from_hex_literal("0x300").unwrap();
+    let admin1 = AccountAddress::from_hex_literal("0x301").unwrap();
+    let admin2 = AccountAddress::from_hex_literal("0x302").unwrap();
+
+    let accounts = vec![
+        AccountMap {
+            account_address: account44,
+            balance,
+        },
+        AccountMap {
+            account_address: account45,
+            balance: balance * 3, // Three times the balance so it can host 2 operators.
+        },
+        AccountMap {
+            account_address: account46,
+            balance,
+        },
+        AccountMap {
+            account_address: account47,
+            balance,
+        },
+        AccountMap {
+            account_address: account48,
+            balance,
+        },
+        AccountMap {
+            account_address: account49,
+            balance,
+        },
+        AccountMap {
+            account_address: admin0,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: admin1,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: admin2,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator0,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator1,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator2,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator3,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator4,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator5,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: voter0,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: voter1,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: voter2,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: voter3,
+            balance: non_validator_balance,
+        },
+    ];
+
+    let test_validators = TestValidator::new_test_set(Some(6), Some(balance * 9 / 10));
+    let mut employee_validator_1 = test_validators[0].data.clone();
+    employee_validator_1.owner_address = admin0;
+    employee_validator_1.operator_address = operator0;
+    employee_validator_1.voter_address = voter0;
+    let mut employee_validator_2 = test_validators[1].data.clone();
+    employee_validator_2.owner_address = admin1;
+    employee_validator_2.operator_address = operator1;
+    employee_validator_2.voter_address = voter1;
+    let mut zero_commission_validator = test_validators[2].data.clone();
+    zero_commission_validator.owner_address = account44;
+    zero_commission_validator.operator_address = operator2;
+    zero_commission_validator.voter_address = voter2;
+    let mut same_owner_validator_1 = test_validators[3].data.clone();
+    same_owner_validator_1.owner_address = account45;
+    same_owner_validator_1.operator_address = operator3;
+    same_owner_validator_1.voter_address = voter3;
+    let mut same_owner_validator_2 = test_validators[4].data.clone();
+    same_owner_validator_2.owner_address = account45;
+    same_owner_validator_2.operator_address = operator4;
+    same_owner_validator_2.voter_address = voter3;
+    let mut same_owner_validator_3 = test_validators[5].data.clone();
+    same_owner_validator_3.owner_address = account45;
+    same_owner_validator_3.operator_address = operator5;
+    same_owner_validator_3.voter_address = voter3;
+
+    let employees = vec![
+        EmployeeAccountMap {
+            accounts: vec![account46, account47],
+            validator: ValidatorWithCommissionRate {
+                validator: employee_validator_1,
+                validator_commission_percentage: 10,
+                join_during_genesis: true,
+            },
+            vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
+            vesting_schedule_denominator: 48,
+            beneficiary_resetter: AccountAddress::ZERO,
+        },
+        EmployeeAccountMap {
+            accounts: vec![account48, account49],
+            validator: ValidatorWithCommissionRate {
+                validator: employee_validator_2,
+                validator_commission_percentage: 10,
+                join_during_genesis: false,
+            },
+            vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
+            vesting_schedule_denominator: 48,
+            beneficiary_resetter: account44,
+        },
+    ];
+
+    let validators = vec![
+        ValidatorWithCommissionRate {
+            validator: same_owner_validator_1,
+            validator_commission_percentage: 10,
+            join_during_genesis: true,
+        },
+        ValidatorWithCommissionRate {
+            validator: same_owner_validator_2,
+            validator_commission_percentage: 15,
+            join_during_genesis: true,
+        },
+        ValidatorWithCommissionRate {
+            validator: same_owner_validator_3,
+            validator_commission_percentage: 10,
+            join_during_genesis: false,
+        },
+        ValidatorWithCommissionRate {
+            validator: zero_commission_validator,
+            validator_commission_percentage: 0,
+            join_during_genesis: true,
+        },
+    ];
+
+    let transaction = encode_aptos_mainnet_genesis_transaction(
+        &accounts,
+        &employees,
+        &validators,
+        cached_packages::head_release_bundle(),
+        ChainId::mainnet(),
+        &mainnet_genesis_config(),
+    );
+
+    let direct_writeset = if let Transaction::GenesisTransaction(direct_writeset) = transaction {
+        direct_writeset
+    } else {
+        panic!("Invalid GenesisTransaction");
+    };
+
+    let changeset = if let WriteSetPayload::Direct(changeset) = direct_writeset {
+        changeset
+    } else {
+        panic!("Invalid WriteSetPayload");
+    };
+
+    let WriteSet::V0(writeset) = changeset.write_set();
+
+    let state_key = StateKey::AccessPath(ValidatorSet::access_path());
+    let bytes = writeset
+        .get(&state_key)
+        .unwrap()
+        .extract_raw_bytes()
+        .unwrap();
+    let validator_set: ValidatorSet = bcs::from_bytes(&bytes).unwrap();
+    let validator_set_addresses = validator_set
+        .active_validators
+        .iter()
+        .map(|v| v.account_address)
+        .collect::<Vec<_>>();
+
+    let zero_commission_validator_pool_address =
+        account_address::default_stake_pool_address(account44, operator2);
+    let same_owner_validator_1_pool_address =
+        account_address::default_stake_pool_address(account45, operator3);
+    let same_owner_validator_2_pool_address =
+        account_address::default_stake_pool_address(account45, operator4);
+    let same_owner_validator_3_pool_address =
+        account_address::default_stake_pool_address(account45, operator5);
+    let employee_1_pool_address =
+        account_address::create_vesting_pool_address(admin0, operator0, 0, &[]);
+    let employee_2_pool_address =
+        account_address::create_vesting_pool_address(admin1, operator1, 0, &[]);
+
+    assert!(validator_set_addresses.contains(&zero_commission_validator_pool_address));
+    assert!(validator_set_addresses.contains(&employee_1_pool_address));
+    // This validator should not be in the genesis validator set as they specified
+    // join_during_genesis = false.
+    assert!(!validator_set_addresses.contains(&employee_2_pool_address));
+    assert!(validator_set_addresses.contains(&same_owner_validator_1_pool_address));
+    assert!(validator_set_addresses.contains(&same_owner_validator_2_pool_address));
+    // This validator should not be in the genesis validator set as they specified
+    // join_during_genesis = false.
+    assert!(!validator_set_addresses.contains(&same_owner_validator_3_pool_address));
 }

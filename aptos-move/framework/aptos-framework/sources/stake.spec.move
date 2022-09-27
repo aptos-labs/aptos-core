@@ -1,12 +1,11 @@
 spec aptos_framework::stake {
-
     // -----------------
     // Global invariants
     // -----------------
 
     spec module {
         // The validator set should satisfy its desired invariant.
-        invariant [suspendable] validator_set_is_valid();
+        invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> validator_set_is_valid();
         // After genesis, `AptosCoinCapabilities`, `ValidatorPerformance` and `ValidatorSet` exist.
         invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorPerformance>(@aptos_framework);
@@ -53,34 +52,43 @@ spec aptos_framework::stake {
 
     spec distribute_rewards {
         include ResourceRequirement;
+        requires rewards_rate <= MAX_REWARDS_RATE;
+        requires rewards_rate_denominator > 0;
+        requires rewards_rate <= rewards_rate_denominator;
+        requires num_successful_proposals <= num_total_proposals;
         aborts_if false;
         ensures old(stake.value) > 0 ==>
-                result == spec_rewards_amount(
-                    old(stake.value),
-                    num_successful_proposals,
-                    num_total_proposals,
-                    rewards_rate,
-                    rewards_rate_denominator);
+            result == spec_rewards_amount(
+                old(stake.value),
+                num_successful_proposals,
+                num_total_proposals,
+                rewards_rate,
+                rewards_rate_denominator);
         ensures old(stake.value) > 0 ==>
-                stake.value == old(stake.value) + spec_rewards_amount(
-                    old(stake.value),
-                    num_successful_proposals,
-                    num_total_proposals,
-                    rewards_rate,
-                    rewards_rate_denominator);
+            stake.value == old(stake.value) + spec_rewards_amount(
+                old(stake.value),
+                num_successful_proposals,
+                num_total_proposals,
+                rewards_rate,
+                rewards_rate_denominator);
         ensures old(stake.value) == 0 ==> result == 0;
         ensures old(stake.value) == 0 ==> stake.value == old(stake.value);
     }
 
     spec calculate_rewards_amount {
         pragma opaque;
+        requires rewards_rate <= MAX_REWARDS_RATE;
+        requires rewards_rate_denominator > 0;
+        requires rewards_rate <= rewards_rate_denominator;
+        requires num_successful_proposals <= num_total_proposals;
         ensures [concrete] (rewards_rate_denominator * num_total_proposals == 0) ==> result == 0;
-        ensures [concrete] (rewards_rate_denominator * num_total_proposals > 0) ==>
-            result == ((stake_amount * rewards_rate * num_successful_proposals) /
+        ensures [concrete] (rewards_rate_denominator * num_total_proposals > 0) ==> {
+            let amount = ((stake_amount * rewards_rate * num_successful_proposals) /
                 (rewards_rate_denominator * num_total_proposals));
-        // We assume that rewards_rate < 100 and num_successful_proposals < 86400 (1 proposal per second in a day).
-        // So, the multiplication in the reward formula should not overflow.
-        aborts_if [abstract] false;
+            result == amount
+        };
+        aborts_if false;
+
         // Used an uninterpreted spec function to avoid dealing with the arithmetic overflow and non-linear arithmetic.
         ensures [abstract] result == spec_rewards_amount(
             stake_amount,
@@ -100,7 +108,7 @@ spec aptos_framework::stake {
     }
 
     spec append {
-        pragma opaque, verify=false;
+        pragma opaque, verify = false;
         aborts_if false;
         ensures len(v1) == old(len(v1) + len(v2));
         ensures len(v2) == 0;
@@ -132,8 +140,8 @@ spec aptos_framework::stake {
         ensures result == VALIDATOR_STATUS_PENDING_INACTIVE ==> spec_contains(validator_set.pending_inactive, pool_address);
         ensures result == VALIDATOR_STATUS_INACTIVE ==> (
             !spec_contains(validator_set.pending_active, pool_address)
-            && !spec_contains(validator_set.active_validators, pool_address)
-            && !spec_contains(validator_set.pending_inactive, pool_address)
+                && !spec_contains(validator_set.active_validators, pool_address)
+                && !spec_contains(validator_set.pending_inactive, pool_address)
         );
     }
 
@@ -196,7 +204,7 @@ spec aptos_framework::stake {
         let validator_set = global<ValidatorSet>(@aptos_framework);
         !spec_contains(validator_set.pending_active, pool_address)
             && (spec_contains(validator_set.active_validators, pool_address)
-                || spec_contains(validator_set.pending_inactive, pool_address))
+            || spec_contains(validator_set.pending_inactive, pool_address))
     }
 
     // These resources are required to successfully execute `on_new_epoch`, which cannot

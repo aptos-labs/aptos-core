@@ -22,7 +22,7 @@ tempfile = "3.3.0"
 
 aptos = { path = "../../crates/aptos" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
-aptos-gas = { path = "../aptos-gas" }
+aptos-gas = { path = "../aptos-gas", features = ["testing"] }
 aptos-keygen = { path = "../../crates/aptos-keygen" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-parallel-executor = { path = "../parallel-executor" }
@@ -31,6 +31,7 @@ aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../aptos-vm", features = ["fuzzing"] }
 cached-packages = { path = "../framework/cached-packages" }
 framework = { path = "../framework" }
+package-builder = { path = "../package-builder" }
 vm-genesis = { path = "../vm-genesis" }
 
 aptos-writeset-generator = { path = "../writeset-transaction-generator" }

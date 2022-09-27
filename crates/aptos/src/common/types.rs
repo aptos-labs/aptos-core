@@ -20,8 +20,9 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
+use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
+use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue, UserTransaction};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
@@ -83,6 +84,8 @@ pub enum CliError {
     UnableToReadFile(String, String),
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
+    #[error("Simulation failed with status: {0}")]
+    SimulationError(String),
 }
 
 impl CliError {
@@ -101,6 +104,7 @@ impl CliError {
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
+            CliError::SimulationError(_) => "SimulationError",
         }
     }
 }
@@ -1125,9 +1129,9 @@ impl FaucetOptions {
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
-    /// The amount of coins used for a transaction is equal
+    /// The amount of Octas (10^-8 APT) used for a transaction is equal
     /// to (gas unit price * gas used).  The gas_unit_price can
-    /// be used as a multiplier for the amount of coins willing
+    /// be used as a multiplier for the amount of Octas willing
     /// to be paid for a transaction.  This will prioritize the
     /// transaction with a higher gas unit price.
     ///
@@ -1137,28 +1141,28 @@ pub struct GasOptions {
     /// Maximum amount of gas units to be used to send this transaction
     ///
     /// The maximum amount of gas units willing to pay for the transaction.
-    /// This is the (max gas in coins / gas unit price).
+    /// This is the (max gas in Octas / gas unit price).
     ///
-    /// For example if I wanted to pay a maximum of 100 coins, I may have the
+    /// For example if I wanted to pay a maximum of 100 Octas, I may have the
     /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
     /// gas unit price of 2, the max gas would need to be 50 to still only have
-    /// a maximum price of 100 coins.
+    /// a maximum price of 100 Octas.
     ///
     /// Without a value, it will determine the price based on simulating the current transaction
     #[clap(long)]
     pub max_gas: Option<u64>,
 }
 
-const DEFAULT_MAX_GAS: u64 = 50000;
-
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
-    /// Estimate maximum gas via simulation
+    /// [Deprecated] Estimate maximum gas via simulation
+    ///
+    /// Deprecated parameter, the default behavior is now to estimate max gas automatically, and ask for
+    /// confirmation
     ///
     /// This will simulate the transaction, and use the simulated actual amount of gas
-    /// to be used as the max gas.  If disabled, and no max gas provided, 50000 will be used
-    /// as the max gas
+    /// to be used as the max gas.
     #[clap(long)]
     pub(crate) estimate_max_gas: bool,
 
@@ -1222,7 +1226,6 @@ impl TransactionOptions {
     pub async fn submit_transaction(
         &self,
         payload: TransactionPayload,
-        amount_transfer: Option<u64>,
     ) -> CliTypedResult<Transaction> {
         let client = self.rest_client()?;
         let (sender_key, sender_address) = self.get_key_and_address()?;
@@ -1239,31 +1242,67 @@ impl TransactionOptions {
         } else {
             let gas_unit_price = client.estimate_gas_price().await?.into_inner().gas_estimate;
 
-            ask_to_confirm_price = gas_unit_price > 1;
+            ask_to_confirm_price = true;
             gas_unit_price
         };
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
-            max_gas
-        } else if self.estimate_max_gas {
-            let simulated_txn = self
-                .simulate_transaction(payload.clone(), Some(gas_unit_price), amount_transfer)
-                .await?;
-            if !simulated_txn.info.success {
-                return Err(CliError::ApiError(format!(
-                    "Simulated transaction failed with status {}",
-                    simulated_txn.info.vm_status
-                )));
+            // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
+            if ask_to_confirm_price {
+                let message = format!("Do you want to submit transaction for a maximum of {} Octas at a gas unit price of {} Octas?",  max_gas * gas_unit_price, gas_unit_price);
+                prompt_yes_with_override(&message, self.prompt_options)?;
             }
-            simulated_txn.info.gas_used.0
+            max_gas
         } else {
-            // TODO: Remove once simulation is stabilized and can handle all cases
-            DEFAULT_MAX_GAS
-        };
+            let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+                .with_gas_unit_price(gas_unit_price);
 
-        if ask_to_confirm_price {
-            prompt_yes_with_override(&format!("Estimated gas price is currently {}, do you want to execute a transaction for a total of {} coins?", gas_unit_price, max_gas * gas_unit_price), self.prompt_options)?;
-        }
+            let unsigned_transaction = transaction_factory
+                .payload(payload.clone())
+                .sender(sender_address)
+                .sequence_number(sequence_number)
+                .build();
+
+            let signed_transaction = SignedTransaction::new(
+                unsigned_transaction,
+                sender_key.public_key(),
+                Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+            );
+            // TODO: Cleanup to use the gas price estimation here
+            let simulated_txn = client
+                .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
+                .await?
+                .into_inner();
+
+            // Check if the transaction will pass, if it doesn't then fail
+            // TODO: Add move resolver so we can explain the VM status with a proper error map
+            let status = simulated_txn.info.status();
+            if !status.is_success() {
+                let status = client.explain_vm_status(status);
+                return Err(CliError::SimulationError(status));
+            }
+
+            // Take the gas used and use a headroom factor on it
+            let adjusted_max_gas = adjust_gas_headroom(
+                simulated_txn.info.gas_used(),
+                simulated_txn
+                    .transaction
+                    .as_signed_user_txn()
+                    .expect("Should be signed user transaction")
+                    .max_gas_amount(),
+            );
+
+            // Ask if you want to accept the estimate amount
+            let upper_cost_bound = adjusted_max_gas * gas_unit_price;
+            let lower_cost_bound = simulated_txn.info.gas_used() * gas_unit_price;
+            let message = format!(
+                    "Do you want to submit a transaction for a range of [{} - {}] Octas at a gas unit price of {} Octas?",
+                    lower_cost_bound,
+                    upper_cost_bound,
+                    gas_unit_price);
+            prompt_yes_with_override(&message, self.prompt_options)?;
+            adjusted_max_gas
+        };
 
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)

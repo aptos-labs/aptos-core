@@ -5,15 +5,24 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::util::remove_null_bytes;
 use diesel::{
-    pg::PgConnection,
+    pg::{Pg, PgConnection},
+    query_builder::{AstPass, Query, QueryFragment},
     r2d2::{ConnectionManager, PoolError, PooledConnection},
-    RunQueryDsl,
+    QueryResult, RunQueryDsl,
 };
 use std::{cmp::min, sync::Arc};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
+#[derive(QueryId)]
+/// Using this will append a where clause at the end of the string upsert function, e.g.
+/// INSERT INTO ... ON CONFLICT DO UPDATE SET ... WHERE "transaction_version" = excluded."transaction_version"
+/// This is needed when we want to maintain a table with only the latest state
+pub struct UpsertFilterLatestTransactionQuery<T> {
+    query: T,
+    where_clause: Option<&'static str>,
+}
 
 pub const MAX_DIESEL_PARAM_SIZE: u16 = u16::MAX;
 
@@ -53,23 +62,55 @@ pub fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
 }
 
 pub fn execute_with_better_error<
-    T: diesel::Table + diesel::QuerySource,
+    T: diesel::Table + diesel::QuerySource + diesel::query_builder::QueryId + 'static,
     U: diesel::query_builder::QueryFragment<diesel::pg::Pg>
+        + diesel::query_builder::QueryId
         + diesel::insertable::CanInsertInSingleQuery<diesel::pg::Pg>,
 >(
-    conn: &PgPoolConnection,
+    conn: &mut PgConnection,
     query: diesel::query_builder::InsertStatement<T, U>,
+    mut additional_where_clause: Option<&'static str>,
 ) -> diesel::QueryResult<usize>
 where
     <T as diesel::QuerySource>::FromClause: diesel::query_builder::QueryFragment<diesel::pg::Pg>,
 {
-    let debug = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    // This is needed because if we don't insert any row, then diesel makes a call like this
+    // SELECT 1 FROM TABLE WHERE 1=0
+    if original_query.to_lowercase().contains("where") {
+        additional_where_clause = None;
+    }
+    let final_query = UpsertFilterLatestTransactionQuery {
+        query,
+        where_clause: additional_where_clause,
+    };
+    let debug = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
     aptos_logger::debug!("Executing query: {:?}", debug);
-    let res = query.execute(conn);
+    let res = final_query.execute(conn);
     if let Err(ref e) = res {
         aptos_logger::warn!("Error running query: {:?}\n{}", e, debug);
     }
     res
+}
+
+/// Section below is required to modify the query.
+impl<T: Query> Query for UpsertFilterLatestTransactionQuery<T> {
+    type SqlType = T::SqlType;
+}
+
+impl<T> RunQueryDsl<PgConnection> for UpsertFilterLatestTransactionQuery<T> {}
+
+impl<T> QueryFragment<Pg> for UpsertFilterLatestTransactionQuery<T>
+where
+    T: QueryFragment<Pg>,
+{
+    fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
+        self.query.walk_ast(out.reborrow())?;
+        if let Some(w) = self.where_clause {
+            out.push_sql(w);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

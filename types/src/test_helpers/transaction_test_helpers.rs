@@ -44,7 +44,7 @@ pub fn get_test_signed_module_publishing_transaction(
         ChainId::test(),
     );
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
 }
@@ -72,7 +72,7 @@ pub fn get_test_signed_transaction(
         ChainId::test(),
     );
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
 }
@@ -123,7 +123,7 @@ fn get_test_unchecked_transaction_(
         chain_id,
     );
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
 }
@@ -195,12 +195,12 @@ pub fn get_test_unchecked_multi_agent_txn(
     let message =
         RawTransactionWithData::new_multi_agent(raw_txn.clone(), secondary_signers.clone());
 
-    let sender_signature = sender_private_key.sign(&message);
+    let sender_signature = sender_private_key.sign(&message).unwrap();
     let sender_authenticator = AccountAuthenticator::ed25519(sender_public_key, sender_signature);
 
     let mut secondary_authenticators = vec![];
     for i in 0..secondary_public_keys.len() {
-        let signature = secondary_private_keys[i].sign(&message);
+        let signature = secondary_private_keys[i].sign(&message).unwrap();
         secondary_authenticators.push(AccountAuthenticator::ed25519(
             secondary_public_keys[i].clone(),
             signature,
@@ -233,7 +233,7 @@ pub fn get_test_txn_with_chain_id(
         chain_id,
     );
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
 }

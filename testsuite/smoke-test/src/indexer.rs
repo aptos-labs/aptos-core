@@ -7,34 +7,18 @@ use aptos_indexer::{
 };
 use aptos_sdk::types::LocalAccount;
 use cached_packages::aptos_stdlib::aptos_token_stdlib;
-use diesel::connection::Connection;
+use diesel::RunQueryDsl;
 use forge::{AptosPublicInfo, Result, Swarm};
 use std::sync::Arc;
 
-pub fn wipe_database(conn: &PgPoolConnection) {
-    for table in [
-        "collection_datas",
-        "tokens",
-        "token_datas",
-        "token_ownerships",
-        "signatures",
-        "collections",
-        "move_modules",
-        "move_resources",
-        "table_items",
-        "table_metadatas",
-        "ownerships",
-        "write_set_changes",
-        "events",
-        "user_transactions",
-        "block_metadata_transactions",
-        "transactions",
-        "processor_statuses",
-        "ledger_infos",
-        "__diesel_schema_migrations",
+pub fn wipe_database(conn: &mut PgPoolConnection) {
+    for command in [
+        "DROP SCHEMA public CASCADE",
+        "CREATE SCHEMA public",
+        "GRANT ALL ON SCHEMA public TO postgres",
+        "GRANT ALL ON SCHEMA public TO public",
     ] {
-        conn.execute(&format!("DROP TABLE IF EXISTS {}", table))
-            .unwrap_or_else(|_| panic!("Could not drop table '{}'", table));
+        diesel::sql_query(command).execute(conn).unwrap();
     }
 }
 
@@ -44,7 +28,7 @@ pub fn get_database_url() -> String {
 
 pub fn setup_indexer() -> anyhow::Result<PgDbPool> {
     let conn_pool = new_db_pool(get_database_url().as_str())?;
-    wipe_database(&conn_pool.get()?);
+    wipe_database(&mut conn_pool.get()?);
     Ok(conn_pool)
 }
 
@@ -140,8 +124,8 @@ async fn test_old_indexer() {
 
     // Set up accounts, generate some traffic
     // TODO(Gas): double check this
-    let mut account1 = info.create_and_fund_user_account(50_000).await.unwrap();
-    let account2 = info.create_and_fund_user_account(50_000).await.unwrap();
+    let mut account1 = info.create_and_fund_user_account(500_000).await.unwrap();
+    let account2 = info.create_and_fund_user_account(500_000).await.unwrap();
     // This transfer should emit events
     let t_tx = info.transfer(&mut account1, &account2, 717).await.unwrap();
     // test NFT creation event indexing
@@ -153,7 +137,8 @@ async fn test_old_indexer() {
     // Get them into the array and sort by type in order to prevent ordering from breaking tests
     let mut transactions = vec![];
     for v in 0..2 {
-        transactions.push(TransactionModel::get_by_version(v, &conn_pool.get().unwrap()).unwrap());
+        transactions
+            .push(TransactionModel::get_by_version(v, &mut conn_pool.get().unwrap()).unwrap());
     }
     transactions.sort_by(|a, b| a.0.type_.partial_cmp(&b.0.type_).unwrap());
 
@@ -174,9 +159,11 @@ async fn test_old_indexer() {
     assert!(wsc0.len() > 10);
 
     // This is the transfer
-    let (tx2, ut2, bmt2, events2, wsc2) =
-        TransactionModel::get_by_hash(t_tx.hash.to_string().as_str(), &conn_pool.get().unwrap())
-            .unwrap();
+    let (tx2, ut2, bmt2, events2, wsc2) = TransactionModel::get_by_hash(
+        t_tx.hash.to_string().as_str(),
+        &mut conn_pool.get().unwrap(),
+    )
+    .unwrap();
 
     assert_eq!(tx2.type_, "user_transaction");
     assert_eq!(tx2.hash, t_tx.hash.to_string());

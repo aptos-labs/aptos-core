@@ -3,13 +3,11 @@
 
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
-pub mod continuous_progress_test;
 pub mod forge_setup_test;
 pub mod fullnode_reboot_stress_test;
 pub mod gas_price_test;
 pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
-pub mod network_latency_test;
 pub mod network_loss_test;
 pub mod network_partition_test;
 pub mod partial_nodes_down_test;
@@ -17,6 +15,8 @@ pub mod performance_test;
 pub mod performance_with_fullnode_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
+pub mod three_region_simulation_test;
+pub mod twin_validator_test;
 pub mod validator_reboot_stress_test;
 
 use anyhow::{anyhow, ensure};
@@ -31,8 +31,8 @@ use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Builder;
 
-const WARMUP_DURATION_FRACTION: f32 = 0.05;
-const COOLDOWN_DURATION_FRACTION: f32 = 0.05;
+const WARMUP_DURATION_FRACTION: f32 = 0.07;
+const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
 
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,
@@ -69,7 +69,8 @@ pub fn create_emitter_and_request(
     let client_timeout = Duration::from_secs(30);
 
     let chain_info = swarm.chain_info();
-    let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
+    let transaction_factory = TransactionFactory::new(chain_info.chain_id)
+        .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE);
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
@@ -134,6 +135,12 @@ impl NetworkTest for dyn NetworkLoadTest {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
+        let one_client = ctx.swarm().aptos_public_info().client().clone();
+        let start_version = ctx
+            .runtime
+            .block_on(one_client.get_ledger_information())?
+            .into_inner()
+            .version;
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
@@ -152,6 +159,11 @@ impl NetworkTest for dyn NetworkLoadTest {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
+        let end_version = ctx
+            .runtime
+            .block_on(one_client.get_ledger_information())?
+            .into_inner()
+            .version;
 
         self.finish(ctx.swarm())?;
 
@@ -160,6 +172,8 @@ impl NetworkTest for dyn NetworkLoadTest {
             &actual_test_duration,
             start_timestamp as i64,
             end_timestamp as i64,
+            start_version,
+            end_version,
         )?;
 
         Ok(())
@@ -201,7 +215,7 @@ impl dyn NetworkLoadTest {
             ctx.swarm(),
             emit_job_request,
             &nodes_to_send_load_to,
-            1,
+            aptos_global_constants::GAS_UNIT_PRICE,
             rng,
         )?;
 
@@ -211,6 +225,22 @@ impl dyn NetworkLoadTest {
         let rt = runtime_builder
             .build()
             .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
+
+        let clients = ctx
+            .swarm()
+            .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
+
+        // Read first
+        for client in &clients {
+            let start = Instant::now();
+            let _v = rt.block_on(client.get_ledger_information())?;
+            let duration = start.elapsed();
+            info!(
+                "Fetch from {:?} took {}ms",
+                client.path_prefix_string(),
+                duration.as_millis(),
+            );
+        }
 
         let job = rt.block_on(emitter.start_job(
             ctx.swarm().chain_info().root_account,
@@ -225,10 +255,6 @@ impl dyn NetworkLoadTest {
 
         std::thread::sleep(warmup_duration);
         info!("{}s warmup finished", warmup_duration.as_secs());
-
-        let clients = ctx
-            .swarm()
-            .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
 
         let max_start_ledger_transactions = rt
             .block_on(join_all(

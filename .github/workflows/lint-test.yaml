@@ -51,66 +51,6 @@ jobs:
       - run: cd ./ecosystem/typescript/sdk && yarn lint
       - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
 
-  community-platform-lint:
-    runs-on: ubuntu-latest
-    env:
-      RAILS_ENV: test
-      NODE_ENV: test
-    defaults:
-      run:
-        working-directory: ecosystem/platform/server
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ruby/setup-ruby@v1
-        with:
-          working-directory: ecosystem/platform/server
-          bundler-cache: true
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: .node-version
-      - run: yarn install --frozen-lockfile
-      - run: yarn run prettier --check .
-      - run: yarn run tsc
-      - run: bundle exec bundler-audit --update
-      - run: bundle exec brakeman -q -w2
-      - run: bundle exec rubocop
-      - run: bundle exec erblint --lint-all
-
-  community-platform-test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:11-alpine
-        ports:
-          - "5432:5432"
-        env:
-          POSTGRES_USER: complat
-          POSTGRES_PASSWORD: password
-    env:
-      RAILS_ENV: test
-      NODE_ENV: test
-      CI: true
-      COMMUNITY_DB_USER: complat
-      COMMUNITY_DB_PASS: password
-      COMMUNITY_DB_HOST: localhost
-      COMMUNITY_DB_PORT: 5432
-    defaults:
-      run:
-        working-directory: ecosystem/platform/server
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ruby/setup-ruby@v1
-        with:
-          working-directory: ecosystem/platform/server
-          bundler-cache: true
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: .node-version
-      - run: bin/setup
-      - run: yarn build
-      - run: yarn build:css
-      - run: bin/rails test
-
   docs-lint:
     runs-on: ubuntu-latest
     steps:
@@ -165,7 +105,7 @@ jobs:
           tool: nextest
       # prebuild node binary, so that tests don't start before node is built.
       # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      - run: cargo build --bin=aptos-node --features=failpoints --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
+      - run: cargo build --bin=aptos-node --features=failpoints,indexer --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 

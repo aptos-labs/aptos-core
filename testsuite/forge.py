@@ -204,17 +204,9 @@ class LocalFilesystem(Filesystem):
 
 
 # o11y resources
-INTERN_ES_DEFAULT_INDEX = "90037930-aafc-11ec-acce-2d961187411f"
-INTERN_ES_BASE_URL = "https://es.intern.aptosdev.com"
-INTERN_GRAFANA_BASE_URL = (
+GRAFANA_BASE_URL = (
     "https://o11y.aptosdev.com/grafana/d/overview/overview?orgId=1&refresh=10s&"
-    "var-Datasource=Remote%20Prometheus%20Intern"
-)
-DEVINFRA_ES_DEFAULT_INDEX = "d0bc5e20-badc-11ec-9a50-89b84ac337af"
-DEVINFRA_ES_BASE_URL = "https://es.devinfra.aptosdev.com"
-DEVINFRA_GRAFANA_BASE_URL = (
-    "https://o11y.aptosdev.com/grafana/d/overview/overview?orgId=1&refresh=10s&"
-    "var-Datasource=Remote%20Prometheus%20Devinfra"
+    "var-Datasource=VictoriaMetrics%20Global"
 )
 HUMIO_LOGS_LINK = (
     "https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28validator_insta"
@@ -235,11 +227,6 @@ HUMIO_LOGS_LINK = (
     "%2C%22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newes"
     "tAtBottom=***&showOnlyFirstLine=false"
 )
-
-
-def prometheus_port_forward() -> None:
-    os.execvp("kubectl", ["kubectl", "port-forward", "prometheus", "9090"])
-
 
 class Process:
     def name(self) -> str:
@@ -523,94 +510,7 @@ def format_report(context: ForgeContext, result: ForgeResult) -> str:
             return "{}\n{}".format(report_text, debugging_appendix)
         return report_text
 
-
-def get_validator_logs_link(
-    forge_namespace: str,
-    forge_chain_name: str,
-    time_filter: Union[bool, Tuple[datetime, datetime]],
-) -> str:
-    es_base_url = (
-        DEVINFRA_ES_BASE_URL
-        if "forge" in forge_chain_name
-        else INTERN_ES_BASE_URL
-    )
-    es_default_index = (
-        DEVINFRA_ES_DEFAULT_INDEX
-        if "forge" in forge_chain_name
-        else INTERN_ES_DEFAULT_INDEX
-    )
-    val0_hostname = "aptos-node-0-validator-0"
-
-    if time_filter is True:
-        es_time_filter = (
-            "refreshInterval:(pause:!f,value:10000),time:(from:now-15m,to:now)"
-        )
-    elif isinstance(time_filter, tuple):
-        es_start_time = time_filter[0].strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        es_end_time = time_filter[1].strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        es_time_filter = (
-            "refreshInterval:(pause:!t,value:0)"
-            f",time:(from:'{es_start_time}',to:'{es_end_time}')"
-        )
-    else:
-        raise Exception(f"Invalid refresh argument: {time_filter}")
-
-    return f"""
-        {es_base_url}/_dashboards/app/discover#/?
-        _g=(filters:!(), {es_time_filter})
-        &_a=(
-            columns:!(_source),
-            filters:!((
-                '$state':(store:appState),
-                meta:(
-                    alias:!n,
-                    disabled:!f,
-                    index:'{es_default_index}',
-                    key:chain_name,
-                    negate:!f,
-                    params:(query:{forge_chain_name}),
-                    type:phrase
-                ),
-                query:(match_phrase:(chain_name:{forge_chain_name}))
-            ),
-            (
-                '$state':(store:appState),
-                meta:(
-                    alias:!n,
-                    disabled:!f,
-                    index:'{es_default_index}',
-                    key:namespace,
-                    negate:!f,
-                    params:(query:{forge_namespace}),
-                    type:phrase
-                ),
-                query:(match_phrase:(namespace:{forge_namespace}))
-            ),
-            (
-                '$state':(store:appState),
-                meta:(
-                    alias:!n,
-                    disabled:!f,
-                    index:'{es_default_index}',
-                    key:hostname,
-                    negate:!f,
-                    params:(query:{val0_hostname}),
-                    type:phrase),
-                    query:(match_phrase:(hostname:{val0_hostname})
-                )
-            )),
-            index:'{es_default_index}',
-            interval:auto,query:(language:kuery,query:''),sort:!()
-        )
-    """.replace(
-        " ", ""
-    ).replace(
-        "\n", ""
-    )
-
-
 def get_dashboard_link(
-    forge_cluster_name: str,
     forge_namespace: str,
     forge_chain_name: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
@@ -624,13 +524,8 @@ def get_dashboard_link(
     else:
         raise Exception(f"Invalid refresh argument: {time_filter}")
 
-    base_url = (
-        DEVINFRA_GRAFANA_BASE_URL
-        if "forge" in forge_cluster_name
-        else INTERN_GRAFANA_BASE_URL
-    )
     return (
-        f"{base_url}&var-namespace={forge_namespace}"
+        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}"
         f"&var-chain_name={forge_chain_name}{grafana_time_filter}"
     )
 
@@ -680,13 +575,9 @@ def get_testsuite_images(context: ForgeContext) -> str:
 
 def format_pre_comment(context: ForgeContext) -> str:
     dashboard_link = get_dashboard_link(
-        context.forge_cluster_name,
         context.forge_namespace,
         context.forge_chain_name,
         True,
-    )
-    validator_logs_link = get_validator_logs_link(
-        context.forge_namespace, context.forge_chain_name, True
     )
     humio_logs_link = get_humio_logs_link(
         context.forge_namespace,
@@ -699,7 +590,6 @@ def format_pre_comment(context: ForgeContext) -> str:
             ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
-            * [(Deprecated) OpenSearch Logs]({validator_logs_link})
             """
         ).lstrip()
         + format_github_info(context)
@@ -708,12 +598,6 @@ def format_pre_comment(context: ForgeContext) -> str:
 
 def format_comment(context: ForgeContext, result: ForgeResult) -> str:
     dashboard_link = get_dashboard_link(
-        context.forge_cluster_name,
-        context.forge_namespace,
-        context.forge_chain_name,
-        (result.start_time, result.end_time),
-    )
-    validator_logs_link = get_validator_logs_link(
         context.forge_namespace,
         context.forge_chain_name,
         (result.start_time, result.end_time),
@@ -751,7 +635,6 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         ```
         * [Grafana dashboard]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
-        * [(Deprecated) OpenSearch Logs]({validator_logs_link})
         """
         )
         + format_github_info(context)
@@ -804,7 +687,6 @@ class LocalForgeRunner(ForgeRunner):
         context.filesystem.rlimit(
             resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY
         )
-        port_forward_process = context.processes.spawn(prometheus_port_forward)
 
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run(
@@ -826,7 +708,6 @@ class LocalForgeRunner(ForgeRunner):
                 ):
                     print("Killing", process)
                     process.kill()
-            port_forward_process.kill()
 
         return forge_result
 

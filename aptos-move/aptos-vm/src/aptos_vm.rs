@@ -29,10 +29,9 @@ use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
-use aptos_types::account_config::new_block_event_key;
-use aptos_types::vm_status::AbortLocation;
 use aptos_types::{
     account_config,
+    account_config::new_block_event_key,
     block_metadata::BlockMetadata,
     on_chain_config::new_epoch_event_key,
     transaction::{
@@ -40,22 +39,21 @@ use aptos_types::{
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    vm_status::{StatusCode, VMStatus},
+    vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteSet,
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
-use move_deps::move_binary_format::errors::VMError;
-use move_deps::move_core_types::language_storage::ModuleId;
 use move_deps::{
     move_binary_format::{
         access::ModuleAccess,
-        errors::{verification_error, Location, PartialVMError, VMResult},
+        errors::{verification_error, Location, PartialVMError, VMError, VMResult},
         CompiledModule, IndexKind,
     },
     move_core_types::{
         account_address::AccountAddress,
         ident_str,
+        language_storage::ModuleId,
         transaction_argument::convert_txn_args,
         value::{serialize_values, MoveValue},
     },
@@ -63,12 +61,14 @@ use move_deps::{
 };
 use num_cpus;
 use once_cell::sync::OnceCell;
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     cmp::min,
+    collections::{BTreeMap, BTreeSet},
     convert::{AsMut, AsRef},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
@@ -628,7 +628,7 @@ impl AptosVM {
             return discard_error_vm_status(err);
         };
 
-        if unwrap_or_discard!(self.0.get_gas_feature_version(log_context)) >= 1 {
+        if self.0.get_gas_feature_version() >= 1 {
             // Create a new session so that the data cache is flushed.
             // This is to ensure we correctly charge for loading certain resources, even if they
             // have been previously cached in the prologue.
@@ -638,8 +638,14 @@ impl AptosVM {
         }
 
         let gas_params = unwrap_or_discard!(self.0.get_gas_parameters(log_context));
+        let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
         let txn_data = TransactionMetadata::new(txn);
-        let mut gas_meter = AptosGasMeter::new(gas_params.clone(), txn_data.max_gas_amount());
+        let mut gas_meter = AptosGasMeter::new(
+            self.0.get_gas_feature_version(),
+            gas_params.clone(),
+            storage_gas_params.cloned(),
+            txn_data.max_gas_amount(),
+        );
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
@@ -782,7 +788,7 @@ impl AptosVM {
         let change_set_ext = match self.execute_writeset(
             storage,
             &writeset_payload,
-            None,
+            Some(aptos_types::account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
         ) {
             Ok(cse) => cse,
@@ -1131,7 +1137,17 @@ impl AptosSimulationVM {
             Err(err) => return discard_error_vm_status(err),
             Ok(s) => s,
         };
-        let mut gas_meter = AptosGasMeter::new(gas_params.clone(), txn_data.max_gas_amount());
+        let storage_gas_params = match self.0 .0.get_storage_gas_parameters(log_context) {
+            Err(err) => return discard_error_vm_status(err),
+            Ok(s) => s,
+        };
+
+        let mut gas_meter = AptosGasMeter::new(
+            self.0 .0.get_gas_feature_version(),
+            gas_params.clone(),
+            storage_gas_params.cloned(),
+            txn_data.max_gas_amount(),
+        );
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)

@@ -1,0 +1,20 @@
+[package]
+name = "package-builder"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Helper for building Move packages for tests"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.57"
+itertools = "0.10.0"
+tempfile = "3.3.0"
+
+move-command-line-common = { git = "https://github.com/aptos-labs/move", rev = "77750b37bb3663d00a7c4058937fed42ceb3089e" }
+move-package = { git = "https://github.com/aptos-labs/move", rev = "77750b37bb3663d00a7c4058937fed42ceb3089e" }
+
+framework = { path = "../framework" }

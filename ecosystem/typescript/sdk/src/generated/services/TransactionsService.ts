@@ -216,15 +216,25 @@ export class TransactionsService {
      * To use this endpoint with BCS, you must submit a SignedTransaction
      * encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
      * @param requestBody
+     * @param estimateMaxGasAmount If set to true, the max gas value in the transaction will be ignored
+     * and the maximum possible gas will be used
+     * @param estimateGasUnitPrice If set to true, the gas unit price in the transaction will be ignored
+     * and the estimated value will be used
      * @returns UserTransaction
      * @throws ApiError
      */
     public simulateTransaction(
         requestBody: SubmitTransactionRequest,
+        estimateMaxGasAmount?: boolean,
+        estimateGasUnitPrice?: boolean,
     ): CancelablePromise<Array<UserTransaction>> {
         return this.httpRequest.request({
             method: 'POST',
             url: '/transactions/simulate',
+            query: {
+                'estimate_max_gas_amount': estimateMaxGasAmount,
+                'estimate_gas_unit_price': estimateGasUnitPrice,
+            },
             body: requestBody,
             mediaType: 'application/json',
         });

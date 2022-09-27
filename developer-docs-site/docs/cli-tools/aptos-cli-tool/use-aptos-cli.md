@@ -1,9 +1,9 @@
 ---
-title: "Use Aptos CLI"
+title: "Using Aptos CLI"
 id: "use-aptos-cli"
 ---
 
-# Use Aptos CLI
+# Using Aptos CLI
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To install the CLI, see [Install Aptos CLI](install-aptos-cli).
 
@@ -172,7 +172,7 @@ Configuration for the CLI works like this:
   ```
 
 :::tip Default configuration
-If you did not set any global configuration, then the `./.aptos/config.yaml` in the current working dorectory is used for configuration.
+If you did not set any global configuration, then the `./.aptos/config.yaml` in the current working directory is used for configuration.
 :::
 
 ### Setting up shell completion
@@ -817,6 +817,10 @@ You can additionally use named profiles for the addresses.  The first placeholde
 ```bash
 $ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
 ```
+
+:::tip
+When publishing Move modules, if multiple modules are in one package, then all the modules in this package must have the same account. If they have different accounts, then the publishing will fail at the transaction level. 
+:::
 
 ### Running a Move function
 
