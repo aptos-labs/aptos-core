@@ -4,11 +4,11 @@
 pub mod account;
 pub mod aggregator_natives;
 pub mod any;
+pub mod base64;
 pub mod code;
 pub mod cryptography;
 pub mod event;
 pub mod hash;
-pub mod base64;
 mod helpers;
 pub mod state_storage;
 pub mod transaction_context;
