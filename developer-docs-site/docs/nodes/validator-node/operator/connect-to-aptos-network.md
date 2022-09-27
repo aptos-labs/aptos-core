@@ -1,12 +1,17 @@
 ---
-title: "Connecting to Aptos Testnet"
-slug: "connect-to-testnet"
-sidebar_position: 14
+title: "Connecting to Aptos Network"
+slug: "connect-to-aptos-network"
 ---
 
-# Connecting to Aptos Testnet
+# Connecting to Aptos Network
 
-Do this only if you received the confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want.
+**TODO**: EDIT THE DOC TO REMOVE "TESTNET" AND GENERALIZE.
+
+This document describes how to connect your running validator node to an Aptos network. Follow these instructions only if you received a notification from the Aptos team confirming your eligibility. 
+
+:::tip Only selected validator nodes
+Validator nodes that are not selected will not have enough tokens to join the network. However, you can still run a public fullnode.
+:::
 
 ## Initializing the staking pool
 

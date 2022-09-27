@@ -76,8 +76,7 @@ REMOVE THIS.
 
 ### Detailed steps
 
-See [Connecting to Aptos Incentivized Testnet](/nodes/ait/connect-to-testnet) for detailed steps.
-
+See [Connecting to Aptos Network](/nodes/validator-node/operator/connect-to-aptos-network) for detailed steps.
 
 ## Vote
 

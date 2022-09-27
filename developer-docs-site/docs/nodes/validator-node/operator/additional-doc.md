@@ -4,7 +4,9 @@ slug: "additional-doc"
 sidebar_position: 15
 ---
 
-## Shutdown nodes for Incentivized Testnet
+## Shutdown nodes 
+
+**TODO**: EDIT THE DOC TO REMOVE "TESTNET" AND GENERALIZE. CHANGE THE TITLE. 
 
 Follow these instructions when you need to take down the validator node and cleanup the resources used by the node.
 
