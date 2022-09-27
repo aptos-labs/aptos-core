@@ -25,6 +25,7 @@ use std::{
 use thiserror::Error;
 
 use aptos_compression::metrics::CompressionClient;
+use aptos_config::config::MAX_APPLICATION_MESSAGE_SIZE;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::de::DeserializeOwned;
@@ -139,8 +140,12 @@ impl ProtocolId {
             Encoding::CompressedBcs => {
                 let compression_client = self.get_compression_client();
                 let bcs_bytes = self.bcs_encode(value)?;
-                aptos_compression::compress(bcs_bytes, compression_client)
-                    .map_err(|e| anyhow!("{:?}", e))
+                aptos_compression::compress(
+                    bcs_bytes,
+                    compression_client,
+                    MAX_APPLICATION_MESSAGE_SIZE,
+                )
+                .map_err(|e| anyhow!("{:?}", e))
             }
             Encoding::Json => serde_json::to_vec(value).map_err(|e| anyhow!("{:?}", e)),
         }
@@ -151,8 +156,12 @@ impl ProtocolId {
             Encoding::Bcs => self.bcs_decode(bytes),
             Encoding::CompressedBcs => {
                 let compression_client = self.get_compression_client();
-                let raw_bytes = aptos_compression::decompress(&bytes.to_vec(), compression_client)
-                    .map_err(|e| anyhow! {"{:?}", e})?;
+                let raw_bytes = aptos_compression::decompress(
+                    &bytes.to_vec(),
+                    compression_client,
+                    MAX_APPLICATION_MESSAGE_SIZE,
+                )
+                .map_err(|e| anyhow! {"{:?}", e})?;
                 self.bcs_decode(&raw_bytes)
             }
             Encoding::Json => serde_json::from_slice(bytes).map_err(|e| anyhow!("{:?}", e)),

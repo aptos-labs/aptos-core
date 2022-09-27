@@ -20,6 +20,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::Debug;
 
+const MAX_COMPRESSION_SIZE: usize = 64 * 1024 * 1024;
+
 #[test]
 fn test_basic_compression() {
     // Test epoch ending ledger infos
@@ -35,14 +37,52 @@ fn test_basic_compression() {
     test_compress_and_decompress(transactions_with_proof);
 }
 
+#[test]
+fn test_compression_limits() {
+    let too_small_bytes = 1;
+    let transactions_with_proof = create_transaction_list_with_proof(1000, 1999, 1999, true);
+
+    // Test compression limit
+    let bcs_encoded_bytes = bcs::to_bytes(&transactions_with_proof).unwrap();
+    let maybe_compressed_bytes = crate::compress(
+        bcs_encoded_bytes,
+        CompressionClient::StateSync,
+        too_small_bytes,
+    );
+    assert!(maybe_compressed_bytes.is_err());
+
+    // Test decompression limit
+    let bcs_encoded_bytes = bcs::to_bytes(&transactions_with_proof).unwrap();
+    let compressed_bytes = crate::compress(
+        bcs_encoded_bytes,
+        CompressionClient::StateSync,
+        MAX_COMPRESSION_SIZE,
+    )
+    .unwrap();
+    let maybe_decompressed_bytes = crate::decompress(
+        &compressed_bytes,
+        CompressionClient::StateSync,
+        too_small_bytes,
+    );
+    assert!(maybe_decompressed_bytes.is_err());
+}
+
 /// Ensures that the given object can be compressed and decompressed successfully
 /// when BCS encoded.
 fn test_compress_and_decompress<T: Debug + DeserializeOwned + PartialEq + Serialize>(object: T) {
     let bcs_encoded_bytes = bcs::to_bytes(&object).unwrap();
-    let compressed_bytes =
-        crate::compress(bcs_encoded_bytes, CompressionClient::StateSync).unwrap();
-    let decompressed_bytes =
-        crate::decompress(&compressed_bytes, CompressionClient::StateSync).unwrap();
+    let compressed_bytes = crate::compress(
+        bcs_encoded_bytes,
+        CompressionClient::StateSync,
+        MAX_COMPRESSION_SIZE,
+    )
+    .unwrap();
+    let decompressed_bytes = crate::decompress(
+        &compressed_bytes,
+        CompressionClient::StateSync,
+        MAX_COMPRESSION_SIZE,
+    )
+    .unwrap();
     let decoded_object = bcs::from_bytes::<T>(&decompressed_bytes).unwrap();
 
     assert_eq!(object, decoded_object);
