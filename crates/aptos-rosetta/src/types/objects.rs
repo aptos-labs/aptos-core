@@ -194,6 +194,23 @@ impl Operation {
         }
     }
 
+    /// TODO: This is experimental and should not be used outside of testing
+    pub fn create_staking_pool(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        sender: AccountAddress,
+    ) -> Operation {
+        Operation::new(
+            OperationType::CreateAccount,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(address),
+            None,
+            Some(OperationMetadata::create_account(sender)),
+        )
+    }
+
     pub fn create_account(
         operation_index: u64,
         status: Option<OperationStatusType>,
@@ -1255,6 +1272,7 @@ pub enum InternalOperation {
     Transfer(Transfer),
     SetOperator(SetOperator),
     SetVoter(SetVoter),
+    InitializeStakePool(InitializeStakePool),
 }
 
 impl InternalOperation {
@@ -1264,6 +1282,39 @@ impl InternalOperation {
             1 => {
                 if let Some(operation) = operations.first() {
                     match OperationType::from_str(&operation.operation_type) {
+                        Ok(OperationType::InitializeStakePool) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    new_operator,
+                                    new_voter,
+                                    staked_balance,
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let owner_address = account.account_address()?;
+                                let operator_address = if let Some(address) = new_operator {
+                                    address.account_address()?
+                                } else {
+                                    owner_address
+                                };
+                                let voter_address = if let Some(address) = new_voter {
+                                    address.account_address()?
+                                } else {
+                                    owner_address
+                                };
+
+                                return Ok(Self::InitializeStakePool(InitializeStakePool {
+                                    owner: owner_address,
+                                    operator: operator_address,
+                                    voter: voter_address,
+                                    amount: staked_balance.map(u64::from).unwrap_or_default(),
+                                    commission_percentage: 0,
+                                    seed: vec![],
+                                }));
+                            }
+                        }
                         Ok(OperationType::CreateAccount) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1349,6 +1400,7 @@ impl InternalOperation {
             Self::Transfer(inner) => inner.sender,
             Self::SetOperator(inner) => inner.owner,
             Self::SetVoter(inner) => inner.owner,
+            Self::InitializeStakePool(inner) => inner.owner,
         }
     }
 
@@ -1395,6 +1447,16 @@ impl InternalOperation {
                     set_voter.owner,
                 )
             }
+            InternalOperation::InitializeStakePool(init_stake_pool) => (
+                aptos_stdlib::staking_contract_create_staking_contract(
+                    init_stake_pool.operator,
+                    init_stake_pool.voter,
+                    init_stake_pool.amount,
+                    init_stake_pool.commission_percentage,
+                    init_stake_pool.seed.clone(),
+                ),
+                init_stake_pool.owner,
+            ),
         })
     }
 }
@@ -1536,4 +1598,14 @@ pub struct SetVoter {
     pub owner: AccountAddress,
     pub operator: Option<AccountAddress>,
     pub new_voter: AccountAddress,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct InitializeStakePool {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+    pub voter: AccountAddress,
+    pub amount: u64,
+    pub commission_percentage: u64,
+    pub seed: Vec<u8>,
 }

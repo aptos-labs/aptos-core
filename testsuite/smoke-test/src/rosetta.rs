@@ -1451,6 +1451,9 @@ async fn parse_operations(
                     }
                 };
             }
+            OperationType::InitializeStakePool => {
+                // This is not supported in block reads
+            }
         }
     }
 
