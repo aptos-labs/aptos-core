@@ -33,6 +33,7 @@ const sidebars = {
         "tutorials/first-coin",
       ],
     },
+    
     {
       type: "category",
       label: "Concepts",
@@ -87,6 +88,114 @@ const sidebars = {
       ],
     },
     {
+      type: 'html',
+      value: 'Nodes',
+      className: 'sidebar-title',
+    },
+    "nodes/aptos-deployments",
+    "nodes/ait/ait3-leaderboard-metrics",
+    /** Delete during clean up
+    {
+      type: "category",
+      label: "AIT-3",
+      link: { type: "doc", id: "nodes/ait/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "nodes/ait/whats-new-in-ait3",
+        "nodes/ait/steps-in-ait3",
+        
+      ],
+    },  */
+    
+    {
+      type: "category",
+      label: "Validators",
+      link: { type: "doc", id: "nodes/validator-node/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        {
+          type: "category",
+          label: "Owner",
+          collapsible: true,
+          collapsed: true,
+          link: { type: "doc", id: "nodes/validator-node/owner/index" },
+          items: [
+          ],
+        },
+        {
+          type: "category",
+          label: "Operator",
+          collapsible: true,
+          collapsed: true,
+          link: { type: "doc", id: "nodes/validator-node/operator/index" },
+          items: [
+            "nodes/validator-node/operator/node-requirements",
+            {
+              type: "category",
+              label: "Run a validator ",
+              collapsible: true,
+              collapsed: true,
+              items: [
+              "nodes/validator-node/operator/using-aws", 
+              "nodes/validator-node/operator/using-azure", 
+              "nodes/validator-node/operator/using-gcp", 
+              "nodes/validator-node/operator/using-docker", 
+              "nodes/validator-node/operator/using-source-code", 
+              ],
+            },
+          "nodes/validator-node/operator/node-liveness-criteria",
+          "nodes/validator-node/operator/connect-to-testnet",
+          "nodes/validator-node/operator/additional-doc",
+          ],
+        },
+        {
+          type: "category",
+          label: "Voter",
+          collapsible: true,
+          collapsed: true,
+          link: { type: "doc", id: "nodes/validator-node/voter/index" },
+          items: [ 
+          ],
+        },
+      ],
+    },
+    {
+      type: "category",
+      label: "Public Fullnode",
+      link: { type: "doc", id: "nodes/full-node/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "nodes/full-node/fullnode-source-code-or-docker",
+        "nodes/full-node/update-fullnode-with-new-releases",
+        "nodes/full-node/network-identity-fullnode",
+        "nodes/full-node/troubleshooting-fullnode",
+        "nodes/full-node/run-a-fullnode-on-gcp",
+        "nodes/full-node/bootstrap-fullnode",
+      ],
+    },
+    {
+      type: "category",
+      label: "Local Testnet",
+      link: { type: "doc", id: "nodes/local-testnet/index" },
+      collapsible: true,
+      collapsed: true,
+      items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "nodes/local-testnet/run-a-local-testnet"],
+    },
+    {
+      type: "category",
+      label: "Node Health Checker",
+      link: { type: "doc", id: "nodes/node-health-checker/index" },
+      collapsible: true,
+      collapsed: true,
+      items: ["nodes/node-health-checker/node-health-checker-faq"],
+    },
+    "reference/telemetry",
+
+    /** Delete this section while cleaning up 
+    {
       type: "category",
       label: "Nodes",
       link: { type: "doc", id: "nodes/index" },
@@ -103,11 +212,7 @@ const sidebars = {
           items: [
             "nodes/ait/whats-new-in-ait3",
             "nodes/ait/steps-in-ait3",
-            "nodes/ait/node-requirements",
-            "nodes/ait/node-liveness-criteria",
             "nodes/ait/ait3-leaderboard-metrics",
-            "nodes/ait/connect-to-testnet",
-            "nodes/ait/additional-doc",
           ],
         },
         {
@@ -117,13 +222,44 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
-            "nodes/validator-node/using-aws",
-            "nodes/validator-node/using-azure",
-            "nodes/validator-node/using-gcp",
-            "nodes/validator-node/using-docker",
-            "nodes/validator-node/using-source-code",
+            {
+              type: "category",
+              label: "Owner",
+              collapsible: true,
+              collapsed: true,
+              link: { type: "doc", id: "nodes/validator-node/owner/index" },
+              items: [
+              ],
+            },
+            {
+              type: "category",
+              label: "Operator",
+              collapsible: true,
+              collapsed: true,
+              link: { type: "doc", id: "nodes/validator-node/operator/index" },
+              items: ["nodes/validator-node/operator/using-aws", 
+              "nodes/validator-node/operator/using-azure", 
+              "nodes/validator-node/operator/using-gcp", 
+              "nodes/validator-node/operator/using-docker", 
+              "nodes/validator-node/operator/using-source-code", 
+              "nodes/validator-node/operator/node-requirements",
+              "nodes/validator-node/operator/node-liveness-criteria",
+              "nodes/validator-node/operator/connect-to-testnet",
+              "nodes/validator-node/operator/additional-doc",
+              ],
+            },
+            {
+              type: "category",
+              label: "Voter",
+              collapsible: true,
+              collapsed: true,
+              link: { type: "doc", id: "nodes/validator-node/voter/index" },
+              items: ["nodes/validator-node/voter/index", 
+              ],
+            },
           ],
         },
+        
         {
           type: "category",
           label: "Public Fullnode",
@@ -157,6 +293,12 @@ const sidebars = {
         },
       ],
     },
+    */
+    {
+      type: 'html',
+      value: 'Tools',
+      className: 'sidebar-title',
+    },
     {
       type: "category",
       label: "SDKs",
@@ -184,7 +326,12 @@ const sidebars = {
       link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
-    "reference/telemetry",
+    {
+      type: 'html',
+      value: 'White Paper',
+      className: 'sidebar-title',
+    },
+   
     {
       type: "category",
       label: "Aptos White Paper",
@@ -192,6 +339,11 @@ const sidebars = {
       collapsed: true,
       link: { type: "doc", id: "aptos-white-paper/index" },
       items: ["aptos-white-paper/in-korean"],
+    },
+    {
+      type: 'html',
+      value: 'Misc',
+      className: 'sidebar-title',
     },
     "reference/glossary",
   ],

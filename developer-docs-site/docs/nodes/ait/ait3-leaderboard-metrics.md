@@ -1,11 +1,13 @@
 ---
-title: "AIT-3 Leaderboard Metrics"
+title: "Leaderboard Metrics"
 slug: "ait-3-leaderboard-metrics"
 ---
 
-# AIT-3 Leaderboard Metrics
+# Leaderboard Metrics (DRAFT)
 
-This document explains how the rewards for AIT-3 validator are evaluated and displayed on the [AIT-3 Validator Status](https://aptoslabs.com/leaderboard/it3) page. 
+This document explains how the rewards for validator are evaluated and displayed on the [Aptos Validator Status](https://aptoslabs.com/leaderboard/it3) page. 
+
+EDIT THIS DOC FOR MAINNET
 
 ## How are rewards calculated
 
