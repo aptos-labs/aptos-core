@@ -10,6 +10,7 @@ import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
 import { AccountAddress } from "./transaction_builder/aptos_types/account_address";
 import { bcsToBytes } from "./transaction_builder/bcs/helper";
+import { Memoize } from "./utils";
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -103,6 +104,7 @@ export class AptosAccount {
    * See here for more info: {@link https://aptos.dev/basics/basics-accounts#single-signer-authentication}
    * @returns Authentication key for the associated account
    */
+  @Memoize()
   authKey(): HexString {
     if (!this.authKeyCached) {
       const hash = SHA3.sha3_256.create();
