@@ -787,6 +787,14 @@ async fn construction_payloads(
                 ))));
             }
         }
+        InternalOperation::InitializeStakePool(_) => {
+            if operation != metadata.internal_operation {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Initialize stake pool doesn't match metadata {:?} vs {:?}",
+                    operation, metadata.internal_operation
+                ))));
+            }
+        }
     }
 
     // Encode operation

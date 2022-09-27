@@ -89,6 +89,7 @@ pub enum OperationType {
     StakingReward,
     SetOperator,
     SetVoter,
+    InitializeStakePool,
     // Fee must always be last for ordering
     Fee,
 }
@@ -101,6 +102,7 @@ impl OperationType {
     const STAKING_REWARD: &'static str = "staking_reward";
     const SET_OPERATOR: &'static str = "set_operator";
     const SET_VOTER: &'static str = "set_voter";
+    const INITIALIZE_STAKE_POOL: &'static str = "initialize_stake_pool";
 
     pub fn all() -> Vec<OperationType> {
         use OperationType::*;
@@ -112,6 +114,7 @@ impl OperationType {
             SetOperator,
             SetVoter,
             StakingReward,
+            InitializeStakePool,
         ]
     }
 }
@@ -128,6 +131,7 @@ impl FromStr for OperationType {
             Self::STAKING_REWARD => Ok(OperationType::StakingReward),
             Self::SET_OPERATOR => Ok(OperationType::SetOperator),
             Self::SET_VOTER => Ok(OperationType::SetVoter),
+            Self::INITIALIZE_STAKE_POOL => Ok(OperationType::InitializeStakePool),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
@@ -146,6 +150,7 @@ impl Display for OperationType {
             StakingReward => Self::STAKING_REWARD,
             SetOperator => Self::SET_OPERATOR,
             SetVoter => Self::SET_VOTER,
+            InitializeStakePool => Self::INITIALIZE_STAKE_POOL,
             Fee => Self::FEE,
         })
     }
