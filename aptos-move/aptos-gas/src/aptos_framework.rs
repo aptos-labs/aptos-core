@@ -74,6 +74,14 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.keccak256.base, optional "hash.keccak256.base", 3000],
     [.hash.keccak256.per_byte, optional "hash.keccak256.per_byte", 50],
 
+    // todo
+    [.base64.base64_encode.base, "base64.base64_encode.base", 1],
+    [.base64.base64_encode.per_byte, "base64.base64_encode.per_byte", 1],
+
+    [.base64.base64_decode.base, "base64.base64_decode.base", 1],
+    [.base64.base64_decode.per_byte, "base64.base64_decode.per_byte", 1],
+
+
     [.type_info.type_of.base, "type_info.type_of.base", 300],
     // TODO(Gas): the on-chain name is wrong...
     [.type_info.type_of.per_byte_in_str, "type_info.type_of.per_abstract_memory_unit", 5],
