@@ -33,11 +33,11 @@ When [using the Aptos CLI to publish Move modules](/docs/cli-tools/aptos-cli-too
 
 ## 16 September 2022
 
-When [connecting to Aptos Testnet](/docs/nodes/ait/connect-to-testnet.md), use the `testnet` rather than `testnet-stable` branch. See that document for the latest commit and Docker image tag.
+When [connecting to Aptos Testnet](/docs/nodes/validator-node/operator/connect-to-aptos-network.md), use the `testnet` rather than `testnet-stable` branch. See that document for the latest commit and Docker image tag.
 
 ## 15 September 2022
 
-The [hardware requirements](/docs/nodes/ait/node-requirements.md#hardware-requirements) for Aptos nodes have grown for both Amazon Web Services and Google Cloud.
+The [hardware requirements](/docs/nodes/validator-node/operator/node-requirements.md#hardware-requirements) for Aptos nodes have grown for both Amazon Web Services and Google Cloud.
 
 ## 13 September 2022
 
