@@ -254,7 +254,7 @@ impl EmitJobRequest {
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
-                let transactions_per_account = min(100, tps);
+                let transactions_per_account = min(20, tps);
                 assert!(
                     transactions_per_account > 0,
                     "TPS ({}) needs to be larger than 0",
