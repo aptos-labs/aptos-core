@@ -93,7 +93,7 @@ const sidebars = {
       className: 'sidebar-title',
     },
     "nodes/aptos-deployments",
-    "nodes/ait/ait3-leaderboard-metrics",
+    "nodes/leaderboard-metrics",
     /** Delete during clean up
     {
       type: "category",
