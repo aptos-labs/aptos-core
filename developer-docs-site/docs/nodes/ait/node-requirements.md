@@ -43,7 +43,7 @@ Example machine types on various clouds:
 
 ### Implications on hardware requirements
 
-The amount of data stored by the Aptos Blockchain depends on the ledger history (the number of transactions) of the blockchain and the number of on-chain states (e.g., accounts and resources). These values depend on several factors, including: the age of the blockchain, the average transaction rate, and the configuration of the ledger pruner.
+The amount of data stored by the Aptos blockchain depends on the ledger history (the number of transactions) of the blockchain and the number of on-chain states (e.g., accounts and resources). These values depend on several factors, including: the age of the blockchain, the average transaction rate, and the configuration of the ledger pruner.
 
 Hardware requirements depend on the transaction rate and storage demands. Over time, hardware requirements will need to scale with these demands. The current hardware requirements are set with the consideration of estimated growth over the next 6 months.
 
