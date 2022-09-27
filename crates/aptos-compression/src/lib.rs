@@ -60,7 +60,7 @@ pub fn compress(
 
     if compressed_data.len() > max_bytes {
         return Err(CompressionError(format!(
-            "Compressed size too big: {} > {}",
+            "Compressed size greater than max. size: {}, max: {}",
             compressed_data.len(),
             max_bytes
         )));
@@ -99,7 +99,7 @@ pub fn decompress(
         Err(error) => {
             increment_compression_error(DECOMPRESS, client);
             return Err(CompressionError(format!(
-                "Failed to decompress the data: {}",
+                "Failed to get decompressed size: {}",
                 error
             )));
         }
@@ -149,14 +149,16 @@ fn get_decompressed_size(src: &CompressedData, max_size: usize) -> std::io::Resu
         ));
     }
 
-    if size as usize > max_size {
+    let size = size as usize;
+
+    if size > max_size {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             format!("Given size parameter is too big: {} > {}", size, max_size),
         ));
     }
 
-    Ok(size as usize)
+    Ok(size)
 }
 
 /// Calculates the relative size (%) between the input and output after a
