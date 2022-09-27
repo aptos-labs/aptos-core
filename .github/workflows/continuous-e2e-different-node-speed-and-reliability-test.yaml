@@ -12,12 +12,11 @@ on:
 jobs:
   ### Please remember to use different namespace for different tests
   # Performance test in an optimal setting
-  run-different-node-speed-and-reliability-test:
+  run-forge-different-node-speed-and-reliability-test:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test
-      FORGE_CLUSTER_NAME: aptos-forge-big-1
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: different_node_speed_and_reliability_test
       POST_TO_SLACK: true
