@@ -12,6 +12,7 @@ import {
   Input,
   Spinner,
   Text,
+  useColorMode,
   VStack,
 } from '@chakra-ui/react';
 import { SubmitHandler, useForm } from 'react-hook-form';
@@ -21,6 +22,7 @@ import { DefaultNetworks, defaultNetworks } from 'shared/types';
 import { useNodeStatus } from 'core/queries/network';
 import useDebounce from 'core/hooks/useDebounce';
 import { addNetworkToast } from 'core/components/Toast';
+import { buttonBorderColor, customColors } from 'core/colors';
 import WalletLayout from 'core/layouts/WalletLayout';
 
 interface AddNetworkFormData {
@@ -47,6 +49,7 @@ function AddNetworkBody() {
     addNetwork,
     networks,
   } = useNetworks();
+  const { colorMode } = useColorMode();
   const navigate = useNavigate();
   const {
     formState: { errors, isValid },
@@ -107,39 +110,41 @@ function AddNetworkBody() {
   };
 
   return (
-    <Box maxH="100%" overflowY="auto" pb={4}>
+    <Box as="form" overflowY="auto" onSubmit={handleSubmit(onSubmit)} display="flex" flexDirection="column" height="100%" width="100%">
       <Box width="100%" height="100%" px={4}>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <VStack spacing={4} px={4} pt={4}>
-            <FormControl isRequired isInvalid={errors.name !== undefined}>
-              <FormLabel>Name</FormLabel>
-              <Input
-                placeholder="Custom network"
-                {...register('name', nameValidators)}
-              />
-              <FormErrorMessage>
-                {
+        <VStack spacing={4} pt={4}>
+          <FormControl isRequired isInvalid={errors.name !== undefined}>
+            <FormLabel>Name</FormLabel>
+            <Input
+              placeholder="Custom network"
+              height={12}
+              errorBorderColor={customColors.orange[200]}
+              {...register('name', nameValidators)}
+            />
+            <FormErrorMessage color={customColors.orange[200]}>
+              {
                     errors.name?.type === 'unique'
                       ? 'A network with this name already exists'
                       : errors.name?.message
                   }
-              </FormErrorMessage>
-            </FormControl>
-            <FormControl isRequired isInvalid={errors.nodeUrl !== undefined}>
-              <FormLabel>Node URL</FormLabel>
-              <Input
-                placeholder={referenceNetwork.nodeUrl}
-                {...register('nodeUrl', nodeUrlValidators)}
-              />
-              <FormErrorMessage>
-                {
+            </FormErrorMessage>
+          </FormControl>
+          <FormControl isRequired isInvalid={errors.nodeUrl !== undefined}>
+            <FormLabel>Node URL</FormLabel>
+            <Input
+              height={12}
+              placeholder={referenceNetwork.nodeUrl}
+              errorBorderColor={customColors.orange[200]}
+              {...register('nodeUrl', nodeUrlValidators)}
+            />
+            <FormErrorMessage color={customColors.orange[200]}>
+              {
                     errors.nodeUrl?.type === 'unique'
                       ? 'A network with this nodeUrl already exists'
                       : errors.nodeUrl?.message
                   }
-
-              </FormErrorMessage>
-              {
+            </FormErrorMessage>
+            {
                   !errors.nodeUrl ? (
                     <Box mt={2} fontSize="sm" lineHeight="normal">
                       { isNodeStatusLoading ? <Spinner size="sm" /> : null }
@@ -147,25 +152,34 @@ function AddNetworkBody() {
                     </Box>
                   ) : null
                 }
-            </FormControl>
-            <FormControl isInvalid={errors.faucetUrl !== undefined}>
-              <FormLabel>Faucet URL (optional)</FormLabel>
-              <Input
-                placeholder={referenceNetwork.faucetUrl}
-                {...register('faucetUrl', { ...urlValidator })}
-              />
-              <FormErrorMessage>{ errors.faucetUrl?.message }</FormErrorMessage>
-            </FormControl>
-            <Button
-              colorScheme="salmon"
-              width="100%"
-              type="submit"
-              isDisabled={!isValid}
+          </FormControl>
+          <FormControl isInvalid={errors.faucetUrl !== undefined}>
+            <FormLabel>Faucet URL (optional)</FormLabel>
+            <Input
+              height={12}
+              placeholder={referenceNetwork.faucetUrl}
+              errorBorderColor={customColors.orange[200]}
+              {...register('faucetUrl', { ...urlValidator })}
+            />
+            <FormErrorMessage
+              color={customColors.orange[200]}
             >
-              Add
-            </Button>
-          </VStack>
-        </form>
+              { errors.faucetUrl?.message }
+            </FormErrorMessage>
+          </FormControl>
+        </VStack>
+
+      </Box>
+      <Box width="100%" borderTop="1px" pt={4} px={4} borderColor={buttonBorderColor[colorMode]}>
+        <Button
+          colorScheme="salmon"
+          height="48px"
+          width="100%"
+          type="submit"
+          isDisabled={!isValid}
+        >
+          Add Network
+        </Button>
       </Box>
     </Box>
   );

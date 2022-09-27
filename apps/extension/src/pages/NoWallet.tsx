@@ -5,6 +5,7 @@ import React from 'react';
 import {
   Box,
 } from '@chakra-ui/react';
+import { mainBgColor } from 'core/colors';
 import WalletLayout from 'core/layouts/WalletLayout';
 import NewExtensionBody from 'core/components/NewExtensionBody';
 
@@ -13,7 +14,7 @@ import NewExtensionBody from 'core/components/NewExtensionBody';
  */
 function NoWallet() {
   return (
-    <WalletLayout hasWalletFooter={false} hasWalletHeader={false}>
+    <WalletLayout hasWalletFooter={false} hasWalletHeader={false} bgColor={mainBgColor}>
       <Box px={6} pb={4} width="100%" height="100%" paddingTop={8}>
         <NewExtensionBody />
       </Box>

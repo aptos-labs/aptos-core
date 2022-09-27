@@ -398,9 +398,9 @@ function CreateWalletViaImportLayoutFC({
         </Flex>
       </HStack>
       <Box px={4} height="100%" width="100%" maxH="100%" overflowY="auto">
-        <form style={{ height: '100%' }}>
+        <Box as="form" height="100%">
           {children}
-        </form>
+        </Box>
       </Box>
       <Flex width="100%" px={4} pt={4} borderTop="1px" borderColor={buttonBorderColor[colorMode]}>
         <NextButton />

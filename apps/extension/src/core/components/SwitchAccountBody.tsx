@@ -18,6 +18,11 @@ import AccountView from './AccountView';
 
 export const boxShadow = 'rgba(0, 0, 0, 0.05) 0px 4px 24px 0px';
 
+const bgColor = {
+  dark: 'gray.700',
+  light: 'white',
+};
+
 export default function SwitchAccountBody() {
   const {
     accounts,
@@ -41,10 +46,7 @@ export default function SwitchAccountBody() {
             <Box px={4} width="100%" key={account.address}>
               <AccountView
                 account={account}
-                bgColor={{
-                  dark: 'gray.700',
-                  light: 'white',
-                }}
+                bgColor={bgColor}
               />
             </Box>
           ))

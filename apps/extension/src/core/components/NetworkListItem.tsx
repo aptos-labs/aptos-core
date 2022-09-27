@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Circle,
+  Flex,
   HStack,
   Modal,
   ModalBody,
@@ -23,7 +24,15 @@ import {
   UseRadioProps,
   VStack,
 } from '@chakra-ui/react';
-import { secondaryHoverBgColor, secondaryButtonColor, secondaryDisabledNetworkBgColor } from 'core/colors';
+import {
+  customColors,
+  secondaryHoverBgColor,
+  secondaryButtonBgColor,
+  secondaryDisabledNetworkBgColor,
+  checkCircleSuccessBg,
+  checkedBgColor,
+} from 'core/colors';
+import { AiFillCheckCircle } from '@react-icons/all-files/ai/AiFillCheckCircle';
 import { DeleteIcon } from '@chakra-ui/icons';
 import { useNodeStatus } from 'core/queries/network';
 import { defaultNetworks, Network } from 'shared/types';
@@ -100,7 +109,7 @@ export default function NetworkListItem(props: NetworkListItemProps) {
   const enabledBoxProps = !isDisabled ? {
     _hover: {
       bg: isChecked
-        ? 'teal.700'
+        ? 'navy.700'
         : secondaryHoverBgColor[colorMode],
     },
     cursor: 'pointer',
@@ -113,14 +122,15 @@ export default function NetworkListItem(props: NetworkListItemProps) {
         {...getCheckboxProps()}
         {...enabledBoxProps}
         borderRadius="md"
-        bgColor={secondaryButtonColor[colorMode]}
+        border="1px"
+        bgColor={secondaryButtonBgColor[colorMode]}
+        borderColor={customColors.navy[200]}
         _disabled={{
           bg: secondaryDisabledNetworkBgColor[colorMode],
-          color: 'gray.400',
+          color: 'navy.300',
         }}
         _checked={{
-          bg: 'teal.600',
-          color: 'white',
+          bg: checkedBgColor[colorMode],
         }}
         _focus={{
           boxShadow: 'outline',
@@ -128,9 +138,9 @@ export default function NetworkListItem(props: NetworkListItemProps) {
         px={5}
         py={3}
       >
-        <HStack w="100%" justifyContent="space-between">
+        <HStack w="100%" justifyContent="space-between" maxWidth="300px">
           <VStack alignItems="flex-start" overflow="hidden">
-            <HStack>
+            <HStack minWidth="320px">
               <Circle bg={isNodeAvailable ? 'green.300' : 'red.400'} size={2} as="span" />
               <Text fontSize="md" fontWeight={600}>
                 {network.name}
@@ -152,7 +162,9 @@ export default function NetworkListItem(props: NetworkListItemProps) {
               {network.nodeUrl}
             </Text>
           </VStack>
-          {
+          <Flex alignItems="center" gap={2}>
+            {isChecked && <AiFillCheckCircle size={32} color={checkCircleSuccessBg[colorMode]} />}
+            {
             isCustomNetwork ? (
               <DeleteIcon
                 fontSize="lg"
@@ -162,6 +174,7 @@ export default function NetworkListItem(props: NetworkListItemProps) {
               />
             ) : null
           }
+          </Flex>
         </HStack>
       </Box>
       <ConfirmationModal

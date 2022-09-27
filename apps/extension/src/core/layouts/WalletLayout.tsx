@@ -8,7 +8,12 @@ import WalletHeader from 'core/components/WalletHeader';
 import { secondaryBgColor } from 'core/colors';
 import styled from '@emotion/styled';
 
+interface BgColor {
+  dark: string;
+  light: string;
+}
 interface WalletLayoutProps {
+  bgColor?: BgColor;
   children: React.ReactNode;
   hasWalletFooter?: boolean;
   hasWalletHeader?: boolean;
@@ -24,6 +29,7 @@ const BodyDiv = styled(Box)`
 `;
 
 export default function WalletLayout({
+  bgColor = secondaryBgColor,
   children,
   hasWalletFooter = true,
   hasWalletHeader = true,
@@ -52,7 +58,7 @@ export default function WalletLayout({
       width="100%"
       maxW="100%"
       templateRows={templateRows}
-      bgColor={secondaryBgColor[colorMode]}
+      bgColor={bgColor[colorMode]}
     >
       {hasWalletHeader ? (
         <WalletHeader

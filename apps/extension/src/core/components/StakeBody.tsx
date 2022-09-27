@@ -12,7 +12,7 @@ import format from 'date-fns/format';
 import { collapseHexString } from 'core/utils/hex';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import { APTOS_UNIT, formatCoin } from 'core/utils/coin';
-import { AptosLogo } from './AptosLogo';
+import { PetraLogo } from './PetraLogo';
 import ChakraLink from './ChakraLink';
 import Copyable from './Copyable';
 
@@ -69,7 +69,7 @@ function StakeBodyContent({
     >
       <SimpleGrid columns={2} width="100%">
         <Box width="72px" height="72px">
-          <AptosLogo />
+          <PetraLogo />
         </Box>
       </SimpleGrid>
       <Text pt={4} fontSize="sm" color={secondaryAddressFontColor[colorMode]}>Stake balance</Text>

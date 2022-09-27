@@ -26,11 +26,13 @@ import {
   changePasswordIncorrectCurrentPasswordErrorToast,
 } from 'core/components/Toast';
 import { Routes } from 'core/routes';
-import { iconBgColor, iconColor } from 'core/colors';
+import {
+  iconBgColor, iconColor, buttonBorderColor, customColors,
+} from 'core/colors';
 
 const inputChangePasswordBgColor = {
   dark: 'gray.800',
-  light: 'gray.100',
+  light: customColors.navy[100],
 };
 
 function ChangePassword() {
@@ -77,15 +79,15 @@ function ChangePassword() {
 
   return (
     <WalletLayout title="Change password" showBackButton showAccountCircle={false}>
-      <VStack width="100%" height="100%" display="flex" paddingTop={8} px={6}>
-        <VStack width="100%" gap={4} flex={1}>
+      <VStack width="100%" height="100%" display="flex" paddingTop={8}>
+        <VStack width="100%" gap={4} flex={1} px={4}>
           <Box px={4} pb={0} width="100%" alignItems="center" display="flex" justifyContent="center">
             <Circle size={16} bgColor={iconBgColor[colorMode]} color={iconColor[colorMode]}>
               <FaLock size={36} />
             </Circle>
           </Box>
           <Text
-            fontSize="md"
+            fontSize="sm"
             textAlign="center"
             as="div"
           >
@@ -123,7 +125,17 @@ function ChangePassword() {
             paddingBottom={6}
           />
         </VStack>
-        <Button width="full" colorScheme="salmon" height={14} onClick={handleClickSave} disabled={shouldDisableSaveButton}>Save</Button>
+        <Box width="100%" borderTop="1px" pt={4} px={4} borderColor={buttonBorderColor[colorMode]}>
+          <Button
+            width="100%"
+            colorScheme="salmon"
+            height="48px"
+            onClick={handleClickSave}
+            disabled={shouldDisableSaveButton}
+          >
+            Save
+          </Button>
+        </Box>
       </VStack>
     </WalletLayout>
   );

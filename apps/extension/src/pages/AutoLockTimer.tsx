@@ -18,13 +18,15 @@ import {
 import { useAppState } from 'core/hooks/useAppState';
 import WalletLayout from 'core/layouts/WalletLayout';
 import useAutoLock from 'core/hooks/useAutoLock';
-import { iconBgColor, iconColor } from 'core/colors';
+import {
+  iconBgColor, iconColor, buttonBorderColor, customColors,
+} from 'core/colors';
 import { FaClock } from '@react-icons/all-files/fa/FaClock';
 import { Routes } from 'core/routes';
 
 const inputAutolockTimerBgColor = {
   dark: 'gray.800',
-  light: 'gray.200',
+  light: customColors.navy[100],
 };
 
 function AutoLockTimer() {
@@ -51,8 +53,8 @@ function AutoLockTimer() {
 
   return (
     <WalletLayout title="Auto-Lock Timer" showBackButton showAccountCircle={false}>
-      <VStack width="100%" height="100%" display="flex" paddingTop={8} px={6}>
-        <VStack width="100%" gap={4} flex={1}>
+      <VStack width="100%" height="100%" display="flex" paddingTop={8}>
+        <VStack width="100%" gap={4} flex={1} px={4}>
           <Box px={4} width="100%" alignItems="center" display="flex" justifyContent="center">
             <Circle size={16} bgColor={iconBgColor[colorMode]} color={iconColor[colorMode]}>
               <FaClock size={36} />
@@ -76,7 +78,9 @@ function AutoLockTimer() {
             </InputRightElement>
           </InputGroup>
         </VStack>
-        <Button width="full" colorScheme="teal" onClick={handleClickSave} disabled={timer.length === 0}>Save</Button>
+        <Box width="100%" borderTop="1px" pt={4} px={4} borderColor={buttonBorderColor[colorMode]}>
+          <Button width="100%" colorScheme="salmon" height="48px" onClick={handleClickSave} disabled={timer.length === 0}>Save</Button>
+        </Box>
       </VStack>
     </WalletLayout>
   );

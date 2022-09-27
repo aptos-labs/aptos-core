@@ -15,7 +15,7 @@ import SecretRecoveryPhraseBody from 'core/components/SecretRecoveryPhraseBody';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import Copyable from 'core/components/Copyable';
 import {
-  buttonBorderColor, rotationKeyButtonBgColor, customColors,
+  buttonBorderColor, secondaryButtonBgColor, customColors,
 } from 'core/colors';
 import { Routes } from 'core/routes';
 
@@ -56,7 +56,7 @@ export default function ManageAccountShowRecoveryPhrase() {
                 >
                   <Button
                     width="100%"
-                    bgColor={rotationKeyButtonBgColor[colorMode]}
+                    bgColor={secondaryButtonBgColor[colorMode]}
                     border="1px"
                     height="48px"
                     borderColor={customColors.navy[200]}
@@ -85,7 +85,7 @@ export default function ManageAccountShowRecoveryPhrase() {
                   py={6}
                   height="48px"
                   border="1px"
-                  bgColor={rotationKeyButtonBgColor[colorMode]}
+                  bgColor={secondaryButtonBgColor[colorMode]}
                   borderColor={customColors.navy[200]}
                 >
                   Done

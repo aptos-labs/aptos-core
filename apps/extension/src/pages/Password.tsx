@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Box,
   Button,
-  Center,
   Flex,
   FormControl,
   FormLabel,
@@ -18,8 +17,8 @@ import {
 } from '@chakra-ui/react';
 
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { secondaryBgColor, textColor } from 'core/colors';
-import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
+import { mainBgColor, passwordBgColor } from 'core/colors';
+import { PetraLogo } from 'core/components/PetraLogo';
 import { AiOutlineEye } from '@react-icons/all-files/ai/AiOutlineEye';
 import { AiOutlineEyeInvisible } from '@react-icons/all-files/ai/AiOutlineEyeInvisible';
 import { useInitializedAccounts } from 'core/hooks/useAccounts';
@@ -70,30 +69,27 @@ function Password() {
 
   return (
     <VStack
-      bgColor={secondaryBgColor[colorMode]}
+      bgColor={mainBgColor[colorMode]}
       justifyContent="center"
       spacing={4}
       width="100%"
       height="100%"
     >
-      <Center
+      <Flex
         w="100%"
         pt={8}
+        px={4}
         h="100%"
-        display="flex"
+        justifyContent="center"
         flexDir="column"
       >
-        <Box width="72px" pb={4}>
-          {
-            (colorMode === 'dark')
-              ? <AptosWhiteLogo />
-              : <AptosBlackLogo />
-          }
+        <Box width="84px" pb={4}>
+          <PetraLogo />
         </Box>
-        <Heading fontSize="3xl" fontWeight="600" color={textColor[colorMode]}>
+        <Heading fontSize="3xl" fontWeight="600" color="white">
           Welcome back
         </Heading>
-      </Center>
+      </Flex>
       <chakra.form onSubmit={handleSubmit(onSubmit)} width="100%" p={6}>
         <VStack gap={4}>
           <FormControl display="flex" flexDir="column" isRequired>
@@ -103,6 +99,7 @@ function Password() {
                 fontSize="md"
                 fontWeight={500}
                 flex={1}
+                color="white"
               >
                 Password
               </FormLabel>
@@ -126,17 +123,22 @@ function Password() {
               <Input
                 autoComplete="false"
                 variant="filled"
+                bgColor={passwordBgColor[colorMode]}
                 height="48px"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Password..."
                 maxLength={64}
+                _hover={{
+                  bgColor: 'navy.700',
+                }}
+                color="white"
                 {...register('password')}
               />
               <InputRightElement width="3rem">
 
                 {showPassword
-                  ? <AiOutlineEyeInvisible size={24} onClick={handleClickShowPassword} />
-                  : <AiOutlineEye size={24} onClick={handleClickShowPassword} />}
+                  ? <AiOutlineEyeInvisible size={24} onClick={handleClickShowPassword} color="white" />
+                  : <AiOutlineEye size={24} onClick={handleClickShowPassword} color="white" />}
               </InputRightElement>
             </InputGroup>
             {

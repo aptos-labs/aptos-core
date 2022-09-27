@@ -12,7 +12,7 @@ import { RiFileCopyLine } from '@react-icons/all-files/ri/RiFileCopyLine';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import Copyable from 'core/components/Copyable';
 import {
-  secondaryTextColor, buttonBorderColor, rotationKeyButtonBgColor, customColors,
+  secondaryTextColor, buttonBorderColor, secondaryButtonBgColor, customColors,
 } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
@@ -53,7 +53,7 @@ export default function ManageAccount() {
             </Text>
             <Button
               size="sm"
-              bgColor={rotationKeyButtonBgColor[colorMode]}
+              bgColor={secondaryButtonBgColor[colorMode]}
               border="1px"
               borderColor={customColors.navy[200]}
               onClick={() => navigate(Routes.manage_account_show_recovery_phrase.path)}
@@ -76,7 +76,7 @@ export default function ManageAccount() {
             <Input
               marginTop={4}
               color={secondaryTextColor[colorMode]}
-              bgColor={rotationKeyButtonBgColor[colorMode]}
+              bgColor={secondaryButtonBgColor[colorMode]}
               size="xs"
               type="password"
               readOnly
@@ -89,7 +89,7 @@ export default function ManageAccount() {
             <ButtonGroup>
               <Button
                 size="sm"
-                bgColor={rotationKeyButtonBgColor[colorMode]}
+                bgColor={secondaryButtonBgColor[colorMode]}
                 onClick={() => navigate(Routes.manage_account_show_private_key.path)}
               >
                 Show
@@ -98,7 +98,7 @@ export default function ManageAccount() {
                 size="sm"
                 onClick={handleRotateKey}
                 isLoading={isLoading}
-                bgColor={rotationKeyButtonBgColor[colorMode]}
+                bgColor={secondaryButtonBgColor[colorMode]}
                 border="1px"
                 borderColor={customColors.navy[200]}
                 leftIcon={<RiRotateLockFill />}

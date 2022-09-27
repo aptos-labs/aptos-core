@@ -10,7 +10,7 @@ import {
   VStack,
 } from '@chakra-ui/react';
 
-import { AptosBlackLogo } from 'core/components/AptosLogo';
+import { PetraLogo } from 'core/components/PetraLogo';
 import { usePermissionRequestContext } from '../hooks';
 
 export function NoAccounts() {
@@ -30,7 +30,7 @@ export function NoAccounts() {
     >
       <Center>
         <Box width="75px">
-          <AptosBlackLogo />
+          <PetraLogo />
         </Box>
       </Center>
       <Heading textAlign="center">Petra</Heading>

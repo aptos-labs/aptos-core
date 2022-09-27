@@ -8,9 +8,14 @@ import RenameAccountBody from 'core/components/RenameAccountBody';
 
 function RenameAccount() {
   return (
-    <WalletLayout title="Rename Account" showBackButton>
-      <VStack width="100%" paddingTop={8}>
-        <Box px={4} pb={4} width="100%">
+    <WalletLayout
+      title="Change Wallet Name"
+      showBackButton
+      showAccountCircle={false}
+      hasWalletFooter={false}
+    >
+      <VStack width="100%" paddingTop={8} height="100%">
+        <Box width="100%" height="100%">
           <RenameAccountBody />
         </Box>
       </VStack>

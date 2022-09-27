@@ -22,7 +22,7 @@ import {
   secondaryTextColor,
   secondaryBorderColor,
   customColors,
-  rotationKeyButtonBgColor,
+  secondaryButtonBgColor,
 } from 'core/colors';
 import ConfirmationPopup from 'core/components/ConfirmationPopup';
 import { useNavigate } from 'react-router-dom';
@@ -129,7 +129,7 @@ export default function RotateKey() {
                   >
                     <Button
                       width="100%"
-                      bgColor={rotationKeyButtonBgColor[colorMode]}
+                      bgColor={secondaryButtonBgColor[colorMode]}
                       border="1px"
                       borderColor={customColors.navy[200]}
                     >

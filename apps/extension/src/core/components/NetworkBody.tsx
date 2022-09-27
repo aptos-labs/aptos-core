@@ -3,17 +3,19 @@
 
 import {
   VStack,
-  HStack,
+  Box,
   useRadioGroup,
   Button,
+  useColorMode,
 } from '@chakra-ui/react';
 import React from 'react';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { useQueryClient } from 'react-query';
 import Routes from 'core/routes';
+import { buttonBorderColor, customColors, secondaryButtonBgColor } from 'core/colors';
 import { AddIcon } from '@chakra-ui/icons';
-import ChakraLink from 'core/components/ChakraLink';
 import { switchNetworkToast } from 'core/components/Toast';
+import { useNavigate } from 'react-router-dom';
 import NetworkListItem from './NetworkListItem';
 
 export default function NetworkBody() {
@@ -24,6 +26,8 @@ export default function NetworkBody() {
     switchNetwork,
   } = useNetworks();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { colorMode } = useColorMode();
 
   const onSwitchNetwork = async (networkName: string) => {
     await switchNetwork(networkName);
@@ -49,19 +53,8 @@ export default function NetworkBody() {
   };
 
   return (
-    <>
-      <HStack justifyContent="end">
-        <ChakraLink to={Routes.addNetwork.path}>
-          <Button
-            colorScheme="salmon"
-            size="sm"
-            leftIcon={<AddIcon />}
-          >
-            Add
-          </Button>
-        </ChakraLink>
-      </HStack>
-      <VStack mt={2} spacing={2} alignItems="left" {...getRootProps()}>
+    <VStack display="flex" height="100%" width="100%">
+      <VStack overflowY="auto" mt={2} spacing={2} alignItems="left" {...getRootProps()} flex={1} height="100%">
         {
           networks ? Object.keys(networks).map((networkName) => (
             <NetworkListItem
@@ -73,6 +66,21 @@ export default function NetworkBody() {
           )) : null
         }
       </VStack>
-    </>
+
+      <Box width="100%" borderTop="1px" pt={4} px={4} borderColor={buttonBorderColor[colorMode]}>
+        <Button
+          width="100%"
+          size="sm"
+          height="48px"
+          border="1px"
+          bgColor={secondaryButtonBgColor[colorMode]}
+          borderColor={customColors.navy[200]}
+          onClick={() => navigate(Routes.addNetwork.path)}
+          leftIcon={<AddIcon />}
+        >
+          Add
+        </Button>
+      </Box>
+    </VStack>
   );
 }

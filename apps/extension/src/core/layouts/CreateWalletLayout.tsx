@@ -363,7 +363,7 @@ function CreateWalletLayout({
           <ConfirmationPopup
             logo={(
               <Box bgColor="rgba(0, 191, 165, 0.1)" borderRadius={100} width="75px" height="75px" display="flex" justifyContent="center" alignItems="center">
-                <BsFillShieldFill size={36} color="teal" />
+                <BsFillShieldFill size={36} color={customColors.teal[100]} />
               </Box>
             )}
             bodyWidth="260px"

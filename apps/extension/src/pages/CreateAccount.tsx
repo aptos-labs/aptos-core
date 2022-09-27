@@ -10,6 +10,7 @@ import { generateMnemonic } from 'core/utils/account';
 import { Transition, type TransitionStatus } from 'react-transition-group';
 import ConfirmationPopup from 'core/components/ConfirmationPopup';
 import useCreateAccount from 'core/hooks/useCreateAccount';
+import { customColors } from 'core/colors';
 import { BsFillShieldFill } from '@react-icons/all-files/bs/BsFillShieldFill';
 import { Box } from '@chakra-ui/react';
 
@@ -18,7 +19,7 @@ const transitionDuration = 200;
 function Logo() {
   return (
     <Box bgColor="rgba(0, 191, 165, 0.1)" borderRadius={100} width="75px" height="75px" display="flex" justifyContent="center" alignItems="center">
-      <BsFillShieldFill size={36} color="teal" />
+      <BsFillShieldFill size={36} color={customColors.teal[100]} />
     </Box>
   );
 }

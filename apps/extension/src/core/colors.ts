@@ -29,6 +29,8 @@ export const customColors = {
     800: '#324459',
     // primary
     900: '#172B45',
+    // main background
+    950: '#1C2B43',
   },
   orange: {
     200: '#F3A845',
@@ -45,6 +47,9 @@ export const customColors = {
     700: '#953232',
     800: '#6F2525',
     900: '#491818',
+  },
+  teal: {
+    100: '#00CCCC',
   },
 };
 
@@ -94,14 +99,29 @@ export const checkCircleSuccessBg = {
   light: customColors.green[500],
 };
 
-export const removeButtonBg = {
-  dark: '#D76D61',
-  light: '#D76D61',
+export const mainBgColor = {
+  dark: 'gray.900',
+  light: 'navy.950',
+};
+
+export const newExtensionBgColor = {
+  dark: 'gray.800',
+  light: 'navy.950',
+};
+
+export const passwordBgColor = {
+  dark: 'gray.800',
+  light: 'navy.800',
 };
 
 export const secondaryBgColor = {
   dark: 'gray.900',
   light: 'white',
+};
+
+export const checkedBgColor = {
+  dark: 'navy.800',
+  light: 'navy.100',
 };
 
 export const walletHeaderBgColor = {
@@ -165,7 +185,7 @@ export const secondaryGridBgColor = {
 };
 
 export const secondaryDisabledNetworkBgColor = {
-  dark: 'gray.800',
+  dark: 'gray.500',
   light: 'gray.50',
 };
 
@@ -209,11 +229,6 @@ export const permissionRequestTileBgColor = {
 export const permissionRequestLoadingOverlayColor = {
   dark: '#2e3038b5',
   light: '#ffffffb5',
-};
-
-export const rotationKeyButtonBgColor = {
-  dark: 'gray.800',
-  light: 'white',
 };
 
 // Wallet
