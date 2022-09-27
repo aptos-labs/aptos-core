@@ -598,14 +598,10 @@ impl TransactionStore {
                     let account = txn.get_sender();
                     let txn_sequence_number = txn.sequence_info.transaction_sequence_number;
                     gc_txns_log.add_with_status(account, txn_sequence_number, status);
-                    if let Some(&creation_time) =
-                        self.get_insertion_time(&account, txn_sequence_number)
-                    {
-                        if let Ok(time_delta) = SystemTime::now().duration_since(creation_time) {
-                            counters::CORE_MEMPOOL_GC_LATENCY
-                                .with_label_values(&[metric_label, status])
-                                .observe(time_delta.as_secs_f64());
-                        }
+                    if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time) {
+                        counters::CORE_MEMPOOL_GC_LATENCY
+                            .with_label_values(&[metric_label, status])
+                            .observe(time_delta.as_secs_f64());
                     }
 
                     // remove txn
@@ -629,14 +625,13 @@ impl TransactionStore {
     pub(crate) fn gen_snapshot(&self) -> TxnsLog {
         let mut txns_log = TxnsLog::new();
         for (account, txns) in self.transactions.iter() {
-            for (seq_num, _txn) in txns.iter() {
+            for (seq_num, txn) in txns.iter() {
                 let status = if self.parking_lot_index.contains(account, seq_num) {
                     "parked"
                 } else {
                     "ready"
                 };
-                let timestamp = self.get_insertion_time(account, *seq_num).copied();
-                txns_log.add_full_metadata(*account, *seq_num, status, timestamp);
+                txns_log.add_full_metadata(*account, *seq_num, status, txn.insertion_time);
             }
         }
         txns_log

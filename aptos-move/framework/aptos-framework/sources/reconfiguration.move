@@ -37,7 +37,8 @@ module aptos_framework::reconfiguration {
         events: event::EventHandle<NewEpochEvent>,
     }
 
-    /// Reconfiguration disabled if this resource occurs under LibraRoot.
+    /// Reconfiguration will be disabled if this resource is published under the
+    /// aptos_framework system address
     struct DisableReconfiguration has key {}
 
     /// The `Configuration` resource is in an invalid state

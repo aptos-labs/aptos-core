@@ -11,7 +11,7 @@ use crate::{
     state_store::StateStore,
     transaction_store::TransactionStore,
 };
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Context, Result};
 use aptos_crypto::hash::HashValue;
 use aptos_types::write_set::WriteSet;
 use aptos_types::{
@@ -21,7 +21,6 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
-use itertools::zip_eq;
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
 
@@ -60,27 +59,35 @@ impl BackupHandler {
         let txn_iter = self
             .transaction_store
             .get_transaction_iter(start_version, num_transactions)?;
-        let txn_info_iter = self
+        let mut txn_info_iter = self
             .ledger_store
             .get_transaction_info_iter(start_version, num_transactions)?;
-        let events_iter = self
+        let mut event_vec_iter = self
             .event_store
             .get_events_by_version_iter(start_version, num_transactions)?;
-        let write_set_iter = self
+        let mut write_set_iter = self
             .transaction_store
             .get_write_set_iter(start_version, num_transactions)?;
 
-        let zipped = zip_eq(
-            zip_eq(txn_iter, txn_info_iter),
-            zip_eq(events_iter, write_set_iter),
-        )
-        .enumerate()
-        .map(
-            move |(idx, ((txn_res, txn_info_res), (events_res, write_set_res)))| {
-                BACKUP_TXN_VERSION.set((start_version.wrapping_add(idx as u64)) as i64);
-                Ok((txn_res?, txn_info_res?, events_res?, write_set_res?))
-            },
-        );
+        let zipped = txn_iter.enumerate().map(move |(idx, txn_res)| {
+            let version = start_version + idx as u64; // overflow is impossible since it's check upon txn_iter construction.
+
+            let txn = txn_res?;
+            let txn_info = txn_info_iter
+                .next()
+                .ok_or_else(|| anyhow!("TransactionInfo not found when Transaction exists."))
+                .context(version)??;
+            let event_vec = event_vec_iter
+                .next()
+                .ok_or_else(|| anyhow!("Events not found when Transaction exists."))
+                .context(version)??;
+            let write_set = write_set_iter
+                .next()
+                .ok_or_else(|| anyhow!("WriteSet not found when Transaction exists."))
+                .context(version)??;
+            BACKUP_TXN_VERSION.set(version as i64);
+            Ok((txn, txn_info, event_vec, write_set))
+        });
         Ok(zipped)
     }
 

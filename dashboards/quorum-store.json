@@ -27,7 +27,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
       "id": 144,
       "isNew": false,
       "span": 0,
@@ -39,7 +39,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_num_batch_per_block_sum[$__rate_interval]) / rate(quorum_store_num_batch_per_block_count[$__rate_interval])",
+          "expr": "rate(quorum_store_num_batch_per_block_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_num_batch_per_block_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -82,7 +82,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
       "id": 142,
       "isNew": false,
       "span": 0,
@@ -94,7 +94,62 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_num_txn_per_batch_sum[$__rate_interval]) / rate(quorum_store_num_txn_per_batch_count[$__rate_interval])",
+          "expr": "rate(quorum_store_num_txn_per_batch_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_num_txn_per_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "id": 180,
+      "isNew": false,
+      "span": 0,
+      "title": "NUM_TXNS_PER_BLOCK",
+      "description": "Histogram for the number of txns per (committed) blocks.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(aptos_consensus_num_txns_per_block_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(aptos_consensus_num_txns_per_block_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -162,7 +217,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_pulled_txn_count[$__rate_interval])",
+          "expr": "rate(quorum_store_pulled_txn_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -217,7 +272,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_pulled_empty_txn_count[$__rate_interval])",
+          "expr": "rate(quorum_store_pulled_empty_txn_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -272,7 +327,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_created_batch_count[$__rate_interval])",
+          "expr": "rate(quorum_store_created_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -327,7 +382,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_created_empty_batch_count[$__rate_interval])",
+          "expr": "rate(quorum_store_created_empty_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
       ],
@@ -382,7 +437,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_delivered_batch_count[$__rate_interval])",
+          "expr": "rate(quorum_store_delivered_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -437,7 +492,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_missed_batch_count[$__rate_interval])",
+          "expr": "rate(quorum_store_missed_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -492,7 +547,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_PoS_count[$__rate_interval])",
+          "expr": "rate(quorum_store_PoS_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -547,7 +602,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_timeout_batch_count[$__rate_interval])",
+          "expr": "rate(quorum_store_timeout_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -590,10 +645,10 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
-      "id": 148,
+      "id": 186,
       "isNew": false,
       "span": 0,
-      "title": "Latencies",
+      "title": "Batch Sync",
       "transparent": false,
       "type": "row",
       "panels": [],
@@ -603,19 +658,19 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 25 },
-      "id": 150,
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 25 },
+      "id": 188,
       "isNew": false,
       "span": 0,
-      "title": "BATCH_CREATION_DURATION",
-      "description": "Histogram of the time durations for batch creation.",
+      "title": "SENT_BATCH_REQUEST_COUNT",
+      "description": "Count of the number of batch request sent to other nodes.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_batch_creation_duration_sum[$__rate_interval]) / rate(quorum_store_batch_creation_duration_count[$__rate_interval])",
+          "expr": "rate(quorum_store_sent_batch_request_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -658,19 +713,19 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 25 },
-      "id": 152,
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 25 },
+      "id": 190,
       "isNew": false,
       "span": 0,
-      "title": "EMPTY_BATCH_CREATION_DURATION",
-      "description": "Histogram of the time durations for empty batch creation.",
+      "title": "SENT_BATCH_REQUEST_RETRY_COUNT",
+      "description": "Count of the number of batch request retry sent to other nodes.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_empty_batch_creation_duration_sum[$__rate_interval]) / rate(quorum_store_empty_batch_creation_duration_count[$__rate_interval])",
+          "expr": "rate(quorum_store_delivered_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -713,19 +768,74 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 25 },
-      "id": 154,
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 25 },
+      "id": 192,
       "isNew": false,
       "span": 0,
-      "title": "BATCH_TO_POS_DURATION",
-      "description": "Histogram of the time durations from batch creation to PoS creation.",
+      "title": "RECEIVED_BATCH_REQUEST_COUNT",
+      "description": "Count of the number of batch request received from other nodes.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_batch_to_PoS_duration_sum[$__rate_interval]) / rate(quorum_store_batch_to_PoS_duration_count[$__rate_interval])",
+          "expr": "rate(quorum_store_received_batch_request_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 25 },
+      "id": 194,
+      "isNew": false,
+      "span": 0,
+      "title": "RECEIVED_BATCH_REQUEST_TIMTOUT_COUNT",
+      "description": "Count of the number of batch request received from other nodes that is timeout.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_received_batch_request_timeout_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -768,10 +878,10 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
-      "id": 178,
+      "id": 148,
       "isNew": false,
       "span": 0,
-      "title": "Networking",
+      "title": "Latencies",
       "transparent": false,
       "type": "row",
       "panels": [],
@@ -782,18 +892,18 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 34 },
-      "id": 172,
+      "id": 150,
       "isNew": false,
       "span": 0,
-      "title": "CONSENSUS_CHANNEL_MSGS",
-      "description": "Counters(queued, dequeued, dropped) related to consensus channel",
+      "title": "BATCH_CREATION_DURATION",
+      "description": "Histogram of the time durations for batch creation.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(aptos_consensus_channel_msgs_count[$__rate_interval])",
+          "expr": "rate(quorum_store_batch_creation_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_batch_creation_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -837,18 +947,18 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 34 },
-      "id": 174,
+      "id": 152,
       "isNew": false,
       "span": 0,
-      "title": "QUORUM_STORE_CHANNEL_MSGS",
-      "description": "Counters(queued, dequeued, dropped) related to quorum store channel",
+      "title": "EMPTY_BATCH_CREATION_DURATION",
+      "description": "Histogram of the time durations for empty batch creation.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(aptos_quorum_store_channel_msgs_count[$__rate_interval])",
+          "expr": "rate(quorum_store_empty_batch_creation_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_empty_batch_creation_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -892,18 +1002,18 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 34 },
-      "id": 176,
+      "id": 154,
       "isNew": false,
       "span": 0,
-      "title": "BLOCK_RETRIEVAL_CHANNEL_MSGS",
-      "description": "Counters(queued, dequeued, dropped) related to block retrieval channel",
+      "title": "BATCH_TO_POS_DURATION",
+      "description": "Histogram of the time durations from batch creation to PoS creation.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count[$__rate_interval])",
+          "expr": "rate(quorum_store_batch_to_PoS_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_batch_to_PoS_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -946,10 +1056,10 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
-      "id": 168,
+      "id": 178,
       "isNew": false,
       "span": 0,
-      "title": "Error",
+      "title": "Networking",
       "transparent": false,
       "type": "row",
       "panels": [],
@@ -960,18 +1070,18 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 43 },
-      "id": 158,
+      "id": 172,
       "isNew": false,
       "span": 0,
-      "title": "EXPIRED_BATCH_FRAGMENTS_COUNT",
-      "description": "Count of the expired batch fragments at the receiver side.",
+      "title": "CONSENSUS_CHANNEL_MSGS",
+      "description": "Counters(queued, dequeued, dropped) related to consensus channel",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_expired_batch_fragments_count[$__rate_interval])",
+          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -1015,18 +1125,18 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 43 },
-      "id": 160,
+      "id": 174,
       "isNew": false,
       "span": 0,
-      "title": "MISSED_BATCH_FRAGMENTS_COUNT",
-      "description": "Count of the missed batch fragments at the receiver side.",
+      "title": "QUORUM_STORE_CHANNEL_MSGS",
+      "description": "Counters(queued, dequeued, dropped) related to quorum store channel",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_missed_batch_fragments_count[$__rate_interval])",
+          "expr": "rate(aptos_quorum_store_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -1070,6 +1180,294 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 43 },
+      "id": 176,
+      "isNew": false,
+      "span": 0,
+      "title": "BLOCK_RETRIEVAL_CHANNEL_MSGS",
+      "description": "Counters(queued, dequeued, dropped) related to block retrieval channel",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 51 },
+      "id": 182,
+      "isNew": false,
+      "span": 0,
+      "title": "Consensus Message Sent",
+      "description": "The number of messages sent group by types",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(aptos_consensus_sent_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 51 },
+      "id": 184,
+      "isNew": false,
+      "span": 0,
+      "title": "Consensus Message Received",
+      "description": "The number of messages received group by types",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(aptos_consensus_received_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
+      "id": 168,
+      "isNew": false,
+      "span": 0,
+      "title": "Error",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 60 },
+      "id": 158,
+      "isNew": false,
+      "span": 0,
+      "title": "EXPIRED_BATCH_FRAGMENTS_COUNT",
+      "description": "Count of the expired batch fragments at the receiver side.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "quorum_store_expired_batch_fragments_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 60 },
+      "id": 160,
+      "isNew": false,
+      "span": 0,
+      "title": "MISSED_BATCH_FRAGMENTS_COUNT",
+      "description": "Count of the missed batch fragments at the receiver side.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "quorum_store_missed_batch_fragments_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 60 },
       "id": 166,
       "isNew": false,
       "span": 0,
@@ -1081,7 +1479,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_exceeded_storage_quota_count[$__rate_interval])",
+          "expr": "rate(quorum_store_exceeded_storage_quota_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -1122,7 +1520,133 @@
     }
   ],
   "rows": null,
-  "templating": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "Datasource",
+        "type": "datasource",
+        "datasource": null,
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": "prometheus",
+        "regex": "",
+        "current": { "text": ["Chronosphere"], "value": "Chronosphere" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": { "query": "label_values(namespace)", "refId": "StandardVariableQuery" },
+        "regex": "",
+        "current": { "text": ["chaos-mesh"], "value": "chaos-mesh" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "chain_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": { "query": "label_values(chain_name)", "refId": "StandardVariableQuery" },
+        "regex": "",
+        "current": { "text": ["None"], "value": "" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "kubernetes_pod_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": true,
+        "multiFormat": "",
+        "query": { "query": "label_values(kubernetes_pod_name)", "refId": "StandardVariableQuery" },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "role",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": "",
+        "multi": true,
+        "multiFormat": "",
+        "query": { "query": "label_values(role)", "refId": "StandardVariableQuery" },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "interval",
+        "type": "interval",
+        "auto": true,
+        "auto_count": 30,
+        "datasource": null,
+        "refresh": 2,
+        "options": [
+          { "text": "auto", "value": "$__auto_interval_interval", "selected": false },
+          { "text": "1m", "value": "1m", "selected": true },
+          { "text": "5m", "value": "5m", "selected": false },
+          { "text": "10m", "value": "10m", "selected": false },
+          { "text": "30m", "value": "30m", "selected": false },
+          { "text": "1h", "value": "1h", "selected": false },
+          { "text": "6h", "value": "6h", "selected": false },
+          { "text": "12h", "value": "12h", "selected": false },
+          { "text": "1d", "value": "1d", "selected": false },
+          { "text": "7d", "value": "7d", "selected": false },
+          { "text": "14d", "value": "14d", "selected": false },
+          { "text": "30d", "value": "30d", "selected": false }
+        ],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": "1m,5m,10m,30m,1h,6h,12h,1d,7d,14d,30d",
+        "regex": "",
+        "current": { "text": ["1m"], "value": "1m" },
+        "label": "Aggregation Interval",
+        "hide": 0,
+        "sort": 0
+      }
+    ]
+  },
   "annotations": {
     "list": [
       {
@@ -1148,7 +1672,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 11,
+  "version": 20,
   "links": [],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }

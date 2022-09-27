@@ -17,6 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub enum ConstructionCommand {
     CreateAccount(CreateAccountCommand),
     SetOperator(SetOperatorCommand),
+    SetVoter(SetVoterCommand),
     Transfer(TransferCommand),
 }
 
@@ -26,6 +27,7 @@ impl ConstructionCommand {
         match self {
             CreateAccount(inner) => format_output(inner.execute().await),
             SetOperator(inner) => format_output(inner.execute().await),
+            SetVoter(inner) => format_output(inner.execute().await),
             Transfer(inner) => format_output(inner.execute().await),
         }
     }
@@ -187,7 +189,7 @@ pub struct SetOperatorCommand {
     sender: Option<AccountAddress>,
     /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
-    old_operator: AccountAddress,
+    old_operator: Option<AccountAddress>,
     /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_operator: AccountAddress,
@@ -209,6 +211,60 @@ impl SetOperatorCommand {
                 &private_key,
                 self.old_operator,
                 self.new_operator,
+                self.txn_args.expiry_time()?,
+                self.txn_args.sequence_number,
+                self.txn_args.max_gas,
+                self.txn_args.gas_price,
+            )
+            .await
+    }
+}
+
+/// Set voter
+///
+///
+#[derive(Debug, Parser)]
+pub struct SetVoterCommand {
+    #[clap(flatten)]
+    network_args: NetworkArgs,
+    #[clap(flatten)]
+    url_args: UrlArgs,
+    #[clap(flatten)]
+    encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    profile_options: ProfileOptions,
+    #[clap(flatten)]
+    private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    txn_args: TransactionArgs,
+    /// The sending account, since the private key doesn't always match the
+    /// AccountAddress if it rotates
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    sender: Option<AccountAddress>,
+    /// The receiving account
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    operator: Option<AccountAddress>,
+    /// The receiving account
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    new_voter: AccountAddress,
+}
+
+impl SetVoterCommand {
+    pub async fn execute(self) -> anyhow::Result<TransactionIdentifier> {
+        info!("Set voter {:?}", self);
+        let client = self.url_args.client();
+        let network_identifier = self.network_args.network_identifier();
+        let private_key = self.private_key_options.extract_private_key(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+        )?;
+
+        client
+            .set_voter(
+                &network_identifier,
+                &private_key,
+                self.operator,
+                self.new_voter,
                 self.txn_args.expiry_time()?,
                 self.txn_args.sequence_number,
                 self.txn_args.max_gas,
