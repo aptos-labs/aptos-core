@@ -11,7 +11,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0.57", features = ["backtrace"] }
-clap = "3.1.17"
+clap = "3.2.17"
 futures = "0.3.21"
 itertools = "0.10.3"
 rand = "0.7.3"

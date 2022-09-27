@@ -10,7 +10,7 @@ edition = "2021"
 
 [dependencies]
 aptos-gas = { path = "../aptos-gas" }
-clap = "3.1.8"
+clap = "3.2.17"
 
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../aptos-vm" }
