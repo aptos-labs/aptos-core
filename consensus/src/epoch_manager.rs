@@ -646,8 +646,8 @@ impl EpochManager {
             block_store.clone(),
             Arc::new(payload_manager),
             self.time_service.clone(),
-            self.config.max_block_txns,
-            self.config.max_block_bytes,
+            self.config.max_sending_block_txns,
+            self.config.max_sending_block_bytes,
             onchain_config.max_failed_authors_to_store(),
         );
 
@@ -670,10 +670,9 @@ impl EpochManager {
             safety_rules_container,
             network_sender,
             self.storage.clone(),
-            self.config.sync_only,
             onchain_config,
             round_manager_tx,
-            self.config.round_initial_timeout_ms,
+            self.config.clone(),
         );
 
         round_manager.init(last_vote).await;

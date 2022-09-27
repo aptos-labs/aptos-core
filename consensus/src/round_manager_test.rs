@@ -21,22 +21,20 @@ use crate::{
     },
     util::time_service::{ClockTimeService, TimeService},
 };
-use aptos_config::network_id::NetworkId;
+use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
-use aptos_types::validator_verifier::generate_validator_verifier;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
+    validator_verifier::{generate_validator_verifier, random_validator_verifier},
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
     block::{
         block_test_utils::{certificate_for_genesis, gen_test_certificate},
@@ -46,7 +44,7 @@ use consensus_types::{
     common::{Author, Payload, Round},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeout,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
     vote_msg::VoteMsg,
 };
 use futures::{
@@ -66,8 +64,7 @@ use network::{
 };
 use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use std::{iter::FromIterator, sync::Arc, time::Duration};
-use tokio::runtime::Handle;
-use tokio::time::timeout;
+use tokio::{runtime::Handle, time::timeout};
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {
@@ -205,7 +202,7 @@ impl NodeSetup {
             block_store.clone(),
             Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
-            1,
+            10,
             1000,
             10,
         );
@@ -227,10 +224,9 @@ impl NodeSetup {
             Arc::new(Mutex::new(safety_rules)),
             network,
             storage.clone(),
-            false,
             OnChainConsensusConfig::default(),
             round_manager_tx,
-            2000,
+            ConsensusConfig::default(),
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
