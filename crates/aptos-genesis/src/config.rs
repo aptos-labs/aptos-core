@@ -104,13 +104,17 @@ pub struct ValidatorConfiguration {
     pub voter_account_address: AccountAddress,
     pub voter_account_public_key: Ed25519PublicKey,
     /// Key used for signing in consensus
-    pub consensus_public_key: bls12381::PublicKey,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consensus_public_key: Option<bls12381::PublicKey>,
     /// Corresponding proof of possession of consensus public key
-    pub proof_of_possession: bls12381::ProofOfPossession,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_of_possession: Option<bls12381::ProofOfPossession>,
     /// Public key used for validator network identity (same as account address)
-    pub validator_network_public_key: x25519::PublicKey,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validator_network_public_key: Option<x25519::PublicKey>,
     /// Host for validator which can be an IP or a DNS name
-    pub validator_host: HostAndPort,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validator_host: Option<HostAndPort>,
     /// Public key used for full node network identity (same as account address)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub full_node_network_public_key: Option<x25519::PublicKey>,
@@ -145,10 +149,20 @@ impl TryFrom<ValidatorConfiguration> for Validator {
     type Error = anyhow::Error;
 
     fn try_from(config: ValidatorConfiguration) -> Result<Self, Self::Error> {
-        let validator_addresses = vec![config
-            .validator_host
-            .as_network_address(config.validator_network_public_key)
-            .unwrap()];
+        let validator_addresses = if let Some(validator_host) = config.validator_host {
+            if let Some(validator_network_public_key) = config.validator_network_public_key {
+                vec![validator_host
+                    .as_network_address(validator_network_public_key)
+                    .unwrap()]
+            } else {
+                return Err(anyhow::Error::msg(
+                    "Validator addresses specified, but not validator network key",
+                ));
+            }
+        } else {
+            vec![]
+        };
+
         let full_node_addresses = if let Some(full_node_host) = config.full_node_host {
             if let Some(full_node_network_key) = config.full_node_network_public_key {
                 vec![full_node_host
@@ -190,12 +204,23 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             )));
         }
 
+        let consensus_pubkey = if let Some(consensus_public_key) = config.consensus_public_key {
+            consensus_public_key.to_bytes().to_vec()
+        } else {
+            vec![]
+        };
+        let proof_of_possession = if let Some(pop) = config.proof_of_possession {
+            pop.to_bytes().to_vec()
+        } else {
+            vec![]
+        };
+
         Ok(Validator {
             owner_address: config.owner_account_address,
             operator_address: config.operator_account_address,
             voter_address: config.voter_account_address,
-            consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
-            proof_of_possession: config.proof_of_possession.to_bytes().to_vec(),
+            consensus_pubkey,
+            proof_of_possession,
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),
             stake_amount: config.stake_amount,

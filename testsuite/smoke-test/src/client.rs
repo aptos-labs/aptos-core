@@ -33,8 +33,6 @@ async fn test_create_mint_transfer_block_metadata() {
     );
 }
 
-// TODO: flaky, disabling until fixed.
-#[ignore]
 #[tokio::test]
 async fn test_basic_fault_tolerance() {
     // A configuration with 4 validators should tolerate single node failure.

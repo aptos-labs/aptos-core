@@ -86,7 +86,8 @@ for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
         --username $username \
         --validator-host $validator_host \
         --full-node-host $fullnode_host \
-        --stake-amount $CUR_STAKE_AMOUNT
+        --stake-amount $CUR_STAKE_AMOUNT \
+        --join-during-genesis
 done
 
 # get the framework
