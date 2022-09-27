@@ -226,4 +226,12 @@ impl ProposalGenerator {
 
         failed_authors
     }
+
+    pub fn max_block_txns(&self) -> u64 {
+        self.max_block_txns
+    }
+
+    pub fn max_block_bytes(&self) -> u64 {
+        self.max_block_bytes
+    }
 }

@@ -587,6 +587,22 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
+        let payload_len = proposal.payload().map_or(0, |payload| payload.len());
+        let payload_size = proposal.payload().map_or(0, |payload| payload.size());
+        ensure!(
+            payload_len as u64 <= self.proposal_generator.max_block_txns(),
+            "Payload len {} exceeds the limit {}",
+            payload_len,
+            self.proposal_generator.max_block_txns()
+        );
+
+        ensure!(
+            payload_size as u64 <= self.proposal_generator.max_block_bytes(),
+            "Payload size {} exceeds the limit {}",
+            payload_size,
+            self.proposal_generator.max_block_bytes(),
+        );
+
         ensure!(
             self.proposer_election.is_valid_proposal(&proposal),
             "[RoundManager] Proposer {} for block {} is not a valid proposer for this round or created duplicate proposal",
