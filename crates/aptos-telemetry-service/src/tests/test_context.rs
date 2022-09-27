@@ -35,6 +35,7 @@ pub async fn new_test_context() -> TestContext {
         humio_url: "".into(),
         pfn_allowlist: HashMap::new(),
         log_env_map: HashMap::new(),
+        metrics_exporter_base_url: "".into(),
     };
 
     let peers = PeerStoreTuple::default();
