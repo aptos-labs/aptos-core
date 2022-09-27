@@ -293,7 +293,7 @@ impl Operation {
         operation_index: u64,
         status: Option<OperationStatusType>,
         owner: AccountAddress,
-        old_operator: AccountIdentifier,
+        old_operator: Option<AccountIdentifier>,
         new_operator: AccountIdentifier,
     ) -> Operation {
         Operation::new(
@@ -310,7 +310,7 @@ impl Operation {
         operation_index: u64,
         status: Option<OperationStatusType>,
         owner: AccountAddress,
-        operator: AccountIdentifier,
+        operator: Option<AccountIdentifier>,
         new_voter: AccountIdentifier,
     ) -> Operation {
         Operation::new(
@@ -376,17 +376,20 @@ impl OperationMetadata {
         }
     }
 
-    pub fn set_operator(old_operator: AccountIdentifier, new_operator: AccountIdentifier) -> Self {
+    pub fn set_operator(
+        old_operator: Option<AccountIdentifier>,
+        new_operator: AccountIdentifier,
+    ) -> Self {
         OperationMetadata {
-            old_operator: Some(old_operator),
+            old_operator,
             new_operator: Some(new_operator),
             ..Default::default()
         }
     }
 
-    pub fn set_voter(operator: AccountIdentifier, new_voter: AccountIdentifier) -> Self {
+    pub fn set_voter(operator: Option<AccountIdentifier>, new_voter: AccountIdentifier) -> Self {
         OperationMetadata {
-            operator: Some(operator),
+            operator,
             new_voter: Some(new_voter),
             ..Default::default()
         }
@@ -644,7 +647,7 @@ fn parse_failed_operations_from_txn_payload(
             (
                 AccountAddress::ONE,
                 STAKING_CONTRACT_MODULE,
-                SWITCH_OPERATOR_WITH_SAME_COMMISSION,
+                SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
             ) => {
                 if let Ok(mut ops) =
                     parse_set_operator_operation(sender, inner.ty_args(), inner.args())
@@ -656,7 +659,7 @@ fn parse_failed_operations_from_txn_payload(
                     warn!("Failed to parse set operator {:?}", inner);
                 }
             }
-            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER) => {
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                 if let Ok(mut ops) =
                     parse_set_voter_operation(sender, inner.ty_args(), inner.args())
                 {
@@ -1006,7 +1009,7 @@ fn parse_stake_pool_resource_changes(
                     operation_index,
                     Some(OperationStatusType::Success),
                     *owner_address,
-                    AccountIdentifier::base_account(event.old_operator),
+                    Some(AccountIdentifier::base_account(event.old_operator)),
                     AccountIdentifier::base_account(event.new_operator),
                 ));
                 operation_index += 1;
@@ -1044,8 +1047,8 @@ fn parse_stake_pool_resource_changes(
 }
 
 fn parse_staking_contract_resource_changes(
-    server_context: &RosettaContext,
-    pool_address: AccountAddress,
+    _server_context: &RosettaContext,
+    owner_address: AccountAddress,
     data: &[u8],
     events: &[ContractEvent],
     mut operation_index: u64,
@@ -1054,38 +1057,36 @@ fn parse_staking_contract_resource_changes(
 
     // This only handles the voter events from the staking contract
     // If there are direct events on the pool, they will be ignored
-    if let Some(owner_address) = server_context.pool_address_to_owner.get(&pool_address) {
-        if let Ok(store) = bcs::from_bytes::<Store>(data) {
-            // Handle set voter events
-            let set_voter_events = filter_events(
-                events,
-                store.update_voter_events.key(),
-                |event_key, event| {
-                    if let Ok(event) = bcs::from_bytes::<UpdateVoterEvent>(event.event_data()) {
-                        Some(event)
-                    } else {
-                        // If we can't parse the withdraw event, then there's nothing
-                        warn!(
-                            "Failed to parse update voter event!  Skipping for {}:{}",
-                            event_key.get_creator_address(),
-                            event_key.get_creation_number()
-                        );
-                        None
-                    }
-                },
-            );
+    if let Ok(store) = bcs::from_bytes::<Store>(data) {
+        // Handle set voter events
+        let set_voter_events = filter_events(
+            events,
+            store.update_voter_events.key(),
+            |event_key, event| {
+                if let Ok(event) = bcs::from_bytes::<UpdateVoterEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!(
+                        "Failed to parse update voter event!  Skipping for {}:{}",
+                        event_key.get_creator_address(),
+                        event_key.get_creation_number()
+                    );
+                    None
+                }
+            },
+        );
 
-            // Parse all set voter events
-            for event in set_voter_events {
-                operations.push(Operation::set_voter(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    *owner_address,
-                    AccountIdentifier::base_account(event.operator),
-                    AccountIdentifier::base_account(event.new_voter),
-                ));
-                operation_index += 1;
-            }
+        // Parse all set voter events
+        for event in set_voter_events {
+            operations.push(Operation::set_voter(
+                operation_index,
+                Some(OperationStatusType::Success),
+                owner_address,
+                Some(AccountIdentifier::base_account(event.operator)),
+                AccountIdentifier::base_account(event.new_voter),
+            ));
+            operation_index += 1;
         }
     }
 

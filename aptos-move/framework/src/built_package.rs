@@ -85,6 +85,7 @@ impl BuiltPackage {
             test_mode: false,
             force_recompilation: false,
             fetch_deps_only: false,
+            fetch_latest_git_deps: false,
         };
         let mut package = build_config.compile_package_no_exit(&package_path, &mut Vec::new())?;
         for module in package.root_modules_map().iter_modules().iter() {

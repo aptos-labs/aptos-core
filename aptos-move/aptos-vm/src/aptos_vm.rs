@@ -516,7 +516,7 @@ impl AptosVM {
             bundle,
             expected_modules,
             allowed_deps,
-            check_compat,
+            check_compat: _,
         }) = session.extract_publish_request()
         {
             // TODO: unfortunately we need to deserialize the entire bundle here to handle
@@ -538,15 +538,7 @@ impl AptosVM {
             }
 
             // Publish the bundle
-            if check_compat {
-                session.publish_module_bundle(bundle.into_inner(), destination, gas_meter)?
-            } else {
-                session.publish_module_bundle_relax_compatibility(
-                    bundle.into_inner(),
-                    destination,
-                    gas_meter,
-                )?
-            }
+            session.publish_module_bundle(bundle.into_inner(), destination, gas_meter)?;
 
             // Execute initializers
             self.execute_module_initialization(session, gas_meter, &modules, exists, &[destination])
