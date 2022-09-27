@@ -170,6 +170,7 @@ where
             socket,
         } = connection;
         let remote_peer_id = connection_metadata.remote_peer_id;
+        let max_fragments = max_message_size / max_frame_size;
         Self {
             network_context,
             executor,
@@ -197,7 +198,7 @@ where
             max_message_size,
             inbound_rate_limiter,
             outbound_rate_limiter,
-            inbound_stream: InboundStreamBuffer::new(),
+            inbound_stream: InboundStreamBuffer::new(max_fragments),
         }
     }
 
