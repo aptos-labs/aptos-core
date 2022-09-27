@@ -2585,6 +2585,7 @@ dependencies = [
  "itertools",
  "mirai-annotations",
  "proptest",
+ "rayon",
  "serde 1.0.144",
  "serde_json",
  "short-hex-str",
