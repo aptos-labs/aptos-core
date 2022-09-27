@@ -11,7 +11,9 @@ use aptos_build_info::build_information;
 use aptos_config::{
     config::{
         AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
-        PersistableConfig, StorageServiceConfig,
+        PersistableConfig, RocksdbConfigs, StorageServiceConfig,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+        TARGET_SNAPSHOT_SIZE,
     },
     network_id::NetworkId,
     utils::get_genesis_txn,
@@ -26,6 +28,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
+
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use backup_service::start_backup_service;
@@ -53,8 +56,9 @@ use state_sync_driver::{
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
+    fs,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
@@ -570,8 +574,43 @@ fn bootstrap_indexer(
     Ok(None)
 }
 
+fn create_checkpoint_and_change_working_dir(
+    node_config: &mut NodeConfig,
+    working_dir: impl AsRef<Path>,
+) {
+    let source_dir = node_config.storage.dir();
+    node_config.set_data_dir(working_dir.as_ref().to_path_buf());
+    let checkpoint_dir = node_config.storage.dir();
+
+    assert!(source_dir != checkpoint_dir);
+
+    // Create rocksdb checkpoint.
+    fs::create_dir_all(&checkpoint_dir).unwrap();
+
+    AptosDB::open(
+        &source_dir,
+        false,                       /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
+        RocksdbConfigs::default(),
+        false,
+        TARGET_SNAPSHOT_SIZE,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    )
+    .expect("AptosDB open failure.")
+    .create_checkpoint(&checkpoint_dir)
+    .expect("AptosDB checkpoint creation failed.");
+
+    consensus::create_checkpoint(&source_dir, &checkpoint_dir)
+        .expect("ConsensusDB checkpoint creation failed.");
+    let state_sync_db =
+        state_sync_driver::metadata_storage::PersistentMetadataStorage::new(&source_dir);
+    state_sync_db
+        .create_checkpoint(&checkpoint_dir)
+        .expect("StateSyncDB checkpoint creation failed.");
+}
+
 pub fn setup_environment(
-    node_config: NodeConfig,
+    mut node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
@@ -580,6 +619,13 @@ pub fn setup_environment(
     thread::spawn(move || {
         inspection_service::inspection_service::start_inspection_service(node_config_clone)
     });
+
+    // If working_dir is provided, we will make RocksDb checkpoint for consensus_db,
+    // state_sync_db, ledger_db and state_merkle_db to the checkpoint_path, and running the node
+    // on the new path, so that the existing data won't change. For now this is a testonly feature.
+    if let Some(working_dir) = node_config.base.working_dir.clone() {
+        create_checkpoint_and_change_working_dir(&mut node_config, working_dir);
+    }
 
     // Open the database
     let mut instant = Instant::now();

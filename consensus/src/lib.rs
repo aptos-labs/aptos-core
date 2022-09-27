@@ -48,6 +48,8 @@ pub mod network_interface;
 /// Required by the smoke tests
 pub use consensusdb::CONSENSUS_DB_NAME;
 
+pub use consensusdb::create_checkpoint;
+
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;
 

@@ -161,6 +161,20 @@ impl PersistentMetadataStorage {
             ))
         })
     }
+
+    /// Creates new physical DB checkpoint in directory specified by `path`.
+    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let start = Instant::now();
+        let state_sync_db_path = path.as_ref().join(STATE_SYNC_DB_NAME);
+        std::fs::remove_dir_all(&state_sync_db_path).unwrap_or(());
+        self.database.create_checkpoint(&state_sync_db_path)?;
+        info!(
+            path = state_sync_db_path,
+            time_ms = %start.elapsed().as_millis(),
+            "Made StateSyncDB checkpoint."
+        );
+        Ok(())
+    }
 }
 
 impl MetadataStorageInterface for PersistentMetadataStorage {

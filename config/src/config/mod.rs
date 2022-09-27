@@ -101,6 +101,7 @@ pub struct NodeConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct BaseConfig {
     pub data_dir: PathBuf,
+    pub working_dir: Option<PathBuf>,
     pub role: RoleType,
     pub waypoint: WaypointConfig,
 }
@@ -109,6 +110,7 @@ impl Default for BaseConfig {
     fn default() -> BaseConfig {
         BaseConfig {
             data_dir: PathBuf::from("/opt/aptos/data"),
+            working_dir: None,
             role: RoleType::Validator,
             waypoint: WaypointConfig::None,
         }
@@ -264,6 +266,13 @@ pub struct ParseRoleError(String);
 impl NodeConfig {
     pub fn data_dir(&self) -> &Path {
         &self.base.data_dir
+    }
+
+    pub fn working_dir(&self) -> &Path {
+        match &self.base.working_dir {
+            Some(working_dir) => working_dir,
+            None => &self.base.data_dir,
+        }
     }
 
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {

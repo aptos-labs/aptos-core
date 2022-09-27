@@ -24,6 +24,22 @@ use std::{collections::HashMap, iter::Iterator, path::Path, time::Instant};
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
 
+/// Creates new physical DB checkpoint in directory specified by `checkpoint_path`.
+pub fn create_checkpoint<P: AsRef<Path> + Clone>(db_path: P, checkpoint_path: P) -> Result<()> {
+    let start = Instant::now();
+    let consensus_db_checkpoint_path = checkpoint_path.as_ref().join(CONSENSUS_DB_NAME);
+    std::fs::remove_dir_all(&consensus_db_checkpoint_path).unwrap_or(());
+    ConsensusDB::new(db_path)
+        .db
+        .create_checkpoint(&consensus_db_checkpoint_path)?;
+    info!(
+        path = consensus_db_checkpoint_path,
+        time_ms = %start.elapsed().as_millis(),
+        "Made ConsensusDB checkpoint."
+    );
+    Ok(())
+}
+
 pub struct ConsensusDB {
     db: DB,
 }
