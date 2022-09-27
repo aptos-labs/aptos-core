@@ -5,9 +5,13 @@ slug: "node-liveness-criteria"
 
 # Node Liveness Criteria
 
-When you participate in the [Aptos Incentivized Testnet](https://aptoslabs.medium.com/welcome-to-aptos-incentivized-testnet-3-9d7ce888205c), your validator node must pass liveness checks within 24 hours of being selected to participate in the testnet, and at a regular cadence onwards. This is required to ensure that your validator node contributes to the health of the overall network and that you become eligible for incentivized testnet rewards. 
+When you participate in the Aptos network, your validator node must pass liveness checks within 24 hours of being selected to participate in the testnet, and at a regular cadence onwards. This is required to ensure that your validator node contributes to the health of the overall network. 
 
-This document describes how you can verify the status of your deployed validator node in the incentivized testnet to meet the success criteria.
+:::tip AIT rewards depend on node liveness
+If your validator node is part of Aptos Incentivized Testnet (AIT), then your node liveness is a critical criterion for you to become eligible for AIT rewards. 
+:::
+
+This document describes how you can verify the status of your deployed validator node in the Aptos network to meet the success criteria.
 
 The liveness of your validator node will be evaluated using both on-chain and off-chain data. On-chain data will be pulled directly from your validator node  syncing to the chain, and off-chain data will be received from your validator node via telemetry. Such data includes:
 
@@ -26,10 +30,9 @@ If you are a node operator, then several tools are available to you (provided by
 
 :::tip
 
-When you register your validator node for incentivized testnet, you will be prompted to perform this check.
+During an AIT program, when you register your validator node for AIT, you will be prompted to perform this check.
 
 :::
-
 
 - To make your validator node more observable, install monitoring tools that scrape the local metrics endpoint:
     - For Kubernetes based deployments, install the monitoring Helm chart ([https://github.com/aptos-labs/aptos-core/tree/main/terraform/helm/monitoring](https://github.com/aptos-labs/aptos-core/tree/main/terraform/helm/monitoring)).
@@ -43,7 +46,7 @@ The above two monitoring methods rely on your node’s reported Prometheus Metri
 
 ### Remotely
 
-Remotely, the Aptos team can verify the state of your node via [telemetry](/reference/telemetry.md). When you enable telemetry on your node, the Aptos node binary will send telemetry data in the background to the Aptos incentivized testnet team.
+Remotely, the Aptos team can verify the state of your node via [telemetry](/reference/telemetry.md). When you enable telemetry on your node, the Aptos node binary will send telemetry data in the background to the Aptos team.
 
 Telemetry data from your node is necessary for the Aptos team to evaluate the off-chain liveness metrics for verification. You can view the exact contents of each telemetry call by checking the `DEBUG` logs on your validator. If your node is using the default config without explicitly disabling telemetry, and has HTTPS egress access to the internet, then it will report various key metrics to Aptos Labs, such as the current synced version and peers connected to your node. 
 

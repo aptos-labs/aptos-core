@@ -21,8 +21,6 @@ The new Petra (Aptos Wallet) is supported only on the Chrome browser.
 REMOVE THIS.
 ### Summary steps
 
-
-
 ## Deploy the validator node and register the node
 
 USE THIS BY EDITING.  
@@ -48,7 +46,7 @@ sources={{
   Before you proceed, make sure that your hardware, storage and network resources satisfy the [Node Requirements](/docs/nodes/validator-node/operator/node-requirements.md).
   :::
 
-2. Follow the detailed node installation steps provided in [Validators](/nodes/validator-node/validators) and deploy a validator node in the test mode.
+2. Follow the detailed node installation steps provided in [Running Validator Node](running-validator-node/index.md) and deploy a validator node in the test mode.
 
   **Make sure to set your node in the Test mode.** Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your node.
 

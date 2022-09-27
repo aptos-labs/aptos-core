@@ -1,26 +1,18 @@
 ---
-title: "On GCP"
-slug: "run-validator-node-using-gcp"
-sidebar_position: 10
+title: "On Azure"
+slug: "run-validator-node-using-azure"
 ---
 
-# Run on GCP
+## Run on Azure
 
-:::tip Set up GCP account and create a project
+This guide assumes you already have Azure account setup.
 
-This guide assumes you already have GCP account setup, and have created a new project for deploying Aptos node. If you are not familiar with GCP (Google Cloud Platform), checkout this [Prerequisites section](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) for GCP account setup.
-:::
-
-:::tip IMPORTANT: Before you proceed
-
-Install the below pre-requisites if have not done so:
+Install prerequisites if needed:
 
    * Aptos CLI 0.3.1: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
    * Terraform 1.2.4: https://www.terraform.io/downloads.html
    * Kubernetes CLI: https://kubernetes.io/docs/tasks/tools/
-   * Google Cloud CLI: https://cloud.google.com/sdk/docs/install-sdk
-
-:::
+   * Azure CLI: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 
 :::tip One validator node + one validator fullnode
 When you follow all the below instructions, you will run one validator node and one validator fullnode in the cluster. 
@@ -28,66 +20,68 @@ When you follow all the below instructions, you will run one validator node and 
 
 1. Create a working directory for your configuration.
 
-    * Choose a workspace name e.g. `testnet`. Note: this defines Terraform workspace name, which in turn is used to form resource names.
-    ```
-    export WORKSPACE=testnet
-    ```
+    * Choose a workspace name e.g. `testnet`. Note: This defines Terraform workspace name, which in turn is used to form resource names.
 
-    * Create a directory for the workspace
-    ```
-    mkdir -p ~/$WORKSPACE
-    ```
+      ```
+      export WORKSPACE=testnet
+      ```
 
+    * Create a directory for the workspace.
+      
+      ```
+      mkdir -p ~/$WORKSPACE
+      ```
+    
     * Choose a username for your node, for example `alice`.
 
       ```
       export USERNAME=alice
       ```
 
-2. Create a storage bucket for storing the Terraform state on Google Cloud Storage.  Use the GCP UI or Google Cloud Storage command to create the bucket.  The name of the bucket must be unique.  See the Google Cloud Storage documentation here: https://cloud.google.com/storage/docs/creating-buckets#prereq-cli
+2. Create a blob storage container for storing the Terraform state on Azure, you can do this on Azure UI or by the command: 
 
-  ```
-  gsutil mb gs://BUCKET_NAME
-  # for example
-  gsutil mb gs://<project-name>-aptos-terraform-dev
-  ```
+    ```
+    az group create -l <azure region> -n aptos-$WORKSPACE
+    az storage account create -n <storage account name> -g aptos-$WORKSPACE -l <azure region> --sku Standard_LRS
+    az storage container create -n <container name> --account-name <storage account name> --resource-group aptos-$WORKSPACE
+    ```
 
 3. Create Terraform file called `main.tf` in your working directory:
   ```
   cd ~/$WORKSPACE
-  touch main.tf
+  vi main.tf
   ```
 
 4. Modify `main.tf` file to configure Terraform, and create fullnode from Terraform module. Example content for `main.tf`:
+
   ```
   terraform {
     required_version = "~> 1.2.0"
-    backend "gcs" {
-      bucket = "BUCKET_NAME" # bucket name created in step 2
-      prefix = "state/aptos-node"
+    backend "azurerm" {
+      resource_group_name  = <resource group name>
+      storage_account_name = <storage account name>
+      container_name       = <container name>
+      key                  = "state/validator"
     }
   }
-
   module "aptos-node" {
     # download Terraform module from aptos-labs/aptos-core repo
-    source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/gcp?ref=testnet"
-    region        = "us-central1"  # Specify the region
-    zone          = "c"            # Specify the zone suffix
-    project       = "<GCP Project ID>" # Specify your GCP project ID
+    source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/azure?ref=testnet"
+    region        = <azure region>  # Specify the region
     era           = 1              # bump era number to wipe the chain
     chain_id      = 43
     image_tag     = "testnet" # Specify the docker image tag to use
-    validator_name = "<Name of Your Validator, no space, e.g. aptosbot>"
+    validator_name = "<Name of Your Validator>"
   }
   ```
 
-  For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/gcp/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
+    For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/azure/variables.tf), and the [Helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
 
-5. Initialize Terraform in the same directory of your `main.tf` file
+5. Initialize Terraform in the same directory of your `main.tf` file.
   ```
   terraform init
   ```
-This will download all the Terraform dependencies for you, in the `.terraform` folder in your current working directory.
+This will download all the terraform dependencies for you, in the `.terraform` folder in your current working directory.
 
 6. Create a new Terraform workspace to isolate your environments:
   ```
@@ -97,25 +91,23 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
   ```
 
 7. Apply the configuration.
-
   ```
   terraform apply
   ```
+  This might take a while to finish (~20 minutes), Terraform will create all the resources on your cloud account.
 
-  This might take a while to finish (10 - 20 minutes), Terraform will create all the resources on your cloud account. 
+8. Once terraform apply finishes, you can check if those resources are created:
 
-8. Once Terraform apply finishes, you can check if those resources are created:
-
-    - `gcloud container clusters get-credentials aptos-$WORKSPACE --zone <region/zone> --project <project>` to configure the access for k8s cluster.
+    - `az aks get-credentials --resource-group aptos-$WORKSPACE --name aptos-$WORKSPACE` to configure access for your k8s cluster.
     - `kubectl get pods` this should have haproxy, validator and fullnode. with validator and fullnode pod `pending` (require further action in later steps)
     - `kubectl get svc` this should have `validator-lb` and `fullnode-lb`, with an external-IP you can share later for connectivity.
 
 9. Get your node IP info:
 
     ```
-    export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-validator-lb --output jsonpath='{.status.loadBalancer.ingress[0].ip}')"
+    export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-validator-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 
-    export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-fullnode-lb --output jsonpath='{.status.loadBalancer.ingress[0].ip}')"
+    export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-fullnode-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
     ```
 
 10. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
@@ -214,7 +206,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
         --from-file=validator-identity.yaml=keys/validator-identity.yaml \
         --from-file=validator-full-node-identity.yaml=keys/validator-full-node-identity.yaml
     ```
-
+  
     :::note
     
     The `-e1` suffix refers to the era number. If you changed the era number, make sure it matches when creating the secret.
