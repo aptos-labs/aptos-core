@@ -23,18 +23,8 @@ on:
       FORGE_RUNNER_DURATION_SECS:
         required: false
         type: string
-        default: 7200
+        default: 480
         description: Duration of the forge test run
-      FORGE_ENABLE_HAPROXY:
-        required: false
-        type: string
-        default: false
-        description: Is HAProxy enabled
-      FORGE_NUM_VALIDATORS:
-        required: false
-        type: string
-        default: 100
-        description: Number of Validator Nodes
       FORGE_TEST_SUITE:
         required: false
         type: string
@@ -78,8 +68,6 @@ env:
   FORGE_PRE_COMMENT: forge_pre_comment.txt
   FORGE_RUNNER_MODE: k8s
   FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
-  FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY}}
-  FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS}}
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
