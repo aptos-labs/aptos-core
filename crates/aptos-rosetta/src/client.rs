@@ -254,6 +254,7 @@ impl RosettaClient {
             sender,
             old_operator.map(AccountIdentifier::base_account),
             AccountIdentifier::base_account(new_operator),
+            None,
         )];
 
         self.submit_operations(

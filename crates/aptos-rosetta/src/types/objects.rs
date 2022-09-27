@@ -7,6 +7,7 @@
 
 use crate::common::native_coin_tag;
 use crate::construction::{parse_set_operator_operation, parse_set_voter_operation};
+use crate::types::get_total_stake;
 use crate::types::move_types::*;
 use crate::{
     common::{is_native_coin, native_coin},
@@ -24,7 +25,6 @@ use aptos_rest_client::aptos_api_types::TransactionOnChainData;
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::account_config::{AccountResource, CoinStoreResource, WithdrawEvent};
 use aptos_types::contract_event::ContractEvent;
-use aptos_types::stake_pool::{DistributeRewardsEvent, StakePool, WithdrawStakeEvent};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use aptos_types::write_set::WriteOp;
@@ -295,6 +295,7 @@ impl Operation {
         owner: AccountAddress,
         old_operator: Option<AccountIdentifier>,
         new_operator: AccountIdentifier,
+        staked_balance: Option<u64>,
     ) -> Operation {
         Operation::new(
             OperationType::SetOperator,
@@ -302,7 +303,11 @@ impl Operation {
             status,
             AccountIdentifier::base_account(owner),
             None,
-            Some(OperationMetadata::set_operator(old_operator, new_operator)),
+            Some(OperationMetadata::set_operator(
+                old_operator,
+                new_operator,
+                staked_balance,
+            )),
         )
     }
 
@@ -366,6 +371,8 @@ pub struct OperationMetadata {
     pub new_operator: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_voter: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staked_balance: Option<U64>,
 }
 
 impl OperationMetadata {
@@ -379,10 +386,12 @@ impl OperationMetadata {
     pub fn set_operator(
         old_operator: Option<AccountIdentifier>,
         new_operator: AccountIdentifier,
+        staked_balance: Option<u64>,
     ) -> Self {
         OperationMetadata {
             old_operator,
             new_operator: Some(new_operator),
+            staked_balance: staked_balance.map(U64::from),
             ..Default::default()
         }
     }
@@ -778,7 +787,9 @@ async fn parse_operations_from_write_set(
                 data,
                 events,
                 operation_index,
+                version,
             )
+            .await
         }
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
@@ -849,7 +860,7 @@ fn parse_stake_pool_resource_changes(
     _events: &[ContractEvent],
     _operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
-    let mut operations = Vec::new();
+    let operations = Vec::new();
 
     // We at this point only care about balance changes from the stake pool
     // TODO: Balance changes are not supported for staking at this time
@@ -1047,12 +1058,13 @@ fn parse_stake_pool_resource_changes(
     Ok(operations)
 }
 
-fn parse_staking_contract_resource_changes(
-    _server_context: &RosettaContext,
+async fn parse_staking_contract_resource_changes(
+    server_context: &RosettaContext,
     owner_address: AccountAddress,
     data: &[u8],
     events: &[ContractEvent],
     mut operation_index: u64,
+    version: u64,
 ) -> ApiResult<Vec<Operation>> {
     let mut operations = Vec::new();
 
@@ -1109,16 +1121,40 @@ fn parse_staking_contract_resource_changes(
             },
         );
 
-        // Parse all set operator events
-        for event in set_operator_events {
-            operations.push(Operation::set_operator(
-                operation_index,
-                Some(OperationStatusType::Success),
-                owner_address,
-                Some(AccountIdentifier::base_account(event.old_operator)),
-                AccountIdentifier::base_account(event.new_operator),
-            ));
-            operation_index += 1;
+        if !set_operator_events.is_empty() {
+            // Collect the current balance for the SetOperator call (not itemized per operator)
+            // This should be rare, but it could become expensive.
+            let client = server_context
+                .rest_client
+                .as_ref()
+                .expect("This call is supposed to be online already anyways");
+            let owner_account = AccountIdentifier::total_stake_account(owner_address);
+            let mut total_balance = 0;
+            for (_operator, staking_contract) in store.staking_contracts.iter() {
+                if let Ok(Some(balance)) = get_total_stake(
+                    client.as_ref(),
+                    &owner_account,
+                    staking_contract.pool_address,
+                    version,
+                )
+                .await
+                {
+                    total_balance += u64::from_str(&balance.value).unwrap_or_default()
+                }
+            }
+
+            // Parse all set operator events
+            for event in set_operator_events {
+                operations.push(Operation::set_operator(
+                    operation_index,
+                    Some(OperationStatusType::Success),
+                    owner_address,
+                    Some(AccountIdentifier::base_account(event.old_operator)),
+                    AccountIdentifier::base_account(event.new_operator),
+                    Some(total_balance),
+                ));
+                operation_index += 1;
+            }
         }
     }
 
