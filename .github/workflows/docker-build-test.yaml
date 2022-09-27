@@ -196,7 +196,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: 843b204dce971d98449b82624f4f684c7a18b991 # test against the latest build on testnet branch
+      IMAGE_TAG: 827e1c63739bbf06dad94f503a325e08b0daeb97 # test against the latest build on testnet branch
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge

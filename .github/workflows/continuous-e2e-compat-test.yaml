@@ -19,5 +19,5 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300
       # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: testnet
+      IMAGE_TAG: 827e1c63739bbf06dad94f503a325e08b0daeb97 # test against the latest build on testnet branch
       POST_TO_SLACK: true
