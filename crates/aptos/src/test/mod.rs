@@ -821,7 +821,7 @@ impl CliTestFramework {
 
 fn str_to_vec(value: &serde_json::Value) -> Vec<u8> {
     let str = value.as_str().unwrap();
-    (&*hex::decode(&str[2..str.len()]).unwrap()).to_vec()
+    (*hex::decode(&str[2..str.len()]).unwrap()).to_vec()
 }
 
 fn to_validator_config(value: &serde_json::Value) -> ValidatorConfig {

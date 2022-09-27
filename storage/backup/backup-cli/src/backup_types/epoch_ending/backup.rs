@@ -57,8 +57,7 @@ impl EpochEndingBackupController {
     pub async fn run(self) -> Result<FileHandle> {
         info!(
             "Epoch ending backup started, starting from epoch {}, unill epoch {} (excluded).",
-            start_epoch = self.start_epoch,
-            end_epoch = self.end_epoch,
+            self.start_epoch, self.end_epoch,
         );
         let ret = self
             .run_impl()
