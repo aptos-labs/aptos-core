@@ -77,7 +77,7 @@ The [hardware requirements](/docs/nodes/ait/node-requirements.md#hardware-requir
 
 - The [Aptos White Paper](/aptos-white-paper/aptos-white-paper-index) is released.
 
-- A section explaining the network [Port settings](/nodes/ait/node-requirements#ports) for the nodes connecting to an Aptos network is added.
+- A section explaining the network [Port settings](/nodes/validator-node/operator/node-requirements#ports) for the nodes connecting to an Aptos network is added.
 
 ## 08 August 2022
 

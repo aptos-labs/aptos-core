@@ -130,7 +130,7 @@ The next steps can only be taken AFTER you have [initialized the Staking Pool](#
 ## Staking with CLI
 
 :::tip Stake with UI
-You can also use UI to perform a few staking operations. See the [**Initialize staking pool** section](/nodes/ait/steps-in-ait3#initialize-staking-pool). Proceed below to use the CLI to perform staking operations. 
+You can also use UI to perform a few staking operations. Proceed below to use the CLI to perform staking operations. 
 :::
 
 - Initialize CLI with your wallet private key or create new wallet
