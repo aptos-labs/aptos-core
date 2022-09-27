@@ -106,7 +106,7 @@ pub trait Bytecode {
             .into_iter()
             .map(MoveAbility::from)
             .collect();
-        let generic_type_params = (&handle.type_parameters)
+        let generic_type_params = (handle.type_parameters)
             .iter()
             .map(MoveStructGenericTypeParam::from)
             .collect();

@@ -133,10 +133,7 @@ async fn convert_balances_to_amounts(
     if let Some(currencies) = maybe_filter_currencies {
         let mut currencies: HashSet<Currency> = currencies.into_iter().collect();
         // Remove extra currencies not requested
-        amounts = amounts
-            .into_iter()
-            .filter(|amount| currencies.contains(&amount.currency))
-            .collect();
+        amounts.retain(|amount| currencies.contains(&amount.currency));
 
         // Zero out currencies that weren't in the account yet
         for amount in amounts.iter() {

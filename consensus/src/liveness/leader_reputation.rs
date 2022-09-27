@@ -242,7 +242,7 @@ impl NewBlockEventAggregation {
             0
         };
 
-        (&history[start..])
+        (history[start..])
             .iter()
             .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
     }

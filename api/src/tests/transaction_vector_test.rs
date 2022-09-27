@@ -295,10 +295,8 @@ async fn test_script_payload() {
 
         for arg in args.as_array_mut().unwrap() {
             let arg_obj = arg.as_object_mut().unwrap();
-
-            match arg_obj.get_mut("U8Vector") {
-                Some(val) => *val = byte_array_to_hex(val),
-                None => {}
+            if let Some(val) = arg_obj.get_mut("U8Vector") {
+                *val = byte_array_to_hex(val)
             }
         }
     }
