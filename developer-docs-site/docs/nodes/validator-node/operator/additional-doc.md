@@ -1,5 +1,5 @@
 ---
-title: "Additional documentation for Incentivized Testnet"
+title: "Additional Documentation"
 slug: "additional-doc"
 sidebar_position: 15
 ---
