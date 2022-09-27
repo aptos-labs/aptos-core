@@ -87,8 +87,8 @@ impl DeltaOp {
                 // Before we proceed to merging deltas, make sure we verify that
                 // `self` delta did not overflow when shifted by +value. At the
                 // same time, we can compute new history values for `self` delta.
-                let other_max_positive = addition(value, self.max_positive, self.limit)?;
-                let other_min_negative = subtraction(self.min_negative, value).or(Ok(0))?;
+                let shifted_max_positive = addition(value, self.max_positive, self.limit)?;
+                let shifted_min_negative = subtraction(self.min_negative, value).or(Ok(0))?;
 
                 // If check has passed, update the value.
                 match self.update {
@@ -108,15 +108,15 @@ impl DeltaOp {
                 }
 
                 // Lastly, update the history.
-                self.max_positive = previous_delta.max_positive.max(other_max_positive);
-                self.min_negative = previous_delta.min_negative.max(other_min_negative);
+                self.max_positive = previous_delta.max_positive.max(shifted_max_positive);
+                self.min_negative = previous_delta.min_negative.max(shifted_min_negative);
             }
             Minus(value) => {
                 // Again, first we verify that the merging makes sense at all.
-                // Now, we can underflow if the minimum value of `other` drops
-                // too much.
-                let other_min_negative = addition(value, self.min_negative, self.limit)?;
-                let other_max_positive = subtraction(self.max_positive, value).or(Ok(0))?;
+                // Now, we can underflow if the minimum value of `self` drops
+                // too much (i.e. when applying -value).
+                let shifted_min_negative = addition(value, self.min_negative, self.limit)?;
+                let shifted_max_positive = subtraction(self.max_positive, value).or(Ok(0))?;
 
                 // Update the value and history.
                 match self.update {
@@ -134,8 +134,8 @@ impl DeltaOp {
                         self.update = Minus(new_value);
                     }
                 }
-                self.max_positive = previous_delta.max_positive.max(other_max_positive);
-                self.min_negative = previous_delta.min_negative.max(other_min_negative);
+                self.max_positive = previous_delta.max_positive.max(shifted_max_positive);
+                self.min_negative = previous_delta.min_negative.max(shifted_min_negative);
             }
         })
     }
