@@ -8,7 +8,7 @@ sidebar_position: 11
 
 This guide assumes you already have Azure account setup.
 
-Install pre-requisites if needed:
+Install prerequisites if needed:
 
    * Aptos CLI 0.3.1: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
    * Terraform 1.2.4: https://www.terraform.io/downloads.html
@@ -186,7 +186,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
 15. To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).
     - `keys` folder, which includes:
-      - `public-keys.yaml`: Publick keys for the owner account, consensus, networking (from step 10).
+      - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 10).
       - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 10).
       - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 10).
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 10).

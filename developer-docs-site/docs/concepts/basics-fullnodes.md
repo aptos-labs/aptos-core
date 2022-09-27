@@ -18,7 +18,7 @@ The [Aptos-core](/reference/glossary#aptos-core) software can be configured to r
 
 ## Overview
 
-Fullnodes can be run by anyone. Fullnodes re-execute all transactions in the history of the Aptos blockchain. Fullnodes replicate the entire state of the blockchain by synchronizing with upstream participants, e.g., other fullnodes or validator nodes. To verify blockchain state, fullnodes receive the set of transactions and the [accumulator hash root](/reference/glossary#accumulator-root-hash) of the ledger signed by the validators. In addition, fullnodes accept transactions submitted by Aptos clients and forward them directly (or indirecly) to validator nodes. While fullnodes and validators share the same code, fullnodes do not participate in consensus.
+Fullnodes can be run by anyone. Fullnodes re-execute all transactions in the history of the Aptos blockchain. Fullnodes replicate the entire state of the blockchain by synchronizing with upstream participants, e.g., other fullnodes or validator nodes. To verify blockchain state, fullnodes receive the set of transactions and the [accumulator hash root](/reference/glossary#accumulator-root-hash) of the ledger signed by the validators. In addition, fullnodes accept transactions submitted by Aptos clients and forward them directly (or indirectly) to validator nodes. While fullnodes and validators share the same code, fullnodes do not participate in consensus.
 
 Depending on the fullnode upstream, a fullnode can be called as a validator fullnode, or a public fullnode:
 * **Validator fullnode** state sync from a validator node directly.

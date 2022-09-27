@@ -64,7 +64,7 @@ Install the Aptos CLI following the [Installing Aptos CLI](/cli-tools/aptos-cli-
 
 ## Install tools
 
-Make sure you have the below tools installed on your computer. You will need them for running the [Developer Tutorials](/docs/tutorials/index.md), in the order specified. The below list is for MacOS:
+Make sure you have the below tools installed on your computer. You will need them for running the [Developer Tutorials](/docs/tutorials/index.md), in the order specified. The below list is for macOS:
 
 - **Homebrew**: [https://brew.sh/](https://brew.sh/)
 - **Node.js**: Install [Node.js](https://nodejs.org/en/download/), which will install `npm` and `npx`, by executing the below command on your Terminal:
@@ -83,9 +83,9 @@ Now your basic Aptos development environment is ready.
 
 This section contains links to frequently referred Aptos developer resources. 
 
-### Aptos explorer
+### Aptos Explorer
 
-- [Aptos Exporer](https://explorer.aptoslabs.com/): Use the top-right drop-down menu to select the network.
+- [Aptos Explorer](https://explorer.aptoslabs.com/): Use the top-right drop-down menu to select the network.
 - [Aptos Community](https://aptoslabs.com/community): Links to discussion forum, Discord and AIT.
 
 ### Aptos testnet
