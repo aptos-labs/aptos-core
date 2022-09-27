@@ -114,7 +114,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 
 ## Aptos devnet
 
-:::info Aptos Devnet Resets
+:::tip Aptos Devnet Resets
 The Aptos devnet is reset every Thursday Morning (PST). See the latest updates in [Aptos Discord][discord].
 :::info
 
