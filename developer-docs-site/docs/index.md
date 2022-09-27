@@ -58,17 +58,23 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 ## Nodes
 
 <div class="docs-card-container">
-<div class="row row-cols-1 row-cols-md-3a g-4">
+<div class="row row-cols-1 row-cols-md-2a g-4">
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column" >
-    <a href="nodes/nodes-index" class="card-title card-link stretched-link"> <h2>Run a validator or a fullnode</h2></a>
-    <p class="card-text">Install and run a Validator or a Fullnode.</p>
+    <a href="/nodes/validator-node/validators" class="card-title card-link stretched-link"> <h2>Run a validator node</h2></a>
+    <p class="card-text">Install and run a validator or a fullnode.</p>
 </div>
 </div>
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column"  >
-    <a href="nodes/nodes-index#for-a-local-testnet" class="card-title card-link stretched-link"> <h2>Run a local testnet</h2></a>
-    <p class="card-text">Run a Validator node on your local testnet.</p>
+    <a href="/nodes/local-testnet/local-testnet-index" class="card-title card-link stretched-link"> <h2>Run a local testnet</h2></a>
+    <p class="card-text">Run a validator node on your local testnet.</p>
+</div>
+  </div>
+  <div class="col">
+    <div class="card card-body h-100 d-flex flex-column"  >
+    <a href="nodes/full-node/public-fullnode" class="card-title card-link stretched-link"> <h2>Run a public fullnode</h2></a>
+    <p class="card-text">Run a public fullnode and connect to devnet.</p>
 </div>
   </div>
   
@@ -78,12 +84,20 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 ## SDKs and APIs
 
 <div class="docs-card-container">
-<div class="row row-cols-1 row-cols-md-3a g-4">
+<div class="row row-cols-1 row-cols-md-2a g-4">
+<div class="col">
+    <div class="card h-100" >
+    <div class="card-body d-flex flex-column" >
+    <a href="/cli-tools/aptos-cli-tool/aptos-cli-index" class="card-title card-link stretched-link"> <h2>CLI</h2></a>
+    <p class="card-text">CLI for developing and deploying on the Aptos blockchain.</p>
+</div>
+</div>
+</div>
   <div class="col">
     <div class="card h-100" >
     <div class="card-body d-flex flex-column" >
-    <a href="https://aptos-labs.github.io/ts-sdk-doc/" class="card-title card-link stretched-link"> <h2>Typescript SDK</h2></a>
-    <p class="card-text">API reference for transacting with the Aptos blockchain.</p>
+    <a href="/sdks/index" class="card-title card-link stretched-link"> <h2>SDKs</h2></a>
+    <p class="card-text">SDKs for building on the Aptos blockchain.</p>
 </div>
 </div>
 </div>
