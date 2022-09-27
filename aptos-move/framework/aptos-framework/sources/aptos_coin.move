@@ -19,7 +19,7 @@ module aptos_framework::aptos_coin {
     /// Cannot find delegation of mint capability to this account
     const EDELEGATION_NOT_FOUND: u64 = 3;
 
-    struct AptosCoin has key { }
+    struct AptosCoin has key {}
 
     struct MintCapStore has key {
         mint_cap: MintCapability<AptosCoin>,

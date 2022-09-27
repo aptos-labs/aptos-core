@@ -6,7 +6,7 @@ use crate::{
     initialize_staking, join_validator_set, leave_validator_set, rotate_consensus_key,
     setup_staking, unlock_stake, withdraw_stake, MoveHarness,
 };
-use aptos_types::account_address::AccountAddress;
+use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use cached_packages::aptos_stdlib;
 use move_deps::move_core_types::language_storage::CORE_CODE_ADDRESS;
 
@@ -105,7 +105,6 @@ fn test_staking_mainnet() {
     assert_success!(setup_staking(&mut harness, &validator, 100_000_000_000_000));
     harness.new_epoch();
     let validator_set = get_validator_set(&harness);
-    println!("validator_set {:?}", validator_set);
     assert_eq!(validator_set.active_validators.len(), 2);
 }
 
@@ -218,4 +217,88 @@ fn test_staking_rewards_pending_inactive() {
         get_stake_pool(&harness, &validator_address).active,
         stake_amount + 570
     );
+}
+
+#[test]
+fn test_staking_contract() {
+    let mut harness = MoveHarness::new();
+    let staker = harness.new_account_at(AccountAddress::from_hex_literal("0x11").unwrap());
+    let operator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x21").unwrap());
+    let operator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x22").unwrap());
+    let amount = 25_000_000;
+    let staker_address = *staker.address();
+    let operator_1_address = *operator_1.address();
+    let operator_2_address = *operator_2.address();
+    assert_success!(harness.run_transaction_payload(
+        &staker,
+        aptos_stdlib::staking_contract_create_staking_contract(
+            operator_1_address,
+            operator_1_address,
+            amount,
+            10,
+            vec![],
+        )
+    ));
+    assert_success!(harness.run_transaction_payload(
+        &staker,
+        aptos_stdlib::staking_contract_add_stake(operator_1_address, amount)
+    ));
+
+    // Join validator set.
+    let pool_address = default_stake_pool_address(staker_address, operator_1_address);
+    assert_success!(rotate_consensus_key(
+        &mut harness,
+        &operator_1,
+        pool_address
+    ));
+    assert_success!(join_validator_set(&mut harness, &operator_1, pool_address));
+    harness.new_epoch();
+    let validator_set = get_validator_set(&harness);
+    assert_eq!(
+        validator_set.active_validators[1].account_address,
+        pool_address,
+    );
+
+    // Operator requests commissions.
+    harness.new_block_with_metadata(pool_address, vec![]);
+    harness.new_epoch();
+    assert_success!(harness.run_transaction_payload(
+        &staker,
+        aptos_stdlib::staking_contract_request_commission(staker_address, operator_1_address)
+    ));
+
+    // Wait until stake is unlocked.
+    harness.fast_forward(7200);
+    harness.new_epoch();
+    assert_success!(harness.run_transaction_payload(
+        &staker,
+        aptos_stdlib::staking_contract_distribute(staker_address, operator_1_address)
+    ));
+
+    // Staker unlocks some stake.
+    harness.new_block_with_metadata(pool_address, vec![]);
+    harness.new_epoch();
+    assert_success!(harness.run_transaction_payload(
+        &staker,
+        aptos_stdlib::staking_contract_unlock_stake(operator_1_address, amount)
+    ));
+
+    // Wait until stake is unlocked.
+    harness.fast_forward(7200);
+    harness.new_epoch();
+    assert_success!(harness.run_transaction_payload(
+        &staker,
+        aptos_stdlib::staking_contract_distribute(staker_address, operator_1_address)
+    ));
+
+    // Switch operators.
+    assert_success!(harness.run_transaction_payload(
+        &staker,
+        aptos_stdlib::staking_contract_switch_operator_with_same_commission(
+            operator_1_address,
+            operator_2_address,
+        )
+    ));
+    // New operator leaves validator set.
+    leave_validator_set(&mut harness, &operator_2, pool_address);
 }

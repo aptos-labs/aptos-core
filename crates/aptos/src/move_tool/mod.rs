@@ -830,6 +830,7 @@ pub(crate) enum FunctionArgType {
     Address,
     Bool,
     Hex,
+    HexArray,
     String,
     U8,
     U64,
@@ -851,6 +852,18 @@ impl FunctionArgType {
             FunctionArgType::Hex => bcs::to_bytes(
                 &hex::decode(arg).map_err(|err| CliError::UnableToParse("hex", err.to_string()))?,
             ),
+            FunctionArgType::HexArray => {
+                let mut encoded = vec![];
+                for sub_arg in arg.split(',') {
+                    encoded.push(hex::decode(sub_arg).map_err(|err| {
+                        CliError::UnableToParse(
+                            "hex_array",
+                            format!("Failed to parse hex array: {:?}", err.to_string()),
+                        )
+                    })?);
+                }
+                bcs::to_bytes(&encoded)
+            }
             FunctionArgType::String => bcs::to_bytes(arg),
             FunctionArgType::U8 => bcs::to_bytes(
                 &u8::from_str(arg).map_err(|err| CliError::UnableToParse("u8", err.to_string()))?,
@@ -884,8 +897,9 @@ impl FromStr for FunctionArgType {
             "u8" => Ok(FunctionArgType::U8),
             "u64" => Ok(FunctionArgType::U64),
             "u128" => Ok(FunctionArgType::U128),
+            "hex_array" => Ok(FunctionArgType::HexArray),
             "raw" => Ok(FunctionArgType::Raw),
-            str => Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','string','u8','u64','u128','raw']", str))),
+            str => Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','hex_array','string','u8','u64','u128','raw']", str))),
         }
     }
 }
@@ -894,6 +908,35 @@ impl FromStr for FunctionArgType {
 pub struct ArgWithType {
     pub(crate) _ty: FunctionArgType,
     pub(crate) arg: Vec<u8>,
+}
+
+impl ArgWithType {
+    pub fn address(account_address: AccountAddress) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Address,
+            arg: bcs::to_bytes(&account_address).unwrap(),
+        }
+    }
+
+    pub fn u64(arg: u64) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::U64,
+            arg: bcs::to_bytes(&arg).unwrap(),
+        }
+    }
+
+    pub fn bytes(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Raw,
+            arg: bcs::to_bytes(&arg).unwrap(),
+        }
+    }
+    pub fn raw(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Raw,
+            arg,
+        }
+    }
 }
 
 impl FromStr for ArgWithType {
@@ -928,6 +971,10 @@ impl TryInto<TransactionArgument> for ArgWithType {
             )?)),
             FunctionArgType::Hex => Ok(TransactionArgument::U8Vector(txn_arg_parser(
                 &self.arg, "hex",
+            )?)),
+            FunctionArgType::HexArray => Ok(TransactionArgument::U8Vector(txn_arg_parser(
+                &self.arg,
+                "hex_array",
             )?)),
             FunctionArgType::String => Ok(TransactionArgument::U8Vector(txn_arg_parser(
                 &self.arg, "string",

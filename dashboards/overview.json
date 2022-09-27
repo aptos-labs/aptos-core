@@ -1600,7 +1600,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 2,
+  "version": 4,
   "links": [
     {
       "title": "Other Dashboards",

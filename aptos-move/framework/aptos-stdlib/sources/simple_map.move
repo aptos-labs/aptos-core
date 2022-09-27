@@ -81,8 +81,8 @@ module aptos_std::simple_map {
         let placement = option::extract(&mut maybe_placement);
         let end = vector::length(&map.data) - 1;
         while (placement < end) {
-          vector::swap(&mut map.data, placement, end);
-          placement = placement + 1;
+            vector::swap(&mut map.data, placement, end);
+            placement = placement + 1;
         };
     }
 

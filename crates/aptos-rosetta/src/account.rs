@@ -6,29 +6,22 @@
 //! See: [Account API Spec](https://www.rosetta-api.org/docs/AccountApi.html)
 //!
 
-use crate::types::{
-    AccountBalanceMetadata, ACCOUNT_MODULE, ACCOUNT_RESOURCE, COIN_MODULE, COIN_STORE_RESOURCE,
-};
+use crate::types::*;
 use crate::{
     common::{
         check_network, get_block_index_from_request, handle_request, native_coin, native_coin_tag,
         with_context,
     },
     error::{ApiError, ApiResult},
-    types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency, CurrencyMetadata},
+    types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency},
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
-use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::account_config::{AccountResource, CoinInfoResource, CoinStoreResource};
-use once_cell::sync::Lazy;
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-use std::collections::BTreeMap;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
-};
+use aptos_types::account_config::{AccountResource, CoinStoreResource};
+use aptos_types::stake_pool::StakePool;
+use std::collections::HashSet;
+use std::str::FromStr;
 use warp::Filter;
 
 /// Account routes e.g. balance
@@ -76,85 +69,40 @@ async fn account_balance(
 
     let (sequence_number, balances) = get_balances(
         &rest_client,
-        request.account_identifier.account_address()?,
+        request.account_identifier,
         balance_version,
-    )
-    .await?;
-
-    let amounts = convert_balances_to_amounts(
-        server_context.coin_cache.clone(),
         request.currencies,
-        balances,
-        balance_version,
     )
     .await?;
 
     Ok(AccountBalanceResponse {
         block_identifier: block_info.block_id,
-        balances: amounts,
+        balances,
         metadata: AccountBalanceMetadata {
             sequence_number: sequence_number.into(),
         },
     })
 }
 
-/// Lookup currencies and convert them to Rosetta types
-async fn convert_balances_to_amounts(
-    coin_cache: Arc<CoinCache>,
-    maybe_filter_currencies: Option<Vec<Currency>>,
-    balances: HashMap<TypeTag, u64>,
-    balance_version: u64,
-) -> ApiResult<Vec<Amount>> {
-    let mut amounts = Vec::new();
-
-    // Lookup coins, and fill in currency codes
-    for (coin, balance) in balances {
-        if let Some(currency) = coin_cache.get_currency(coin, Some(balance_version)).await? {
-            amounts.push(Amount {
-                value: balance.to_string(),
-                currency,
-            });
-        }
-    }
-
-    // Filter based on requested currencies
-    if let Some(currencies) = maybe_filter_currencies {
-        let mut currencies: HashSet<Currency> = currencies.into_iter().collect();
-        // Remove extra currencies not requested
-        amounts = amounts
-            .into_iter()
-            .filter(|amount| currencies.contains(&amount.currency))
-            .collect();
-
-        // Zero out currencies that weren't in the account yet
-        for amount in amounts.iter() {
-            currencies.remove(&amount.currency);
-        }
-        for currency in currencies {
-            amounts.push(Amount {
-                value: 0.to_string(),
-                currency,
-            });
-        }
-    }
-
-    Ok(amounts)
-}
-
 /// Retrieve the balances for an account
 async fn get_balances(
     rest_client: &aptos_rest_client::Client,
-    address: AccountAddress,
+    account: AccountIdentifier,
     version: u64,
-) -> ApiResult<(u64, HashMap<TypeTag, u64>)> {
+    maybe_filter_currencies: Option<Vec<Currency>>,
+) -> ApiResult<(u64, Vec<Amount>)> {
+    let owner_address = account.account_address()?;
+
+    // Retrieve all account resources
     if let Ok(response) = rest_client
-        .get_account_resources_at_version_bcs(address, version)
+        .get_account_resources_at_version_bcs(owner_address, version)
         .await
     {
         let resources = response.into_inner();
         let mut maybe_sequence_number = None;
-        let mut balances = HashMap::new();
+        let mut balances = vec![];
 
+        // Iterate through resources, converting balances
         for (struct_tag, bytes) in resources {
             match (
                 struct_tag.address,
@@ -166,9 +114,83 @@ async fn get_balances(
                     maybe_sequence_number = Some(account.sequence_number())
                 }
                 (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE) => {
-                    let coin_store: CoinStoreResource = bcs::from_bytes(&bytes)?;
-                    if let Some(coin_type) = struct_tag.type_params.first() {
-                        balances.insert(coin_type.clone(), coin_store.coin());
+                    // Only show coins on the base account
+                    if account.is_base_account() {
+                        let coin_store: CoinStoreResource = bcs::from_bytes(&bytes)?;
+                        if let Some(coin_type) = struct_tag.type_params.first() {
+                            // Only display supported coins
+                            if coin_type == &native_coin_tag() {
+                                balances.push(Amount {
+                                    value: coin_store.coin().to_string(),
+                                    currency: native_coin(),
+                                });
+                            }
+                        }
+                    }
+                }
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE) => {
+                    if account.is_base_account() {
+                        continue;
+                    }
+
+                    let store: Store = bcs::from_bytes(&bytes)?;
+                    if account.is_total_stake() {
+                        // For total stake, collect all underlying staking contracts and combine
+                        let mut total_stake: Option<u64> = None;
+                        for (_operator, contract) in store.staking_contracts {
+                            if let Ok(response) = rest_client
+                                .get_account_resource_bcs::<StakePool>(
+                                    contract.pool_address,
+                                    &format!(
+                                        "{}::{}::{}",
+                                        AccountAddress::ONE.to_hex_literal(),
+                                        STAKE_MODULE,
+                                        STAKE_POOL_RESOURCE
+                                    ),
+                                )
+                                .await
+                            {
+                                let stake_pool = response.into_inner();
+
+                                // Any stake pools that match, retrieve that.  Then update the total
+                                if let Ok(balance) =
+                                    get_stake_balance_from_stake_pool(&stake_pool, &account)
+                                {
+                                    total_stake = Some(
+                                        total_stake.unwrap_or_default()
+                                            + u64::from_str(&balance.value).unwrap_or_default(),
+                                    );
+                                }
+                            }
+                        }
+
+                        if let Some(balance) = total_stake {
+                            balances.push(Amount {
+                                value: balance.to_string(),
+                                currency: native_coin(),
+                            })
+                        }
+                    } else if account.is_operator_stake() {
+                        // For operator stake, filter on operator address
+                        let operator_address = account.operator_address()?;
+                        if let Some(contract) = store.staking_contracts.get(&operator_address) {
+                            if let Ok(response) = rest_client
+                                .get_account_resource_bcs::<StakePool>(
+                                    contract.pool_address,
+                                    "0x1::stake::StakePool",
+                                )
+                                .await
+                            {
+                                let stake_pool = response.into_inner();
+
+                                // Any stake pools that match, retrieve that.  Then update the total
+                                if let Ok(balance) =
+                                    get_stake_balance_from_stake_pool(&stake_pool, &account)
+                                {
+                                    balances.push(balance)
+                                }
+                            }
+                        }
                     }
                 }
                 _ => {}
@@ -183,143 +205,62 @@ async fn get_balances(
             )));
         };
 
-        // Retrieve balances
-        Ok((sequence_number, balances))
-    } else {
-        let mut currency_map = HashMap::new();
-        currency_map.insert(native_coin_tag(), 0);
-        Ok((0, currency_map))
-    }
-}
+        // Filter based on requested currencies
+        if let Some(currencies) = maybe_filter_currencies {
+            let mut currencies: HashSet<Currency> = currencies.into_iter().collect();
+            // Remove extra currencies not requested
+            balances = balances
+                .into_iter()
+                .filter(|balance| currencies.contains(&balance.currency))
+                .collect();
 
-/// Only coins supported by Rosetta
-///
-/// TODO: Allow passing in known supported coins in some sort of config file
-pub static SUPPORTED_COINS: Lazy<Vec<TypeTag>> = Lazy::new(|| vec![native_coin_tag()]);
+            for balance in balances.iter() {
+                currencies.remove(&balance.currency);
+            }
 
-/// A cache for currencies, so we don't have to keep looking up the status of it
-#[derive(Debug)]
-pub struct CoinCache {
-    rest_client: Option<Arc<aptos_rest_client::Client>>,
-    currencies: RwLock<BTreeMap<TypeTag, Option<Currency>>>,
-}
-
-impl CoinCache {
-    pub fn new(rest_client: Option<Arc<aptos_rest_client::Client>>) -> Self {
-        Self {
-            rest_client,
-            currencies: RwLock::new(BTreeMap::new()),
-        }
-    }
-
-    pub fn get_currency_from_cache(&self, coin: &TypeTag) -> Option<Currency> {
-        // Short circuit for the default coin
-        if coin == &native_coin_tag() {
-            return Some(native_coin());
-        }
-
-        let currencies = self
-            .currencies
-            .read()
-            .expect("Can't recover from poisoned lock on coin cache");
-
-        if let Some(currency) = currencies.get(coin) {
-            currency.clone()
-        } else {
-            None
-        }
-    }
-
-    /// Retrieve a currency and cache it if applicable
-    pub async fn get_currency(
-        &self,
-        coin: TypeTag,
-        version: Option<u64>,
-    ) -> ApiResult<Option<Currency>> {
-        // Short circuit for the default coin
-        if coin == native_coin_tag() {
-            return Ok(Some(native_coin()));
-        }
-
-        // Unsupported coins should be ignored, as symbol may be used as an identifier
-        if !SUPPORTED_COINS.contains(&coin) {
-            return Ok(None);
-        }
-
-        {
-            let currencies = self
-                .currencies
-                .read()
-                .expect("Can't recover from poisoned lock on coin cache");
-            if let Some(currency) = currencies.get(&coin) {
-                return Ok(currency.clone());
+            for currency in currencies {
+                balances.push(Amount {
+                    value: 0.to_string(),
+                    currency,
+                });
             }
         }
 
-        let currency = self
-            .get_currency_inner(coin.clone(), version)
-            .await
-            .map_err(|err| {
-                ApiError::CoinTypeFailedToBeFetched(Some(format!(
-                    "Failed to retrieve coin type {} {}",
-                    coin, err
-                )))
-            })?;
-        self.currencies
-            .write()
-            .expect("Can't recover from poisoned lock on coin cache")
-            .insert(coin, currency.clone());
-        Ok(currency)
+        // Retrieve balances
+        Ok((sequence_number, balances))
+    } else {
+        Ok((
+            0,
+            vec![Amount {
+                value: 0.to_string(),
+                currency: native_coin(),
+            }],
+        ))
+    }
+}
+
+/// Retrieves total stake balances from an individual stake pool
+fn get_stake_balance_from_stake_pool(
+    stake_pool: &StakePool,
+    account: &AccountIdentifier,
+) -> ApiResult<Amount> {
+    // Stake isn't allowed for base accounts
+    if account.is_base_account() {
+        return Err(ApiError::InvalidInput(Some(
+            "Stake pool not supported for base account".to_string(),
+        )));
     }
 
-    /// Pulls currency information from onchain
-    pub async fn get_currency_inner(
-        &self,
-        coin: TypeTag,
-        version: Option<u64>,
-    ) -> ApiResult<Option<Currency>> {
-        let struct_tag = match coin {
-            TypeTag::Struct(ref tag) => tag,
-            // This is a poorly formed coin, and we'll just skip over it
-            _ => return Ok(None),
-        };
-
-        // Retrieve the coin type
-        const ENCODE_CHARS: &AsciiSet = &CONTROLS.add(b'<').add(b'>');
-        let address = struct_tag.address;
-        let resource_tag = format!("0x1::coin::CoinInfo<{}>", struct_tag);
-        let encoded_resource_tag = utf8_percent_encode(&resource_tag, ENCODE_CHARS).to_string();
-
-        let response = if let Some(version) = version {
-            self.rest_client
-                .as_ref()
-                .expect("Should have rest client to check coin cache")
-                .get_account_resource_at_version_bcs::<CoinInfoResource>(
-                    address,
-                    &encoded_resource_tag,
-                    version,
-                )
-                .await
-        } else {
-            self.rest_client
-                .as_ref()
-                .expect("Should have rest client to check coin cache")
-                .get_account_resource_bcs::<CoinInfoResource>(address, &encoded_resource_tag)
-                .await
-        };
-
-        // At this point if we've retrieved it and it's bad, we error out
-        let coin_info = response?.into_inner();
-
-        // TODO: The symbol has to come from a trusted list, as the move type is the real indicator
-        Ok(Some(Currency {
-            symbol: coin_info
-                .symbol()
-                .unwrap_or_else(|err| format!("Invalid Symbol: {}", err)),
-            decimals: coin_info.decimals(),
-            metadata: Some(CurrencyMetadata {
-                move_type: struct_tag.to_string(),
-            }),
-        }))
+    // If the operator address is different, skip
+    if account.is_operator_stake() && account.operator_address()? != stake_pool.operator_address {
+        return Err(ApiError::InvalidInput(Some(
+            "Stake pool not for matching operator".to_string(),
+        )));
     }
+
+    // TODO: Represent inactive, and pending as separate?
+    Ok(Amount {
+        value: stake_pool.get_total_staked_amount().to_string(),
+        currency: native_coin(),
+    })
 }

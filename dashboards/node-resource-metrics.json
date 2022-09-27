@@ -362,7 +362,7 @@
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "rate(node_linux_disk_num_reads{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$pod\"}[$__rate_interval]) + rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$pod\"}[$__rate_interval])",
-          "legendFormat": "__auto"
+          "legendFormat": "{{kubernetes_pod_name}} {{name}}"
         }
       ],
       "options": {
@@ -540,7 +540,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 5,
+  "version": 6,
   "links": [
     {
       "title": "Other Dashboards",

@@ -22,9 +22,9 @@ use crate::move_tool::{
     InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
-    AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
-    LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
-    ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
+    AnalyzeMode, AnalyzeValidatorPerformance, GetPoolAddress, InitializeValidator,
+    JoinValidatorSet, LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig,
+    ShowValidatorSet, ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
@@ -122,6 +122,10 @@ impl CliTestFramework {
         }
 
         framework
+    }
+
+    pub fn addresses(&self) -> Vec<AccountAddress> {
+        self.account_addresses.clone()
     }
 
     async fn check_account_exists(&self, index: usize) -> bool {
@@ -504,6 +508,18 @@ impl CliTestFramework {
         .await
     }
 
+    pub async fn get_pool_address(&self, owner_index: usize) -> CliTypedResult<AccountAddress> {
+        GetPoolAddress {
+            owner_address: self.account_id(owner_index),
+            operator_address: None,
+            employee_account_index: None,
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
+        }
+        .execute()
+        .await
+    }
+
     pub async fn initialize_stake_owner(
         &self,
         owner_index: usize,
@@ -523,6 +539,31 @@ impl CliTestFramework {
             initial_stake_amount,
             operator_address: operator_index.map(|idx| self.account_id(idx)),
             voter_address: voter_index.map(|idx| self.account_id(idx)),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn create_stake_pool(
+        &self,
+        owner_index: usize,
+        operator_index: usize,
+        voter_index: usize,
+        amount: u64,
+        commission_percentage: u64,
+    ) -> CliTypedResult<TransactionSummary> {
+        RunFunction {
+            function_id: MemberId::from_str("0x1::staking_contract::create_staking_contract")
+                .unwrap(),
+            args: vec![
+                ArgWithType::address(self.account_id(operator_index)),
+                ArgWithType::address(self.account_id(voter_index)),
+                ArgWithType::u64(amount),
+                ArgWithType::u64(commission_percentage),
+                ArgWithType::bytes(vec![]),
+            ],
+            type_args: vec![],
+            txn_options: self.transaction_options(owner_index, None),
         }
         .execute()
         .await

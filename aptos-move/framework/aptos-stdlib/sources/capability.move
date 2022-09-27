@@ -109,7 +109,7 @@ module aptos_std::capability {
     public fun create<Feature>(owner: &signer, _feature_witness: &Feature) {
         let addr = signer::address_of(owner);
         assert!(!exists<CapState<Feature>>(addr), error::already_exists(ECAPABILITY_ALREADY_EXISTS));
-        move_to<CapState<Feature>>(owner, CapState{ delegates: vector::empty() });
+        move_to<CapState<Feature>>(owner, CapState { delegates: vector::empty() });
     }
 
     /// Acquires a capability token. Only the owner of the capability class, or an authorized delegate,
@@ -117,14 +117,14 @@ module aptos_std::capability {
     /// parameter.
     public fun acquire<Feature>(requester: &signer, _feature_witness: &Feature): Cap<Feature>
     acquires CapState, CapDelegateState {
-        Cap<Feature>{root: validate_acquire<Feature>(requester)}
+        Cap<Feature> { root: validate_acquire<Feature>(requester) }
     }
 
     /// Acquires a linear capability token. It is up to the module which owns `Feature` to decide
     /// whether to expose a linear or non-linear capability.
     public fun acquire_linear<Feature>(requester: &signer, _feature_witness: &Feature): LinearCap<Feature>
     acquires CapState, CapDelegateState {
-        LinearCap<Feature>{root: validate_acquire<Feature>(requester)}
+        LinearCap<Feature> { root: validate_acquire<Feature>(requester) }
     }
 
     /// Helper to validate an acquire. Returns the root address of the capability.
@@ -136,7 +136,7 @@ module aptos_std::capability {
             // double check that requester is actually registered as a delegate
             assert!(exists<CapState<Feature>>(root_addr), error::invalid_state(EDELEGATE));
             assert!(vector::contains(&borrow_global<CapState<Feature>>(root_addr).delegates, &addr),
-                   error::invalid_state(EDELEGATE));
+                error::invalid_state(EDELEGATE));
             root_addr
         } else {
             assert!(exists<CapState<Feature>>(addr), error::not_found(ECAPABILITY_NOT_FOUND));
@@ -162,7 +162,7 @@ module aptos_std::capability {
     acquires CapState {
         let addr = signer::address_of(to);
         if (exists<CapDelegateState<Feature>>(addr)) return;
-        move_to(to, CapDelegateState<Feature>{root: cap.root});
+        move_to(to, CapDelegateState<Feature> { root: cap.root });
         add_element(&mut borrow_global_mut<CapState<Feature>>(cap.root).delegates, addr);
     }
 
@@ -172,7 +172,7 @@ module aptos_std::capability {
     acquires CapState, CapDelegateState
     {
         if (!exists<CapDelegateState<Feature>>(from)) return;
-        let CapDelegateState{root: _root} = move_from<CapDelegateState<Feature>>(from);
+        let CapDelegateState { root: _root } = move_from<CapDelegateState<Feature>>(from);
         remove_element(&mut borrow_global_mut<CapState<Feature>>(cap.root).delegates, &from);
     }
 
