@@ -6,6 +6,7 @@ use crate::{
     clients::{big_query, victoria_metrics_api::Client as MetricsClient},
     context::{ClientTuple, Context, JsonWebTokenService, PeerStoreTuple},
     index::routes,
+    metrics::PrometheusExporter,
     validator_cache::PeerSetCacheUpdater,
 };
 
@@ -32,6 +33,7 @@ mod error;
 mod index;
 mod jwt_auth;
 mod log_ingest;
+mod metrics;
 mod prometheus_push_metrics;
 mod remote_config;
 #[cfg(any(test))]
@@ -131,6 +133,15 @@ impl AptosTelemetryServiceArgs {
         )
         .run();
 
+        let metrics_exporter_client = MetricsClient::new(
+            Url::parse(&config.metrics_exporter_base_url)
+                .expect("base url must be provided for victoria metrics"),
+            env::var("METRICS_EXPORTER_AUTH_TOKEN")
+                .expect("environment variable VICTORIA_METRICS_AUTH_TOKEN must be set"),
+        );
+
+        PrometheusExporter::new(metrics_exporter_client).run();
+
         Self::serve(&config, routes(context)).await;
     }
 
@@ -168,6 +179,7 @@ pub struct TelemetryServiceConfig {
 
     pub custom_event_config: CustomEventConfig,
     pub victoria_metrics_base_url: String,
+    pub metrics_exporter_base_url: String,
     pub humio_url: String,
 
     pub log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,

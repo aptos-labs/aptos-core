@@ -5,11 +5,14 @@ use crate::{
     auth::with_auth,
     constants::MAX_CONTENT_LENGTH,
     context::Context,
+    error::{MetricsIngestError, ServiceError},
+    metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
+use tokio::time::Instant;
 use tracing::{debug, error};
-use warp::{filters::BoxedFilter, hyper::body::Bytes, reply, Filter, Rejection, Reply};
+use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
 /// TODO: Cleanup after v1 API is ramped up
 pub fn metrics_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
@@ -60,6 +63,8 @@ pub async fn handle_metrics_ingest(
 
     let extra_labels = claims_to_extra_labels(&claims);
 
+    let start_timer = Instant::now();
+
     let res = context
         .metrics_client()
         .post_prometheus_metrics(metrics_body, extra_labels, encoding.unwrap_or_default())
@@ -67,6 +72,9 @@ pub async fn handle_metrics_ingest(
 
     match res {
         Ok(res) => {
+            METRICS_INGEST_BACKEND_REQUEST_DURATION
+                .with_label_values(&[res.status().as_str()])
+                .observe(start_timer.elapsed().as_secs_f64());
             if res.status().is_success() {
                 debug!("remote write to victoria metrics succeeded");
             } else {
@@ -74,10 +82,19 @@ pub async fn handle_metrics_ingest(
                     "remote write failed to victoria_metrics: {}",
                     res.error_for_status().err().unwrap()
                 );
+                return Err(reject::custom(ServiceError::internal(
+                    MetricsIngestError::IngestionError.into(),
+                )));
             }
         }
         Err(err) => {
+            METRICS_INGEST_BACKEND_REQUEST_DURATION
+                .with_label_values(&["Unknown"])
+                .observe(start_timer.elapsed().as_secs_f64());
             error!("error sending remote write request: {}", err);
+            return Err(reject::custom(ServiceError::internal(
+                MetricsIngestError::IngestionError.into(),
+            )));
         }
     }
 

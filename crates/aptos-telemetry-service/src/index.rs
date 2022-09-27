@@ -2,9 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    auth, constants::GCP_CLOUD_TRACE_CONTEXT_HEADER, context::Context, custom_event,
-    error::ServiceError, log_ingest, prometheus_push_metrics, remote_config,
-    types::index::IndexResponse,
+    auth,
+    constants::GCP_CLOUD_TRACE_CONTEXT_HEADER,
+    context::Context,
+    custom_event,
+    error::ServiceError,
+    log_ingest,
+    metrics::SERVICE_ERROR_COUNTS,
+    prometheus_push_metrics, remote_config,
+    types::response::{ErrorResponse, IndexResponse},
 };
 use std::convert::Infallible;
 use tracing::debug;
@@ -86,33 +92,37 @@ pub async fn handle_rejection(err: Rejection) -> std::result::Result<impl Reply,
     let code;
     let body;
 
-    if err.is_not_found() {
+    if let Some(error) = err.find::<ServiceError>() {
+        code = error.http_status_code();
+        body = reply::json(&ErrorResponse::from(error));
+
+        SERVICE_ERROR_COUNTS
+            .with_label_values(&[&format!("{:?}", error.error_code())])
+            .inc();
+    } else if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
-        body = reply::json(&ServiceError::new(code, "Not Found".to_owned()));
-    } else if let Some(error) = err.find::<ServiceError>() {
-        code = error.status_code();
-        body = reply::json(error);
+        body = reply::json(&ErrorResponse::new(code, "Not Found".to_owned()));
     } else if let Some(cause) = err.find::<BodyDeserializeError>() {
         code = StatusCode::BAD_REQUEST;
-        body = reply::json(&ServiceError::new(code, cause.to_string()));
+        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<InvalidHeader>() {
         code = StatusCode::BAD_REQUEST;
-        body = reply::json(&ServiceError::new(code, cause.to_string()));
+        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<LengthRequired>() {
         code = StatusCode::LENGTH_REQUIRED;
-        body = reply::json(&ServiceError::new(code, cause.to_string()));
+        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<PayloadTooLarge>() {
         code = StatusCode::PAYLOAD_TOO_LARGE;
-        body = reply::json(&ServiceError::new(code, cause.to_string()));
+        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<UnsupportedMediaType>() {
         code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
-        body = reply::json(&ServiceError::new(code, cause.to_string()));
+        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<MethodNotAllowed>() {
         code = StatusCode::METHOD_NOT_ALLOWED;
-        body = reply::json(&ServiceError::new(code, cause.to_string()));
+        body = reply::json(&ErrorResponse::new(code, cause.to_string()));
     } else {
         code = StatusCode::INTERNAL_SERVER_ERROR;
-        body = reply::json(&ServiceError::new(
+        body = reply::json(&ErrorResponse::new(
             code,
             format!("unexpected error: {:?}", err),
         ));
