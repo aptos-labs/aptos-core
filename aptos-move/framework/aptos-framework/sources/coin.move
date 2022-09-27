@@ -284,7 +284,16 @@ module aptos_framework::coin {
         _freeze_cap: &FreezeCapability<CoinType>,
     ) acquires CoinStore {
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
-        coin_store.frozen = true
+        coin_store.frozen = true;
+    }
+
+    /// Unfreeze a CoinStore to allow transfers
+    public entry fun unfreeze_coin_store<CoinType>(
+        account_addr: address,
+        _freeze_cap: &FreezeCapability<CoinType>,
+    ) acquires CoinStore {
+        let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        coin_store.frozen = false;
     }
 
     /// Upgrade total supply to use a parallelizable implementation if it is
@@ -781,14 +790,14 @@ module aptos_framework::coin {
 
     #[test(account = @0x1)]
     #[expected_failure(abort_code = 0x5000A)]
-    public entry fun withdraw_frozen(account: signer) acquires CoinStore {
+    public entry fun withdraw_frozen(account: signer) acquires CoinInfo, CoinStore {
         let account_addr = signer::address_of(&account);
         account::create_account_for_test(account_addr);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&account, 18, true);
 
         freeze_coin_store(account_addr, &freeze_cap);
         let coin = withdraw<FakeMoney>(&account, 10);
-        deposit(account_addr, coin);
+        burn(coin, &burn_cap);
 
         move_to(&account, FakeMoneyCapabilities {
             burn_cap,
@@ -807,6 +816,29 @@ module aptos_framework::coin {
         let coins_minted = mint<FakeMoney>(100, &mint_cap);
         freeze_coin_store(account_addr, &freeze_cap);
         deposit(account_addr, coins_minted);
+
+        move_to(&account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(account = @0x1)]
+    public entry fun deposit_widthdraw_unfrozen(account: signer) acquires CoinInfo, CoinStore {
+        let account_addr = signer::address_of(&account);
+        account::create_account_for_test(account_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&account, 18, true);
+
+        let coins_minted = mint<FakeMoney>(100, &mint_cap);
+        freeze_coin_store(account_addr, &freeze_cap);
+        unfreeze_coin_store(account_addr, &freeze_cap);
+        deposit(account_addr, coins_minted);
+
+        freeze_coin_store(account_addr, &freeze_cap);
+        unfreeze_coin_store(account_addr, &freeze_cap);
+        let coin = withdraw<FakeMoney>(&account, 10);
+        burn(coin, &burn_cap);
 
         move_to(&account, FakeMoneyCapabilities {
             burn_cap,

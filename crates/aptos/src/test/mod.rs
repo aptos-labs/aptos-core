@@ -22,9 +22,9 @@ use crate::move_tool::{
     InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
-    AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
+    AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
     LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
-    ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
+    ShowValidatorStake, StakePoolResult, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
@@ -503,6 +503,19 @@ impl CliTestFramework {
             prompt_options: PromptOptions::yes(),
             encoding_options: EncodingOptions::default(),
             skip_faucet: false,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn get_pool_address(
+        &self,
+        owner_index: usize,
+    ) -> CliTypedResult<Vec<StakePoolResult>> {
+        GetStakePool {
+            owner_address: self.account_id(owner_index),
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
         }
         .execute()
         .await

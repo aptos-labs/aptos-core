@@ -238,10 +238,17 @@ fn wait_for_backups(
         if state.latest_epoch_ending_epoch.is_some()
             && state.latest_transaction_version.is_some()
             && state.latest_state_snapshot_epoch.is_some()
+            && state.latest_state_snapshot_epoch.is_some()
             && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
             && state.latest_transaction_version.unwrap() >= target_version
+            && state.latest_transaction_version.unwrap()
+                >= state.latest_state_snapshot_version.unwrap()
         {
-            info!("Backup created in {} seconds.", now.elapsed().as_secs());
+            info!(
+                "Backup created in {} seconds. backup storage state: {}",
+                now.elapsed().as_secs(),
+                state
+            );
             return Ok(());
         }
         info!("Backup storage state: {}", state);

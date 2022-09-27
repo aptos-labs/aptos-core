@@ -481,9 +481,9 @@ async fn construction_parse(
                 (
                     AccountAddress::ONE,
                     STAKING_CONTRACT_MODULE,
-                    SWITCH_OPERATOR_WITH_SAME_COMMISSION,
+                    SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
                 ) => parse_set_operator_operation(sender, &type_args, &args)?,
-                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER) => {
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
                 }
                 _ => {
@@ -680,7 +680,7 @@ pub fn parse_set_operator_operation(
         0,
         None,
         sender,
-        AccountIdentifier::base_account(old_operator),
+        Some(AccountIdentifier::base_account(old_operator)),
         AccountIdentifier::base_account(new_operator),
     )])
 }
@@ -703,7 +703,7 @@ pub fn parse_set_voter_operation(
         0,
         None,
         sender,
-        AccountIdentifier::base_account(operator),
+        Some(AccountIdentifier::base_account(operator)),
         AccountIdentifier::base_account(new_voter),
     )])
 }
