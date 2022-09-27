@@ -10,9 +10,9 @@ Do this only if you received the confirmation email from Aptos team for your eli
 
 ## Initializing the staking pool
 
-In testnet we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool), if you've already done this through the UI, you can igore this step and jump into "Bootstrapping validator node". 
+In testnet we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool), if you've already done this through the UI, you can ignore this step and jump into "Bootstrapping validator node". 
 
-Alternatively, you can also use CLI to intialize staking pool:
+Alternatively, you can also use CLI to initialize staking pool:
 
 - Initialize CLI with your wallet **private key**, you can get in from Settings -> Credentials
 

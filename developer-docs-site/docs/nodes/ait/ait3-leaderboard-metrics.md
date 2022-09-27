@@ -33,7 +33,7 @@ The reward a leader receives is calculated by multiplying the maximum possible r
 - Also, two leaders with no failures but one with 10 and another with 100 successful proposals will get the same % of the maximum reward.
 
 :::tip Reward rate is the same
-Note also that the reward rate is the same for every validator. Hence the maxumum reward is directly proportional to the staking amount, i.e., the more a validator stakes, the more the validator can earn in absolute terms.
+Note also that the reward rate is the same for every validator. Hence the maximum reward is directly proportional to the staking amount, i.e., the more a validator stakes, the more the validator can earn in absolute terms.
 :::
 
 ## Rewards performance

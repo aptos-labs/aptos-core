@@ -8,7 +8,7 @@ sidebar_position: 10
 
 :::tip Set up GCP account and create a project
 
-This guide assumes you already have GCP account setup, and have created a new project for deploying Aptos node. If you are not familar with GCP (Google Cloud Platform), checkout this [Prerequisites section](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) for GCP account setup.
+This guide assumes you already have GCP account setup, and have created a new project for deploying Aptos node. If you are not familiar with GCP (Google Cloud Platform), checkout this [Prerequisites section](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) for GCP account setup.
 :::
 
 :::tip IMPORTANT: Before you proceed
@@ -193,7 +193,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 15. To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).
     - `keys` folder, which includes:
-      - `public-keys.yaml`: Publick keys for the owner account, consensus, networking (from step 10).
+      - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 10).
       - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 10).
       - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 10).
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 10).

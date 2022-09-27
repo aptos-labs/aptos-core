@@ -9,7 +9,7 @@ This is a step-by-step guide to install an Aptos node on AWS. These steps will c
 
 ## Before you proceed
 
-Make sure you complete these pre-requisite steps before you proceed:
+Make sure you complete these prerequisite steps before you proceed:
 
 1. Set up your AWS account. 
 2. Make sure the following are installed on your local computer:
@@ -202,7 +202,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 15. To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).
     - `keys` folder, which includes:
-      - `public-keys.yaml`: Publick keys for the owner account, consensus, networking (from step 10).
+      - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 10).
       - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 10).
       - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 10).
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 10).

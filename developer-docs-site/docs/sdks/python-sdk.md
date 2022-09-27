@@ -5,7 +5,7 @@ slug: "python-sdk"
 
 # Python SDK
 
-Aptos provides a lightly maintained official Python SDK. It is available on [PyPi](https://pypi.org/project/aptos-sdk/) with the source code in the [Aptos-core github repository](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk). Much of the functionality of the Python SDK mirrors the [Typescript SDK](/sdks/ts-sdk/index). The primary purpose of the Python SDK is to help Python developers to quickly become familiar with Aptos and as an accompaniment to Aptos tutorials.
+Aptos provides a lightly maintained official Python SDK. It is available on [PyPi](https://pypi.org/project/aptos-sdk/) with the source code in the [Aptos-core GitHub repository](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk). Much of the functionality of the Python SDK mirrors the [Typescript SDK](/sdks/ts-sdk/index). The primary purpose of the Python SDK is to help Python developers to quickly become familiar with Aptos and as an accompaniment to Aptos tutorials.
 
 ## Installing Python SDK
 
@@ -19,7 +19,7 @@ To install via `pip`:
 pip3 install aptos-sdk
 ```
 
-The `aptos-sdk` will be installed in the local site packages directory. For example, on MacOS, you will find the `aptos-sdk` in the `~/Library/Python/3.8/lib/python/site-packages/aptos_sdk` directory.
+The `aptos-sdk` will be installed in the local site packages directory. For example, on macOS, you will find the `aptos-sdk` in the `~/Library/Python/3.8/lib/python/site-packages/aptos_sdk` directory.
 
 ### Install from the source
 
