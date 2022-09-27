@@ -8,6 +8,7 @@ pub mod code;
 pub mod cryptography;
 pub mod event;
 pub mod hash;
+pub mod base64;
 mod helpers;
 pub mod state_storage;
 pub mod transaction_context;
@@ -39,6 +40,7 @@ pub struct GasParameters {
     pub secp256k1: cryptography::secp256k1::GasParameters,
     pub ristretto255: cryptography::ristretto255::GasParameters,
     pub hash: hash::GasParameters,
+    pub base64: base64::GasParameters,
     pub type_info: type_info::GasParameters,
     pub util: util::GasParameters,
     pub transaction_context: transaction_context::GasParameters,
@@ -116,6 +118,16 @@ impl GasParameters {
                     per_byte: 0.into(),
                 },
                 keccak256: hash::Keccak256HashGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
+            },
+            base64: base64::GasParameters {
+                base64_encode: base64::Base64EncodeGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
+                base64_decode: base64::Base64DecodeGasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
                 },
@@ -201,6 +213,7 @@ pub fn all_natives(
         "ristretto255",
         cryptography::ristretto255::make_all(gas_params.ristretto255)
     );
+    add_natives_from_module!("aptos_base64", base64::make_all(gas_params.base64));
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
     add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
     add_natives_from_module!("from_bcs", util::make_all(gas_params.util));
