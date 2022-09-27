@@ -209,10 +209,7 @@ async fn get_balances(
         if let Some(currencies) = maybe_filter_currencies {
             let mut currencies: HashSet<Currency> = currencies.into_iter().collect();
             // Remove extra currencies not requested
-            balances = balances
-                .into_iter()
-                .filter(|balance| currencies.contains(&balance.currency))
-                .collect();
+            balances.retain(|balance| currencies.contains(&balance.currency));
 
             for balance in balances.iter() {
                 currencies.remove(&balance.currency);
