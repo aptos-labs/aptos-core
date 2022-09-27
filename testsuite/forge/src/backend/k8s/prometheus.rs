@@ -19,10 +19,10 @@ pub async fn get_prometheus_client() -> Result<PrometheusClient> {
     let prom_url_env = std::env::var("PROMETHEUS_URL");
     let prom_token_env = std::env::var("PROMETHEUS_TOKEN");
 
-    let (prom_url, prom_token) = match (prom_url_env, prom_token_env) {
+    let (prom_url, prom_token) = match (prom_url_env.clone(), prom_token_env) {
         // if both variables are provided, use them, otherwise try inferring from environment
         (Ok(url), Ok(token)) => {
-            println!("Creating prometheus client from environment variables");
+            info!("Creating prometheus client from environment variables");
             (url, Some(token))
         }
         _ => {
@@ -34,7 +34,7 @@ pub async fn get_prometheus_client() -> Result<PrometheusClient> {
                         let prom_token_k8s_secret = data.get("token");
                         match (prom_url_k8s_secret, prom_token_k8s_secret) {
                             (Some(url), Some(token)) => {
-                                println!("Creating prometheus client from kubernetes secret");
+                                info!("Creating prometheus client from kubernetes secret");
                                 (
                                     String::from_utf8(url.0.clone()).unwrap(),
                                     Some(String::from_utf8(token.0.clone()).unwrap()),
@@ -50,10 +50,10 @@ pub async fn get_prometheus_client() -> Result<PrometheusClient> {
                 }
                 Err(e) => {
                     // There's no remote prometheus secret setup. Try reading from a local prometheus backend
-                    println!("Failed to get prometheus-read-only secret: {}", e);
-                    println!("Creating prometheus client from local");
+                    info!("Failed to get prometheus-read-only secret: {}", e);
+                    info!("Creating prometheus client from local");
                     // Try reading from remote prometheus first, otherwise assume it's local
-                    if let Some(prom_url_env) = prom_url_env {
+                    if let Ok(prom_url_env) = prom_url_env {
                         (prom_url_env, None)
                     } else {
                         ("http://127.0.0.1:9090".to_string(), None)

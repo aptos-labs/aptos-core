@@ -117,10 +117,11 @@ fullnode:
   affinity: {}
   # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
-    # This full_node_networks config allows changing the below parameters for public fullnode networks
+    # This full_node_networks config block allows changing only the below parameters for public fullnode networks
     # The rest of the configs are inherited from fullnode-base.yaml
-    # This must be done because arrays cannot be merged natively, so we fall back to string templating
+    # Arrays in helm are immutable, so we fall back to string templating
     full_node_networks:
+      # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
         max_inbound_connections: 100
         seeds: {}

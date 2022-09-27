@@ -7,8 +7,8 @@
 {{ $validatorBaseConfig := tpl ($.Files.Get "files/configs/validator-base.yaml") $ | fromYaml }}
 {{ $fullnodeBaseConfig := tpl ($.Files.Get "files/configs/fullnode-base.yaml") $ | fromYaml }}
 # merge with user-provided helm values using precedence: base config > helm values
-{{ $validatorMergedConfig := mustMergeOverwrite (dict) $.Values.validator.config $validatorBaseConfig }}
-{{ $fullnodeMergedConfig := mustMergeOverwrite (dict) $.Values.fullnode.config $fullnodeBaseConfig }}
+{{ $validatorMergedConfig := mustMergeOverwrite $.Values.validator.config $validatorBaseConfig }}
+{{ $fullnodeMergedConfig := mustMergeOverwrite $.Values.fullnode.config $fullnodeBaseConfig }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
