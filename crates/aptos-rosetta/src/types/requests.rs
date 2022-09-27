@@ -6,6 +6,7 @@ use crate::types::{
     NetworkIdentifier, Operation, PartialBlockIdentifier, Peer, PublicKey, Signature,
     SigningPayload, SyncStatus, Transaction, TransactionIdentifier, Version,
 };
+use crate::AccountAddress;
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::chain_id::ChainId;
 use aptos_types::transaction::{RawTransaction, SignedTransaction};
@@ -45,6 +46,8 @@ pub struct AccountBalanceResponse {
 pub struct AccountBalanceMetadata {
     /// Sequence number of the account
     pub sequence_number: U64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operators: Option<Vec<AccountAddress>>,
 }
 /// Reqyest a block (version) on the account
 ///
