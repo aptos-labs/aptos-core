@@ -66,7 +66,7 @@ async fn account_balance(
         .await?;
     let balance_version = block_info.last_version;
 
-    let (sequence_number, balances) = get_balances(
+    let (sequence_number, operators, balances) = get_balances(
         &rest_client,
         request.account_identifier,
         balance_version,
@@ -79,6 +79,7 @@ async fn account_balance(
         balances,
         metadata: AccountBalanceMetadata {
             sequence_number: sequence_number.into(),
+            operators,
         },
     })
 }
@@ -89,7 +90,7 @@ async fn get_balances(
     account: AccountIdentifier,
     version: u64,
     maybe_filter_currencies: Option<Vec<Currency>>,
-) -> ApiResult<(u64, Vec<Amount>)> {
+) -> ApiResult<(u64, Option<Vec<AccountAddress>>, Vec<Amount>)> {
     let owner_address = account.account_address()?;
 
     // Retrieve all account resources
@@ -99,6 +100,7 @@ async fn get_balances(
     {
         let resources = response.into_inner();
         let mut maybe_sequence_number = None;
+        let mut maybe_operators = None;
         let mut balances = vec![];
 
         // Iterate through resources, converting balances
@@ -136,7 +138,10 @@ async fn get_balances(
                     if account.is_total_stake() {
                         // For total stake, collect all underlying staking contracts and combine
                         let mut total_stake: Option<u64> = None;
-                        for (_operator, contract) in store.staking_contracts {
+                        maybe_operators = Some(vec![]);
+                        for (operator, contract) in store.staking_contracts {
+                            // Keep track of operators
+                            maybe_operators.as_mut().unwrap().push(operator);
                             match get_total_stake(
                                 rest_client,
                                 &account,
@@ -214,10 +219,11 @@ async fn get_balances(
         }
 
         // Retrieve balances
-        Ok((sequence_number, balances))
+        Ok((sequence_number, maybe_operators, balances))
     } else {
         Ok((
             0,
+            None,
             vec![Amount {
                 value: 0.to_string(),
                 currency: native_coin(),
