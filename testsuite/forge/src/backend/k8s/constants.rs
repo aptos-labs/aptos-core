@@ -18,7 +18,7 @@ pub const KUBECTL_BIN: &str = "kubectl";
 
 // helm release names and helm chart paths
 pub const APTOS_NODE_HELM_RELEASE_NAME: &str = "aptos-node";
-pub const PUBLIC_FULLNODE_HELM_RELEASE_NAME: &str = "public-fullnode";
+pub const PUBLIC_FULLNODE_HELM_RELEASE_NAME: &str = "pfn";
 pub const GENESIS_HELM_RELEASE_NAME: &str = "genesis";
 pub const APTOS_NODE_HELM_CHART_PATH: &str = "terraform/helm/aptos-node";
 pub const PUBLIC_FULLNODE_HELM_CHART_PATH: &str = "terraform/helm/fullnode";
