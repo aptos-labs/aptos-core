@@ -1,8 +1,0 @@
-apiVersion: v2
-appVersion: 0.1.0
-name: indexer
-version: 0.2.0
-dependencies:
-  - name: prometheus-postgres-exporter
-    version: 3.0.0 
-    repository: https://prometheus-community.github.io/helm-charts

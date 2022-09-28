@@ -5,6 +5,6 @@ spec aptos_std::event {
     }
 
     spec module {
-        pragma verify=false;
+        pragma verify = false;
     }
 }

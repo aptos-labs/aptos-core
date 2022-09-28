@@ -630,6 +630,7 @@ impl Context {
 
             // When there's no gas prices in the last 100k transactions, we're going to set it to
             // the lowest gas price because the transaction should get through with any amount
+            gas_estimation.last_updated_version = Some(ledger_info.ledger_version.0);
             gas_estimation.median_gas_price = if gas_prices.is_empty() {
                 // Pull the min gas price
                 let gas_schedule = self.get_gas_schedule(ledger_info)?;
@@ -727,6 +728,14 @@ impl Context {
             }
         }
         Ok(())
+    }
+
+    pub fn last_updated_gas_schedule(&self) -> Option<u64> {
+        self.gas_schedule_cache.read().unwrap().last_updated_epoch
+    }
+
+    pub fn last_updated_gas_estimation(&self) -> Option<u64> {
+        self.gas_estimation.read().unwrap().last_updated_version
     }
 }
 

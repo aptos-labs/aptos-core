@@ -14,10 +14,12 @@ use forge::{Factory, LocalFactory, LocalSwarm};
 use framework::ReleaseBundle;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
-use std::pin::Pin;
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 use tokio::task::JoinHandle;
 
+const SWARM_BUILD_NUM_RETRIES: u8 = 3;
+
+#[derive(Clone)]
 pub struct SwarmBuilder {
     local: bool,
     num_validators: NonZeroUsize,
@@ -64,7 +66,7 @@ impl SwarmBuilder {
     }
 
     // Gas is not enabled with this setup, it's enabled via forge instance.
-    pub async fn build_wrapped(self) -> anyhow::Result<LocalSwarm> {
+    pub async fn build_inner(&mut self) -> anyhow::Result<LocalSwarm> {
         ::aptos_logger::Logger::new().init();
         info!("Preparing to finish compiling");
         // TODO change to return Swarm trait
@@ -79,16 +81,16 @@ impl SwarmBuilder {
         static ACTIVE_NODES: Lazy<Arc<Mutex<usize>>> = Lazy::new(|| Arc::new(Mutex::new(0)));
         let guard = ActiveNodesGuard::grab(slots, ACTIVE_NODES.clone()).await;
 
-        let init_genesis_config = self.init_genesis_config;
-
+        let builder = self.clone();
+        let init_genesis_config = builder.init_genesis_config;
         FACTORY
             .new_swarm_with_version(
                 OsRng,
-                self.num_validators,
-                self.num_fullnodes,
+                builder.num_validators,
+                builder.num_fullnodes,
                 &version,
-                self.genesis_framework,
-                self.init_config,
+                builder.genesis_framework,
+                builder.init_config,
                 Some(Arc::new(move |genesis_config| {
                     if let Some(init_genesis_config) = &init_genesis_config {
                         (init_genesis_config)(genesis_config);
@@ -100,12 +102,26 @@ impl SwarmBuilder {
     }
 
     // Gas is not enabled with this setup, it's enabled via forge instance.
-    pub async fn build(self) -> LocalSwarm {
-        self.build_wrapped().await.unwrap()
+    // Local swarm spin-up can fail due to port issues. So we retry SWARM_BUILD_NUM_RETRIES times.
+    pub async fn build(&mut self) -> LocalSwarm {
+        let num_retries = SWARM_BUILD_NUM_RETRIES;
+        let mut attempt = 0;
+        loop {
+            if attempt > num_retries {
+                panic!("Exhausted retries: {} / {}", attempt, num_retries);
+            }
+            match self.build_inner().await {
+                Ok(swarm) => {
+                    return swarm;
+                }
+                Err(err) => warn!("Attempt {} / {} failed with: {}", attempt, num_retries, err),
+            }
+            attempt += 1;
+        }
     }
 
     pub async fn build_with_cli(
-        self,
+        &mut self,
         num_cli_accounts: usize,
     ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>) {
         let swarm = self.build().await;
@@ -133,27 +149,6 @@ impl SwarmBuilder {
             num_cli_accounts
         );
         (swarm, tool, faucet)
-    }
-}
-
-pub async fn with_retry<
-    F: Fn() -> Pin<Box<dyn std::future::Future<Output = anyhow::Result<LocalSwarm>>>>,
->(
-    build: F,
-    num_retries: u8,
-) -> LocalSwarm {
-    let mut attempt = 0;
-    loop {
-        if attempt >= num_retries {
-            panic!("Exhausted retries: {} / {}", attempt, num_retries);
-        }
-        match build().await {
-            Ok(swarm) => {
-                return swarm;
-            }
-            Err(err) => warn!("Attempt {} / {} failed with: {}", attempt, num_retries, err),
-        }
-        attempt += 1;
     }
 }
 

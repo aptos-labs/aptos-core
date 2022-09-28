@@ -37,7 +37,8 @@ module aptos_framework::reconfiguration {
         events: event::EventHandle<NewEpochEvent>,
     }
 
-    /// Reconfiguration disabled if this resource occurs under LibraRoot.
+    /// Reconfiguration will be disabled if this resource is published under the
+    /// aptos_framework system address
     struct DisableReconfiguration has key {}
 
     /// The `Configuration` resource is in an invalid state
@@ -73,7 +74,7 @@ module aptos_framework::reconfiguration {
     fun disable_reconfiguration(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
-        move_to(aptos_framework, DisableReconfiguration {} )
+        move_to(aptos_framework, DisableReconfiguration {})
     }
 
     /// Private function to resume reconfiguration.

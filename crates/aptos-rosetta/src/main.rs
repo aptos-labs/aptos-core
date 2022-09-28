@@ -7,8 +7,11 @@ use aptos_config::config::{ApiConfig, DEFAULT_MAX_PAGE_SIZE};
 use aptos_logger::prelude::*;
 use aptos_node::AptosNodeArgs;
 use aptos_rosetta::bootstrap;
+use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
+use std::fs::read_to_string;
+use std::path::PathBuf;
 use std::{
     net::SocketAddr,
     sync::{
@@ -82,8 +85,13 @@ async fn main() {
 
     println!("aptos-rosetta: Starting rosetta");
     // Ensure runtime for Rosetta is up and running
-    let _rosetta = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
-        .expect("aptos-rosetta: Should bootstrap rosetta server");
+    let _rosetta = bootstrap(
+        args.chain_id(),
+        args.api_config(),
+        args.rest_client(),
+        args.owner_addresses(),
+    )
+    .expect("aptos-rosetta: Should bootstrap rosetta server");
 
     println!("aptos-rosetta: Rosetta started");
     // Run until there is an interrupt
@@ -103,6 +111,9 @@ trait ServerArgs {
 
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
+
+    /// Retrieve owner addresses
+    fn owner_addresses(&self) -> Vec<AccountAddress>;
 }
 
 /// Aptos Rosetta API Server
@@ -141,6 +152,14 @@ impl ServerArgs for CommandArgs {
             CommandArgs::OnlineRemote(args) => args.chain_id(),
             CommandArgs::Offline(args) => args.chain_id(),
             CommandArgs::Online(args) => args.chain_id(),
+        }
+    }
+
+    fn owner_addresses(&self) -> Vec<AccountAddress> {
+        match self {
+            CommandArgs::OnlineRemote(args) => args.owner_addresses(),
+            CommandArgs::Offline(args) => args.owner_addresses(),
+            CommandArgs::Online(args) => args.owner_addresses(),
         }
     }
 }
@@ -189,6 +208,10 @@ impl ServerArgs for OfflineArgs {
     fn chain_id(&self) -> ChainId {
         self.chain_id
     }
+
+    fn owner_addresses(&self) -> Vec<AccountAddress> {
+        vec![]
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -198,6 +221,9 @@ pub struct OnlineRemoteArgs {
     /// URL for the Aptos REST API. e.g. https://fullnode.devnet.aptoslabs.com
     #[clap(long, default_value = "http://localhost:8080")]
     rest_api_url: url::Url,
+    /// Owner addresses file as a YAML file with a list
+    #[clap(long, parse(from_os_str))]
+    owner_address_file: Option<PathBuf>,
 }
 
 impl ServerArgs for OnlineRemoteArgs {
@@ -211,6 +237,17 @@ impl ServerArgs for OnlineRemoteArgs {
 
     fn chain_id(&self) -> ChainId {
         self.offline_args.chain_id
+    }
+
+    fn owner_addresses(&self) -> Vec<AccountAddress> {
+        if let Some(ref path) = self.owner_address_file {
+            serde_yaml::from_str(
+                &read_to_string(path.as_path()).expect("Failed to read owner address file"),
+            )
+            .expect("Owner address file is in an invalid format")
+        } else {
+            vec![]
+        }
     }
 }
 
@@ -235,5 +272,9 @@ impl ServerArgs for OnlineLocalArgs {
 
     fn chain_id(&self) -> ChainId {
         self.online_args.offline_args.chain_id
+    }
+
+    fn owner_addresses(&self) -> Vec<AccountAddress> {
+        self.online_args.owner_addresses()
     }
 }

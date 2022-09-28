@@ -35,6 +35,7 @@ pub(crate) fn generate_error_map(
         test_mode: false,
         force_recompilation: false,
         fetch_deps_only: false,
+        fetch_latest_git_deps: false,
     };
     if let Ok(model) = build_config.move_model_for_package(
         package_path,

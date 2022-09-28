@@ -549,14 +549,18 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         // TODO: Add tracing latency of high-gas-fee transactions
         "graceful_overload" => config
             .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
-            .with_initial_fullnode_count(4)
+            // if we have smaller number of full nodes, TPS drops.
+            // Validators without VFN are proposing almost empty blocks,
+            // as no useful transaction reach their mempool.
+            // something to potentially improve upon.
+            .with_initial_fullnode_count(8)
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 15000 }))
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))
             .with_success_criteria(SuccessCriteria::new(
-                5500,
+                6500,
                 50000,
                 true,
                 Some(Duration::from_secs(120)),
@@ -621,7 +625,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             100,
             70,
             &ChangingWorkingQuorumTest {
-                min_tps: 20,
+                min_tps: 15,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
@@ -640,7 +644,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             500,
             300,
             &ChangingWorkingQuorumTest {
-                min_tps: 20,
+                min_tps: 50,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
@@ -922,7 +926,19 @@ fn changing_working_quorum_test(
             Some(Duration::from_secs(30)),
             None,
             Some(StateProgressThreshold {
-                max_no_progress_secs: if test.max_down_nodes == 0 { 3.0 } else { 20.0 },
+                max_no_progress_secs: if test.max_down_nodes == 0 {
+                    // very aggressive if no nodes are expected to be down
+                    3.0
+                } else if test.max_down_nodes * 3 + 1 + 2 < num_validators {
+                    // number of down nodes is at least 2 below the quorum limit, so
+                    // we can still be reasonably aggressive
+                    15.0
+                } else {
+                    // number of down nodes is close to the quorum limit, so
+                    // make a check a bit looser, as state sync might be required
+                    // to get the quorum back.
+                    30.0
+                },
                 max_round_gap: 6,
             }),
         ))

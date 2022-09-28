@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::{with_retry, SwarmBuilder};
+use crate::smoke_test_environment::SwarmBuilder;
 use crate::{
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
@@ -35,11 +35,7 @@ async fn test_db_restore() {
     workspace_builder::get_bin("db-backup-verify");
     info!("---------- 1. pre-building finished.");
 
-    let mut swarm = with_retry(
-        || Box::pin(SwarmBuilder::new_local(4).with_aptos().build_wrapped()),
-        3,
-    )
-    .await;
+    let mut swarm = SwarmBuilder::new_local(4).with_aptos().build().await;
     info!("---------- 1.1 swarm built, sending some transactions.");
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let client_1 = swarm
@@ -242,10 +238,17 @@ fn wait_for_backups(
         if state.latest_epoch_ending_epoch.is_some()
             && state.latest_transaction_version.is_some()
             && state.latest_state_snapshot_epoch.is_some()
+            && state.latest_state_snapshot_epoch.is_some()
             && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
             && state.latest_transaction_version.unwrap() >= target_version
+            && state.latest_transaction_version.unwrap()
+                >= state.latest_state_snapshot_version.unwrap()
         {
-            info!("Backup created in {} seconds.", now.elapsed().as_secs());
+            info!(
+                "Backup created in {} seconds. backup storage state: {}",
+                now.elapsed().as_secs(),
+                state
+            );
             return Ok(());
         }
         info!("Backup storage state: {}", state);

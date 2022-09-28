@@ -234,8 +234,8 @@ test(
     const account2 = new AptosAccount();
     const txns1 = await faucetClient.fundAccount(account1.address(), 1000000);
     const txns2 = await faucetClient.fundAccount(account2.address(), 1000000);
-    const tx1 = await client.getTransactionByHash(txns1[1]);
-    const tx2 = await client.getTransactionByHash(txns2[1]);
+    const tx1 = await client.getTransactionByHash(txns1[0]);
+    const tx2 = await client.getTransactionByHash(txns2[0]);
     expect(tx1.type).toBe("user_transaction");
     expect(tx2.type).toBe("user_transaction");
     const checkAptosCoin = async () => {
@@ -288,8 +288,8 @@ test(
     const account2 = new AptosAccount();
     const txns1 = await faucetClient.fundAccount(account1.address(), 100_000_000);
     const txns2 = await faucetClient.fundAccount(account2.address(), 100_000_000);
-    const tx1 = await client.getTransactionByHash(txns1[1]);
-    const tx2 = await client.getTransactionByHash(txns2[1]);
+    const tx1 = await client.getTransactionByHash(txns1[0]);
+    const tx2 = await client.getTransactionByHash(txns2[0]);
     expect(tx1.type).toBe("user_transaction");
     expect(tx2.type).toBe("user_transaction");
     const checkAptosCoin = async () => {

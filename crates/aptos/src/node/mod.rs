@@ -27,8 +27,11 @@ use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
 use aptos_types::chain_id::ChainId;
 use aptos_types::network_address::NetworkAddress;
 use aptos_types::on_chain_config::{ConsensusScheme, ValidatorSet};
+use aptos_types::stake_pool::StakePool;
+use aptos_types::staking_conttract::StakingContractStore;
 use aptos_types::validator_config::ValidatorConfig;
 use aptos_types::validator_info::ValidatorInfo;
+use aptos_types::vesting::VestingAdminStore;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
 use backup_cli::coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt};
@@ -57,6 +60,7 @@ use tokio::time::Instant;
 /// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
+    GetStakePool(GetStakePool),
     InitializeValidator(InitializeValidator),
     JoinValidatorSet(JoinValidatorSet),
     LeaveValidatorSet(LeaveValidatorSet),
@@ -74,6 +78,7 @@ impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
         match self {
+            GetStakePool(tool) => tool.execute_serialized().await,
             InitializeValidator(tool) => tool.execute_serialized().await,
             JoinValidatorSet(tool) => tool.execute_serialized().await,
             LeaveValidatorSet(tool) => tool.execute_serialized().await,
@@ -228,6 +233,92 @@ impl ValidatorNetworkAddressesArgs {
             validator_host,
             full_node_host,
         ))
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct StakePoolResult {
+    pool_address: AccountAddress,
+    operator_address: AccountAddress,
+}
+
+#[derive(Parser)]
+pub struct GetStakePool {
+    // The owner address that directly or indirectly owns the stake pool.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) owner_address: AccountAddress,
+    // Configurations for where queries will be sent to.
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    // Configurations for CLI profile to use.
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+}
+
+#[async_trait]
+impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
+    fn command_name(&self) -> &'static str {
+        "GetStakePool"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<Vec<StakePoolResult>> {
+        let owner_address = self.owner_address;
+        let mut stake_pool_results: Vec<StakePoolResult> = vec![];
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+
+        // Add direct stake pool if any.
+        let stake_pool = client
+            .get_account_resource_bcs::<StakePool>(owner_address, "0x1::stake::StakePool")
+            .await;
+        if let Ok(stake_pool) = stake_pool {
+            stake_pool_results.push(StakePoolResult {
+                pool_address: owner_address,
+                operator_address: stake_pool.into_inner().operator_address,
+            });
+        };
+
+        // Fetch all stake pools managed via staking contracts.
+        let staking_contract_store = client
+            .get_account_resource_bcs::<StakingContractStore>(
+                owner_address,
+                "0x1::staking_contract::Store",
+            )
+            .await;
+        if let Ok(staking_contract_store) = staking_contract_store {
+            let mut managed_stake_pools: Vec<_> = staking_contract_store
+                .into_inner()
+                .staking_contracts
+                .into_iter()
+                .map(|staking_contract| StakePoolResult {
+                    pool_address: staking_contract.value.pool_address,
+                    operator_address: staking_contract.key,
+                })
+                .collect();
+            stake_pool_results.append(&mut managed_stake_pools);
+        };
+
+        // Fetch all stake pools managed via employee vesting accounts.
+        let vesting_admin_store = client
+            .get_account_resource_bcs::<VestingAdminStore>(
+                owner_address,
+                "0x1::vesting::AdminStore",
+            )
+            .await;
+        if let Ok(vesting_admin_store) = vesting_admin_store {
+            let mut employee_stake_pools: Vec<_> = vesting_admin_store
+                .into_inner()
+                .vesting_contracts
+                .into_iter()
+                .map(|pool_address| StakePoolResult {
+                    pool_address,
+                    // TODO: Query the operator address for each employee stake pool.
+                    operator_address: AccountAddress::ZERO,
+                })
+                .collect();
+            stake_pool_results.append(&mut employee_stake_pools);
+        };
+
+        Ok(stake_pool_results)
     }
 }
 

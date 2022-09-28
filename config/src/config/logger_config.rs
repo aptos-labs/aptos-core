@@ -30,7 +30,10 @@ impl Default for LoggerConfig {
             enable_backtrace: false,
             is_async: true,
             level: Level::Info,
-            console_port: None,
+            // This is the default port used by tokio-console
+            // setting console_port to None will disable tokio console even if aptos-console
+            // feature is enabled
+            console_port: Some(6669),
             enable_telemetry_remote_log: true,
             enable_telemetry_flush: true,
             telemetry_level: Level::Error,

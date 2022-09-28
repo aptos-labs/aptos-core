@@ -344,7 +344,7 @@ where
         }
     }
 
-    /// Get the node hash from the cache if exists, otherwise compute it.
+    /// Get the node hash from the cache if cache is provided, otherwise (for test only) compute it.
     fn get_hash(
         node_key: &NodeKey,
         node: &Node<K>,

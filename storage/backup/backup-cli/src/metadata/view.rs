@@ -16,21 +16,27 @@ pub struct MetadataView {
 }
 
 impl MetadataView {
-    pub fn get_storage_state(&self) -> BackupStorageState {
+    pub fn get_storage_state(&self) -> Result<BackupStorageState> {
         let latest_epoch_ending_epoch =
             self.epoch_ending_backups.iter().map(|e| e.last_epoch).max();
-        let latest_state_snapshot_epoch = self.state_snapshot_backups.iter().map(|s| s.epoch).max();
+        let latest_state_snapshot = self.select_state_snapshot(Version::MAX)?;
+        let (latest_state_snapshot_epoch, latest_state_snapshot_version) =
+            match latest_state_snapshot {
+                Some(snapshot) => (Some(snapshot.epoch), Some(snapshot.version)),
+                None => (None, None),
+            };
         let latest_transaction_version = self
             .transaction_backups
             .iter()
             .map(|t| t.last_version)
             .max();
 
-        BackupStorageState {
+        Ok(BackupStorageState {
             latest_epoch_ending_epoch,
             latest_state_snapshot_epoch,
+            latest_state_snapshot_version,
             latest_transaction_version,
-        }
+        })
     }
 
     pub fn select_state_snapshot(
@@ -145,7 +151,8 @@ impl From<Vec<Metadata>> for MetadataView {
 
 pub struct BackupStorageState {
     pub latest_epoch_ending_epoch: Option<u64>,
-    pub latest_state_snapshot_epoch: Option<Version>,
+    pub latest_state_snapshot_epoch: Option<u64>,
+    pub latest_state_snapshot_version: Option<Version>,
     pub latest_transaction_version: Option<Version>,
 }
 
@@ -153,9 +160,10 @@ impl fmt::Display for BackupStorageState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "latest_epoch_ending_epoch: {}, latest_state_snapshot_epoch: {}, latest_transaction_version: {}",
+            "latest_epoch_ending_epoch: {}, latest_state_snapshot_epoch: {}, latest_state_snapshot_version: {}, latest_transaction_version: {}",
             self.latest_epoch_ending_epoch.as_ref().map_or("none".to_string(), u64::to_string),
-            self.latest_state_snapshot_epoch.as_ref().map_or("none".to_string(), Version::to_string),
+            self.latest_state_snapshot_epoch.as_ref().map_or("none".to_string(), u64::to_string),
+            self.latest_state_snapshot_version.as_ref().map_or("none".to_string(), Version::to_string),
             self.latest_transaction_version.as_ref().map_or("none".to_string(), Version::to_string),
         )
     }
@@ -181,13 +189,14 @@ impl FromStr for BackupStorageState {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let captures = regex::Regex::new(
-            r"latest_epoch_ending_epoch: (none|\d+), latest_state_snapshot_epoch: (none|\d+), latest_transaction_version: (none|\d+)",
+            r"latest_epoch_ending_epoch: (none|\d+), latest_state_snapshot_epoch: (none|\d+), latest_state_snapshot_version: (none|\d+), latest_transaction_version: (none|\d+)",
         )?.captures(s).ok_or_else(|| anyhow!("Not in BackupStorageState display format: {}", s))?;
 
         Ok(Self {
             latest_epoch_ending_epoch: captures.get(1).parse_option_u64()?,
             latest_state_snapshot_epoch: captures.get(2).parse_option_u64()?,
-            latest_transaction_version: captures.get(3).parse_option_u64()?,
+            latest_state_snapshot_version: captures.get(3).parse_option_u64()?,
+            latest_transaction_version: captures.get(4).parse_option_u64()?,
         })
     }
 }

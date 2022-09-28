@@ -40,15 +40,15 @@ module aptos_framework::system_addresses {
     /// Return true if `addr` is 0x0 or under the on chain governance's control.
     public fun is_framework_reserved_address(addr: address): bool {
         is_aptos_framework_address(addr) ||
-        addr == @0x2 ||
-        addr == @0x3 ||
-        addr == @0x4 ||
-        addr == @0x5 ||
-        addr == @0x6 ||
-        addr == @0x7 ||
-        addr == @0x8 ||
-        addr == @0x9 ||
-        addr == @0xa
+            addr == @0x2 ||
+            addr == @0x3 ||
+            addr == @0x4 ||
+            addr == @0x5 ||
+            addr == @0x6 ||
+            addr == @0x7 ||
+            addr == @0x8 ||
+            addr == @0x9 ||
+            addr == @0xa
     }
 
     /// Return true if `addr` is 0x1.

@@ -114,7 +114,7 @@ impl BackupCoordinator {
             self.concurrent_downloads,
         )
         .await?
-        .get_storage_state();
+        .get_storage_state()?;
 
         // On new DbState retrieved:
         // `watch_db_state` informs `backup_epoch_endings` via channel 1,

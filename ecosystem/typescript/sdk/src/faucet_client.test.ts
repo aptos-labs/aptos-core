@@ -26,8 +26,8 @@ test(
 
     const account1 = new AptosAccount();
     const txns = await faucetClient.fundAccount(account1.address(), 1000000);
-    const tx1 = await client.getTransactionByHash(txns[1]);
-    expect(tx1.type).toBe("user_transaction");
+    const tx0 = await client.getTransactionByHash(txns[0]);
+    expect(tx0.type).toBe("user_transaction");
     let resources = await client.getAccountResources(account1.address());
     let accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("1000000");

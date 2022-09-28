@@ -1,0 +1,29 @@
+name: "Forge Continuous"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"
+  pull_request:
+    paths:
+      - '.github/workflows/forge-continuous.yaml'
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+  issues: write
+  pull-requests: write
+
+jobs:
+  forge-continuous:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      COMMENT_HEADER: forge-continuous
+      # This test suite is configured using the forge.py config test command
+      FORGE_TEST_SUITE: continuous

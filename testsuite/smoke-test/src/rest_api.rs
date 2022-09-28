@@ -64,6 +64,9 @@ async fn test_basic_client() {
     info.client().get_transactions(None, None).await.unwrap();
 }
 
+// Test needs to be fixed to estimate over a longer period of time / probably needs an adjustable window
+// to test
+#[ignore]
 #[tokio::test]
 async fn test_gas_estimation() {
     let mut swarm = new_local_swarm_with_aptos(1).await;

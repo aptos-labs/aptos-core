@@ -12,11 +12,11 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
 use aptos_crypto::{HashValue, PrivateKey};
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_rest_client::aptos_api_types::{TransactionOnChainData, UserTransaction};
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{Response, Transaction};
 use aptos_rosetta::common::BlockHash;
 use aptos_rosetta::types::{
     AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
-    TransactionType,
+    TransactionType, STAKING_CONTRACT_MODULE, SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
 };
 use aptos_rosetta::{
     client::RosettaClient,
@@ -28,12 +28,13 @@ use aptos_rosetta::{
     ROSETTA_VERSION,
 };
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_sdk::types::LocalAccount;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::on_chain_config::GasScheduleV2;
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cached_packages::aptos_stdlib;
-use forge::{LocalSwarm, Node, NodeExt, Swarm};
+use forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -52,6 +53,9 @@ pub async fn setup_test(
     num_accounts: usize,
 ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
     let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.epoch_duration_secs = 5;
+        }))
         .with_aptos()
         .build_with_cli(num_accounts)
         .await;
@@ -80,6 +84,7 @@ pub async fn setup_test(
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
+        cli.addresses(),
     )
     .await
     .unwrap();
@@ -130,6 +135,7 @@ async fn test_block_transactions() {
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
+        cli.addresses(),
     )
     .await
     .unwrap();
@@ -143,9 +149,14 @@ async fn test_block_transactions() {
     let chain_id = swarm.chain_id();
 
     // At time 0, there should be 0 balance
-    let response = get_balance(&rosetta_client, chain_id, account_1, Some(0))
-        .await
-        .unwrap();
+    let response = get_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::base_account(account_1),
+        Some(0),
+    )
+    .await
+    .unwrap();
     assert_eq!(
         response.block_identifier,
         BlockIdentifier {
@@ -243,16 +254,41 @@ async fn test_network() {
 
 #[tokio::test]
 async fn test_account_balance() {
-    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
+    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 3).await;
 
     let account_1 = cli.account_id(0);
     let account_2 = cli.account_id(1);
+    let account_3 = cli.account_id(2);
     let chain_id = swarm.chain_id();
+    let root_address = swarm.aptos_public_info().root_account().address();
+    let root_sequence_number = swarm
+        .aptos_public_info()
+        .client()
+        .get_account_bcs(root_address)
+        .await
+        .unwrap()
+        .into_inner()
+        .sequence_number();
+    *swarm
+        .aptos_public_info()
+        .root_account()
+        .sequence_number_mut() = root_sequence_number;
 
-    // At time 0, there should be 0 balance
-    let response = get_balance(&rosetta_client, chain_id, account_1, Some(0))
+    let mut account_4 = swarm
+        .aptos_public_info()
+        .create_and_fund_user_account(10_000_000)
         .await
         .unwrap();
+
+    // At time 0, there should be no balance
+    let response = get_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::base_account(account_1),
+        Some(0),
+    )
+    .await
+    .unwrap();
     assert_eq!(
         response.block_identifier,
         BlockIdentifier {
@@ -270,12 +306,24 @@ async fn test_account_balance() {
     let mut account_2_balance = DEFAULT_FUNDED_COINS;
     // At some time both accounts should exist with initial amounts
     try_until_ok(Duration::from_secs(5), DEFAULT_INTERVAL_DURATION, || {
-        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 0)
+        account_has_balance(
+            &rosetta_client,
+            chain_id,
+            AccountIdentifier::base_account(account_1),
+            account_1_balance,
+            0,
+        )
     })
     .await
     .unwrap();
     try_until_ok_default(|| {
-        account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance, 0)
+        account_has_balance(
+            &rosetta_client,
+            chain_id,
+            AccountIdentifier::base_account(account_2),
+            account_2_balance,
+            0,
+        )
     })
     .await
     .unwrap();
@@ -288,12 +336,24 @@ async fn test_account_balance() {
         .unwrap();
     account_1_balance -= TRANSFER_AMOUNT + response.gas_used * response.gas_unit_price;
     account_2_balance += TRANSFER_AMOUNT;
-    account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 1)
-        .await
-        .unwrap();
-    account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance, 0)
-        .await
-        .unwrap();
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::base_account(account_1),
+        account_1_balance,
+        1,
+    )
+    .await
+    .unwrap();
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::base_account(account_2),
+        account_2_balance,
+        0,
+    )
+    .await
+    .unwrap();
 
     // Failed transaction spends gas
     let _ = cli
@@ -319,31 +379,105 @@ async fn test_account_balance() {
     let failed_txn = txns.last().unwrap();
     if let Transaction::UserTransaction(txn) = failed_txn {
         account_1_balance -= txn.request.gas_unit_price.0 * txn.info.gas_used.0;
-        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 2)
-            .await
-            .unwrap();
+        account_has_balance(
+            &rosetta_client,
+            chain_id,
+            AccountIdentifier::base_account(account_1),
+            account_1_balance,
+            2,
+        )
+        .await
+        .unwrap();
     }
 
     // Check that the balance hasn't changed (and should be 0) in the invalid account
     account_has_balance(
         &rosetta_client,
         chain_id,
-        AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+        AccountIdentifier::base_account(AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap()),
         0,
         0,
     )
     .await
     .unwrap();
+
+    // Let's now check the staking balance with the original staking contract, it should not be supported
+    cli.fund_account(2, Some(10_000_000)).await.unwrap();
+    cli.initialize_stake_owner(2, 1_000_000, None, None)
+        .await
+        .unwrap();
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::total_stake_account(account_3),
+        1_000_000,
+        1,
+    )
+    .await
+    .expect_err("Original staking contract is not supported");
+
+    create_staking_contract(
+        &swarm.aptos_public_info(),
+        &mut account_4,
+        account_1,
+        account_2,
+        1_000_000,
+        10,
+    )
+    .await;
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::total_stake_account(account_4.address()),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+    /* TODO: Support operator stake account in the future
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::operator_stake_account(account_4.address(), account_1),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();*/
+}
+
+async fn create_staking_contract(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    voter: AccountAddress,
+    amount: u64,
+    commission_percentage: u64,
+) -> Response<Transaction> {
+    let staking_contract_creation = info
+        .transaction_factory()
+        .payload(aptos_stdlib::staking_contract_create_staking_contract(
+            operator,
+            voter,
+            amount,
+            commission_percentage,
+            vec![],
+        ))
+        .sequence_number(1);
+
+    let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap()
 }
 
 async fn account_has_balance(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
-    account: AccountAddress,
+    account_identifier: AccountIdentifier,
     expected_balance: u64,
     expected_sequence_number: u64,
 ) -> anyhow::Result<u64> {
-    let response = get_balance(rosetta_client, chain_id, account, None).await?;
+    let response = get_balance(rosetta_client, chain_id, account_identifier.clone(), None).await?;
     assert_eq!(
         expected_sequence_number,
         response.metadata.sequence_number.0
@@ -355,7 +489,8 @@ async fn account_has_balance(
         Ok(response.block_identifier.index)
     } else {
         Err(anyhow!(
-            "Failed to find account with {} {:?}, received {:?}",
+            "Failed to find account {:?} with {} {:?}, received {:?}",
+            account_identifier,
             expected_balance,
             native_coin(),
             response
@@ -366,12 +501,12 @@ async fn account_has_balance(
 async fn get_balance(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
-    account: AccountAddress,
+    account_identifier: AccountIdentifier,
     index: Option<u64>,
 ) -> anyhow::Result<AccountBalanceResponse> {
     let request = AccountBalanceRequest {
         network_identifier: chain_id.into(),
-        account_identifier: account.into(),
+        account_identifier,
         block_identifier: Some(PartialBlockIdentifier { index, hash: None }),
         currencies: Some(vec![native_coin()]),
     };
@@ -395,7 +530,6 @@ async fn test_transfer() {
         .coin
         .value
         .0;
-    println!("{}", sender_balance);
     let network = NetworkIdentifier::from(chain_id);
 
     // Wait until the Rosetta service is ready
@@ -726,14 +860,15 @@ async fn test_block() {
 
     // Add a ton of coins, and set an operator
     cli.fund_account(3, Some(10_000_000)).await.unwrap();
-    cli.initialize_stake_owner(3, 1_000_000, None, None)
-        .await
-        .unwrap();
+    cli.create_stake_pool(3, 3, 1, 1_000_000, 0).await.unwrap();
+
+    // Set the operator
     set_operator_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
         private_key_3,
+        Some(account_id_3),
         account_id_1,
         Duration::from_secs(5),
         None,
@@ -743,8 +878,21 @@ async fn test_block() {
     .await
     .expect("Set operator should work!");
 
-    // Also fail to set an operator
-    cli.set_operator(1, 3).await.unwrap_err();
+    // Also fail to set an operator (since the operator already changed)
+    set_operator_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        Some(account_id_3),
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap_err();
 
     // Successfully, and fail setting a voter
     set_voter_and_wait(
@@ -752,6 +900,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_3,
+        Some(account_id_1),
         account_id_1,
         Duration::from_secs(5),
         None,
@@ -759,8 +908,21 @@ async fn test_block() {
         None,
     )
     .await
-    .expect("Set operator should work!");
-    cli.set_delegated_voter(1, 3).await.unwrap_err();
+    .expect("Set voter should work!");
+    set_voter_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        Some(account_id_3),
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect_err("Set voter shouldn't work with the wrong operator!");
 
     // This one will fail (and skip estimation of gas)
     let maybe_final_txn = transfer_and_wait(
@@ -1115,6 +1277,45 @@ async fn parse_operations(
                     );
                 }
             }
+            OperationType::StakingReward => {
+                let account = operation
+                    .account
+                    .as_ref()
+                    .expect("There should be an account in a stake reward operation")
+                    .account_address()
+                    .expect("Account address should be parsable");
+
+                if actual_successful {
+                    assert_eq!(OperationStatusType::Success, status);
+                    let account_balances = balances.entry(account).or_insert_with(|| {
+                        let mut map = BTreeMap::new();
+                        map.insert(block_height, 0);
+                        map
+                    });
+                    let (_, latest_balance) = account_balances.iter().last().unwrap();
+                    let amount = operation
+                        .amount
+                        .as_ref()
+                        .expect("Should have an amount in a stake reward operation");
+                    assert_eq!(
+                        amount.currency,
+                        native_coin(),
+                        "Balance should be the native coin"
+                    );
+                    let delta =
+                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+
+                    // Add with panic on overflow in case of too high of a balance
+                    let new_balance = *latest_balance + delta as i128;
+                    account_balances.insert(block_height, new_balance);
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed stake reward operation"
+                    );
+                }
+            }
             OperationType::SetOperator => {
                 if actual_successful {
                     assert_eq!(
@@ -1138,13 +1339,29 @@ async fn parse_operations(
                         ref payload,
                     ) = txn.payload()
                     {
-                        let actual_operator_address: AccountAddress =
-                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let actual_operator_address: AccountAddress = match (
+                            *payload.module().address(),
+                            payload.module().name().as_str(),
+                            payload.function().as_str(),
+                        ) {
+                            (
+                                AccountAddress::ONE,
+                                STAKING_CONTRACT_MODULE,
+                                SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
+                            ) => bcs::from_bytes(payload.args().last().unwrap()).unwrap(),
+                            (
+                                AccountAddress::ONE,
+                                STAKING_CONTRACT_MODULE,
+                                "create_staking_contract",
+                            ) => bcs::from_bytes(payload.args().first().unwrap()).unwrap(),
+                            _ => panic!("Unsupported entry function for set operator! {:?}", txn),
+                        };
+
                         let operator = operation
                             .metadata
                             .as_ref()
                             .unwrap()
-                            .operator
+                            .new_operator
                             .as_ref()
                             .unwrap()
                             .account_address()
@@ -1186,7 +1403,7 @@ async fn parse_operations(
                             .metadata
                             .as_ref()
                             .unwrap()
-                            .voter
+                            .new_voter
                             .as_ref()
                             .unwrap()
                             .account_address()
@@ -1251,6 +1468,9 @@ async fn parse_operations(
                     }
                 };
             }
+            OperationType::InitializeStakePool => {
+                // This is not supported in block reads
+            }
         }
     }
 
@@ -1275,7 +1495,7 @@ async fn check_balances(
             let response = rosetta_client
                 .account_balance(&AccountBalanceRequest {
                     network_identifier: NetworkIdentifier::from(chain_id),
-                    account_identifier: account.into(),
+                    account_identifier: AccountIdentifier::base_account(account),
                     block_identifier: Some(PartialBlockIdentifier {
                         index: Some(block_height),
                         hash: None,
@@ -1493,7 +1713,7 @@ fn assert_transfer(
     assert_eq!(native_coin(), amount.currency);
     assert_eq!(expected_amount, amount.value);
     assert_eq!(
-        &AccountIdentifier::from(account),
+        &AccountIdentifier::base_account(account),
         operation.account.as_ref().unwrap()
     );
     let expected_status = if success {
@@ -1606,6 +1826,7 @@ async fn set_operator_and_wait(
     rest_client: &aptos_rest_client::Client,
     network_identifier: &NetworkIdentifier,
     sender_key: &Ed25519PrivateKey,
+    old_operator: Option<AccountAddress>,
     new_operator: AccountAddress,
     txn_expiry_duration: Duration,
     sequence_number: Option<u64>,
@@ -1617,6 +1838,7 @@ async fn set_operator_and_wait(
         .set_operator(
             network_identifier,
             sender_key,
+            old_operator,
             new_operator,
             expiry_time.as_secs(),
             sequence_number,
@@ -1636,6 +1858,7 @@ async fn set_voter_and_wait(
     rest_client: &aptos_rest_client::Client,
     network_identifier: &NetworkIdentifier,
     sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
     new_voter: AccountAddress,
     txn_expiry_duration: Duration,
     sequence_number: Option<u64>,
@@ -1647,6 +1870,7 @@ async fn set_voter_and_wait(
         .set_voter(
             network_identifier,
             sender_key,
+            operator,
             new_voter,
             expiry_time.as_secs(),
             sequence_number,

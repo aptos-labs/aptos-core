@@ -166,7 +166,7 @@ If you're getting an error similar to this error:
 
 This means you are either already running a node, or you have another process running on that port.
 
-On MacOS and Linux you can run the following command to get the name and PID of the process using the port:
+On macOS and Linux, you can run the following command to get the name and PID of the process using the port:
 
 ```bash
 PORT=9101
