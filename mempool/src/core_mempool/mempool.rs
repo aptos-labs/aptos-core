@@ -3,7 +3,7 @@
 
 //! Mempool is used to track transactions which have been submitted but not yet
 //! agreed upon.
-use crate::counters::{E2E, LOCAL};
+use crate::counters::{E2E_LABEL, LOCAL_LABEL};
 use crate::{
     core_mempool::{
         index::TxnPointer,
@@ -73,12 +73,12 @@ impl Mempool {
         {
             if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
                 counters::CORE_MEMPOOL_TXN_COMMIT_LATENCY
-                    .with_label_values(&[metric, LOCAL])
+                    .with_label_values(&[metric, LOCAL_LABEL])
                     .observe(time_delta.as_secs_f64());
 
                 if is_end_to_end {
                     counters::CORE_MEMPOOL_TXN_COMMIT_LATENCY
-                        .with_label_values(&[metric, E2E])
+                        .with_label_values(&[metric, E2E_LABEL])
                         .observe(time_delta.as_secs_f64());
                 }
             }

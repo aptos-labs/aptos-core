@@ -161,7 +161,7 @@ impl TransactionStore {
     ) {
         if let Some(txn) = self.get_mempool_txn(sender, sequence_number) {
             counters::CORE_MEMPOOL_TXN_RANKING_SCORE
-                .with_label_values(&[metric_label])
+                .with_label_values(&["remove", metric_label])
                 .observe(txn.ranking_score as f64);
         }
 
