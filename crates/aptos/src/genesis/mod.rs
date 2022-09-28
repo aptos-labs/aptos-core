@@ -70,8 +70,10 @@ pub struct GenerateGenesis {
     #[clap(long, parse(from_os_str))]
     output_dir: Option<PathBuf>,
     /// Whether this is mainnet genesis.
+    ///
+    /// Default is false
     #[clap(long)]
-    mainnet: Option<bool>,
+    mainnet: bool,
 
     #[clap(flatten)]
     prompt_options: PromptOptions,
@@ -93,7 +95,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
         check_if_file_exists(waypoint_file.as_path(), self.prompt_options)?;
 
         // Generate genesis and waypoint files
-        let (genesis_bytes, waypoint) = if self.mainnet.unwrap_or_default() {
+        let (genesis_bytes, waypoint) = if self.mainnet {
             let mut mainnet_genesis = fetch_mainnet_genesis_info(self.git_options)?;
             let genesis_bytes = bcs::to_bytes(mainnet_genesis.clone().get_genesis())
                 .map_err(|e| CliError::BCS(GENESIS_FILE, e))?;
