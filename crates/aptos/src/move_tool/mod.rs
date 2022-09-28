@@ -122,6 +122,14 @@ pub struct FrameworkPackageArgs {
     /// This is mutually exclusive with `--framework-git-rev`
     #[clap(long, parse(from_os_str), group = "framework_package_args")]
     pub(crate) framework_local_dir: Option<PathBuf>,
+
+    /// Skip pulling the latest git dependencies
+    ///
+    /// If you don't have a network connection, the compiler may fail due
+    /// to no ability to pull git dependencies.  This will allow overriding
+    /// this for local development.
+    #[clap(long)]
+    pub(crate) skip_fetch_latest_git_deps: bool,
 }
 
 impl FrameworkPackageArgs {
@@ -276,7 +284,10 @@ impl CliCommand<Vec<String>> for CompilePackage {
             ..self
                 .included_artifacts_args
                 .included_artifacts
-                .build_options(self.move_options.named_addresses())
+                .build_options(
+                    self.move_options.skip_fetch_latest_git_deps,
+                    self.move_options.named_addresses(),
+                )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
@@ -450,6 +461,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             install_dir: None,
             named_addresses: move_options.named_addresses(),
             docgen_options: Some(docgen_options),
+            skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -521,6 +533,7 @@ impl FromStr for IncludedArtifacts {
 impl IncludedArtifacts {
     pub(crate) fn build_options(
         self,
+        skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
@@ -532,6 +545,7 @@ impl IncludedArtifacts {
                 // Always enable error map bytecode injection
                 with_error_map: true,
                 named_addresses,
+                skip_fetch_latest_git_deps,
                 ..BuildOptions::default()
             },
             Sparse => BuildOptions {
@@ -540,6 +554,7 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses,
+                skip_fetch_latest_git_deps,
                 ..BuildOptions::default()
             },
             All => BuildOptions {
@@ -548,6 +563,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
+                skip_fetch_latest_git_deps,
                 ..BuildOptions::default()
             },
         }
@@ -570,9 +586,10 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             included_artifacts_args,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts_args
-            .included_artifacts
-            .build_options(move_options.named_addresses());
+        let options = included_artifacts_args.included_artifacts.build_options(
+            move_options.skip_fetch_latest_git_deps,
+            move_options.named_addresses(),
+        );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
 
@@ -654,9 +671,10 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         move_options.add_named_address(address_name, resource_address.to_string());
 
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts_args
-            .included_artifacts
-            .build_options(move_options.named_addresses());
+        let options = included_artifacts_args.included_artifacts.build_options(
+            move_options.skip_fetch_latest_git_deps,
+            move_options.named_addresses(),
+        );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
 
@@ -779,9 +797,10 @@ impl CliCommand<&'static str> for VerifyPackage {
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
-            ..self
-                .included_artifacts
-                .build_options(self.move_options.named_addresses())
+            ..self.included_artifacts.build_options(
+                self.move_options.skip_fetch_latest_git_deps,
+                self.move_options.named_addresses(),
+            )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
