@@ -76,9 +76,9 @@ pub const SENT_LABEL: &str = "sent";
 // invalid ACK type labels
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
-// Latency measurement type labels
-pub const LOCAL: &str = "local";
-pub const E2E: &str = "e2e";
+// Inserted transaction scope
+pub const LOCAL_LABEL: &str = "local";
+pub const E2E_LABEL: &str = "e2e";
 
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -120,7 +120,7 @@ pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
-        &["stage"]
+        &["stage", "scope"]
     )
     .unwrap()
 });
@@ -129,7 +129,7 @@ pub static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_core_mempool_txn_ranking_score",
         "Ranking score of txn reaching various stages in core mempool",
-        &["stage"]
+        &["stage", "status"]
     )
     .unwrap()
 });
