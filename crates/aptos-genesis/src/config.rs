@@ -32,10 +32,16 @@ pub struct Layout {
     /// ChainId for the target network
     pub chain_id: ChainId,
     /// Whether to allow new validators to join the set after genesis
+    ///
+    /// Ignored for mainnet
     #[serde(default)]
     pub allow_new_validators: bool,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
+    /// Whether this is a test network or not
+    ///
+    /// Ignored for mainnet
+    #[serde(default)]
     pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
