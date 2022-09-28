@@ -210,7 +210,7 @@ full_node_networks:
 
 :::tip Ports and port settings
 
-See [Ports and port settings](/nodes/ait/node-requirements#networking-requirements) for an explanation of port settings and how they are used.
+See [Ports and port settings](/nodes/validator-node/operator/node-requirements#networking-requirements) for an explanation of port settings and how they are used.
 :::
 
 Once you start your fullnode with a static identity you can allow others to connect to devnet through your node.

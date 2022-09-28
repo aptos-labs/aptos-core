@@ -1,7 +1,6 @@
 ---
 title: "Using Docker"
 slug: "run-validator-node-using-docker"
-sidebar_position: 12
 ---
 
 # Using Docker
@@ -49,7 +48,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
        Backup your private key files somewhere safe. These key files are important for you to establish ownership of your node. **Never share private keys with anyone.**
       :::
 
-5. Configure validator information. You need to setup a static IP / DNS address (DNS is much preferred) which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. See [Network Identity For Fullnode](../full-node/network-identity-fullnode.md) for how to do this. 
+5. Configure validator information. You need to setup a static IP / DNS address (DNS is much preferred) which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. See [Network Identity For Fullnode](/docs/nodes/full-node/network-identity-fullnode.md) for how to do this. 
 
     You will need this information to register on Aptos community website later.
 
