@@ -148,7 +148,7 @@ const sidebars = {
             },
           "nodes/validator-node/operator/node-liveness-criteria",
           "nodes/validator-node/operator/connect-to-aptos-network",
-          "nodes/validator-node/operator/additional-doc",
+          "nodes/validator-node/operator/shutting-down-nodes",
           ],
         },
         {
