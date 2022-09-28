@@ -52,7 +52,7 @@ To participate as a voter in the Aptos governance, follow the below steps.
 
 ## Vote
 
-1. From the Chrome browser, go to the [**Proposals section** of the Aptos Governance page for AIT-3](https://explorer.aptoslabs.com/proposals?network=ait3).
+1. From the Chrome browser, go to the [**Proposals section** of the Aptos Governance page](https://explorer.aptoslabs.com/proposals?network=Devnet).
 2. View the proposals. When you are ready to vote on a proposal, click on the proposal.
 3. Make sure you connected the wallet with your **voter** wallet account.
 4. Provide your **owner** account address and vote “For” or “Against”.

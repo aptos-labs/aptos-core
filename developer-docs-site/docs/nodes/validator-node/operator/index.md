@@ -6,78 +6,57 @@ slug: "index"
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Operator (Operator actions only - DRAFT)
+# Operator
 
-***This is the landing page for the operator persona. I will edit this page. For now, only a placeholder.***
+If you are an operator participating in the Aptos network, then use this document to perform the operator tasks such as deploying a validator node and validator fullnode, registering the nodes on the Aptos community platform, and performing the validation. 
 
-See below the summary flowcharts and detailed steps you will execute as operator.
-
-:::caution Chrome browser only
-The new Petra (Aptos Wallet) is supported only on the Chrome browser. 
+:::tip Both validator node and validator fullnode are required for mainnet
+For participating in the Aptos mainnet, you must deploy both a validator node and a validator fullnode. 
 :::
 
-## Sign-in and connect Wallet
-
-REMOVE THIS.
-### Summary steps
-
-## Deploy the validator node and register the node
-
-USE THIS BY EDITING.  
+## Deploy the nodes and register
 
 ### Summary steps
 
 <center>
 <ThemedImage
-alt="Signed Transaction Flow"
+alt="Operator Flow"
 sources={{
-    light: useBaseUrl('/img/docs/install-validator-and-register.svg'),
-    dark: useBaseUrl('/img/docs/install-validator-and-register-dark.svg'),
+    light: useBaseUrl('/img/docs/operator-flow.svg'),
+    dark: useBaseUrl('/img/docs/operator-flow-dark.svg'),
   }}
 />
 </center>
 
 ### Detailed steps
 
-1. Read the Node Requirements.
+:::tip Petra on Chrome browser only
+The [Petra wallet](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. You can also use Petra extension on [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge).
+:::
 
-  :::tip
+**Step 1:** Before you proceed, read the [**Node Requirements**](/docs/nodes/validator-node/operator/node-requirements.md) and make sure that your hardware, storage and network resources satisfy the node requirements.
 
-  Before you proceed, make sure that your hardware, storage and network resources satisfy the [Node Requirements](/docs/nodes/validator-node/operator/node-requirements.md).
-  :::
+**Step 2:** **Deploy the nodes**. Follow the detailed node installation steps provided in [**Running Validator Node**](running-validator-node/index.md) and deploy a validator node and a validator fullnode in the test mode.
 
-2. Follow the detailed node installation steps provided in [Running Validator Node](running-validator-node/index.md) and deploy a validator node in the test mode.
+:::tip Set your nodes in test mode
+**Make sure to set your nodes in the Test mode.** Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your nodes.
+:::
 
-  **Make sure to set your node in the Test mode.** Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your node.
+**Step 3:** Go to the [Aptos Community page](https://aptoslabs.com/community) and register your node by clicking on **NODE REGISTRATION** button.
 
-3. Come back to the Aptos Community page and register your node by clicking on Step 4: **NODE REGISTRATION** button.
+Provide the following details of your validator node and validator fullnode on this node registration screen. All the public key information you need is in the `~/$WORKSPACE/keys/public-keys.yaml` file (under any circumstances do not enter anything from private keys). For more on `WORKSPACE` see the node installation guide you used to deploy the node.
 
-  Provide the details of your validator node on this node registration screen, all the public key information you need is in the `~/$WORKSPACE/keys/public-keys.yaml` file (please don't enter anything from private keys).
+  - **CONSENSUS KEY**: Value of `consensus_public_key` from `public-keys.yaml` file.
+  - **CONSENSUS POP**: Value of `consensus_proof_of_possession` from `public-keys.yaml` file.
+  - **ACCOUNT KEY**: Value of `account_public_key` from `public-keys.yaml` file.
+  - **VALIDATOR NETWORK KEY**: Value of `validator_network_public_key` from `public-keys.yaml` file.
 
-    - OWNER KEY: the first wallet public key. From Settings -> Credentials
-    - CONSENSUS KEY: consensus_public_key from `public-keys.yaml`
-    - CONSENSUS POP: consensus_proof_of_possession from `public-keys.yaml`
-    - ACCOUNT KEY: account_public_key from `public-keys.yaml`
-    - VALIDATOR NETWORK KEY: validator_network_public_key from `public-keys.yaml`
+**Step 4:** Next, click on **VALIDATE NODE** on the community page. If your nodes pass healthcheck, you will be prompted to complete the identity verification process.
 
-4. Next, click on **VALIDATE NODE**. If your node passes healthcheck, you will be prompted to complete the identity verification process.
+  The Aptos team will perform a node health check on your validator and validator fullnode, using the [Node Health Checker](/nodes/node-health-checker/index). When Aptos confirms that your nodes are healthy, you will be asked to complete the KYC process.
 
-  The Aptos team will perform a node health check on your validator, using the [Node Health Checker](/nodes/node-health-checker/index). When Aptos confirms that your node is healthy, you will be asked to complete the KYC process.
+**Step 5:** When you receive notification from Aptos that you are selected, then proceed to **Connect to Aptos network** step.
 
-5. Wait for the selection announcement. If you are selected, the Aptos team will airdrop coins into your owner wallet address. If you do not see airdropped coins in your owner wallet, you were not selected.
-
-6. If you are selected, then proceed to **Iniatilize staking pool** step.
-
-## Initialize staking pool
-
-REMOVE THIS.
-
-## Connect to Aptos network and join the validator set
-
-### Detailed steps
+## Connect to Aptos network
 
 See [Connecting to Aptos Network](/nodes/validator-node/operator/connect-to-aptos-network) for detailed steps.
-
-## Vote
-
-REMOVE THIS.

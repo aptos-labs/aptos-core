@@ -11,7 +11,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 This document describes how to use [Aptos CLI](/docs/cli-tools/aptos-cli-tool/index.md) to perform owner operations during validation.
 
 :::tip Using Petra wallet
-This document assumes that you are using [Petra wallet](/docs/guides/install-petra-wallet.md).
+This document assumes that you are using [Petra wallet](/docs/guides/install-petra-wallet.md). The [Petra wallet](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. You can also use Petra extension on [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge).
 :::
 
 ## Owner operations with CLI
