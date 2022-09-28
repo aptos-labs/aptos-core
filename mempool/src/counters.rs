@@ -76,6 +76,10 @@ pub const SENT_LABEL: &str = "sent";
 // invalid ACK type labels
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
+// Latency measurement type labels
+pub const LOCAL: &str = "local";
+pub const E2E: &str = "e2e";
+
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(

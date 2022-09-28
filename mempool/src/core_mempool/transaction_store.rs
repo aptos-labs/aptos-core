@@ -123,19 +123,21 @@ impl TransactionStore {
         }
     }
 
+    /// Return (SystemTime, is the timestamp for end-to-end)
     pub(crate) fn get_insertion_time(
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<&SystemTime> {
+    ) -> Option<(&SystemTime, bool)> {
         if let Some(txn) = self
             .transactions
             .get(address)
             .and_then(|txns| txns.get(&sequence_number))
         {
-            if txn.timeline_state != TimelineState::NonQualified {
-                return Some(&txn.insertion_time);
-            }
+            return Some((
+                &txn.insertion_time,
+                txn.timeline_state != TimelineState::NonQualified,
+            ));
         }
         None
     }
