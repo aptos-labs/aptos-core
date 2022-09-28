@@ -122,7 +122,7 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
     let accounts: Vec<AccountMap> = client.get(Path::new(BALANCES_FILE))?;
     let employee_vesting_accounts: Vec<EmployeeAccountMap> =
         client.get(Path::new(EMPLOYEE_VESTING_ACCOUNTS_FILE))?;
-    let validators = get_validator_configs(&client, &layout).map_err(parse_error)?;
+    let validators = get_validator_configs(&client, &layout, true).map_err(parse_error)?;
     let framework = client.get_framework()?;
     Ok(MainnetGenesisInfo::new(
         layout.chain_id,
@@ -158,7 +158,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         ));
     }
 
-    let validators = get_validator_configs(&client, &layout).map_err(parse_error)?;
+    let validators = get_validator_configs(&client, &layout, false).map_err(parse_error)?;
     let framework = client.get_framework()?;
     Ok(GenesisInfo::new(
         layout.chain_id,
@@ -192,11 +192,12 @@ fn parse_error(errors: Vec<String>) -> CliError {
 fn get_validator_configs(
     client: &Client,
     layout: &Layout,
+    is_mainnet: bool,
 ) -> Result<Vec<ValidatorConfiguration>, Vec<String>> {
     let mut validators = Vec::new();
     let mut errors = Vec::new();
     for user in &layout.users {
-        match get_config(client, user) {
+        match get_config(client, user, is_mainnet) {
             Ok(validator) => {
                 validators.push(validator);
             }
@@ -218,7 +219,11 @@ fn get_validator_configs(
 }
 
 /// Do proper parsing so more information is known about failures
-fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfiguration> {
+fn get_config(
+    client: &Client,
+    user: &str,
+    is_mainnet: bool,
+) -> CliTypedResult<ValidatorConfiguration> {
     // Load a user's configuration files
     let dir = PathBuf::from(user);
     let owner_file = dir.join(OWNER_FILE);
@@ -291,7 +296,7 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfigurat
     .unwrap_or(true);
 
     // We don't require the operator file if the validator is not joining during genesis.
-    if !join_during_genesis {
+    if is_mainnet && !join_during_genesis {
         return Ok(ValidatorConfiguration {
             owner_account_address,
             owner_account_public_key,
