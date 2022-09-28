@@ -349,7 +349,7 @@ impl RosettaClient {
             sequence_number,
             max_gas,
             gas_unit_price,
-            false,
+            true,
         )
         .await
     }
