@@ -74,6 +74,8 @@ pub struct QuorumStoreConfig {
     pub db_quota: usize,
     pub mempool_txn_pull_max_count: u64,
     pub mempool_txn_pull_max_bytes: u64,
+    // the number of network_listener workers = # validators/this number
+    pub num_nodes_per_worker_handles: usize,
 }
 
 use std::future::Future;
@@ -105,7 +107,7 @@ impl QuorumStore {
         last_committed_round: Round,
         my_peer_id: PeerId,
         db: Arc<QuorumStoreDB>,
-        network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+        network_msg_rx_vec: Vec<aptos_channel::Receiver<PeerId, VerifiedEvent>>,
         network_sender: NetworkSender,
         config: QuorumStoreConfig,
         validator_verifier: ValidatorVerifier, //TODO: pass the epoch config
@@ -123,14 +125,6 @@ impl QuorumStore {
         let (batch_reader_tx, batch_reader_rx) = channel(config.channel_size);
         let (proof_builder_tx, proof_builder_rx) = channel(config.channel_size);
 
-        let net = NetworkListener::new(
-            epoch,
-            network_msg_rx,
-            batch_store_tx.clone(),
-            batch_reader_tx.clone(),
-            proof_builder_tx.clone(),
-            config.max_batch_bytes,
-        );
         let proof_builder = ProofBuilder::new(config.proof_timeout_ms, my_peer_id);
         let (batch_store, batch_reader) = BatchStore::new(
             epoch,
@@ -138,7 +132,7 @@ impl QuorumStore {
             my_peer_id,
             network_sender.clone(),
             batch_store_tx.clone(),
-            batch_reader_tx,
+            batch_reader_tx.clone(),
             batch_reader_rx,
             db,
             validator_verifier.clone(),
@@ -155,7 +149,19 @@ impl QuorumStore {
             "Quorum:ProofBuilder",
             proof_builder.start(proof_builder_rx, validator_verifier),
         );
-        spawn_monitored("Quorum:NetworkListener", net.start());
+
+        for network_msg_rx in network_msg_rx_vec.into_iter() {
+            let net = NetworkListener::new(
+                epoch,
+                network_msg_rx,
+                batch_store_tx.clone(),
+                batch_reader_tx.clone(),
+                proof_builder_tx.clone(),
+                config.max_batch_bytes,
+            );
+            spawn_monitored("Quorum:NetworkListener", net.start());
+        }
+
         spawn_monitored(
             "Quorum:BatchStore",
             batch_store.start(batch_store_rx, proof_builder_tx.clone()),
