@@ -125,6 +125,15 @@ pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_core_mempool_txn_ranking_score",
+        "Ranking score of txn reaching various stages in core mempool",
+        &["stage"]
+    )
+    .unwrap()
+});
+
 /// Counter for number of periodic garbage-collection (=GC) events that happen, regardless of
 /// how many txns were actually cleaned up in this GC event
 pub static CORE_MEMPOOL_GC_EVENT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {

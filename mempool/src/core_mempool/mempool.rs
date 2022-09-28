@@ -63,7 +63,7 @@ impl Mempool {
         self.log_latency(*sender, sequence_number, metric_label);
 
         self.transactions
-            .remove(sender, sequence_number, is_rejected);
+            .remove(sender, sequence_number, is_rejected, metric_label);
     }
 
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, metric: &str) {
@@ -127,7 +127,11 @@ impl Mempool {
             now,
         );
 
-        self.transactions.insert(txn_info)
+        let status = self.transactions.insert(txn_info);
+        counters::CORE_MEMPOOL_TXN_RANKING_SCORE
+            .with_label_values(&["insert", &status.code.to_string()])
+            .observe(ranking_score as f64);
+        status
     }
 
     /// Fetches next block of transactions for consensus.
