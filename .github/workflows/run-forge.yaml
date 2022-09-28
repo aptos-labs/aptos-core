@@ -13,7 +13,7 @@ on:
         type: string
         description: The docker image tag to test. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
       FORGE_NAMESPACE:
-        required: true
+        required: false
         type: string
         description: The Forge k8s namespace to be used for test. This value should manage Forge test concurrency. It may be truncated.
       FORGE_CLUSTER_NAME:
