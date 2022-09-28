@@ -9,7 +9,8 @@ use aptos_types::{
     network_address::{DnsName, NetworkAddress, Protocol},
     transaction::authenticator::AuthenticationKey,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::{BTreeMap, HashSet};
 use std::{
     convert::TryFrom,
     fs::File,
@@ -18,7 +19,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use vm_genesis::{Validator, ValidatorWithCommissionRate};
+use vm_genesis::{AccountBalance, Validator, ValidatorWithCommissionRate};
 
 /// Template for setting up Github for Genesis
 ///
@@ -349,4 +350,79 @@ pub struct StringOperatorConfiguration {
     pub validator_host: HostAndPort,
     pub full_node_network_public_key: Option<String>,
     pub full_node_host: Option<HostAndPort>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AccountBalanceMap {
+    pub account_balances: Vec<BTreeMap<AccountAddress, u64>>,
+}
+
+impl Serialize for AccountBalanceMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.account_balances.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AccountBalanceMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let account_balances = <Vec<BTreeMap<AccountAddress, u64>>>::deserialize(deserializer)?;
+        Ok(AccountBalanceMap { account_balances })
+    }
+}
+
+impl TryFrom<Vec<AccountBalance>> for AccountBalanceMap {
+    type Error = anyhow::Error;
+
+    fn try_from(balances: Vec<AccountBalance>) -> Result<Self, Self::Error> {
+        let mut accounts = HashSet::new();
+        let mut vector = vec![];
+        for balance in balances {
+            let mut map = BTreeMap::new();
+            map.insert(balance.account_address, balance.balance);
+            if !accounts.insert(balance.account_address) {
+                return Err(anyhow::anyhow!(
+                    "An account was duplicated {}",
+                    balance.account_address
+                ));
+            }
+
+            vector.push(map);
+        }
+
+        Ok(AccountBalanceMap {
+            account_balances: vector,
+        })
+    }
+}
+
+impl TryFrom<AccountBalanceMap> for Vec<AccountBalance> {
+    type Error = anyhow::Error;
+
+    fn try_from(balance_map: AccountBalanceMap) -> Result<Self, Self::Error> {
+        let mut accounts = HashSet::new();
+        let mut balances = vec![];
+        for balance_entry in balance_map.account_balances.iter() {
+            let (account_address, balance) = balance_entry
+                .iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("No values in entry map"))?;
+
+            if !accounts.insert(*account_address) {
+                panic!("An account was duplicated {}", account_address);
+            }
+
+            balances.push(AccountBalance {
+                account_address: *account_address,
+                balance: *balance,
+            });
+        }
+
+        Ok(balances)
+    }
 }

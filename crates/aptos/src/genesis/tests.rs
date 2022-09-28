@@ -32,7 +32,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use vm_genesis::{AccountMap, EmployeeAccountMap, TestValidator, ValidatorWithCommissionRate};
+use vm_genesis::{AccountBalance, EmployeeAccountMap, TestValidator, ValidatorWithCommissionRate};
 
 const INITIAL_BALANCE: u64 = 100_000_000_000_000;
 
@@ -259,9 +259,9 @@ async fn set_validator_config(
 }
 
 async fn create_account_balances_file(path: PathBuf, addresses: Vec<AccountAddress>) {
-    let account_balances: &Vec<AccountMap> = &addresses
+    let account_balances: &Vec<AccountBalance> = &addresses
         .iter()
-        .map(|account_address| AccountMap {
+        .map(|account_address| AccountBalance {
             account_address: *account_address,
             balance: INITIAL_BALANCE,
         })
