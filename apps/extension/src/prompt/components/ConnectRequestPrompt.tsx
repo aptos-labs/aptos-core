@@ -22,7 +22,7 @@ export function ConnectRequestPrompt() {
   }, [setApprovalState]);
 
   return (
-    <PermissionPromptLayout title="Signature request">
+    <PermissionPromptLayout title="Connection request">
       <Tile>
         <Heading size="sm" lineHeight="24px" mb="8px">
           This app would like to:
