@@ -17,7 +17,6 @@ jobs:
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-performance
-      FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 2 hours
       FORGE_RUNNER_DURATION_SECS: 7200
       # Land blocking is performance test

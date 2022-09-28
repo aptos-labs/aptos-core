@@ -105,8 +105,6 @@ async fn test_full_node_basic_flow() {
     assert_balance(&pfn_client, &account_1, 13).await;
 }
 
-// TODO: flaky, disabling until fixed.
-#[ignore]
 #[tokio::test]
 async fn test_vfn_failover() {
     let mut swarm = local_swarm_with_fullnodes(4, 4).await;

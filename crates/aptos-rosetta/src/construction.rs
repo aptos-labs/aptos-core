@@ -486,6 +486,9 @@ async fn construction_parse(
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
                 }
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, CREATE_STAKING_CONTRACT) => {
+                    parse_create_stake_pool_operation(sender, &type_args, &args)?
+                }
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
                         "Unsupported entry function type {:x}::{}::{}",
@@ -682,6 +685,7 @@ pub fn parse_set_operator_operation(
         sender,
         Some(AccountIdentifier::base_account(old_operator)),
         AccountIdentifier::base_account(new_operator),
+        None,
     )])
 }
 
@@ -705,6 +709,31 @@ pub fn parse_set_voter_operation(
         sender,
         Some(AccountIdentifier::base_account(operator)),
         AccountIdentifier::base_account(new_voter),
+    )])
+}
+
+pub fn parse_create_stake_pool_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Create stake pool should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let operator = parse_function_arg("create_stake_pool", args, 0)?;
+    let voter = parse_function_arg("create_stake_pool", args, 1)?;
+    let amount: u64 = parse_function_arg("create_stake_pool", args, 2)?;
+    Ok(vec![Operation::create_stake_pool(
+        0,
+        None,
+        sender,
+        Some(operator),
+        Some(voter),
+        Some(amount),
     )])
 }
 
@@ -783,6 +812,14 @@ async fn construction_payloads(
                 return Err(ApiError::InvalidInput(Some(format!(
                     "Set voter operation doesn't match metadata {:?} vs {:?}",
                     inner, metadata.internal_operation
+                ))));
+            }
+        }
+        InternalOperation::InitializeStakePool(_) => {
+            if operation != metadata.internal_operation {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Initialize stake pool doesn't match metadata {:?} vs {:?}",
+                    operation, metadata.internal_operation
                 ))));
             }
         }

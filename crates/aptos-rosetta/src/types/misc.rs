@@ -1,7 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::native_coin;
 use crate::error::ApiError;
+use crate::types::{AccountIdentifier, Amount};
+use crate::{AccountAddress, ApiResult};
+use aptos_types::stake_pool::StakePool;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
@@ -85,6 +89,7 @@ pub enum OperationType {
     StakingReward,
     SetOperator,
     SetVoter,
+    InitializeStakePool,
     // Fee must always be last for ordering
     Fee,
 }
@@ -97,6 +102,7 @@ impl OperationType {
     const STAKING_REWARD: &'static str = "staking_reward";
     const SET_OPERATOR: &'static str = "set_operator";
     const SET_VOTER: &'static str = "set_voter";
+    const INITIALIZE_STAKE_POOL: &'static str = "initialize_stake_pool";
 
     pub fn all() -> Vec<OperationType> {
         use OperationType::*;
@@ -108,6 +114,7 @@ impl OperationType {
             SetOperator,
             SetVoter,
             StakingReward,
+            InitializeStakePool,
         ]
     }
 }
@@ -124,6 +131,7 @@ impl FromStr for OperationType {
             Self::STAKING_REWARD => Ok(OperationType::StakingReward),
             Self::SET_OPERATOR => Ok(OperationType::SetOperator),
             Self::SET_VOTER => Ok(OperationType::SetVoter),
+            Self::INITIALIZE_STAKE_POOL => Ok(OperationType::InitializeStakePool),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
@@ -142,6 +150,7 @@ impl Display for OperationType {
             StakingReward => Self::STAKING_REWARD,
             SetOperator => Self::SET_OPERATOR,
             SetVoter => Self::SET_VOTER,
+            InitializeStakePool => Self::INITIALIZE_STAKE_POOL,
             Fee => Self::FEE,
         })
     }
@@ -209,4 +218,51 @@ impl Display for OperationStatusType {
             OperationStatusType::Failure => Self::FAILURE,
         })
     }
+}
+
+pub async fn get_total_stake(
+    rest_client: &aptos_rest_client::Client,
+    owner_account: &AccountIdentifier,
+    pool_address: AccountAddress,
+    version: u64,
+) -> ApiResult<Option<Amount>> {
+    const STAKE_POOL: &str = "0x1::stake::StakePool";
+    if let Ok(response) = rest_client
+        .get_account_resource_at_version_bcs::<StakePool>(pool_address, STAKE_POOL, version)
+        .await
+    {
+        let stake_pool = response.into_inner();
+
+        // Any stake pools that match, retrieve that.  Then update the total
+        let balance = get_stake_balance_from_stake_pool(&stake_pool, owner_account)?;
+        Ok(Some(balance))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Retrieves total stake balances from an individual stake pool
+fn get_stake_balance_from_stake_pool(
+    stake_pool: &StakePool,
+    account: &AccountIdentifier,
+) -> ApiResult<Amount> {
+    // Stake isn't allowed for base accounts
+    if account.is_base_account() {
+        return Err(ApiError::InvalidInput(Some(
+            "Stake pool not supported for base account".to_string(),
+        )));
+    }
+
+    // If the operator address is different, skip
+    if account.is_operator_stake() && account.operator_address()? != stake_pool.operator_address {
+        return Err(ApiError::InvalidInput(Some(
+            "Stake pool not for matching operator".to_string(),
+        )));
+    }
+
+    // TODO: Represent inactive, and pending as separate?
+    Ok(Amount {
+        value: stake_pool.get_total_staked_amount().to_string(),
+        currency: native_coin(),
+    })
 }

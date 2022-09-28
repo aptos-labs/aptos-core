@@ -100,7 +100,7 @@ sources={{
 
 5. Wait for the selection announcement. If you are selected, the Aptos team will airdrop coins into your owner wallet address. If you do not see airdropped coins in your owner wallet, you were not selected.
 
-6. If you are selected, then proceed to **Iniatilize staking pool** step.
+6. If you are selected, then proceed to **Initialize staking pool** step.
 
 ## Initialize staking pool
 

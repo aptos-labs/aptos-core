@@ -169,7 +169,7 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
       - `validator.yaml` validator config file
       - `fullnode.yaml` fullnode config file
     - `keys` folder, which includes:
-      - `public-keys.yaml`: Publick keys for the owner account, consensus, networking (from step 7).
+      - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 7).
       - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 7).
       - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 7).
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 7).

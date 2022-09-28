@@ -15,7 +15,6 @@ jobs:
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-fullnode-reboot-stress
-      FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_TEST_SUITE: fullnode_reboot_stress_test

@@ -318,6 +318,10 @@ const config = {
             to: "/guides/getting-started",
             from: "/aptos-developer-resources",
           },
+          {
+            to: "/concepts/basics-txns-states",
+            from: "/concepts/basics-merkle-proof",
+          },
         ],
       },
     ],
