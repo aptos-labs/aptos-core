@@ -76,68 +76,90 @@ impl DeltaOp {
         }
     }
 
+    /// Shifts by a `delta` the maximum positive value seen by `self`.
+    fn shifted_max_positive_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
+        match delta.update {
+            // Suppose that maximim value seen is +M and we shift by +V. Then the
+            // new maximum value is M+V provided addition do no overflow.
+            DeltaUpdate::Plus(value) => addition(value, self.max_positive, self.limit),
+            // Suppose that maximim value seen is +M and we shift by -V this time.
+            // If M >= V, the result is +(M-V). Otherwise, `self` should have never
+            // reached any positive value. By convention, we use 0 for the latter
+            // case. Also, we can reuse `subtraction` which throws an error when M < V,
+            // simply mapping the error to 0.
+            DeltaUpdate::Minus(value) => Ok(subtraction(self.max_positive, value).unwrap_or(0)),
+        }
+    }
+
+    /// Shifts by a `delta` the minimum negative value seen by `self`.
+    fn shifted_min_negative_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
+        match delta.update {
+            // Suppose that minimum value seen is -M and we shift by +V. Then this case
+            // is symmetric to +M-V in `shifted_max_positive_by`. Indeed, if M >= V, then
+            // the minimum value should become -(M-V). Otherwise, delta had never been
+            // negative and the minimum value capped to 0.
+            DeltaUpdate::Plus(value) => Ok(subtraction(self.min_negative, value).unwrap_or(0)),
+            // Otherwise, given  the minimum value of -M and the shift of -V the new
+            // minimum value becomes -(M+V), which of course can overflow on addition,
+            // implying that we subtracted too much and there was an underflow.
+            DeltaUpdate::Minus(value) => addition(value, self.min_negative, self.limit),
+        }
+    }
+
     /// Applies self on top of previous delta, merging them together. Note
     /// that the strict ordering here is crucial for catching overflows
     /// correctly.
     pub fn merge_onto(&mut self, previous_delta: DeltaOp) -> PartialVMResult<()> {
         use DeltaUpdate::*;
 
-        Ok(match previous_delta.update {
-            Plus(prev_value) => {
-                // Before we proceed to merging deltas, make sure we verify that
-                // `self` delta did not overflow when shifted by +value. At the
-                // same time, we can compute new history values for `self` delta.
-                let shifted_max_positive = addition(prev_value, self.max_positive, self.limit)?;
-                let shifted_min_negative = subtraction(self.min_negative, prev_value).unwrap_or(0);
+        // First, update the history values of this delta given that it starts from
+        // +value or -value instead of 0. We should do this check to avoid cases like this:
+        //
+        // Suppose we have deltas with limit of 100, and we have some `d2` which is +3 but it
+        // was +99 at some point. Now, if we merge some `d1` which is +2 with `d2`, we get
+        // the result is +5. However, it should not have happened because `d2` should hit
+        // +2+99 > 100 at some point in history and fail.
+        let shifted_max_positive = self.shifted_max_positive_by(&previous_delta)?;
+        let shifted_min_negative = self.shifted_min_negative_by(&previous_delta)?;
 
-                // If check has passed, update the value.
-                match self.update {
-                    Plus(self_value) => {
-                        let new_value = addition(prev_value, self_value, self.limit)?;
-                        self.update = Plus(new_value);
-                    }
-                    Minus(self_value) => {
-                        if prev_value >= self_value {
-                            let new_value = subtraction(prev_value, self_value)?;
-                            self.update = Plus(new_value);
-                        } else {
-                            let new_value = subtraction(self_value, prev_value)?;
-                            self.update = Minus(new_value);
-                        };
-                    }
+        // Useful macro for merging deltas of the same sign, e.g. +A+B or -A-B.
+        // In this cases we compute the absolute sum of deltas (A+B) and use plus
+        // or minus sign accordingly.
+        macro_rules! update_same_sign {
+            ($sign: ident, $prev_value: ident, $self_value: ident) => {
+                self.update = $sign(addition($prev_value, $self_value, self.limit)?)
+            };
+        }
+
+        // Another useful macro, this time for merging deltas with different signs, such
+        // as +A-B and -A+B. In these cases we have to check which of A or B is greater
+        // and possibly flip a sign.
+        macro_rules! update_different_sign {
+            ($first: ident, $second: ident) => {
+                if $first >= $second {
+                    self.update = Plus(subtraction($first, $second)?);
+                } else {
+                    self.update = Minus(subtraction($second, $first)?);
                 }
+            };
+        }
 
-                // Lastly, update the history.
-                self.max_positive = previous_delta.max_positive.max(shifted_max_positive);
-                self.min_negative = previous_delta.min_negative.max(shifted_min_negative);
-            }
-            Minus(prev_value) => {
-                // Again, first we verify that the merging makes sense at all.
-                // Now, we can underflow if the minimum value of `self` drops
-                // too much (i.e. when applying -value).
-                let shifted_min_negative = addition(prev_value, self.min_negative, self.limit)?;
-                let shifted_max_positive = subtraction(self.max_positive, prev_value).unwrap_or(0);
+        // History check passed, and we are ready to update the actual values now.
+        match previous_delta.update {
+            Plus(prev_value) => match self.update {
+                Plus(self_value) => update_same_sign!(Plus, prev_value, self_value),
+                Minus(self_value) => update_different_sign!(prev_value, self_value),
+            },
+            Minus(prev_value) => match self.update {
+                Plus(self_value) => update_different_sign!(self_value, prev_value),
+                Minus(self_value) => update_same_sign!(Minus, prev_value, self_value),
+            },
+        }
 
-                // Update the value and history.
-                match self.update {
-                    Plus(self_value) => {
-                        if self_value >= prev_value {
-                            let new_value = subtraction(self_value, prev_value)?;
-                            self.update = Plus(new_value);
-                        } else {
-                            let new_value = subtraction(prev_value, self_value)?;
-                            self.update = Minus(new_value);
-                        };
-                    }
-                    Minus(self_value) => {
-                        let new_value = addition(prev_value, self_value, self.limit)?;
-                        self.update = Minus(new_value);
-                    }
-                }
-                self.max_positive = previous_delta.max_positive.max(shifted_max_positive);
-                self.min_negative = previous_delta.min_negative.max(shifted_min_negative);
-            }
-        })
+        // Deltas have been merged successfully - update the history as well.
+        self.max_positive = u128::max(previous_delta.max_positive, shifted_max_positive);
+        self.min_negative = u128::max(previous_delta.min_negative, shifted_min_negative);
+        Ok(())
     }
 
     /// Consumes a single delta and tries to materialize it with a given state
