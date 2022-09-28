@@ -310,6 +310,18 @@ const config = {
             to: "/concepts/basics-txns-states",
             from: "/concepts/basics-merkle-proof",
           },
+          {
+            to: "/nodes/validator-node/operator/connect-to-aptos-network",
+            from: "/nodes/ait/connect-to-testnet",
+          },
+          {
+            to: "/nodes/validator-node/operator/node-requirements",
+            from: "/nodes/ait/node-requirements",
+          },
+          {
+            to: "/nodes/validator-node/operator/node-liveness-criteria",
+            from: "/nodes/ait/node-liveness-criteria",
+          },
         ],
       },
     ],
