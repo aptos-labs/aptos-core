@@ -147,7 +147,6 @@ fn create_node_for_fuzzing() -> RoundManager {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         time_service,
-        1,
         1024,
         10,
     );

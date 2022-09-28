@@ -44,8 +44,6 @@ pub struct ProposalGenerator {
     // Transaction manager is delivering the transactions.
     // Time service to generate block timestamps
     time_service: Arc<dyn TimeService>,
-    // Max number of transactions to be added to a proposed block.
-    max_block_txns: u64,
     // Max number of bytes to be added to a proposed block.
     max_block_bytes: u64,
     // Max number of failed authors to be added to a proposed block.
@@ -60,7 +58,6 @@ impl ProposalGenerator {
         block_store: Arc<dyn BlockReader + Send + Sync>,
         payload_manager: Arc<dyn PayloadManager>,
         time_service: Arc<dyn TimeService>,
-        max_block_txns: u64,
         max_block_bytes: u64,
         max_failed_authors_to_store: usize,
     ) -> Self {
@@ -69,7 +66,6 @@ impl ProposalGenerator {
             block_store,
             payload_manager,
             time_service,
-            max_block_txns,
             max_block_bytes,
             max_failed_authors_to_store,
             last_round_generated: 0,
@@ -159,7 +155,7 @@ impl ProposalGenerator {
             let payload = self
                 .payload_manager
                 .pull_payload(
-                    self.max_block_txns,
+                    2500,
                     self.max_block_bytes,
                     payload_filter,
                     wait_callback,

@@ -31,7 +31,6 @@ async fn test_proposal_generation_empty_tree() {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
-        1,
         10,
         10,
     );
@@ -67,7 +66,6 @@ async fn test_proposal_generation_parent() {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
-        1,
         1000,
         10,
     );
@@ -135,7 +133,6 @@ async fn test_old_proposal_generation() {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
-        1,
         1000,
         10,
     );
@@ -168,7 +165,6 @@ async fn test_correct_failed_authors() {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
-        1,
         1000,
         10,
     );

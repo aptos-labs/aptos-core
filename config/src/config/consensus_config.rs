@@ -8,7 +8,6 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusConfig {
-    pub max_block_txns: u64,
     pub max_block_bytes: u64,
     pub max_pruned_blocks_in_mem: usize,
     // Timeout for consensus to get an ack from mempool for executed transactions (in milliseconds)
@@ -35,7 +34,6 @@ pub struct ConsensusConfig {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
-            max_block_txns: 2500,
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
             max_block_bytes: 600 * 1024, // 600 KB
