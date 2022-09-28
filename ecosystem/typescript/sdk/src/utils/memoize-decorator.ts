@@ -77,22 +77,25 @@ function getNewFunction(
   return function (...args: any[]) {
     let returnedValue: any;
 
+    // @ts-ignore
+    const that: any = this;
+
     // Get or create map
     // eslint-disable-next-line no-prototype-builtins
-    if (!this.hasOwnProperty(propMapName)) {
-      Object.defineProperty(this, propMapName, {
+    if (!that.hasOwnProperty(propMapName)) {
+      Object.defineProperty(that, propMapName, {
         configurable: false,
         enumerable: false,
         writable: false,
         value: new Map<any, any>(),
       });
     }
-    const myMap: Map<any, any> = this[propMapName];
+    const myMap: Map<any, any> = that[propMapName];
 
     if (Array.isArray(tags)) {
       for (const tag of tags) {
         if (clearCacheTagsMap.has(tag)) {
-          clearCacheTagsMap.get(tag).push(myMap);
+          clearCacheTagsMap.get(tag)!.push(myMap);
         } else {
           clearCacheTagsMap.set(tag, [myMap]);
         }
@@ -106,7 +109,7 @@ function getNewFunction(
       if (hashFunction === true) {
         hashKey = args.map((a) => a.toString()).join("!");
       } else if (hashFunction) {
-        hashKey = hashFunction.apply(this, args);
+        hashKey = hashFunction.apply(that, args);
       } else {
         // eslint-disable-next-line prefer-destructuring
         hashKey = args[0];
@@ -127,18 +130,18 @@ function getNewFunction(
       if (myMap.has(hashKey) && !isExpired) {
         returnedValue = myMap.get(hashKey);
       } else {
-        returnedValue = originalMethod.apply(this, args);
+        returnedValue = originalMethod.apply(that, args as any);
         myMap.set(hashKey, returnedValue);
         if (ttlMs > 0) {
           myMap.set(timestampKey, Date.now());
         }
       }
     } else {
-      const hashKey = this;
+      const hashKey = that;
       if (myMap.has(hashKey)) {
         returnedValue = myMap.get(hashKey);
       } else {
-        returnedValue = originalMethod.apply(this, args);
+        returnedValue = originalMethod.apply(that, args as any);
         myMap.set(hashKey, returnedValue);
       }
     }

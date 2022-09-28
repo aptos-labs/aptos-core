@@ -7,7 +7,7 @@ hide_table_of_contents: false
 # Nodes
 
 :::tip Before you proceed
-- **Looking for the Aptos Incentivized Testnet-3 (AIT-3) program?** [Click here](/nodes/ait/ait-3). 
+
 - Read [Aptos Blockchain Deployments](/nodes/aptos-deployments) for the **differences between** deploying for a local testnet, for the Aptos devnet and for the Aptos incentivized testnet.
 
 :::

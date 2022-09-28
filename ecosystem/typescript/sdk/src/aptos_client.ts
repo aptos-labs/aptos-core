@@ -288,19 +288,6 @@ export class AptosClient {
   }
 
   /**
-   * @deprecated Use `getEventsByCreationNumber` instead. This will be removed in the next release.
-   *
-   * Queries events by event key
-   * @param eventKey Event key for an event stream. It is BCS serialized bytes
-   * of `guid` field in the Move struct `EventHandle`
-   * @returns Array of events assotiated with given key
-   */
-  @parseApiError
-  async getEventsByEventKey(eventKey: string): Promise<Gen.Event[]> {
-    return this.client.events.getEventsByEventKey(eventKey);
-  }
-
-  /**
    * Event types are globally identifiable by an account `address` and
    * monotonically increasing `creation_number`, one per event type emitted
    * to the given account. This API returns events corresponding to that
@@ -482,7 +469,7 @@ export class AptosClient {
     try {
       const response = await this.client.transactions.getTransactionByHash(txnHash);
       return response.type === "pending_transaction";
-    } catch (e) {
+    } catch (e: any) {
       if (e?.status === 404) {
         return true;
       }
@@ -560,6 +547,12 @@ export class AptosClient {
       await sleep(1000);
       count += 1;
     }
+
+    // There is a chance that lastTxn is still undefined. Let's throw some error here
+    if (lastTxn === undefined) {
+      throw new Error(`Waiting for transaction ${txnHash} failed`);
+    }
+
     if (isPending) {
       throw new WaitForTransactionError(
         `Waiting for transaction ${txnHash} timed out after ${timeoutSecs} seconds`,
@@ -571,7 +564,7 @@ export class AptosClient {
     }
     if (!(lastTxn as any)?.success) {
       throw new FailedTransactionError(
-        `Transaction ${lastTxn.hash} committed to the blockchain but execution failed`,
+        `Transaction ${txnHash} committed to the blockchain but execution failed`,
         lastTxn,
       );
     }

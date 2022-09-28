@@ -1,11 +1,11 @@
 ---
-title: "AIT-3 Leaderboard Metrics"
-slug: "ait-3-leaderboard-metrics"
+title: "Leaderboard Metrics"
+slug: "leaderboard-metrics"
 ---
 
-# AIT-3 Leaderboard Metrics
+# Leaderboard Metrics
 
-This document explains how the rewards for AIT-3 validator are evaluated and displayed on the [AIT-3 Validator Status](https://aptoslabs.com/leaderboard/it3) page. 
+This document explains how the rewards for validator are evaluated and displayed on the [Aptos Validator Status](https://aptoslabs.com/leaderboard/it3) page. 
 
 ## How are rewards calculated
 
@@ -13,7 +13,8 @@ This document explains how the rewards for AIT-3 validator are evaluated and dis
 For a backgrounder on staking with explanations of epoch, rewards and how to join and leave validator set, see the [Staking](/concepts/staking.md). 
 :::
 
-- For the AIT-3 the epoch duration is 7200 seconds, i.e., two hours.
+- For the Aptos network deployments, the various epoch durations are as follows:
+  - <TBD: ADD VALUES or LINK to the table>.
 - An epoch starts with a finalized validator set. During the epoch, only validators in this validator set will vote. 
 - During the epoch, following the process described in [Validation on the Aptos blockchain](/concepts/staking#validation-on-the-aptos-blockchain), a validator is selected as a leader to make a proposal. Because the validator set is unchanged during the course of an epoch, this will result in a validator being selected multiple times as a leader in an epoch.
 -  On successful proposals, i.e., proposals achieving the quorum consensus, the leaders earn rewards based on their stake and on the reward rate that is configured on-chain. The reward rate is the same for every validator.

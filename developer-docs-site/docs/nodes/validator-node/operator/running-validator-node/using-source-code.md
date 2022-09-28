@@ -1,7 +1,6 @@
 ---
 title: "Using Source Code"
 slug: "run-validator-node-using-source"
-sidebar_position: 13
 ---
 
 # Using Aptos-core source code

@@ -190,8 +190,10 @@ impl Default for StateMerklePrunerConfig {
             enable: true,
             // This allows a block / chunk being executed to have access to a non-latest state tree.
             // It needs to be greater than the number of versions the state committing thread is
-            // able to commit during the execution of the block / chunk.
-            prune_window: 100_000,
+            // able to commit during the execution of the block / chunk. If the bad case indeed
+            // happens due to this being too small, a node restart should recover it.
+            // Still, defaulting to 1M to be super safe.
+            prune_window: 1_000_000,
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             batch_size: 1_000,

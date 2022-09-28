@@ -683,7 +683,7 @@ def get_testsuite_images(context: ForgeContext) -> str:
 
 def format_pre_comment(context: ForgeContext) -> str:
     dashboard_link = get_dashboard_link(
-        context.forge_cluster.name,
+        context.forge_namespace,
         context.forge_chain_name,
         True,
     )
@@ -706,7 +706,7 @@ def format_pre_comment(context: ForgeContext) -> str:
 
 def format_comment(context: ForgeContext, result: ForgeResult) -> str:
     dashboard_link = get_dashboard_link(
-        context.forge_cluster.name,
+        context.forge_namespace,
         context.forge_chain_name,
         (result.start_time, result.end_time),
     )

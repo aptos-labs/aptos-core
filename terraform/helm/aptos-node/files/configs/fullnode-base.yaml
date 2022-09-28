@@ -1,0 +1,45 @@
+###
+### This is the base fullnode NodeConfig to work with this helm chart
+### Additional overrides to the NodeConfig can be specified via .Values.fullnode.config or .Values.overrideNodeConfig
+###
+base:
+  role: "full_node"
+  waypoint:
+    from_file: /opt/aptos/genesis/waypoint.txt
+
+execution:
+  genesis_file_location: /opt/aptos/genesis/genesis.blob
+
+storage:
+  backup_service_address: "0.0.0.0:6186"
+
+# Configure a public and VFN network
+full_node_networks:
+- network_id: "public"
+  discovery_method: "onchain"
+  listen_address: "/ip4/0.0.0.0/tcp/6182"
+  identity:
+    type: "from_file"
+    path: "/opt/aptos/genesis/validator-full-node-identity.yaml"
+  enable_proxy_protocol: {{ $.Values.haproxy.config.send_proxy_protocol }}
+  # Assume public network config always exists as the first list item in helm values
+  {{ with index $.Values.fullnode.config.full_node_networks 0 }}
+  {{ with .max_inbound_connections }}
+  max_inbound_connections: {{ . }}
+  {{ end }}
+  {{ with .seeds }}
+  seeds: {{ . }}
+  {{ end }}
+  {{ end }}
+- network_id:
+    private: "vfn"
+  listen_address: "/ip4/0.0.0.0/tcp/6181"
+  seeds:
+    00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
+      addresses:
+      - "/dns4/{{ include "aptos-validator.fullname" $ }}-{{$.Values.i}}-validator/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0"
+      role: "Validator"
+
+api:
+  enabled: true
+  address: "0.0.0.0:8080"
