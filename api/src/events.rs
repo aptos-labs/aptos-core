@@ -12,8 +12,10 @@ use crate::response::{
 };
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{Address, AptosErrorCode, IdentifierWrapper, LedgerInfo, MoveStructTag, U64};
-use aptos_api_types::{AsConverter, VersionedEvent};
+use aptos_api_types::{
+    verify_field_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
+    MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
+};
 use aptos_types::event::EventKey;
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};

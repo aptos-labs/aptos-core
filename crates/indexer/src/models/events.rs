@@ -31,8 +31,8 @@ impl Event {
         transaction_block_height: i64,
     ) -> Self {
         Event {
-            account_address: event.key.0.get_creator_address().to_string(),
-            creation_number: event.key.0.get_creation_number() as i64,
+            account_address: event.guid.account_address.to_string(),
+            creation_number: event.guid.creation_number.0 as i64,
             sequence_number: event.sequence_number.0 as i64,
             transaction_version,
             transaction_block_height,
