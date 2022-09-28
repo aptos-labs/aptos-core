@@ -45,8 +45,8 @@ module aptos_framework::timestamp {
         } else {
             // Normal block. Time must advance
             assert!(now < timestamp, error::invalid_argument(EINVALID_TIMESTAMP));
+            global_timer.microseconds = timestamp;
         };
-        global_timer.microseconds = timestamp;
     }
 
     #[test_only]
@@ -76,7 +76,7 @@ module aptos_framework::timestamp {
 
     #[test_only]
     public fun update_global_time_for_test_secs(timestamp_seconds: u64) acquires CurrentTimeMicroseconds {
-        update_global_time_for_test(timestamp_seconds * 1000000);
+        update_global_time_for_test(timestamp_seconds * MICRO_CONVERSION_FACTOR);
     }
 
     #[test_only]
