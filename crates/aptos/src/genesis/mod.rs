@@ -21,7 +21,7 @@ use crate::{
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::builder::GenesisConfiguration;
 use aptos_genesis::config::{
-    AccountBalanceMap, StringOperatorConfiguration, StringOwnerConfiguration,
+    AccountBalanceMap, EmployeePoolMap, StringOperatorConfiguration, StringOwnerConfiguration,
 };
 use aptos_genesis::{
     config::{Layout, ValidatorConfiguration},
@@ -33,7 +33,6 @@ use async_trait::async_trait;
 use clap::Parser;
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
-use vm_genesis::EmployeeAccountMap;
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
@@ -125,8 +124,9 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
 
     let account_balance_map: AccountBalanceMap = client.get(Path::new(BALANCES_FILE))?;
     let accounts = account_balance_map.try_into()?;
-    let employee_vesting_accounts: Vec<EmployeeAccountMap> =
+    let employee_vesting_accounts: EmployeePoolMap =
         client.get(Path::new(EMPLOYEE_VESTING_ACCOUNTS_FILE))?;
+    let employee_vesting_accounts = employee_vesting_accounts.try_into()?;
     let validators = get_validator_configs(&client, &layout, true).map_err(parse_error)?;
     let framework = client.get_framework()?;
     Ok(MainnetGenesisInfo::new(
