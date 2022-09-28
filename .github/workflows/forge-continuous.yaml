@@ -5,7 +5,7 @@ on:
     - cron: "0 * * * *"
   pull_request:
     paths:
-      - 'testsuite/**.py'
+      - '.github/workflows/forge-continuous.yaml'
 
 # cancel redundant builds
 concurrency:
@@ -25,8 +25,5 @@ jobs:
     secrets: inherit
     with:
       COMMENT_HEADER: forge-continuous
-      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
-      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
-      # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
-      FORGE_NAMESPACE: forge-continuous
+      # This test suite is configured using the forge.py config test command
       FORGE_TEST_SUITE: continuous
