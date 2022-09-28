@@ -26,6 +26,7 @@ use move_package::source_package::manifest_parser::{
 use move_package::{BuildConfig, ModelConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::stderr;
 use std::path::{Path, PathBuf};
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
@@ -123,8 +124,7 @@ impl BuiltPackage {
             skip_fetch_latest_git_deps: true,
         };
         eprintln!("Compiling, may take a little while to download git dependencies...");
-        let mut package =
-            build_config.compile_package_no_exit(&package_path, &mut std::io::stderr())?;
+        let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
         for module in package.root_modules_map().iter_modules().iter() {
             verify_module_init_function(module)?;
         }
