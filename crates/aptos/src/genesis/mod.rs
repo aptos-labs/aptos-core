@@ -31,8 +31,10 @@ use aptos_genesis::{
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
+use std::collections::HashSet;
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
+use vm_genesis::{AccountBalance, EmployeePool};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
@@ -123,11 +125,74 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
     let layout: Layout = client.get(Path::new(LAYOUT_FILE))?;
 
     let account_balance_map: AccountBalanceMap = client.get(Path::new(BALANCES_FILE))?;
-    let accounts = account_balance_map.try_into()?;
+
+    let accounts: Vec<AccountBalance> = account_balance_map.try_into()?;
+    let initialized_accounts: HashSet<_> =
+        accounts.iter().map(|inner| inner.account_address).collect();
+
     let employee_vesting_accounts: EmployeePoolMap =
         client.get(Path::new(EMPLOYEE_VESTING_ACCOUNTS_FILE))?;
-    let employee_vesting_accounts = employee_vesting_accounts.try_into()?;
+    let employee_vesting_accounts: Vec<EmployeePool> = employee_vesting_accounts.try_into()?;
     let validators = get_validator_configs(&client, &layout, true).map_err(parse_error)?;
+
+    // Check accounts for employee accounts
+    for (i, pool) in employee_vesting_accounts.iter().enumerate() {
+        for (j, account) in pool.accounts.iter().enumerate() {
+            if !initialized_accounts.contains(account) {
+                return Err(CliError::UnexpectedError(format!(
+                    "Account #{} '{}' in pool #{} is is not in the initialized balances",
+                    j, account, i
+                )));
+            }
+        }
+        if !initialized_accounts.contains(&pool.validator.validator.owner_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Owner address {} in pool #{} is is not in the initialized balances",
+                pool.validator.validator.owner_address, i
+            )));
+        }
+        if !initialized_accounts.contains(&pool.validator.validator.operator_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Operator address {} in pool #{} is is not in the initialized balances",
+                pool.validator.validator.operator_address, i
+            )));
+        }
+        if !initialized_accounts.contains(&pool.validator.validator.voter_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Voter address {} in pool #{} is is not in the initialized balances",
+                pool.validator.validator.voter_address, i
+            )));
+        }
+        if !initialized_accounts.contains(&pool.beneficiary_resetter) {
+            return Err(CliError::UnexpectedError(format!(
+                "Beneficiary resetter {} in pool #{} is is not in the initialized balances",
+                pool.beneficiary_resetter, i
+            )));
+        }
+    }
+
+    // check accounts for validators
+    for (i, validator) in validators.iter().enumerate() {
+        if !initialized_accounts.contains(&validator.owner_account_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Owner {} in validator #{} is is not in the initialized balances",
+                validator.owner_account_address, i
+            )));
+        }
+        if !initialized_accounts.contains(&validator.operator_account_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Operator {} in validator #{} is is not in the initialized balances",
+                validator.operator_account_address, i
+            )));
+        }
+        if !initialized_accounts.contains(&validator.voter_account_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Voter {} in validator #{} is is not in the initialized balances",
+                validator.voter_account_address, i
+            )));
+        }
+    }
+
     let framework = client.get_framework()?;
     Ok(MainnetGenesisInfo::new(
         layout.chain_id,
