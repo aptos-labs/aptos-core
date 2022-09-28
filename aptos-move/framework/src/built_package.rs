@@ -52,6 +52,8 @@ pub struct BuildOptions {
     pub named_addresses: BTreeMap<String, AccountAddress>,
     #[clap(skip)]
     pub docgen_options: Option<DocgenOptions>,
+    #[clap(long)]
+    pub skip_fetch_latest_git_deps: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -67,6 +69,9 @@ impl Default for BuildOptions {
             install_dir: None,
             named_addresses: Default::default(),
             docgen_options: None,
+            // This is false by default, because it could accidentally pull new dependencies
+            // while in a test (and cause some havoc)
+            skip_fetch_latest_git_deps: false,
         }
     }
 }
@@ -121,7 +126,7 @@ impl BuiltPackage {
             test_mode: false,
             force_recompilation: false,
             fetch_deps_only: false,
-            skip_fetch_latest_git_deps: true,
+            skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
         };
         eprintln!("Compiling, may take a little while to download git dependencies...");
         let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
