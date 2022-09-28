@@ -793,6 +793,7 @@ impl CliTestFramework {
             framework_package_args: FrameworkPackageArgs {
                 framework_git_rev: None,
                 framework_local_dir: framework_dir,
+                skip_fetch_latest_git_deps: false,
             },
         }
         .execute()
@@ -925,6 +926,7 @@ impl CliTestFramework {
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
+                    skip_fetch_latest_git_deps: false,
                 },
             },
             args: Vec::new(),
@@ -948,6 +950,7 @@ impl CliTestFramework {
             package_dir: Some(self.move_dir()),
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
+            skip_fetch_latest_git_deps: true,
         }
     }
 
