@@ -17,7 +17,6 @@ jobs:
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-changing-working-quorum-test-high-load
-      FORGE_CLUSTER_NAME: aptos-forge-big-1
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: changing_working_quorum_test_high_load
       POST_TO_SLACK: true

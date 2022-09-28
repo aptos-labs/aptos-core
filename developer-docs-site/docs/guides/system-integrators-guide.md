@@ -72,7 +72,7 @@ At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88
 * A [resource containing Aptos Coin](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/coin.move#L50) and deposit and withdrawal of coins from that resource.
 * An authentication key associated with their current public, private key(s).
 * A strictly increasing sequence number that represents the account's next transaction's sequence number to prevent replay attacks.
-* A strictly increasing number that represents the next distinct guid creation number.
+* A strictly increasing number that represents the next distinct GUID creation number.
 * An event stream for all new types of coins added to the account.
 * An event stream for all key rotations for the account.
 
@@ -202,7 +202,7 @@ Here's an example showing how to use the simulation API in the [Typescript SDK]
 Most integrations into the Aptos blockchain benefit from a holistic and comprehensive overview of the current and historical state of the blockchain. Aptos provides historical transactions, state, and events, which are the result of transaction execution.
 
 * Historical transactions specify the execution status, output, and tie to related events. Each transaction has a unique version number associated with it that dictates its global sequential ordering in the history of the blockchain ledger.
-* The state is the representation of all transaction outputs up to a specific version. In otherwords, a state version is the accumulation of all transactions inclusive of that transaction version.
+* The state is the representation of all transaction outputs up to a specific version. In other words, a state version is the accumulation of all transactions inclusive of that transaction version.
 * As transactions execute, they may emit events. [Events](/concepts/basics-events) are hints about changes in on-chain data.
 
 The storage service on a node employs two forms of pruning that erase data from nodes: 
@@ -367,7 +367,7 @@ There's a lot of information in a transaction:
 * `events` contain all the events emitted during the transaction execution
 * `timetstamp` is the near real time timestamp of the transactions execution
 
-If `success` is false, then `vm_status` will contain an error code or message that resultd in the transaction failing to succeed. When `success` is false, `changes` will be limited to gas deducted from the account and the sequence number incrementing. There will be no `events`.
+If `success` is false, then `vm_status` will contain an error code or message that resulted in the transaction failing to succeed. When `success` is false, `changes` will be limited to gas deducted from the account and the sequence number incrementing. There will be no `events`.
 
 Each event in `events` is differentiated by an `key`. The `key` is derived from the `guid` from `changes`. Specifically, the `key` is a 40-byte hex string where the first 8-bytes (or 16 characters) are the little endian representation of the `creation_num` in the `guid` of the `changes` event and the remaining characters are the account address. As events do not dictate what emitted them, it is imperative to track the path in `changes` to determine the source of an event. In particular, each `CoinStore<T>` has both a `WithdrawEvent` and a `DepositEvent`, based upon the type of coin. In order to determine which coin based upon a transaction, an indexer can compare the `guid::creation_num` in a `changes` event combined with the address to the `key` for events in `events`.
 

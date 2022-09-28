@@ -33,7 +33,7 @@ Google Cloud offers a [90 day $300 free trial for every new user](https://cloud.
 [Sign up for the $300 in credits here.](https://cloud.google.com/free)
 
 #### Create a new GCP Project
-You will also need to create a new project on the GCP Console or using the glcoud command from the Google Cloud CLI. Before you do that, however, it may be helpful to familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
+You will also need to create a new project on the GCP Console or using the gcloud command from the Google Cloud CLI. Before you do that, however, it may be helpful to familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
 
 [Follow these instructions to setup a new project.](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project)
 
@@ -148,7 +148,7 @@ Once Terraform apply finished, you can follow this section to validate your depl
   # Example command syntax: curl http://104.198.36.142/v1
   ```
 
-5. To verify the correctness of your fullnode, as outlined in the [fullnode documentation](https://aptos.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal and test it in another ssh terminal
+5. To verify the correctness of your fullnode, as outlined in the [fullnode documentation](https://aptos.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the Aptos pod in one SSH terminal and test it in another ssh terminal
 
    * Set up the port-forwarding to the aptos-fullnode pod.  Use `kubectl get pods -n aptos` to get the name of the pod
       ```

@@ -121,7 +121,7 @@ async fn check_stateful_set_status(
                 .map_err(|e| WorkloadScalingError::RetryableError(e.to_string()))?
                 .status
             {
-                if let Some(container_statuses) = status.container_statuses {
+                if let Some(ref container_statuses) = status.container_statuses {
                     if let Some(container_status) = container_statuses.last() {
                         if let Some(state) = &container_status.state {
                             if let Some(waiting) = &state.waiting {
@@ -161,8 +161,8 @@ async fn check_stateful_set_status(
                     info!("Pod {} at phase {}", &pod_name, phase)
                 }
                 Err(WorkloadScalingError::RetryableError(format!(
-                    "Retry due to pod {} status",
-                    &pod_name
+                    "Retry due to pod {} status {:?}",
+                    &pod_name, status
                 )))
             } else {
                 Err(WorkloadScalingError::FinalError(format!(
@@ -292,17 +292,15 @@ pub async fn check_for_container_restart(
             let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
             Box::pin(async move {
                 // Get the StatefulSet's Pod status
-                if let Some(status) = pod_api
-                    .get_status(format!("{}-0", sts_name).as_str())
-                    .await?
-                    .status
-                {
+                let pod_name = format!("{}-0", sts_name);
+                if let Some(status) = pod_api.get_status(&pod_name).await?.status {
                     if let Some(container_statuses) = status.container_statuses {
                         for container_status in container_statuses {
                             if container_status.restart_count > 0 {
                                 bail!(
-                                    "Container {} restarted {} times ",
+                                    "Container {} in pod {} restarted {} times ",
                                     container_status.name,
+                                    &pod_name,
                                     container_status.restart_count
                                 );
                             }

@@ -52,7 +52,6 @@ const sidebars = {
           collapsed: true,
           items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token"],
         },
-        "concepts/basics-merkle-proof",
         "concepts/basics-fullnodes",
         "concepts/basics-validator-nodes",
         "concepts/basics-node-networks-sync",

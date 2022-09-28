@@ -13,7 +13,7 @@ Users can disable telemetry at any point. If telemetry remains enabled, Aptos no
 
 # Disabling telemetry
 
-On macOs and Linux, you can disable telemetry by setting the `APTOS_DISABLE_TELEMETRY` environment variable to any value.
+On macOS and Linux, you can disable telemetry by setting the `APTOS_DISABLE_TELEMETRY` environment variable to any value.
 
 ```
 export APTOS_DISABLE_TELEMETRY=true

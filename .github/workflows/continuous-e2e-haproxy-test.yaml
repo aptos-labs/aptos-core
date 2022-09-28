@@ -1,4 +1,4 @@
-name: Twin Validator Test
+name: Continuous E2E HAProxy Test
 
 permissions:
   issues: write
@@ -10,11 +10,12 @@ on:
     - cron: "0 */3 * * *"
 
 jobs:
-  run-forge-twin-validator-test:
+  run-forge-haproxy:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-twin-validator
-      FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: twin_validator_test
+      FORGE_NAMESPACE: forge-haproxy
+      FORGE_RUNNER_DURATION_SECS: 600
+      FORGE_ENABLE_HAPROXY: true
+      FORGE_TEST_SUITE: land_blocking
       POST_TO_SLACK: true
