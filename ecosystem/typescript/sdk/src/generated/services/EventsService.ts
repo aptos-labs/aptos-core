@@ -2,7 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { Address } from '../models/Address';
-import type { EventKey } from '../models/EventKey';
 import type { IdentifierWrapper } from '../models/IdentifierWrapper';
 import type { MoveStructTag } from '../models/MoveStructTag';
 import type { U64 } from '../models/U64';
@@ -14,39 +13,6 @@ import type { BaseHttpRequest } from '../core/BaseHttpRequest';
 export class EventsService {
 
     constructor(public readonly httpRequest: BaseHttpRequest) {}
-
-    /**
-     * @deprecated
-     * Get events by event key
-     * This endpoint allows you to get a list of events of a specific type
-     * as identified by its event key, which is a globally unique ID.
-     * @param eventKey Event key to retrieve events by
-     * @param start Starting sequence number of events.
-     *
-     * If unspecified, by default will retrieve the most recent events
-     * @param limit Max number of events to retrieve.
-     *
-     * If unspecified, defaults to default page size
-     * @returns VersionedEvent
-     * @throws ApiError
-     */
-    public getEventsByEventKey(
-        eventKey: EventKey,
-        start?: U64,
-        limit?: number,
-    ): CancelablePromise<Array<VersionedEvent>> {
-        return this.httpRequest.request({
-            method: 'GET',
-            url: '/events/{event_key}',
-            path: {
-                'event_key': eventKey,
-            },
-            query: {
-                'start': start,
-                'limit': limit,
-            },
-        });
-    }
 
     /**
      * Get events by creation number

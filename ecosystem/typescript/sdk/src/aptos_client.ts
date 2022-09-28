@@ -288,19 +288,6 @@ export class AptosClient {
   }
 
   /**
-   * @deprecated Use `getEventsByCreationNumber` instead. This will be removed in the next release.
-   *
-   * Queries events by event key
-   * @param eventKey Event key for an event stream. It is BCS serialized bytes
-   * of `guid` field in the Move struct `EventHandle`
-   * @returns Array of events assotiated with given key
-   */
-  @parseApiError
-  async getEventsByEventKey(eventKey: string): Promise<Gen.Event[]> {
-    return this.client.events.getEventsByEventKey(eventKey);
-  }
-
-  /**
    * Event types are globally identifiable by an account `address` and
    * monotonically increasing `creation_number`, one per event type emitted
    * to the given account. This API returns events corresponding to that
