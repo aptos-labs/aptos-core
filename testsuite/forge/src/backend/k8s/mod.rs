@@ -112,7 +112,7 @@ impl Factory for K8sFactory {
         };
 
         let kube_client = create_k8s_client().await;
-        let (validators, fullnodes) = if self.reuse {
+        let workload_collection = if self.reuse {
             match collect_running_nodes(
                 &kube_client,
                 self.kube_namespace.clone(),
@@ -161,8 +161,9 @@ impl Factory for K8sFactory {
             &self.image_tag,
             &self.upgrade_image_tag,
             &self.kube_namespace,
-            validators,
-            fullnodes,
+            workload_collection.validators,
+            workload_collection.fullnodes,
+            workload_collection.public_fullnodes,
             self.keep,
         )
         .await

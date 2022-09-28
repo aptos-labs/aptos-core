@@ -14,6 +14,7 @@ use crate::{
 use again::RetryPolicy;
 use anyhow::{bail, format_err};
 use aptos_logger::info;
+use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
@@ -417,6 +418,12 @@ fn get_node_default_helm_path() -> String {
     }
 }
 
+pub struct WorkloadCollection {
+    pub validators: HashMap<PeerId, K8sNode>,
+    pub fullnodes: HashMap<PeerId, K8sNode>,
+    pub public_fullnodes: HashMap<PeerId, K8sNode>,
+}
+
 pub async fn install_testnet_resources(
     kube_namespace: String,
     num_validators: usize,
@@ -429,7 +436,7 @@ pub async fn install_testnet_resources(
     enable_haproxy: bool,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
-) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
+) -> Result<WorkloadCollection> {
     let kube_client = create_k8s_client().await;
 
     // get deployment-specific helm values and cache it
@@ -524,7 +531,7 @@ pub async fn install_testnet_resources(
         upgrade_public_fullnode_helm(pfn_options.as_slice(), kube_namespace.clone())?;
     }
 
-    let (validators, fullnodes) = collect_running_nodes(
+    let node_collection = collect_running_nodes(
         &kube_client,
         kube_namespace,
         use_port_forward,
@@ -532,7 +539,7 @@ pub async fn install_testnet_resources(
     )
     .await?;
 
-    Ok((validators, fullnodes))
+    Ok(node_collection)
 }
 
 pub fn construct_node_helm_values(
@@ -603,7 +610,7 @@ pub async fn collect_running_nodes(
     kube_namespace: String,
     use_port_forward: bool,
     enable_haproxy: bool,
-) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
+) -> Result<WorkloadCollection> {
     // get all validators
     let validators = get_validators(
         kube_client.clone(),
@@ -622,7 +629,7 @@ pub async fn collect_running_nodes(
     }
 
     // get all fullnodes
-    let fullnodes = get_fullnodes(
+    let fullnodes: HashMap<AccountAddress, K8sNode> = get_fullnodes(
         kube_client.clone(),
         &kube_namespace,
         use_port_forward,
@@ -632,6 +639,17 @@ pub async fn collect_running_nodes(
     .unwrap();
 
     wait_nodes_stateful_set(kube_client, &kube_namespace, &fullnodes).await?;
+
+    // let public_fullnodes = get_public_fullnodes(
+    //     kube_client.clone(),
+    //     &kube_namespace,
+    //     use_port_forward,
+    //     enable_haproxy,
+    // )
+    // .await
+    // .unwrap();
+    let public_fullnodes: HashMap<AccountAddress, K8sNode> = HashMap::new();
+    wait_nodes_stateful_set(kube_client, &kube_namespace, &public_fullnodes).await?;
 
     let nodes = validators
         .values()
@@ -647,7 +665,11 @@ pub async fn collect_running_nodes(
     }
 
     nodes_healthcheck(nodes).await?;
-    Ok((validators, fullnodes))
+    Ok(WorkloadCollection {
+        validators,
+        fullnodes,
+        public_fullnodes: HashMap::new(), //todo
+    })
 }
 
 pub async fn create_k8s_client() -> K8sClient {
@@ -993,6 +1015,7 @@ mod tests {
             "era".to_string(),
             5,
             6,
+            1,
             "image".to_string(),
             true,
         )
@@ -1001,6 +1024,7 @@ mod tests {
         let expected_helm_values = "---
 numValidators: 5
 numFullnodeGroups: 6
+numPublicFullnodeGroups: 1
 imageTag: image
 chain:
   era: era

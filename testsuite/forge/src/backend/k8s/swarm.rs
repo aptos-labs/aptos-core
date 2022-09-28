@@ -38,6 +38,7 @@ use tokio::{runtime::Runtime, time::Duration};
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
     fullnodes: HashMap<PeerId, K8sNode>,
+    public_fullnodes: HashMap<PeerId, K8sNode>,
     root_account: LocalAccount,
     kube_client: K8sClient,
     versions: Arc<HashMap<Version, String>>,
@@ -56,6 +57,7 @@ impl K8sSwarm {
         kube_namespace: &str,
         validators: HashMap<AccountAddress, K8sNode>,
         fullnodes: HashMap<AccountAddress, K8sNode>,
+        public_fullnodes: HashMap<AccountAddress, K8sNode>,
         keep: bool,
     ) -> Result<Self> {
         let kube_client = create_k8s_client().await;
@@ -90,6 +92,7 @@ impl K8sSwarm {
         let swarm = K8sSwarm {
             validators,
             fullnodes,
+            public_fullnodes,
             root_account,
             kube_client,
             chain_id: ChainId::new(4),
