@@ -1245,7 +1245,7 @@ async def run_multiple(
     for suite in forge_test_suites:
         new_namespace = f"{forge_namespace}-{suite}"
         short_link = shorten_link(get_humio_forge_link(new_namespace, True))
-        pending_comment.append(f"Running {suite}: {short_link}")
+        pending_comment.append(f"Running {suite}: [Runner logs]{short_link}")
         if forge_runner_mode != "pre-forge":
             pending_results.append(
                 context.shell.gen_run(
