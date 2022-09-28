@@ -11,7 +11,12 @@ import {
   MemoryRouter,
   useRoutes,
 } from 'react-router-dom';
-import { ChakraProvider, extendTheme, type ThemeConfig } from '@chakra-ui/react';
+import {
+  ChakraProvider,
+  StyleFunctionProps,
+  mergeThemeOverride,
+  theme as baseTheme,
+} from '@chakra-ui/react';
 import { AppStateProvider, useAppState } from 'core/hooks/useAppState';
 import { AccountsProvider } from 'core/hooks/useAccounts';
 import { NetworksProvider } from 'core/hooks/useNetworks';
@@ -27,9 +32,18 @@ window.Buffer = window.Buffer || require('buffer').Buffer;
 
 const isProductionEnv = process.env.NODE_ENV === 'production';
 
-const theme: ThemeConfig = extendTheme({
-  colors: {
-    ...customColors,
+// `extendTheme` is doing something funky with colors, so we need to manually merge
+const baseThemeWithColors = { ...baseTheme };
+Object.assign(baseThemeWithColors.colors, customColors);
+
+const theme = mergeThemeOverride(baseThemeWithColors, {
+  colors: customColors,
+  components: {
+    Spinner: {
+      baseStyle: (props: StyleFunctionProps) => ({
+        color: props.colorMode === 'dark' ? 'navy.200' : 'navy.700',
+      }),
+    },
   },
   initialColorMode: 'light',
   styles: {
