@@ -12,7 +12,8 @@ use crate::{
 };
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
-    StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
+    StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    SNAPSHOT_DELTA_TARGET_ITEMS,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_temppath::TempPath;
@@ -205,7 +206,7 @@ pub fn test_state_merkle_pruning_impl(
         },
         RocksdbConfigs::default(),
         false, /* enable_indexer */
-        TARGET_SNAPSHOT_SIZE,
+        SNAPSHOT_DELTA_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )
     .unwrap();

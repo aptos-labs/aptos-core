@@ -9,7 +9,7 @@ use aptos_api_types::{
 };
 use aptos_config::config::{
     NodeConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    NO_OP_STORAGE_PRUNER_CONFIG, SNAPSHOT_DELTA_TARGET_ITEMS,
 };
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
@@ -113,7 +113,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
                 RocksdbConfigs::default(),
                 false, /* indexer */
-                TARGET_SNAPSHOT_SIZE,
+                SNAPSHOT_DELTA_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )
             .unwrap(),

@@ -11,7 +11,7 @@ use std::{
 // Lru cache will consume about 2G RAM based on this default value.
 pub const DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD: usize = 1 << 13;
 
-pub const TARGET_SNAPSHOT_SIZE: usize = 100_000;
+pub const SNAPSHOT_DELTA_TARGET_ITEMS: usize = 100_000;
 
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
@@ -77,8 +77,9 @@ pub struct StorageConfig {
     pub storage_pruner_config: PrunerConfig,
     #[serde(skip)]
     data_dir: PathBuf,
-    /// The threshold that determine whether a snapshot should be committed to state merkle db.
-    pub target_snapshot_size: usize,
+    /// The threshold of the number of key-value pairs that determine whether a snapshot delta
+    /// should be committed to state merkle db.
+    pub snapshot_delta_target_items: usize,
     /// The max # of nodes for a lru cache shard.
     pub max_num_nodes_per_lru_cache_shard: usize,
     /// Rocksdb-specific configurations
@@ -232,7 +233,7 @@ impl Default for StorageConfig {
             data_dir: PathBuf::from("/opt/aptos/data"),
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,
-            target_snapshot_size: TARGET_SNAPSHOT_SIZE,
+            snapshot_delta_target_items: SNAPSHOT_DELTA_TARGET_ITEMS,
             max_num_nodes_per_lru_cache_shard: DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         }
     }

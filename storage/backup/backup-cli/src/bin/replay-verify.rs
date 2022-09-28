@@ -3,7 +3,8 @@
 
 use anyhow::Result;
 use aptos_config::config::{
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    SNAPSHOT_DELTA_TARGET_ITEMS,
 };
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
@@ -62,7 +63,7 @@ async fn main_impl() -> Result<()> {
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
         opt.rocksdb_opt.into(),
         false,
-        TARGET_SNAPSHOT_SIZE,
+        SNAPSHOT_DELTA_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )?)
     .get_restore_handler();

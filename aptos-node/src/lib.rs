@@ -590,7 +590,7 @@ pub fn setup_environment(
             node_config.storage.storage_pruner_config,
             node_config.storage.rocksdb_configs,
             node_config.storage.enable_indexer,
-            node_config.storage.target_snapshot_size,
+            node_config.storage.snapshot_delta_target_items,
             node_config.storage.max_num_nodes_per_lru_cache_shard,
         )
         .map_err(|err| anyhow!("DB failed to open {}", err))?,
