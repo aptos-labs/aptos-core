@@ -81,8 +81,10 @@ impl<'t> AccountMinter<'t> {
             .checked_mul(SEND_AMOUNT + GAS_AMOUNT)
             .unwrap(); // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();
-        let coins_per_seed_account = (num_accounts as u64)
-            .checked_mul(coins_per_account + 1_000_000)
+        let expected_children_per_seed_account =
+            (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
+        let coins_per_seed_account = (expected_children_per_seed_account as u64)
+            .checked_mul(coins_per_account + GAS_AMOUNT)
             .unwrap();
         let coins_for_root = coins_per_seed_account
             .checked_mul(expected_num_seed_accounts as u64)
