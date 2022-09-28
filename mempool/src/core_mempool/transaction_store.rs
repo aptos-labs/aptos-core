@@ -116,6 +116,16 @@ impl TransactionStore {
         None
     }
 
+    fn get_mempool_txn(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<&MempoolTransaction> {
+        self.transactions
+            .get(address)
+            .and_then(|txns| txns.get(&sequence_number))
+    }
+
     pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {
         match self.hash_index.get(&hash) {
             Some((address, seq)) => self.get(address, *seq),
@@ -147,7 +157,14 @@ impl TransactionStore {
         sender: &AccountAddress,
         sequence_number: u64,
         is_rejected: bool,
+        metric_label: &str,
     ) {
+        if let Some(txn) = self.get_mempool_txn(sender, sequence_number) {
+            counters::CORE_MEMPOOL_TXN_RANKING_SCORE
+                .with_label_values(&[metric_label])
+                .observe(txn.ranking_score as f64);
+        }
+
         let current_seq_number = self.get_sequence_number(sender).map_or(0, |v| *v);
         if is_rejected {
             if sequence_number >= current_seq_number {
