@@ -407,14 +407,18 @@ impl TryFrom<AccountBalanceMap> for Vec<AccountBalance> {
     fn try_from(balance_map: AccountBalanceMap) -> Result<Self, Self::Error> {
         let mut accounts = HashSet::new();
         let mut balances = vec![];
-        for balance_entry in balance_map.account_balances.iter() {
+        for (i, balance_entry) in balance_map.account_balances.iter().enumerate() {
             let (account_address, balance) = balance_entry
                 .iter()
                 .next()
-                .ok_or_else(|| anyhow::anyhow!("No values in entry map"))?;
+                .ok_or_else(|| anyhow::anyhow!("No account in entry #{}", i))?;
 
             if !accounts.insert(*account_address) {
-                panic!("An account was duplicated {}", account_address);
+                return Err(anyhow::anyhow!(
+                    "An account was duplicated {} in the balances at entry #{}",
+                    account_address,
+                    i
+                ));
             }
 
             balances.push(AccountBalance {
@@ -457,13 +461,14 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
     fn try_from(map: EmployeePoolMap) -> Result<Self, Self::Error> {
         let mut employee_accounts = HashSet::new();
         let mut pools = vec![];
-        for pool in map.inner.into_iter() {
-            for employee_account in pool.accounts.iter() {
+        for (i, pool) in map.inner.into_iter().enumerate() {
+            for (j, employee_account) in pool.accounts.iter().enumerate() {
                 if !employee_accounts.insert(*employee_account) {
                     anyhow::bail!(
-                        "Employee account {} duplicated in pool {:?}",
+                        "Employee account #{} {} duplicated in pool #{}",
+                        j,
                         employee_account,
-                        pool
+                        i
                     )
                 }
             }
