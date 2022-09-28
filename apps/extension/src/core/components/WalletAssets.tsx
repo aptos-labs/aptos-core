@@ -1,10 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { ChevronRightIcon } from '@chakra-ui/icons';
 import {
   Box,
-  Button,
   Center,
   Grid,
   Heading,
@@ -16,15 +14,11 @@ import {
 import React, { useMemo } from 'react';
 import AvatarImage from 'core/AvatarImage';
 import { assetSecondaryBgColor, secondaryBorderColor, secondaryTextColor } from 'core/colors';
-import ChakraLink from 'core/components/ChakraLink';
 import { aptosCoinStoreStructTag } from 'core/constants';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useAccountCoinResources } from 'core/queries/account';
-import useActivity from 'core/queries/useActivity';
 import { formatCoin } from 'core/utils/coin';
-import { ActivityList } from './ActivityList';
 import { AptosLogo } from './AptosLogo';
-import { Routes } from '../routes';
 
 const CoinType = {
   APTOS_TOKEN: aptosCoinStoreStructTag,
@@ -33,11 +27,14 @@ const CoinType = {
 function NoAssets() {
   const { colorMode } = useColorMode();
   return (
-    <Box w="100%" borderWidth="1px" borderRadius=".5rem" borderColor={secondaryBorderColor[colorMode]}>
-      <Center height="100%" p={4}>
-        <Text fontSize="md" textAlign="center">No assets yet!</Text>
-      </Center>
-    </Box>
+    <Center
+      borderWidth="1px"
+      borderRadius=".5rem"
+      borderColor={secondaryBorderColor[colorMode]}
+      p={4}
+    >
+      <Text fontSize="md">No assets yet!</Text>
+    </Center>
   );
 }
 
@@ -117,18 +114,15 @@ function AssetListItem({
 export default function WalletAssets() {
   const { colorMode } = useColorMode();
   const { activeAccountAddress } = useActiveAccount();
-  const { data: coinResources } = useAccountCoinResources(
+  const coinResources = useAccountCoinResources(
     activeAccountAddress,
     {
       refetchInterval: 5000,
     },
   );
 
-  const activity = useActivity({ pageSize: 5 });
-  const transactions = useMemo(() => activity.data?.pages[0]?.txns, [activity.data]);
-
   return (
-    <VStack width="100%" alignItems="flex-start" px={4}>
+    <VStack px={4} spacing={2} alignItems="stretch">
       <Heading
         py={2}
         fontSize="md"
@@ -136,47 +130,29 @@ export default function WalletAssets() {
       >
         ASSETS
       </Heading>
-      <VStack width="100%" gap={1}>
-        {
-          (coinResources && coinResources.length > 0) ? (
-            coinResources?.map((coinResource) => (
-              <AssetListItem key={coinResource.type} {...coinResource} />
-            ))
-          ) : <NoAssets />
-        }
-      </VStack>
-      <Heading
-        py={4}
-        pb={2}
-        fontSize="md"
-        color={secondaryTextColor[colorMode]}
-      >
-        RECENT TRANSACTIONS
-      </Heading>
-      <VStack w="100%" spacing={0}>
-        {
-          activity.isLoading
-            ? <Spinner />
-            : <ActivityList transactions={transactions} />
-        }
-        {
-          activity.hasNextPage
-            ? (
-              <ChakraLink key="View more" w="100%" to={Routes.activity.path}>
-                <Button
-                  mt={3}
-                  py={6}
-                  width="100%"
-                  rightIcon={<ChevronRightIcon />}
-                  justifyContent="space-between"
-                >
-                  View more
-                </Button>
-              </ChakraLink>
-            )
-            : null
-        }
-      </VStack>
+      {
+        coinResources.isLoading
+          ? <Spinner alignSelf="center" />
+          : undefined
+      }
+      {
+        coinResources.data && coinResources.data.length > 0
+          ? (
+            <VStack spacing={2}>
+              {
+                coinResources.data.map((coinResource) => (
+                  <AssetListItem key={coinResource.type} {...coinResource} />
+                ))
+              }
+            </VStack>
+          )
+          : null
+      }
+      {
+        coinResources.data && coinResources.data.length === 0
+          ? <NoAssets />
+          : null
+      }
     </VStack>
   );
 }

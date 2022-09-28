@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
@@ -21,6 +22,7 @@ import { useNodeStatus } from 'core/queries/network';
 import TransferFlow from 'core/components/TransferFlow';
 import { useLocation } from 'react-router-dom';
 import WalletAssets from 'core/components/WalletAssets';
+import WalletRecentTransactions from 'core/components/WalletRecentTransactions';
 
 function Wallet() {
   const { activeNetwork, faucetClient } = useNetworks();
@@ -35,28 +37,23 @@ function Wallet() {
 
   return (
     <WalletLayout title="Home">
-      <VStack width="100%" pb={4} spacing={4}>
-        <Flex
+      <VStack pb={4} spacing={4} alignItems="stretch">
+        <VStack
           py={4}
           px={4}
-          width="100%"
-          flexDir="column"
+          color={textColor}
           bgColor={bgColor}
+          alignItems="stretch"
         >
-          <HStack color={textColor} spacing={0} alignItems="flex-end">
-            <WalletAccountBalance />
-          </HStack>
-          <Flex width="100%" flexDir="column">
-            <SimpleGrid columns={2} spacing={2} pt={4}>
-              { faucetClient && <Faucet /> }
-              <TransferFlow />
-            </SimpleGrid>
-          </Flex>
-        </Flex>
-        <WalletAssets />
+          <WalletAccountBalance />
+          <SimpleGrid columns={2} spacing={2} pt={4}>
+            { faucetClient && <Faucet /> }
+            <TransferFlow />
+          </SimpleGrid>
+        </VStack>
         {
           isNodeAvailable === false ? (
-            <Alert status="error" borderRadius=".5rem">
+            <Alert status="error">
               <AlertIcon />
               <AlertDescription fontSize="md">
                 <Text fontSize="md" fontWeight={700}>Not connected</Text>
@@ -65,6 +62,8 @@ function Wallet() {
             </Alert>
           ) : null
         }
+        <WalletAssets />
+        <WalletRecentTransactions />
       </VStack>
     </WalletLayout>
   );

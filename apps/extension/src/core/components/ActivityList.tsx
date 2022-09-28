@@ -2,43 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React from 'react';
-import {
-  Box,
-  Center,
-  Text,
-  useColorMode,
-  VStack,
-} from '@chakra-ui/react';
-import { secondaryBorderColor } from 'core/colors';
+import { VStack } from '@chakra-ui/react';
 import ActivityListItem from 'core/components/ActivityListItem';
 import { Transaction } from 'shared/types/transaction';
 import { formatAmount } from 'core/utils/coin';
 import { BsArrowCounterclockwise } from '@react-icons/all-files/bs/BsArrowCounterclockwise';
 import { BsArrowUpRight } from '@react-icons/all-files/bs/BsArrowUpRight';
-import collapseHexString from 'core/utils/hex';
-import { HiDownload } from '@react-icons/all-files/hi/HiDownload';
+import { FiDownload } from '@react-icons/all-files/fi/FiDownload';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
 import { useActiveAccount } from 'core/hooks/useAccounts';
-
-function NoActivity() {
-  const { colorMode } = useColorMode();
-  return (
-    <Box w="100%" borderWidth="1px" borderRadius=".5rem" borderColor={secondaryBorderColor[colorMode]}>
-      <Center height="100%" p={4}>
-        <Text fontSize="md" textAlign="center">No activity yet!</Text>
-      </Center>
-    </Box>
-  );
-}
+import collapseHexString from 'core/utils/hex';
 
 const positiveAmountColor = 'green.500';
-const negativeAmountColor = 'red.500';
-const neutralAmountColor = 'gray.500';
-const formatAmountOptions = { decimals: 4, prefix: true } as const;
-const coinDepositIcon = <HiDownload />;
-const coinWithdrawalIcon = <BsArrowUpRight />;
-const selfTransferIcon = <BsArrowCounterclockwise />;
+const negativeAmountColor = 'salmon.400';
+const neutralAmountColor = 'navy.500';
+const formatAmountOptions = { decimals: 5, prefix: true } as const;
+const coinDepositIcon = <FiDownload />;
+const coinWithdrawalIcon = <BsArrowUpRight fontSize="18px" />;
+const selfTransferIcon = <BsArrowCounterclockwise fontSize="18px" />;
 const coinMintIcon = <FontAwesomeIcon icon={faFaucet} />;
 
 function extractActivityItemsFromTransaction(
@@ -101,7 +83,7 @@ function extractActivityItemsFromTransaction(
     .flatMap(({ amount, coinInfo }, index) => {
       const amountColor = amount > 0 ? positiveAmountColor : negativeAmountColor;
       const icon = amount > 0 ? coinDepositIcon : coinWithdrawalIcon;
-      const text = amount > 0 ? 'Deposited' : 'Withdrawn';
+      const text = amount > 0 ? 'Deposit' : 'Withdrawal';
       return [{
         ...common,
         amount: formatAmount(amount, coinInfo, formatAmountOptions),
@@ -114,25 +96,22 @@ function extractActivityItemsFromTransaction(
 }
 
 interface ActivityListProps {
-  transactions: Transaction[] | undefined,
+  transactions: Transaction[],
 }
 
 export function ActivityList({
   transactions,
 }: ActivityListProps) {
   const { activeAccountAddress } = useActiveAccount();
-  const activityItems = transactions?.flatMap((txn) => extractActivityItemsFromTransaction(
+  const activityItems = transactions.flatMap((txn) => extractActivityItemsFromTransaction(
     activeAccountAddress,
     txn,
   ));
 
-  const hasActivity = activityItems !== undefined && activityItems.length > 0;
   return (
-    <VStack w="100%" spacing={3}>
+    <VStack w="100%">
       {
-        hasActivity
-          ? activityItems.map(({ key, ...props }) => <ActivityListItem key={key} {...props} />)
-          : <NoActivity />
+        activityItems.map(({ key, ...props }) => <ActivityListItem key={key} {...props} />)
       }
     </VStack>
   );

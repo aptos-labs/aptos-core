@@ -32,7 +32,7 @@ function Account() {
 
   return (
     <WalletLayout title="Account" showBackButton>
-      <VStack width="100%" paddingTop={8} px={4} spacing={4}>
+      <VStack width="100%" paddingTop={8} spacing={4}>
         <Box w={20}>
           <GraceHopperBoringAvatar type="beam" />
         </Box>
@@ -43,10 +43,11 @@ function Account() {
         </Heading>
         <Divider />
         <Heading fontSize="lg">Between you</Heading>
+        <ActivityList transactions={transactions ?? []} />
         {
           activity.isLoading || activity.isFetchingNextPage
             ? <Spinner />
-            : <ActivityList transactions={transactions} />
+            : null
         }
         <NextPageLoader query={activity} />
       </VStack>

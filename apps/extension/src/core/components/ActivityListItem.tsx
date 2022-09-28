@@ -2,21 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  Box,
   Circle,
+  Heading,
   HStack,
   Text,
   Tooltip,
+  VStack,
   useColorMode,
   useInterval,
-  VStack,
 } from '@chakra-ui/react';
 import React, { useState } from 'react';
-import {
-  secondaryGridBgColor,
-  secondaryGridHoverBgColor,
-  timestampColor,
-} from 'core/colors';
 import ChakraLink from 'core/components/ChakraLink';
+import { BiChevronRight } from '@react-icons/all-files/bi/BiChevronRight';
+import { customColors } from 'core/colors';
+import { transparentize } from 'color2k';
+
+const itemTextColor = { dark: 'navy.200', light: 'navy.700' };
+const iconColor = customColors.green['500'];
+const iconBgColor = transparentize(iconColor, 0.9);
+const itemHoverColor = transparentize(iconColor, 0.95);
 
 /**
  * Convert a timestamp into a relative time short string. If the time difference
@@ -91,41 +96,42 @@ export function ActivityListItem({
   const relTime = useRelativeTime(timestamp);
 
   return (
-    <ChakraLink to={`/transactions/${txnVersion}`} w="100%">
+    <ChakraLink to={`/transactions/${txnVersion}`} w="100%" m={0}>
       <HStack
-        spacing={4}
-        py={3}
+        h="100%"
+        spacing={3}
+        py={4}
         px={4}
         cursor="pointer"
-        bgColor={secondaryGridBgColor[colorMode]}
-        borderRadius=".5rem"
         _hover={{
-          bgColor: secondaryGridHoverBgColor[colorMode],
+          bgColor: itemHoverColor,
         }}
       >
-        <Circle size={8} border="1px" borderColor="blue.400" color="blue.400">
+        <Circle size="37px" bgColor={iconBgColor} color={iconColor}>
           { icon }
         </Circle>
-        <VStack flexGrow={1} alignItems="start" spacing={0.5}>
-          <HStack w="100%" fontSize="sm">
-            <Text flexGrow={1}>
-              { text }
-            </Text>
-            <Text
-              maxWidth="45%"
-              color={amountColor}
-              fontWeight={500}
-              whiteSpace="nowrap"
-              overflow="hidden"
-              textOverflow="ellipsis"
-            >
-              { amount }
-            </Text>
-          </HStack>
-          <Text color={timestampColor[colorMode]} fontSize="xs">
+        <VStack flexGrow={1} alignItems="start" spacing="3px">
+          <Heading fontSize="sm" color={itemTextColor[colorMode]}>{ text }</Heading>
+          <Text color="navy.600" fontSize="xs">
+            <Text as="span">Confirmed</Text>
+            <Text as="span" color="navy.700" px={0.5}>&bull;</Text>
             <Tooltip label={absDateTime}>{ relTime }</Tooltip>
           </Text>
         </VStack>
+        <Heading
+          fontSize="sm"
+          alignSelf="start"
+          color={amountColor}
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          textAlign="right"
+        >
+          { amount }
+        </Heading>
+        <Box color="navy.500">
+          <BiChevronRight size="24px" />
+        </Box>
       </HStack>
     </ChakraLink>
   );
