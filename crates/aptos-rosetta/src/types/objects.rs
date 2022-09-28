@@ -7,7 +7,6 @@
 
 use crate::common::native_coin_tag;
 use crate::construction::{parse_set_operator_operation, parse_set_voter_operation};
-use crate::types::get_total_stake;
 use crate::types::move_types::*;
 use crate::{
     common::{is_native_coin, native_coin},
@@ -25,14 +24,16 @@ use aptos_rest_client::aptos_api_types::TransactionOnChainData;
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::account_config::{AccountResource, CoinStoreResource, WithdrawEvent};
 use aptos_types::contract_event::ContractEvent;
+use aptos_types::stake_pool::{SetOperatorEvent, StakePool};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
-use aptos_types::write_set::WriteOp;
+use aptos_types::write_set::{WriteOp, WriteSet};
 use aptos_types::{account_address::AccountAddress, event::EventKey};
 use cached_packages::aptos_stdlib;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -588,6 +589,7 @@ impl Transaction {
                     maybe_user_txn.map(|inner| inner.payload()),
                     txn.version,
                     operation_index,
+                    &txn.changes,
                 )
                 .await?;
                 operation_index += ops.len() as u64;
@@ -775,6 +777,7 @@ async fn parse_operations_from_write_set(
     _maybe_payload: Option<&TransactionPayload>,
     version: u64,
     operation_index: u64,
+    changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
     let (struct_tag, address) = match state_key {
         StateKey::AccessPath(path) => {
@@ -817,15 +820,8 @@ async fn parse_operations_from_write_set(
             )
         }
         (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE, 0) => {
-            parse_staking_contract_resource_changes(
-                server_context,
-                address,
-                data,
-                events,
-                operation_index,
-                version,
-            )
-            .await
+            parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
+                .await
         }
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
@@ -1095,19 +1091,91 @@ fn parse_stake_pool_resource_changes(
 }
 
 async fn parse_staking_contract_resource_changes(
-    server_context: &RosettaContext,
     owner_address: AccountAddress,
     data: &[u8],
     events: &[ContractEvent],
     mut operation_index: u64,
-    version: u64,
+    changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
     let mut operations = Vec::new();
 
     // This only handles the voter events from the staking contract
     // If there are direct events on the pool, they will be ignored
     if let Ok(store) = bcs::from_bytes::<Store>(data) {
-        // Handle set voter events
+        // Collect all the stake pools that were created
+        let stake_pools: BTreeMap<AccountAddress, StakePool> = changes
+            .iter()
+            .filter_map(|(state_key, write_op)| {
+                let data = match write_op {
+                    WriteOp::Creation(data) => Some(data),
+                    WriteOp::Modification(data) => Some(data),
+                    WriteOp::Deletion => None,
+                };
+
+                let mut ret = None;
+                if let (StateKey::AccessPath(path), Some(data)) = (state_key, data) {
+                    if let Some(struct_tag) = path.get_struct_tag() {
+                        if let (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE) = (
+                            struct_tag.address,
+                            struct_tag.module.as_str(),
+                            struct_tag.name.as_str(),
+                        ) {
+                            if let Ok(pool) = bcs::from_bytes::<StakePool>(data) {
+                                ret = Some((path.address, pool))
+                            }
+                        }
+                    }
+                }
+
+                ret
+            })
+            .collect();
+
+        // Collect all operator events for all the stake pools, and add the total stake
+        let mut set_operator_operations = vec![];
+        let mut total_stake = 0;
+        for (operator, staking_contract) in store.staking_contracts {
+            if let Some(stake_pool) = stake_pools.get(&staking_contract.pool_address) {
+                // Skip mismatched operators
+                if operator != stake_pool.operator_address {
+                    continue;
+                }
+                total_stake += stake_pool.get_total_staked_amount();
+
+                // Get all set operator events for this stake pool
+                let set_operator_events = filter_events(
+                    events,
+                    stake_pool.set_operator_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<SetOperatorEvent>(event.event_data()) {
+                            Some(event)
+                        } else {
+                            // If we can't parse the withdraw event, then there's nothing
+                            warn!(
+                                "Failed to parse set operator event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                for event in set_operator_events.iter() {
+                    set_operator_operations.push(Operation::set_operator(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        owner_address,
+                        Some(AccountIdentifier::base_account(event.old_operator)),
+                        AccountIdentifier::base_account(event.new_operator),
+                        None,
+                    ));
+                    operation_index += 1;
+                }
+            }
+        }
+
+        // Handle set voter events, there are no events on the stake pool
         let set_voter_events = filter_events(
             events,
             store.update_voter_events.key(),
@@ -1138,59 +1206,12 @@ async fn parse_staking_contract_resource_changes(
             operation_index += 1;
         }
 
-        // Handle set operator events
-        let set_operator_events = filter_events(
-            events,
-            store.switch_operator_events.key(),
-            |event_key, event| {
-                if let Ok(event) = bcs::from_bytes::<SwitchOperatorEvent>(event.event_data()) {
-                    Some(event)
-                } else {
-                    // If we can't parse the withdraw event, then there's nothing
-                    warn!(
-                        "Failed to parse switch operator event!  Skipping for {}:{}",
-                        event_key.get_creator_address(),
-                        event_key.get_creation_number()
-                    );
-                    None
-                }
-            },
-        );
-
-        if !set_operator_events.is_empty() {
-            // Collect the current balance for the SetOperator call (not itemized per operator)
-            // This should be rare, but it could become expensive.
-            let client = server_context
-                .rest_client
-                .as_ref()
-                .expect("This call is supposed to be online already anyways");
-            let owner_account = AccountIdentifier::total_stake_account(owner_address);
-            let mut total_balance = 0;
-            for (_operator, staking_contract) in store.staking_contracts.iter() {
-                if let Ok(Some(balance)) = get_total_stake(
-                    client.as_ref(),
-                    &owner_account,
-                    staking_contract.pool_address,
-                    version,
-                )
-                .await
-                {
-                    total_balance += u64::from_str(&balance.value).unwrap_or_default()
-                }
+        // Attach all set operators now, but with the total stake listed
+        for mut operation in set_operator_operations.into_iter() {
+            if let Some(inner) = operation.metadata.as_mut() {
+                inner.staked_balance = Some(total_stake.into())
             }
-
-            // Parse all set operator events
-            for event in set_operator_events {
-                operations.push(Operation::set_operator(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    owner_address,
-                    Some(AccountIdentifier::base_account(event.old_operator)),
-                    AccountIdentifier::base_account(event.new_operator),
-                    Some(total_balance),
-                ));
-                operation_index += 1;
-            }
+            operations.push(operation);
         }
     }
 
