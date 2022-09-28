@@ -141,7 +141,7 @@ async fn generate_genesis(git_options: GitOptions, output_dir: PathBuf, mainnet:
         prompt_options: PromptOptions::yes(),
         git_options,
         output_dir: Some(output_dir),
-        mainnet: Some(mainnet),
+        mainnet,
     };
     let _ = command.execute().await.unwrap();
 }
