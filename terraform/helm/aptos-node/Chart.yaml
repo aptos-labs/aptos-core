@@ -1,7 +1,7 @@
 apiVersion: v2
 name: aptos-node
-version: 0.1.0
-appVersion: 0.1.0
+version: 1.0.0
+appVersion: 1.0.0
 description: Aptos blockchain node deployment
 home: https://aptoslabs.com/
 sources:
