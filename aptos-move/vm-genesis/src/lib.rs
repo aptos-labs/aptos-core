@@ -80,7 +80,7 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 });
 
 pub fn encode_aptos_mainnet_genesis_transaction(
-    accounts: &[AccountMap],
+    accounts: &[AccountBalance],
     employees: &[EmployeeAccountMap],
     validators: &[ValidatorWithCommissionRate],
     framework: &ReleaseBundle,
@@ -417,7 +417,7 @@ fn initialize_on_chain_governance(
     );
 }
 
-fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountMap]) {
+fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountBalance]) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
@@ -761,7 +761,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountMap {
+pub struct AccountBalance {
     pub account_address: AccountAddress,
     pub balance: u64,
 }
@@ -839,79 +839,79 @@ pub fn test_mainnet_end_to_end() {
     let admin2 = AccountAddress::from_hex_literal("0x302").unwrap();
 
     let accounts = vec![
-        AccountMap {
+        AccountBalance {
             account_address: account44,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account45,
             balance: balance * 3, // Three times the balance so it can host 2 operators.
         },
-        AccountMap {
+        AccountBalance {
             account_address: account46,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account47,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account48,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account49,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator3,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator4,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator5,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter3,
             balance: non_validator_balance,
         },
