@@ -79,7 +79,7 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 
 pub fn encode_aptos_mainnet_genesis_transaction(
     accounts: &[AccountBalance],
-    employees: &[EmployeeAccountMap],
+    employees: &[EmployeePool],
     validators: &[ValidatorWithCommissionRate],
     framework: &ReleaseBundle,
     chain_id: ChainId,
@@ -430,7 +430,7 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
 
 fn create_employee_validators(
     session: &mut SessionExt<impl MoveResolver>,
-    employees: &[EmployeeAccountMap],
+    employees: &[EmployeePool],
 ) {
     let employees_bytes = bcs::to_bytes(employees).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&[]);
@@ -765,7 +765,7 @@ pub struct AccountBalance {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmployeeAccountMap {
+pub struct EmployeePool {
     pub accounts: Vec<AccountAddress>,
     pub validator: ValidatorWithCommissionRate,
     pub vesting_schedule_numerators: Vec<u64>,
@@ -942,7 +942,7 @@ pub fn test_mainnet_end_to_end() {
     same_owner_validator_3.voter_address = voter3;
 
     let employees = vec![
-        EmployeeAccountMap {
+        EmployeePool {
             accounts: vec![account46, account47],
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_1,
@@ -953,7 +953,7 @@ pub fn test_mainnet_end_to_end() {
             vesting_schedule_denominator: 48,
             beneficiary_resetter: AccountAddress::ZERO,
         },
-        EmployeeAccountMap {
+        EmployeePool {
             accounts: vec![account48, account49],
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_2,

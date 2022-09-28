@@ -19,7 +19,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, Validator, ValidatorWithCommissionRate};
+use vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
 
 /// Template for setting up Github for Genesis
 ///
@@ -424,5 +424,85 @@ impl TryFrom<AccountBalanceMap> for Vec<AccountBalance> {
         }
 
         Ok(balances)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EmployeePoolMap {
+    pub inner: Vec<EmployeePoolConfig>,
+}
+
+impl Serialize for EmployeePoolMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.inner.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for EmployeePoolMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let inner = <Vec<EmployeePoolConfig>>::deserialize(deserializer)?;
+        Ok(EmployeePoolMap { inner })
+    }
+}
+
+impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
+    type Error = anyhow::Error;
+
+    fn try_from(map: EmployeePoolMap) -> Result<Self, Self::Error> {
+        let mut employee_accounts = HashSet::new();
+        let mut pools = vec![];
+        for pool in map.inner.into_iter() {
+            for employee_account in pool.accounts.iter() {
+                if !employee_accounts.insert(*employee_account) {
+                    anyhow::bail!(
+                        "Employee account {} duplicated in pool {:?}",
+                        employee_account,
+                        pool
+                    )
+                }
+            }
+
+            // TODO: Any other checks other than just that accounts are duplicated?
+
+            pools.push(EmployeePool::try_from(pool)?);
+        }
+
+        Ok(pools)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmployeePoolConfig {
+    pub accounts: Vec<AccountAddress>,
+    pub validator: ValidatorConfiguration,
+    pub vesting_schedule_numerators: Vec<u64>,
+    pub vesting_schedule_denominator: u64,
+    pub beneficiary_resetter: AccountAddress,
+}
+
+impl TryFrom<EmployeePoolConfig> for EmployeePool {
+    type Error = anyhow::Error;
+
+    fn try_from(pool: EmployeePoolConfig) -> Result<Self, Self::Error> {
+        let validator_commission_percentage = pool.validator.commission_percentage;
+        let join_during_genesis = pool.validator.join_during_genesis;
+        let validator = Validator::try_from(pool.validator)?;
+        Ok(EmployeePool {
+            accounts: pool.accounts,
+            validator: ValidatorWithCommissionRate {
+                validator,
+                validator_commission_percentage,
+                join_during_genesis,
+            },
+            vesting_schedule_numerators: pool.vesting_schedule_numerators,
+            vesting_schedule_denominator: pool.vesting_schedule_denominator,
+            beneficiary_resetter: pool.beneficiary_resetter,
+        })
     }
 }

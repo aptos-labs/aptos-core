@@ -32,7 +32,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, EmployeeAccountMap, TestValidator, ValidatorWithCommissionRate};
+use vm_genesis::{AccountBalance, EmployeePool, TestValidator, ValidatorWithCommissionRate};
 
 const INITIAL_BALANCE: u64 = 100_000_000_000_000;
 
@@ -291,7 +291,7 @@ async fn create_employee_vesting_accounts_file(
             validator.owner_address = admin_address;
             validator.operator_address = admin_address;
             validator.voter_address = admin_address;
-            EmployeeAccountMap {
+            EmployeePool {
                 accounts: account.clone(),
                 validator: ValidatorWithCommissionRate {
                     validator,
