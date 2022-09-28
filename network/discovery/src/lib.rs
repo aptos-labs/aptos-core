@@ -103,13 +103,13 @@ impl DiscoveryChangeListener {
     pub fn rest(
         network_context: NetworkContext,
         update_channel: channel::Sender<ConnectivityRequest>,
-        rest_url: &str,
+        rest_url: url::Url,
         interval_duration: Duration,
         time_service: TimeService,
     ) -> Self {
         let source_stream = DiscoveryChangeStream::Rest(RestStream::new(
             network_context,
-            url::Url::parse(rest_url).expect("REST discovery URL is invalid"),
+            rest_url,
             interval_duration,
             time_service,
         ));

@@ -350,7 +350,7 @@ pub struct FileDiscovery {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct RestDiscovery {
-    pub url: String,
+    pub url: url::Url,
     pub interval_secs: u64,
 }
 

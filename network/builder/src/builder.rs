@@ -403,7 +403,7 @@ impl NetworkBuilder {
             DiscoveryMethod::Rest(rest_discovery) => DiscoveryChangeListener::rest(
                 self.network_context,
                 conn_mgr_reqs_tx,
-                &rest_discovery.url,
+                rest_discovery.url.clone(),
                 Duration::from_secs(rest_discovery.interval_secs),
                 self.time_service.clone(),
             ),
