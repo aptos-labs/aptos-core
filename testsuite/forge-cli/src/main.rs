@@ -147,6 +147,8 @@ struct Resize {
     num_validators: usize,
     #[structopt(long, default_value = "1")]
     num_fullnodes: usize,
+    #[structopt(long, default_value = "1")]
+    num_public_fullnodes: usize,
     #[structopt(
         long,
         help = "Override the image tag used for validators",
@@ -282,6 +284,7 @@ fn main() -> Result<()> {
                     resize.namespace,
                     resize.num_validators,
                     resize.num_fullnodes,
+                    resize.num_public_fullnodes,
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.move_modules_dir,
@@ -708,9 +711,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             )),
         "pfn_test" => config
             .with_network_tests(vec![&PfnTest])
-            .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
             .with_initial_fullnode_count(1)
-            .with_initial_public_fullnode_count(10)
+            .with_initial_public_fullnode_count(1)
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))

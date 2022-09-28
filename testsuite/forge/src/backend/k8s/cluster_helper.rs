@@ -8,6 +8,7 @@ use crate::{
     FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
     GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN,
     MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS,
+    PUBLIC_FULLNODE_HELM_CHART_PATH, PUBLIC_FULLNODE_HELM_RELEASE_NAME,
     VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
@@ -371,6 +372,14 @@ fn upgrade_aptos_node_helm(options: &[String], kube_namespace: String) -> Result
     )
 }
 
+fn upgrade_public_fullnode_helm(options: &[String], kube_namespace: String) -> Result<()> {
+    upgrade_helm_release(
+        PUBLIC_FULLNODE_HELM_RELEASE_NAME.to_string(),
+        PUBLIC_FULLNODE_HELM_CHART_PATH.to_string(),
+        options,
+        kube_namespace,
+    )
+}
 // runs helm upgrade on the installed aptos-genesis release named "genesis"
 // if a new "era" is specified, a new genesis will be created, and old resources will be destroyed
 fn upgrade_genesis_helm(options: &[String], kube_namespace: String) -> Result<()> {
@@ -440,6 +449,7 @@ pub async fn install_testnet_resources(
         new_era.clone(),
         num_validators,
         num_fullnodes,
+        num_public_fullodes,
         node_image_tag,
         enable_haproxy,
     )?;
@@ -473,6 +483,13 @@ pub async fn install_testnet_resources(
         aptos_node_forge_values_file,
     ];
 
+    let pfn_options = vec![
+        // "-f".to_string(),
+        // pfn_values_file,
+        // "-f".to_string(),
+        // pfn_forge_values_file,
+    ];
+
     let mut genesis_upgrade_options = vec![
         // use the old values
         "-f".to_string(),
@@ -501,6 +518,12 @@ pub async fn install_testnet_resources(
         kube_namespace.clone(),
     )?;
 
+    if num_public_fullodes >= 2 {
+        unimplemented!()
+    } else if num_public_fullodes == 1 {
+        upgrade_public_fullnode_helm(pfn_options.as_slice(), kube_namespace.clone())?;
+    }
+
     let (validators, fullnodes) = collect_running_nodes(
         &kube_client,
         kube_namespace,
@@ -519,12 +542,14 @@ pub fn construct_node_helm_values(
     era: String,
     num_validators: usize,
     num_fullnodes: usize,
+    num_public_fullnodes: usize,
     image_tag: String,
     enable_haproxy: bool,
 ) -> Result<String> {
     let mut value: serde_yaml::Value = serde_yaml::from_str(&base_helm_values)?;
     value["numValidators"] = num_validators.into();
     value["numFullnodeGroups"] = num_fullnodes.into();
+    value["numPublicFullnodeGroups"] = num_public_fullnodes.into();
     value["imageTag"] = image_tag.clone().into();
     value["chain"]["era"] = era.into();
     value["haproxy"]["enabled"] = enable_haproxy.into();
