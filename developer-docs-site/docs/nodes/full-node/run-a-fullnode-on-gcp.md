@@ -5,9 +5,9 @@ slug: "run-a-fullnode-on-gcp"
 
 # Run a Fullnode on GCP
 
-This tutorial explains how to configure and deploy a public fullnode to connect to the Aptos devnet using Google Cloud (GCP). Running a fullnode in the cloud usually provides better stability and availability compared to running it on your laptop. If you're looking for deploying a production grade fullnode, we recommend you to deploy it on the cloud.
+This tutorial explains how to configure and deploy a public fullnode to connect to the Aptos devnet using Google Cloud (GCP). Running a fullnode in the cloud usually provides better stability and availability compared to running it on your laptop. If you're looking to deploy a production grade fullnode, we recommend you to deploy it on the cloud.
 
-> **Note:** Please read [Run a Fullnode](/nodes/full-node/public-fullnode) if you want other alternatives for deployment, using Cloud comes with a cost, and it varies depends on how you configure it.
+> **Note:** Please read [Run a Fullnode](/nodes/full-node/public-fullnode) if you want other alternatives for deployment, using Cloud comes with a cost, and it varies depending on how you configure it.
 >
 
 ## Prerequisites
@@ -28,7 +28,7 @@ If you already have a GCP account setup, jump right into [Getting Started](#gett
 ### GCP Setup
 
 #### Sign Up for the 90 Day Free Trial
-Google Cloud offers a [90 day $300 free trial for every new user](https://cloud.google.com/free/docs/gcp-free-tier/#free-trial). These $300 are given as credits to your account and you can use them to get a sense of Google Cloud products. Be aware that you will need to add payment information when signing up for the free trial. This is for identity verification purposes and [will not incur charges until you upgrade to a paid account and run out of credits](https://cloud.google.com/free/docs/gcp-free-tier/#:~:text=Don%27t%20worry%2C%20setting,90%2Dday%20period).). Some GCP feature such as GPUs and Windows servers are not available in the free trial. 
+Google Cloud offers a [90 day $300 free trial for every new user](https://cloud.google.com/free/docs/gcp-free-tier/#free-trial). These $300 are given as credits to your account and you can use them to get a sense of Google Cloud products. Be aware that you will need to add payment information when signing up for the free trial. This is for identity verification purposes and [will not incur charges until you upgrade to a paid account and run out of credits](https://cloud.google.com/free/docs/gcp-free-tier/#:~:text=Don%27t%20worry%2C%20setting,90%2Dday%20period).). Some GCP feature such as GPUs and Windows servers are not available in the free trial.
 
 [Sign up for the $300 in credits here.](https://cloud.google.com/free)
 
@@ -303,7 +303,7 @@ To check the logs of the pod, using the following commands.
   ```
 
 
-When using GKE, the logs of the cluster and pod will automatically show up in the Google Cloud console.  From the console menu, choose `Kubernetes Engine`.  From the side menu, choose `Workloads`.  You will see all the pods from the cluster listed.  
+When using GKE, the logs of the cluster and pod will automatically show up in the Google Cloud console.  From the console menu, choose `Kubernetes Engine`.  From the side menu, choose `Workloads`.  You will see all the pods from the cluster listed.
 
 
 ![GKE Workloads screenshot](../../../static/img/tutorial-gcp-logging1.png "GKE Workloads screenshot")
@@ -321,21 +321,21 @@ Click the `LOGS` tab to view the logs directly from the pod.  If there are error
 ![GKE Workloads Pod Logs screenshot](../../../static/img/tutorial-gcp-logging3.png "GKE Workloads Pod Logs screenshot")
 
 
-Click the `open in new window` icon to view the logs in the Log Explorer.  This screen allows advanced searching in the logs.  
+Click the `open in new window` icon to view the logs in the Log Explorer.  This screen allows advanced searching in the logs.
 
 
 ![GKE Workloads Pod Logs Explorer screenshot](../../../static/img/tutorial-gcp-logging4.png "GKE Workloads Pod Logs Explorer screenshot")
 
 
 
-Other logging insights are available in the Logs Dashboard 
+Other logging insights are available in the Logs Dashboard
 
 
 ![GKE Workloads Pod Logs Dashboard screenshot](../../../static/img/tutorial-gcp-logging5.png "GKE Workloads Pod Logs Dashboard screenshot")
 
 
 
-Additional [features](https://cloud.google.com/logging/docs) are available through [Cloud Logging](https://cloud.google.com/logging), including creating log-based metrics, logging sinks and log buckets. 
+Additional [features](https://cloud.google.com/logging/docs) are available through [Cloud Logging](https://cloud.google.com/logging), including creating log-based metrics, logging sinks and log buckets.
 
 
 
@@ -347,13 +347,13 @@ Google cloud captures many metrics from the cluster and makes them easily viewab
 ![GKE Monitoring metrics screenshot](../../../static/img/tutorial-gcp-mon1.png "GKE Monitoring metrics screenshot")
 
 
-Click the `View in Cloud Monitoring` link at the top to view the built-in GKE [dashboard](https://cloud.google.com/stackdriver/docs/solutions/gke/observing) for the cluster.  
+Click the `View in Cloud Monitoring` link at the top to view the built-in GKE [dashboard](https://cloud.google.com/stackdriver/docs/solutions/gke/observing) for the cluster.
 
 
 ![GKE Monitoring dashboard screenshot](../../../static/img/tutorial-gcp-mon2.png "GKE Monitoring dashboard screenshot")
 
 
-Google Cloud [Monitoring](https://cloud.google.com/monitoring) has many other features to easily monitor the cluster and pods.  You can configure [uptime checks](https://cloud.google.com/monitoring/uptime-checks/introduction) for the services and configure [alerts](https://cloud.google.com/monitoring/alerts/using-alerting-ui) for when the metrics reach a certain [threshold](https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/sli-metrics/overview).  
+Google Cloud [Monitoring](https://cloud.google.com/monitoring) has many other features to easily monitor the cluster and pods.  You can configure [uptime checks](https://cloud.google.com/monitoring/uptime-checks/introduction) for the services and configure [alerts](https://cloud.google.com/monitoring/alerts/using-alerting-ui) for when the metrics reach a certain [threshold](https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/sli-metrics/overview).
 
 
 ## Troubleshooting
@@ -368,7 +368,7 @@ When running terraform, the command errors out with a connection refused error m
   Error: Get "http://localhost/api/v1/namespaces/aptos": dial tcp 127.0.0.1:80: connect: connection refused
   ```
 
-This likely means that the state of the install is out of sync with the saved terraform state file located in the storage bucket.  (configured during `terraform init` statement).  This could happen if the cluster or other components were deleted outside of terraform.  Or if terraform had an error and did not finish.  Use the following commands to check the state.  Delete the state that is related to the error message.  You will likely need to run terraform destroy, clean up the environment, and run the terraform script again.  
+This likely means that the state of the install is out of sync with the saved terraform state file located in the storage bucket.  (configured during `terraform init` statement).  This could happen if the cluster or other components were deleted outside of terraform.  Or if terraform had an error and did not finish.  Use the following commands to check the state.  Delete the state that is related to the error message.  You will likely need to run terraform destroy, clean up the environment, and run the terraform script again.
 
   ```
   terraform state list
