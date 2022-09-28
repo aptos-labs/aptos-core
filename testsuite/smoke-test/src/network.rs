@@ -4,13 +4,13 @@
 use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
 use aptos::common::types::EncodingType;
 use aptos::test::CliTestFramework;
-use aptos_config::config::{FileDiscovery, Peer};
+use aptos_config::config::{FileDiscovery, Peer, RestDiscovery};
 use aptos_config::{
     config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, PeerSet},
     network_id::NetworkId,
 };
 use aptos_crypto::{x25519, x25519::PrivateKey};
-use aptos_forge::{FullNode, NodeExt, Swarm};
+use aptos_forge::{FullNode, Node, NodeExt, Swarm};
 use aptos_genesis::config::HostAndPort;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
@@ -129,6 +129,27 @@ async fn test_connection_limiting() {
             .unwrap()
             .unwrap_or(0)
     );
+}
+
+#[tokio::test]
+async fn test_rest_discovery() {
+    let mut swarm = SwarmBuilder::new_local(1).with_aptos().build().await;
+
+    // Point to an already existing node
+    let (version, rest_endpoint) = {
+        let validator = swarm.validators().next().unwrap();
+        (validator.version(), validator.rest_api_endpoint())
+    };
+    let mut full_node_config = NodeConfig::default_for_public_full_node();
+    let network_config = full_node_config.full_node_networks.first_mut().unwrap();
+    network_config.discovery_method = DiscoveryMethod::Rest(RestDiscovery {
+        url: rest_endpoint,
+        interval_secs: 1,
+    });
+
+    // Start a new node that should connect to the previous node only via REST
+    // The startup wait time should check if it connects successfully
+    swarm.add_full_node(&version, full_node_config).unwrap();
 }
 
 // Currently this test seems flaky: https://github.com/aptos-labs/aptos-core/issues/670
