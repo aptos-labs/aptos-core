@@ -79,11 +79,11 @@ impl K8sSwarm {
         versions.insert(upgrade_version, upgrade_image_tag.to_string());
         versions.insert(cur_version, image_tag.to_string());
 
-        let prom_client = match prometheus::get_prometheus_client() {
+        let prom_client = match prometheus::get_prometheus_client().await {
             Ok(p) => Some(p),
             Err(e) => {
-                error!("Could not build prometheus client: {}", e);
-                None
+                // Fail fast if prometheus is not configured. A test is meaningless if we do not have observability
+                bail!("Could not build prometheus client: {}", e);
             }
         };
 
