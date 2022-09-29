@@ -1,15 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::{
-    move_binary_format::{
-        access::ModuleAccess,
-        errors::{PartialVMError, PartialVMResult},
-        file_format::{SignatureToken, Visibility},
-        CompiledModule,
-    },
-    move_core_types::{ident_str, vm_status::StatusCode},
+use move_binary_format::{
+    access::ModuleAccess,
+    errors::{PartialVMError, PartialVMResult},
+    file_format::{SignatureToken, Visibility},
+    CompiledModule,
 };
+use move_core_types::{ident_str, vm_status::StatusCode};
 
 pub fn is_signer_or_signer_reference(token: &SignatureToken) -> bool {
     match token {

@@ -4,16 +4,14 @@
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
-use move_deps::move_binary_format::errors::PartialVMError;
-use move_deps::move_core_types::gas_algebra::InternalGas;
-use move_deps::move_vm_types::{
+use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::gas_algebra::InternalGas;
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     values::{Struct, Value},
-};
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
 };
 use smallvec::smallvec;
 use std::collections::VecDeque;

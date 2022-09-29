@@ -5,14 +5,12 @@ use crate::natives::util::make_native_from_func;
 use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
 use aptos_crypto::{ed25519, traits::*};
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use move_deps::move_core_types::gas_algebra::{InternalGasPerArg, NumArgs};
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
-    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
-    move_vm_types::{
-        loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-    },
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
+use move_core_types::gas_algebra::{InternalGasPerArg, NumArgs};
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};

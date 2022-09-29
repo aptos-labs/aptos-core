@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{event::EventHandle, utility_coin::APTOS_COIN_TYPE};
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     identifier::IdentStr,
     language_storage::TypeTag,

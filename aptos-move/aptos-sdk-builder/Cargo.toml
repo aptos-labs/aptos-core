@@ -22,7 +22,8 @@ structopt = "0.3.21"
 textwrap = "0.15.0"
 
 aptos-types = { path = "../../types" }
-move-deps = { path = "../move-deps", features = ["address32"] }
+
+move-core-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5", features = ["address32"] }
 
 [dev-dependencies]
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }

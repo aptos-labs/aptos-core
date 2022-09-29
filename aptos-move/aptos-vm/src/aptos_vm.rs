@@ -44,21 +44,19 @@ use aptos_types::{
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
-use move_deps::{
-    move_binary_format::{
-        access::ModuleAccess,
-        errors::{verification_error, Location, PartialVMError, VMError, VMResult},
-        CompiledModule, IndexKind,
-    },
-    move_core_types::{
-        account_address::AccountAddress,
-        ident_str,
-        language_storage::ModuleId,
-        transaction_argument::convert_txn_args,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_binary_format::{
+    access::ModuleAccess,
+    errors::{verification_error, Location, PartialVMError, VMError, VMResult},
+    CompiledModule, IndexKind,
 };
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::ModuleId,
+    transaction_argument::convert_txn_args,
+    value::{serialize_values, MoveValue},
+};
+use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{

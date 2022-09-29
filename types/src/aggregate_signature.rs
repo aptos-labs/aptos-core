@@ -6,7 +6,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use std::collections::BTreeMap;
 
 use aptos_bitvec::BitVec;
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
 /// This struct represents a BLS multi-signature or aggregated signature:

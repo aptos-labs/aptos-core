@@ -4,10 +4,8 @@
 use crate::logging::AdapterLogSchema;
 use aptos_logger::prelude::*;
 use aptos_types::account_config::TransactionValidation;
-use move_deps::{
-    move_binary_format::errors::VMError,
-    move_core_types::vm_status::{StatusCode, VMStatus},
-};
+use move_binary_format::errors::VMError;
+use move_core_types::vm_status::{StatusCode, VMStatus};
 
 /// Error codes that can be emitted by the prologue. These have special significance to the VM when
 /// they are raised during the prologue.

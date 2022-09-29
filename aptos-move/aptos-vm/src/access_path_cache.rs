@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::access_path::AccessPath;
-use move_deps::move_core_types::{
+use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
 };

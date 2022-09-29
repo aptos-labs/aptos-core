@@ -3,18 +3,16 @@
 
 use crate::{natives::util::make_native_from_func, pop_vec_arg};
 use aptos_crypto::{bls12381, traits};
-use move_deps::move_binary_format::errors::PartialVMError;
-use move_deps::move_core_types::gas_algebra::{
+use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
 };
-use move_deps::move_core_types::vm_status::StatusCode;
-use move_deps::move_vm_types::values::Struct;
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
-    move_vm_types::{
-        loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-    },
+use move_core_types::vm_status::StatusCode;
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::values::Struct;
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};

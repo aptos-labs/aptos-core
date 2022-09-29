@@ -7,7 +7,7 @@ use crate::release_builder::RELEASE_BUNDLE_EXTENSION;
 use crate::release_bundle::ReleaseBundle;
 use crate::{path_in_crate, BuildOptions, ReleaseOptions};
 use clap::ArgEnum;
-use move_deps::move_command_line_common::address::NumericalAddress;
+use move_command_line_common::address::NumericalAddress;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 use std::fmt::Display;

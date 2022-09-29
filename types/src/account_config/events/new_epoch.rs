@@ -3,7 +3,7 @@
 
 use crate::event::EventKey;
 use anyhow::Result;
-use move_deps::move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 
 /// Struct that represents a NewEpochEvent.

@@ -10,16 +10,14 @@ use better_any::{Tid, TidAble};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
-use move_deps::move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes};
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_vm_runtime::native_functions::NativeContext,
-    move_vm_types::{
-        loaded_data::runtime_types::Type,
-        natives::function::NativeResult,
-        pop_arg,
-        values::{Reference, StructRef, Value, VectorRef},
-    },
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes};
+use move_vm_runtime::native_functions::NativeContext;
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
+    pop_arg,
+    values::{Reference, StructRef, Value, VectorRef},
 };
 use sha2::Sha512;
 use smallvec::smallvec;

@@ -9,7 +9,7 @@ use crate::{
     validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
 };
 use anyhow::anyhow;
-use move_deps::move_core_types::{account_address::AccountAddress, move_resource::MoveResource};
+use move_core_types::{account_address::AccountAddress, move_resource::MoveResource};
 use serde::de::DeserializeOwned;
 
 pub trait AccountView {

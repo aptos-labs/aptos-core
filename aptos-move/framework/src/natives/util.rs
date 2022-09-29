@@ -1,16 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::{
-    move_binary_format::errors::{PartialVMError, PartialVMResult},
-    move_core_types::{
-        gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
-        vm_status::StatusCode,
-    },
-    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
-    move_vm_types::{
-        loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-    },
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{
+    gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
+    vm_status::StatusCode,
+};
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
@@ -31,7 +29,7 @@ pub fn make_native_from_func<T: std::marker::Send + std::marker::Sync + 'static>
 macro_rules! pop_vec_arg {
     ($arguments:ident, $t:ty) => {{
         // Replicating the code from pop_arg! here
-        use move_deps::move_vm_types::natives::function::{PartialVMError, StatusCode};
+        use move_vm_types::natives::function::{PartialVMError, StatusCode};
         let value_vec = match $arguments.pop_back().map(|v| v.value_as::<Vec<Value>>()) {
             None => {
                 return Err(PartialVMError::new(

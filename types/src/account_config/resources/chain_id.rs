@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::chain_id::ChainId;
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     identifier::IdentStr,
     move_resource::{MoveResource, MoveStructType},

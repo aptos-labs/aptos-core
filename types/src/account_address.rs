@@ -7,7 +7,7 @@ use aptos_crypto::{
     x25519,
 };
 
-pub use move_deps::move_core_types::account_address::AccountAddress;
+pub use move_core_types::account_address::AccountAddress;
 
 const SALT: &[u8] = b"aptos_framework::staking_contract";
 const VESTING_POOL_SALT: &[u8] = b"aptos_framework::vesting";

@@ -19,8 +19,10 @@ smallvec = "1.8.0"
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
 
-move-deps = { path = "../move-deps", features = ["address32", "table-extension"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5", features = ["address32"] }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
 
 [dev-dependencies]
 claims = "0.7"

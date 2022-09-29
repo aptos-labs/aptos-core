@@ -22,7 +22,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_deps::move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::vm_status::{StatusCode, VMStatus};
 use rayon::prelude::*;
 use std::collections::HashMap;
 

@@ -3,11 +3,9 @@
 
 use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
 use aptos_types::account_address::AccountAddress;
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_table_extension::TableHandle,
-    move_vm_types::values::{Reference, Struct, StructRef, Value},
-};
+use move_binary_format::errors::PartialVMResult;
+use move_table_extension::TableHandle;
+use move_vm_types::values::{Reference, Struct, StructRef, Value};
 
 /// The index of the `phantom_table` field in the `AggregatorFactory` Move
 /// struct.

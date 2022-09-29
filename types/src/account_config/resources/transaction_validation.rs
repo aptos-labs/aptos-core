@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::account_config::constants::CORE_CODE_ADDRESS;
-use move_deps::move_core_types::{
+use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},

@@ -10,11 +10,10 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt},
     VMStatus,
 };
-use move_deps::{
-    move_core_types::{account_address::AccountAddress, value::MoveValue, vm_status::StatusCode},
-    move_vm_runtime::session::LoadedFunctionInstantiation,
-    move_vm_types::loaded_data::runtime_types::Type,
-};
+use move_core_types::{account_address::AccountAddress, value::MoveValue, vm_status::StatusCode};
+use move_vm_runtime::session::LoadedFunctionInstantiation;
+use move_vm_types::loaded_data::runtime_types::Type;
+
 use once_cell::sync::Lazy;
 use std::collections::BTreeSet;
 
@@ -87,7 +86,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
 }
 
 fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> bool {
-    use move_deps::move_vm_types::loaded_data::runtime_types::Type::*;
+    use move_vm_types::loaded_data::runtime_types::Type::*;
     match typ {
         Bool | U8 | U64 | U128 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner),

@@ -8,8 +8,8 @@ use crate::{
     state_store::{state_key::StateKey, state_value::StateValue},
 };
 use anyhow::{anyhow, Error, Result};
-use move_deps::move_core_types::language_storage::ModuleId;
-use move_deps::move_core_types::{
+use move_core_types::language_storage::ModuleId;
+use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

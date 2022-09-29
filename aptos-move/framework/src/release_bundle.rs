@@ -6,16 +6,14 @@ use crate::natives::code::PackageMetadata;
 use crate::path_in_crate;
 use anyhow::Context;
 use aptos_types::account_address::AccountAddress;
-use move_deps::move_binary_format::access::ModuleAccess;
-use move_deps::move_binary_format::errors::PartialVMError;
-use move_deps::move_binary_format::CompiledModule;
-use move_deps::move_command_line_common::files::{
-    extension_equals, find_filenames, MOVE_EXTENSION,
-};
-use move_deps::move_core_types::language_storage::ModuleId;
-use move_deps::move_model::code_writer::CodeWriter;
-use move_deps::move_model::model::Loc;
-use move_deps::move_model::{emit, emitln};
+use move_binary_format::access::ModuleAccess;
+use move_binary_format::errors::PartialVMError;
+use move_binary_format::CompiledModule;
+use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
+use move_core_types::language_storage::ModuleId;
+use move_model::code_writer::CodeWriter;
+use move_model::model::Loc;
+use move_model::{emit, emitln};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;

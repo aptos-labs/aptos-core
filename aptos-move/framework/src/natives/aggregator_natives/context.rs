@@ -7,7 +7,8 @@ use aptos_aggregator::{
 };
 use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
-use move_deps::{move_binary_format::errors::Location, move_table_extension::TableResolver};
+use move_binary_format::errors::Location;
+use move_table_extension::TableResolver;
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},

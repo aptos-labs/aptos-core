@@ -5,13 +5,11 @@ use crate::natives::cryptography::ristretto255::{
     pop_32_byte_slice, pop_64_byte_slice, pop_scalar_from_bytes, GasParameters,
 };
 use curve25519_dalek::scalar::Scalar;
-use move_deps::move_core_types::gas_algebra::{NumArgs, NumBytes};
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_vm_runtime::native_functions::NativeContext,
-    move_vm_types::{
-        loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-    },
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::gas_algebra::{NumArgs, NumBytes};
+use move_vm_runtime::native_functions::NativeContext;
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
 use sha2::Sha512;
 use smallvec::smallvec;

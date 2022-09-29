@@ -7,7 +7,7 @@ use crate::{
     event::{EventHandle, EventKey},
 };
 use anyhow::{format_err, Result};
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::StructTag,

@@ -3,7 +3,7 @@
 
 use crate::network_address::NetworkAddress;
 use aptos_crypto::bls12381;
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     identifier::IdentStr,
     move_resource::{MoveResource, MoveStructType},
