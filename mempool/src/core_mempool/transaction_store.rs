@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::core_mempool_txn_ranking_score;
 use crate::{
     core_mempool::{
         index::{
@@ -160,9 +161,7 @@ impl TransactionStore {
         metric_label: &str,
     ) {
         if let Some(txn) = self.get_mempool_txn(sender, sequence_number) {
-            counters::CORE_MEMPOOL_TXN_RANKING_SCORE
-                .with_label_values(&["remove", metric_label])
-                .observe(txn.ranking_score as f64);
+            core_mempool_txn_ranking_score("remove", metric_label, txn.ranking_score);
         }
 
         let current_seq_number = self.get_sequence_number(sender).map_or(0, |v| *v);

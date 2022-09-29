@@ -72,14 +72,9 @@ impl Mempool {
             .get_insertion_time(&account, sequence_number)
         {
             if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
-                counters::CORE_MEMPOOL_TXN_COMMIT_LATENCY
-                    .with_label_values(&[metric, LOCAL_LABEL])
-                    .observe(time_delta.as_secs_f64());
-
+                counters::core_mempool_txn_commit_latency(metric, LOCAL_LABEL, time_delta);
                 if is_end_to_end {
-                    counters::CORE_MEMPOOL_TXN_COMMIT_LATENCY
-                        .with_label_values(&[metric, E2E_LABEL])
-                        .observe(time_delta.as_secs_f64());
+                    counters::core_mempool_txn_commit_latency(metric, E2E_LABEL, time_delta);
                 }
             }
         }
@@ -128,9 +123,7 @@ impl Mempool {
         );
 
         let status = self.transactions.insert(txn_info);
-        counters::CORE_MEMPOOL_TXN_RANKING_SCORE
-            .with_label_values(&["insert", &status.code.to_string()])
-            .observe(ranking_score as f64);
+        counters::core_mempool_txn_ranking_score("insert", &status.code.to_string(), ranking_score);
         status
     }
 
