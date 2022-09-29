@@ -128,7 +128,7 @@ pub fn core_mempool_txn_commit_latency(
 ) {
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
         .with_label_values(&[stage, scope])
-        .observe(latency.time_delta.as_secs_f64());
+        .observe(latency.as_secs_f64());
 }
 
 /// Counter tracking latency of txns reaching various stages in committing
@@ -142,11 +142,7 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub fn core_mempool_txn_ranking_score(
-    stage: &'static str,
-    status: &'static str,
-    ranking_score: u64,
-) {
+pub fn core_mempool_txn_ranking_score(stage: &'static str, status: &str, ranking_score: u64) {
     CORE_MEMPOOL_TXN_RANKING_SCORE
         .with_label_values(&[stage, status])
         .observe(ranking_score as f64);

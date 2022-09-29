@@ -3,9 +3,7 @@
 
 //! Mempool is used to track transactions which have been submitted but not yet
 //! agreed upon.
-use crate::counters::{
-    CONSENSUS_PULLED_LABEL, E2E_LABEL, GET_BLOCK_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL,
-};
+use crate::counters::{CONSENSUS_PULLED_LABEL, E2E_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL};
 use crate::{
     core_mempool::{
         index::TxnPointer,
@@ -68,10 +66,10 @@ impl Mempool {
         }
 
         self.transactions
-            .remove(sender, sequence_number, is_rejected, metric_label);
+            .remove(sender, sequence_number, is_rejected);
     }
 
-    fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &str) {
+    fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
         if let Some((&insertion_time, is_end_to_end)) = self
             .transactions
             .get_insertion_time(&account, sequence_number)
@@ -132,7 +130,7 @@ impl Mempool {
         let status = self.transactions.insert(txn_info);
         counters::core_mempool_txn_ranking_score(
             INSERT_LABEL,
-            &status.code.to_string(),
+            status.code.to_string().as_str(),
             ranking_score,
         );
         status
@@ -204,10 +202,7 @@ impl Mempool {
                 }
                 total_bytes += txn_size;
                 block.push(txn);
-                if let Some(ranking_score) = self
-                    .transactions
-                    .get_ranking_score(&address, sequence_number)
-                {
+                if let Some(ranking_score) = self.transactions.get_ranking_score(&address, seq) {
                     counters::core_mempool_txn_ranking_score(
                         CONSENSUS_PULLED_LABEL,
                         CONSENSUS_PULLED_LABEL,

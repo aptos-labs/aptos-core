@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::{
-    core_mempool_txn_ranking_score, BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL,
-    CONSENSUS_READY_LABEL, E2E_LABEL, LOCAL_LABEL,
+    BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL, LOCAL_LABEL,
 };
 use crate::{
     core_mempool::{
@@ -168,7 +167,6 @@ impl TransactionStore {
         sender: &AccountAddress,
         sequence_number: u64,
         is_rejected: bool,
-        metric_label: &str,
     ) {
         let current_seq_number = self.get_sequence_number(sender).map_or(0, |v| *v);
         if is_rejected {
@@ -400,7 +398,8 @@ impl TransactionStore {
                             broadcast_ready = true;
                         }
 
-                        if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
+                        if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time)
+                        {
                             if broadcast_ready {
                                 counters::core_mempool_txn_commit_latency(
                                     CONSENSUS_READY_LABEL,
