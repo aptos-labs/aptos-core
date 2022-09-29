@@ -60,11 +60,11 @@ impl UserTransaction {
                 sequence_number: txn.request.sequence_number.0 as i64,
                 max_gas_amount: u64_to_bigdecimal(txn.request.max_gas_amount.0),
                 expiration_timestamp_secs: parse_timestamp_secs(
-                    txn.request.expiration_timestamp_secs,
+                    txn.request.expiration_timestamp_secs.0,
                     version,
                 ),
                 gas_unit_price: u64_to_bigdecimal(txn.request.gas_unit_price.0),
-                timestamp: parse_timestamp(txn.timestamp, version),
+                timestamp: parse_timestamp(txn.timestamp.0, version),
                 inserted_at: chrono::Utc::now().naive_utc(),
                 entry_function_id_str: match &txn.request.payload {
                     TransactionPayload::EntryFunctionPayload(payload) => {
