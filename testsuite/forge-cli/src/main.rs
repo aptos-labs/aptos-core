@@ -869,7 +869,9 @@ fn changing_working_quorum_test(
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
-            helm_values["validator"]["config"]["consensus"]["max_block_txns"] =
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                (target_tps / 4).into();
+            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
                 (target_tps / 4).into();
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
