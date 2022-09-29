@@ -95,12 +95,10 @@ module aptos_framework::genesis {
 
         // put reserved framework reserved accounts under aptos governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
-        let i = 0;
         while (!vector::is_empty(&framework_reserved_addresses)) {
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
             let (aptos_account, framework_signer_cap) = account::create_framework_reserved_account(address);
             aptos_governance::store_signer_cap(&aptos_account, address, framework_signer_cap);
-            i = i + 1;
         };
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
