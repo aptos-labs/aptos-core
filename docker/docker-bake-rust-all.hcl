@@ -163,6 +163,7 @@ function "generate_tags" {
   result = TARGET_REGISTRY == "remote" ? [
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+
     "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     ] : [
     "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
