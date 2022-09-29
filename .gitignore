@@ -52,8 +52,17 @@ terraform/testnet/*-kubernetes.json
 terraform/testnet/*-vault.ca
 .terraform.lock.hcl
 
-# Move Build Output
-build/
+# Move build output
+aptos-move/framework/aptos-framework/build/*
+aptos-move/framework/aptos-stdlib/build/*
+aptos-move/move-examples/data_structures/build/*
+
+# Included Move build output
+!aptos-move/framework/aptos-framework/build/AptosFramework
+aptos-move/framework/aptos-framework/build/AptosFramework/*
+!aptos-move/framework/aptos-framework/build/AptosFramework/docs
+aptos-move/framework/aptos-framework/build/AptosFramework/docs/*
+!aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md
 
 # Move coverage and tracing information
 .trace
