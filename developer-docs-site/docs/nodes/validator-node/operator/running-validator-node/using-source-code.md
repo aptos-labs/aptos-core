@@ -110,49 +110,16 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-9. Create a layout template file, which defines the node in the Aptos `validatorSet`. 
+9. Download the genesis blob and waypoint for the network you want to connect to, you can find a full list of networks [here](https://github.com/aptos-labs/aptos-genesis-waypoint)
+
+  For example, to download testnet genesis and waypoint:
 
   ```
-  aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
-  ```
-  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
-
-  ```
-  root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"
-  users: ["<username you specified from previous step>"]
-  chain_id: 43
-  allow_new_validators: false
-  epoch_duration_secs: 7200
-  is_test: true
-  min_stake: 100000000000000
-  min_voting_threshold: 100000000000000
-  max_stake: 100000000000000000
-  recurring_lockup_duration_secs: 86400
-  required_proposer_stake: 100000000000000
-  rewards_apy_percentage: 10
-  voting_duration_secs: 43200
-  voting_power_increase_limit: 20
+  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/waypoint.txt -o waypoint.txt
+  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/genesis.blob -o genesis.blob
   ```
 
-  Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
-
-10. Build and copy the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
-
-    ```
-    cd ~/aptos-core
-    cargo run --package framework -- release
-    cp head.mrb ~/$WORKSPACE/framework.mrb
-    ```
-
-11. Compile genesis blob and waypoint
-
-    ```
-    aptos genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
-    ```
-
-    This will create two files in your working directory, `genesis.blob` and `waypoint.txt`.
-
-12. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
+10. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
     ```
     mkdir ~/$WORKSPACE/config
     cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/config/validator.yaml
@@ -162,7 +129,7 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
     Modify the config files to update the data directory, key path, genesis file path, waypoint path.
     User must have write access to data directory.
 
-13. <span id="source-code-vfn">To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:</span>
+11. <span id="source-code-vfn">To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:</span>
 
     - `config` folder, which includes:
       - `validator.yaml` validator config file
@@ -175,21 +142,19 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
     - `username` folder, which includes: 
       - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 8).
       - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 8). 
-    - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 9).
-    - `framework.mrb`: The AptosFramework Move package (from step 10).
-    - `waypoint.txt`: The waypoint for the genesis transaction (from step 11).
-    - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 11).
+    - `waypoint.txt`: The waypoint for the genesis transaction (from step 9).
+    - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 9).
 
-14. Start your local Validator by running the below command:
+12. Start your local Validator by running the below command:
 
     ```
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
     ```
 
-    Run fullnode in another machine:
+    Run fullnode in **another machine**:
 
     ```
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
     ```
 
-Now you have completed setting up your node in test mode. You can continue to our [Aptos community platform](https://community.aptoslabs.com/) website for registration.
+Now you have completed setting up your node.
