@@ -462,6 +462,7 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
         let mut employee_accounts = HashSet::new();
         let mut pools = vec![];
         for (i, pool) in map.inner.into_iter().enumerate() {
+            // Check for duplicate employee accounts
             for (j, employee_account) in pool.accounts.iter().enumerate() {
                 if !employee_accounts.insert(*employee_account) {
                     anyhow::bail!(
@@ -471,6 +472,26 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
                         i
                     )
                 }
+            }
+
+            // Check vesting schedule adds up properly
+            let mut numerators = 0;
+            let denominator = pool.vesting_schedule_denominator;
+            let mut last_numerator = 0;
+            for numerator in pool.vesting_schedule_numerators.iter() {
+                numerators += *numerator;
+                last_numerator = *numerator;
+            }
+
+            if numerators > denominator {
+                anyhow::bail!(
+                    "Numerators {} add up over the denominator {} for pool #{}",
+                    numerators,
+                    denominator,
+                    i
+                )
+            } else if (denominator - numerators) % last_numerator != 0 {
+                anyhow::bail!("Numerators don't add up to the denominator {} (with the last one {} being repeated for pool #{}", denominator, last_numerator, i)
             }
 
             // TODO: Any other checks other than just that accounts are duplicated?
