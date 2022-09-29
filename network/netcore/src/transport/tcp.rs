@@ -15,7 +15,6 @@ use futures::{
 };
 use proxy::Proxy;
 use std::{
-    convert::TryFrom,
     fmt::Debug,
     io,
     net::SocketAddr,
@@ -29,6 +28,38 @@ use tokio::{
 use tokio_util::compat::Compat;
 use url::Url;
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TCPBufferCfg {
+    inbound_rx_buffer_bytes: Option<u32>,
+    inbound_tx_buffer_bytes: Option<u32>,
+    outbound_rx_buffer_bytes: Option<u32>,
+    outbound_tx_buffer_bytes: Option<u32>,
+}
+
+impl TCPBufferCfg {
+    pub const fn new() -> Self {
+        Self {
+            inbound_rx_buffer_bytes: None,
+            inbound_tx_buffer_bytes: None,
+            outbound_rx_buffer_bytes: None,
+            outbound_tx_buffer_bytes: None,
+        }
+    }
+    pub fn new_configs(
+        inbound_rx: Option<u32>,
+        inbound_tx: Option<u32>,
+        outbound_rx: Option<u32>,
+        outbound_tx: Option<u32>,
+    ) -> Self {
+        Self {
+            inbound_rx_buffer_bytes: inbound_rx,
+            inbound_tx_buffer_bytes: inbound_tx,
+            outbound_rx_buffer_bytes: outbound_rx,
+            outbound_tx_buffer_bytes: outbound_tx,
+        }
+    }
+}
+
 /// Transport to build TCP connections
 #[derive(Debug, Clone, Default)]
 pub struct TcpTransport {
@@ -36,6 +67,8 @@ pub struct TcpTransport {
     pub ttl: Option<u32>,
     /// `TCP_NODELAY` to set for opened sockets, or `None` to keep default.
     pub nodelay: Option<bool>,
+
+    pub tcp_buff_cfg: TCPBufferCfg,
 }
 
 impl TcpTransport {
@@ -49,6 +82,10 @@ impl TcpTransport {
         }
 
         Ok(())
+    }
+
+    pub fn set_tcp_buffers(&mut self, configs: &TCPBufferCfg) {
+        self.tcp_buff_cfg = *configs;
     }
 }
 
@@ -69,9 +106,18 @@ impl Transport for TcpTransport {
             return Err(invalid_addr_error(&addr));
         }
 
-        let listener = ::std::net::TcpListener::bind((ipaddr, port))?;
-        listener.set_nonblocking(true)?;
-        let listener = TcpListener::try_from(listener)?;
+        let addr = SocketAddr::new(ipaddr, port);
+        let socket = tokio::net::TcpSocket::new_v4()?;
+
+        if let Some(rx_buf) = self.tcp_buff_cfg.inbound_rx_buffer_bytes {
+            socket.set_recv_buffer_size(rx_buf)?;
+        }
+        if let Some(tx_buf) = self.tcp_buff_cfg.inbound_tx_buffer_bytes {
+            socket.set_send_buffer_size(tx_buf)?;
+        }
+        socket.bind(addr)?;
+
+        let listener = socket.listen(256)?;
         let listen_addr = NetworkAddress::from(listener.local_addr()?);
 
         Ok((
@@ -88,7 +134,6 @@ impl Transport for TcpTransport {
 
         // ensure addr is well formed to save some work before potentially
         // spawning a dial task that will fail anyway.
-        // TODO(philiphayes): base tcp transport should not allow trailing protocols
         parse_ip_tcp(protos)
             .map(|_| ())
             .or_else(|| parse_dns_tcp(protos).map(|_| ()))
@@ -123,7 +168,7 @@ impl Transport for TcpTransport {
         let f: Pin<Box<dyn Future<Output = io::Result<TcpStream>> + Send + 'static>> =
             Box::pin(match proxy_addr {
                 Some(proxy_addr) => Either::Left(connect_via_proxy(proxy_addr, addr)),
-                None => Either::Right(resolve_and_connect(addr)),
+                None => Either::Right(resolve_and_connect(addr, self.tcp_buff_cfg)),
             });
 
         Ok(TcpOutbound {
@@ -146,13 +191,26 @@ async fn resolve_with_filter(
 
 /// Note: we need to take ownership of this `NetworkAddress` (instead of just
 /// borrowing the `&[Protocol]` slice) so this future can be `Send + 'static`.
-pub async fn resolve_and_connect(addr: NetworkAddress) -> io::Result<TcpStream> {
+pub async fn resolve_and_connect(
+    addr: NetworkAddress,
+    tcp_buff_cfg: TCPBufferCfg,
+) -> io::Result<TcpStream> {
     let protos = addr.as_slice();
 
     if let Some(((ipaddr, port), _addr_suffix)) = parse_ip_tcp(protos) {
         // this is an /ip4 or /ip6 address, so we can just connect without any
         // extra resolving or filtering.
-        TcpStream::connect((ipaddr, port)).await
+        let addr = SocketAddr::new(ipaddr, port);
+        let socket = tokio::net::TcpSocket::new_v4()?;
+        if let Some(rx_buf) = tcp_buff_cfg.outbound_rx_buffer_bytes {
+            socket.set_recv_buffer_size(rx_buf)?;
+        }
+        if let Some(tx_buf) = tcp_buff_cfg.outbound_tx_buffer_bytes {
+            socket.set_send_buffer_size(tx_buf)?;
+        }
+
+        // Here same treatment as ingress
+        socket.connect(addr).await
     } else if let Some(((ip_filter, dns_name, port), _addr_suffix)) = parse_dns_tcp(protos) {
         // resolve dns name and filter
         let socketaddr_iter = resolve_with_filter(ip_filter, dns_name.as_ref(), port).await?;
