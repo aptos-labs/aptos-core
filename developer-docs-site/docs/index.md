@@ -8,9 +8,11 @@ hide_table_of_contents: true
 
 # Aptos Developer Documentation
 
-Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
+Welcome! At Aptos Labs we are building a Layer 1 for everyone. Aptos supports the blockchain-specific [Move programming language](https://github.com/move-language/move) in its purest form, derived directly from Rust. Aptos let's you program in Move without needing to learn [complex modifications to the language itself](https://medium.com/@fidika/aptos-vs-sui-detailed-dev-comparison-5d24df53eee8). And the results are lightning-speed transactions created with little effort and executed in parallel.
 
-## Start here
+This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the ever-growing Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
+
+## Set up your environment and take our tutorials
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-3a g-4">
@@ -30,7 +32,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 </div>
 </div>
 
-## Concepts and guides
+## Learn our concepts and follow the guides
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-2a g-4">
@@ -55,7 +57,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 </div>
 </div>
 
-## Nodes
+## Run Aptos validator and fullnodes
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-2a g-4">
@@ -81,7 +83,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 </div>
 </div>
 
-## SDKs and APIs
+## Write apps with our SDKs and APIs
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-2a g-4">
@@ -112,13 +114,16 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 </div>
 </div>
 
-## Aptos devnet
+## Connect to Aptos networks
+
+Aptos offers a local testnet and online devnet and testnet, with mainnet on the way. See the [System Integrators Guide](docs/guides/system-integrators-guide.md#getting-started) for a summary of the available networks and the means to connect to them.
+
 
 :::tip Aptos Devnet Resets
-The Aptos devnet is reset every Thursday Morning (PST). See the latest updates in [Aptos Discord][discord].
+The Aptos devnet is reset every Thursday. See the latest updates in Aptos [Discord][discord].
 :::info
 
-## Got a question?
+## Ask questions and offer answers
 
 Join our [Discord][discord] to speak with our developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to keep topic-specific links, events, and more.
 
@@ -134,9 +139,13 @@ It's dangerous to go alone. Please remember, our community managers will never m
 
 Want to join a great team working on amazing world-scale problems? Take a look at our [active roles](https://boards.greenhouse.io/aptoslabs), and come build with us!
 
+Or simply [create a pull request](https://github.com/aptos-labs/aptos-core/pulls) to make updates and [file issues](https://github.com/aptos-labs/aptos-core/issues) to report problems.
+
 ## Have fun!
 
 We are excited that you are here, and we look forward to getting to know you. Welcome to the Aptos community!
 
-[typeform]: https://www.aptoslabs.com/developers
-[discord]: https://discord.gg/aptoslabs
+* [aptoslabs.com]: https://www.aptoslabs.com/developers
+* [Discord]: https://discord.gg/aptoslabs
+* [Telegram](https://t.me/aptos_official)
+* [Medium](https://medium.com/aptoslabs).
