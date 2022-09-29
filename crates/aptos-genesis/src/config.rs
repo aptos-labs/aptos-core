@@ -60,6 +60,8 @@ pub struct Layout {
     pub voting_duration_secs: u64,
     /// % of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+    /// Total supply of coins
+    pub total_supply: Option<u64>,
 }
 
 impl Layout {
@@ -94,6 +96,7 @@ impl Default for Layout {
             rewards_apy_percentage: 10,
             voting_duration_secs: 43_200,
             voting_power_increase_limit: 20,
+            total_supply: None,
         }
     }
 }
