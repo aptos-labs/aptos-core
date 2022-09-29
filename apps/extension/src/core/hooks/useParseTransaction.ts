@@ -3,8 +3,9 @@
 
 import { Types } from 'aptos';
 import { useRef } from 'react';
-import { aptosCoinStructTag, coinStoreStructTag } from 'core/constants';
+import { aptosCoinStructTag } from 'core/constants';
 import useCachedRestApi from 'core/hooks/useCachedRestApi';
+import { getCoinStoresByCoinType } from 'core/utils/resource';
 import { parseMoveAbortDetails } from 'shared/move';
 import {
   CoinInfoData,
@@ -70,22 +71,6 @@ function getNewResourcesStateByAccount(txn: Types.UserTransaction) {
     }
   }
   return newResourcesStateByOwner;
-}
-
-/**
- * Get coin store resources from a set of resources, grouped by coin type
- */
-function getCoinStoresByCoinType(resources: Resource[]) {
-  const coinStoreTypePattern = new RegExp(`^${coinStoreStructTag}<(.+)>$`);
-  const coinStores: Record<string, CoinStoreResourceData> = {};
-  for (const resource of resources) {
-    const match = resource.type.match(coinStoreTypePattern);
-    if (match !== null) {
-      const coinType = match[1];
-      coinStores[coinType] = resource.data;
-    }
-  }
-  return coinStores;
 }
 
 /**

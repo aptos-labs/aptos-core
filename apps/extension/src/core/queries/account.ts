@@ -3,19 +3,19 @@
 
 import {
   ApiError,
-  AptosClient,
   MaybeHexString,
 } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
 import {
   aptosCoinStoreStructTag,
+  aptosCoinStructTag,
   aptosStakePoolStructTag,
-  coinInfoResource,
-  coinStoreResource,
-  coinStoreStructTag,
 } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { CoinInfoData } from 'shared/types/resource';
+import { useFetchAccountResources } from 'core/queries/useAccountResources';
+import useCachedRestApi from 'core/hooks/useCachedRestApi';
+import getCoinStoresByCoinType from 'core/utils/resource';
 
 /**
  * QUERY KEYS
@@ -83,70 +83,10 @@ export function useAccountOctaCoinBalance(
   );
 }
 
-export const replaceCoinStoreWithCoinInfo = (structTag: string) => {
-  const replaceString = structTag.replace(coinStoreResource, coinInfoResource);
-  return replaceString;
-};
-
-/**
- * @summary Returns a dictionary with the parsed coin info from the struct tag
- * @example
- * ```ts
- *  const {
- *    address,
- *    resource
- *  } = parseCoinInfoStructTag(
- *    '0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>'
- *  )
- * ```
- */
-export const parseCoinInfoStructTag = (coinInfoStructTag: string) => {
-  const address = coinInfoStructTag.toString().split('::')[2].split('<')[1];
-  const resource = coinInfoStructTag.toString().split('<')[1].replace('>', '');
-  return {
-    address,
-    resource,
-  };
-};
-
-interface GetCoinInfoParams {
-  accountAddress: MaybeHexString;
-  coinInfoStructTag: string;
-  nodeUrl: string;
-}
-
-/**
- * @summary Gets CoinInfo from an address that holds the CoinInfo (ie. the creator account)
- * @see https://fullnode.devnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::coin::CoinInfo%3C0x1::aptos_coin::AptosCoin%3E
- * @description in the url above:
- *              %3C = "<" character for the opening generic bracket
- *              %3E = ">" character for the closing generic bracket
- */
-export const getCoinInfo = async ({
-  accountAddress,
-  coinInfoStructTag,
-  nodeUrl,
-}: GetCoinInfoParams) => {
-  const aptosClient = new AptosClient(nodeUrl);
-  const coinInfo = await aptosClient.getAccountResource(accountAddress, coinInfoStructTag);
-  const coinInfoData = coinInfo.data as CoinInfoData;
-  const { decimals, name, symbol } = coinInfoData;
-
-  return ({
-    decimals,
-    name,
-    symbol,
-  });
-};
-
 type AccountCoinResource = {
-  coinInfoAddress: string;
-  coinInfoStructTag: string;
-  decimals: number;
-  name: string;
-  symbol: string;
+  balance: bigint;
+  info: CoinInfoData,
   type: string;
-  value: bigint;
 };
 
 /**
@@ -158,46 +98,34 @@ export function useAccountCoinResources(
   address: string | undefined,
   options?: UseQueryOptions<AccountCoinResource[]>,
 ) {
-  const { activeNetwork, aptosClient } = useNetworks();
+  const fetchAccountResources = useFetchAccountResources();
+  const { getCoinInfo } = useCachedRestApi();
 
   return useQuery<AccountCoinResource[]>(
     [accountQueryKeys.getAccountCoinResources, address],
-    async () => aptosClient.getAccountResources(address!)
-      .then(async (res: any[]) => {
-        const result: Omit<AccountCoinResource, 'decimals' | 'name' | 'symbol'>[] = [];
-        res.forEach((item) => {
-          if (item.type.includes(coinStoreStructTag)) {
-            const { type } = item;
-            const coinInfoStructTag = replaceCoinStoreWithCoinInfo(type);
-            const { address: coinInfoAddress } = parseCoinInfoStructTag(coinInfoStructTag);
-            result.push({
-              coinInfoAddress,
-              coinInfoStructTag,
-              type: item.type,
-              value: BigInt(item.data.coin.value),
-            });
+    async () => fetchAccountResources(address!)
+      .then(async (resources) => {
+        const coinStores = getCoinStoresByCoinType(resources);
+        const result: AccountCoinResource[] = [];
+        // Extract info for non-empty coin stores
+        await Promise.all(Object.entries(coinStores).map(async ([coinType, coinStore]) => {
+          const balance = BigInt(coinStore.coin.value);
+          const coinInfo = await getCoinInfo(coinType);
+          if (balance !== 0n && coinInfo !== undefined) {
+            result.push({ balance, info: coinInfo, type: coinType });
           }
+        }));
+
+        // Sort by descending balance, with APT always on top
+        return result.sort((lhs, rhs) => {
+          if (lhs.balance > rhs.balance && rhs.type !== aptosCoinStructTag) return -1;
+          if (lhs.balance < rhs.balance && lhs.type !== aptosCoinStructTag) return 1;
+          return 0;
         });
-
-        const finalCoinInfo = await Promise.all((result.map(async (item) => {
-          const coinInfo = await getCoinInfo({
-            accountAddress: item.coinInfoAddress,
-            coinInfoStructTag: item.coinInfoStructTag,
-            nodeUrl: activeNetwork.nodeUrl,
-          });
-
-          return {
-            ...item,
-            ...coinInfo,
-          };
-        })));
-
-        return finalCoinInfo;
       })
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
-          const emptyArray: AccountCoinResource[] = [];
-          return emptyArray;
+          return [];
         }
         throw err;
       }),

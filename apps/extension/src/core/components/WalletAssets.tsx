@@ -14,15 +14,12 @@ import {
 import React, { useMemo } from 'react';
 import AvatarImage from 'core/AvatarImage';
 import { assetSecondaryBgColor, secondaryBorderColor, secondaryTextColor } from 'core/colors';
-import { aptosCoinStoreStructTag } from 'core/constants';
+import { aptosCoinStructTag } from 'core/constants';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useAccountCoinResources } from 'core/queries/account';
 import { formatCoin } from 'core/utils/coin';
+import { CoinInfoData } from 'shared/types';
 import { AptosLogo } from './AptosLogo';
-
-const CoinType = {
-  APTOS_TOKEN: aptosCoinStoreStructTag,
-};
 
 function NoAssets() {
   const { colorMode } = useColorMode();
@@ -39,52 +36,33 @@ function NoAssets() {
 }
 
 interface AssetListItemProps {
-  decimals: number;
-  name: string;
-  symbol: string;
-  type: string;
-  value: bigint;
+  balance: bigint,
+  info: CoinInfoData,
+  type: string,
 }
 
-function AssetListItem({
-  decimals,
-  name,
-  symbol,
-  type,
-  value,
-}: AssetListItemProps) {
+function AssetListItem({ balance, info, type }: AssetListItemProps) {
   const { colorMode } = useColorMode();
 
-  // TODO: Will need to cache some logos and symbols for relevent
-  // coins since they don't appear in account resources
+  // TODO: Will need to cache some logos and symbols for relevant
+  //  coins since they don't appear in account resources
   const logo = useMemo(() => {
     switch (type) {
-      case CoinType.APTOS_TOKEN:
+      case aptosCoinStructTag:
         return <AptosLogo />;
       default:
         return <AvatarImage size={32} address={type} />;
     }
   }, [type]);
 
-  const coinInfoName = useMemo(() => {
-    switch (type) {
-      case CoinType.APTOS_TOKEN: {
-        return 'Aptos';
-      }
-      default: {
-        return name;
-      }
-    }
-  }, [type, name]);
-
-  const amount = useMemo(() => {
-    switch (type) {
-      case CoinType.APTOS_TOKEN:
-        return formatCoin(value);
-      default:
-        return `${formatCoin(value, { decimals, includeUnit: false })} ${symbol}`;
-    }
-  }, [type, value, decimals, symbol]);
+  const amount = useMemo(
+    () => {
+      const multiplier = 10 ** (-info.decimals);
+      const amountString = formatCoin(balance, { includeUnit: false, multiplier });
+      return `${amountString} ${info.symbol}`;
+    },
+    [balance, info],
+  );
 
   return (
     <Grid
@@ -100,7 +78,7 @@ function AssetListItem({
       </Center>
       <VStack fontSize="md" alignItems="left" spacing={0}>
         <Text fontWeight={600}>
-          {coinInfoName}
+          {info.name}
         </Text>
         <Text color={secondaryTextColor[colorMode]}>
           {amount}
@@ -114,12 +92,10 @@ function AssetListItem({
 export default function WalletAssets() {
   const { colorMode } = useColorMode();
   const { activeAccountAddress } = useActiveAccount();
-  const coinResources = useAccountCoinResources(
-    activeAccountAddress,
-    {
-      refetchInterval: 5000,
-    },
-  );
+  const coinResources = useAccountCoinResources(activeAccountAddress, {
+    keepPreviousData: true,
+    refetchInterval: 10000,
+  });
 
   return (
     <VStack px={4} spacing={2} alignItems="stretch">
