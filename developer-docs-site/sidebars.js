@@ -170,7 +170,6 @@ const sidebars = {
         "nodes/full-node/fullnode-source-code-or-docker",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
-        "nodes/full-node/troubleshooting-fullnode",
         "nodes/full-node/run-a-fullnode-on-gcp",
         "nodes/full-node/bootstrap-fullnode",
       ],
@@ -344,6 +343,7 @@ const sidebars = {
       value: "Misc",
       className: "sidebar-title",
     },
+    "issues-and-workarounds",
     "reference/glossary",
   ],
 };

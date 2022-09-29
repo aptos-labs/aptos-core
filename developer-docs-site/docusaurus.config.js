@@ -328,6 +328,10 @@ const config = {
             to: "/nodes/validator-node/operator/node-liveness-criteria",
             from: "/nodes/ait/node-liveness-criteria",
           },
+          {
+            to: "/issues-and-workarounds",
+            from: "/nodes/full-node/troubleshooting-fullnode-setup",
+          },
         ],
       },
     ],
