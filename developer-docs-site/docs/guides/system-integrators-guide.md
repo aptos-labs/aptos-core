@@ -3,41 +3,39 @@ title: "System Integrators Guide"
 slug: "system-integrators-guide"
 ---
 
-:::tip 
-This documentation is currently under construction with more being added on a regular basis.
-:::
-
-If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform. This guide assumes that you are familiar with the blockchains.
+If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform.
 
 ## Overview
 
-This guide will overview the following topics for integrating with Aptos:
-- Preparing an environment for testing.
-- Create an account on the blockchain.
-- Exchange account identifiers with another entity on the blockchain, for example, to perform swaps.
-- Create a transaction.
-- Obtain a gas estimate and validate the transaction for correctness.
-- Submit the transaction to the blockchain.
-- Wait for the outcome of the transaction.
-- Query historical transactions and interactions for a given account with a specific account, i.e., withdraws and deposits.
+This document will guide you through the following tasks to integrate with Aptos:
+1. Prepare an environment for testing.
+1. Create an account on the blockchain.
+1. Exchange account identifiers with another entity on the blockchain, for example, to perform swaps.
+1. Create a transaction.
+1. Obtain a gas estimate and validate the transaction for correctness.
+1. Submit the transaction to the blockchain.
+1. Wait for the outcome of the transaction.
+1. Query historical transactions and interactions for a given account with a specific account, i.e., withdraws and deposits.
 
-## Getting Started
+TODO: Link into specific docs or sections from above before pushing this PR.
 
-There are two well-supported approaches for integrating with the Aptos blockchain:
+## Networks
 
-1. Local development using our standalone testnet
-2. Devnet -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
-3. Testnet -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
+There are three well-supported networks for integrating with the Aptos blockchain:
 
-### Local Testnet
+1. Local testnet -- our standalone tool for local development against a known version of the codebase with no live network.
+1. Devnet -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
+1. Testnet -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
+
+### Local testnet
 
 There are two options to run a local testnet:
-1. Directly run a local testnet is to follow [this guide](/nodes/local-testnet/run-a-local-testnet/).
-2. Use the CLI by 1) [installing with the CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet)
+* Directly [run a local testnet](/nodes/local-testnet/run-a-local-testnet/) using either the [Aptos-core source code](/nodes/local-testnet/run-a-local-testnet/#using-the-aptos-core-source-code) or a [Docker image](/nodes/local-testnet/run-a-local-testnet/#using-docker). These paths are useful for testing changes to the Aptos-core codebase or ramework, or for building services on top of the Aptos blockchain, respectively.
+* [Install the Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
 
-This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
+Either of these methods will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
 
-### Access Devnet
+### Aptos Devnet
 
 Faucet service: https://faucet.devnet.aptoslabs.com
 REST API service: https://fullnode.devnet.aptoslabs.com/v1
