@@ -16,15 +16,16 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { collapseHexString } from 'core/utils/hex';
+import { FaRegCheckCircle } from '@react-icons/all-files/fa/FaRegCheckCircle';
+import { FaRegTimesCircle } from '@react-icons/all-files/fa/FaRegTimesCircle';
 import { HexString, MaybeHexString } from 'aptos';
 import { useParams } from 'react-router-dom';
 import ChakraLink from 'core/components/ChakraLink';
 import { useActiveAccount } from 'core/hooks/useAccounts';
-import { formatAmount, formatCoin } from 'core/utils/coin';
 import { useTransaction } from 'core/queries/transaction';
-import { FaRegCheckCircle } from '@react-icons/all-files/fa/FaRegCheckCircle';
-import { FaRegTimesCircle } from '@react-icons/all-files/fa/FaRegTimesCircle';
+import { formatAmount, formatCoin } from 'core/utils/coin';
+import { collapseHexString } from 'core/utils/hex';
+import { isEntryFunctionPayload } from 'shared/types';
 import Copyable from './Copyable';
 
 const positiveAmountColor = 'green.500';
@@ -196,9 +197,15 @@ function TransactionBody() {
         txn?.type === 'generic'
           ? (
             <>
-              <DetailItem label="Function">
-                <Text>{ txn.payload.function.split('::').pop() }</Text>
-              </DetailItem>
+              {
+                isEntryFunctionPayload(txn.payload)
+                  ? (
+                    <DetailItem label="Function">
+                      <Text>{ txn.payload.function.split('::').pop() }</Text>
+                    </DetailItem>
+                  )
+                  : null
+              }
               <HStack w="100%" fontSize="md" justify="space-between" alignItems="start">
                 <Text as="span" fontWeight={700}> Balance changes </Text>
                 <VStack alignItems="end">

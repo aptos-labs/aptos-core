@@ -12,7 +12,11 @@ import {
   EventHandle,
   Resource,
 } from 'shared/types/resource';
-import { CoinBalanceChange, Transaction } from 'shared/types/transaction';
+import {
+  CoinBalanceChange,
+  Transaction,
+  isEntryFunctionPayload,
+} from 'shared/types/transaction';
 
 // region Utils
 
@@ -164,7 +168,7 @@ export default function useParseTransaction() {
     const gasFee = Number(txn.gas_used);
     const gasUnitPrice = Number(txn.gas_unit_price);
     const version = Number(txn.version);
-    const payload = txn.payload as Types.EntryFunctionPayload;
+    const { payload } = txn;
     const error = !txn.success ? parseMoveAbortDetails(txn.vm_status) : undefined;
 
     const baseProps = {
@@ -181,34 +185,37 @@ export default function useParseTransaction() {
       version,
     };
 
-    if (payload.function === coinTransferFunction || payload.function === accountTransferFunction) {
-      const recipient = payload.arguments[0];
-      const amount = BigInt(payload.arguments[1]);
-      const coinType = payload.type_arguments[0] ?? aptosCoinStructTag;
-      const coinInfo = await getCoinInfo(coinType);
+    if (isEntryFunctionPayload(payload)) {
+      if (payload.function === coinTransferFunction
+        || payload.function === accountTransferFunction) {
+        const recipient = payload.arguments[0];
+        const amount = BigInt(payload.arguments[1]);
+        const coinType = payload.type_arguments[0] ?? aptosCoinStructTag;
+        const coinInfo = await getCoinInfo(coinType);
 
-      return {
-        amount,
-        coinInfo,
-        coinType,
-        recipient,
-        sender: txn.sender,
-        type: 'transfer',
-        ...baseProps,
-      };
-    }
+        return {
+          amount,
+          coinInfo,
+          coinType,
+          recipient,
+          sender: txn.sender,
+          type: 'transfer',
+          ...baseProps,
+        };
+      }
 
-    if (payload.function === coinMintFunction) {
-      const recipient = payload.arguments[0];
-      const amount = BigInt(payload.arguments[1]);
-      const coinInfo = await getCoinInfo(aptosCoinStructTag);
-      return {
-        amount,
-        coinInfo,
-        recipient,
-        type: 'mint',
-        ...baseProps,
-      };
+      if (payload.function === coinMintFunction) {
+        const recipient = payload.arguments[0];
+        const amount = BigInt(payload.arguments[1]);
+        const coinInfo = await getCoinInfo(aptosCoinStructTag);
+        return {
+          amount,
+          coinInfo,
+          recipient,
+          type: 'mint',
+          ...baseProps,
+        };
+      }
     }
 
     return {

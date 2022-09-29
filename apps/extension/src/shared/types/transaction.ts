@@ -17,7 +17,7 @@ export interface BaseTransaction {
   gasFee: number,
   gasUnitPrice: number,
   hash: string,
-  payload: Types.EntryFunctionPayload,
+  payload: Types.TransactionPayload,
   rawChanges: Types.WriteSetChange[],
   success: boolean,
   timestamp: number,
@@ -48,3 +48,9 @@ export type GenericTransaction = BaseTransaction & {
 export type Transaction = CoinTransferTransaction
 | CoinMintTransaction
 | GenericTransaction;
+
+export function isEntryFunctionPayload(
+  payload: Types.TransactionPayload,
+): payload is Types.TransactionPayload_EntryFunctionPayload {
+  return payload.type === 'entry_function_payload';
+}
