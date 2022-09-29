@@ -986,7 +986,7 @@ class ForgeConfigTests(unittest.TestCase):
             filesystem.assert_reads(self)
             filesystem.assert_writes(self)
 
-    def testEnableCluster(self) -> None:
+    def testEnableClusterOldFormat(self) -> None:
         config = ForgeConfig(
             FakeConfigBackend({
                 "enabled_clusters": ["forge-big-1"],
@@ -1000,7 +1000,7 @@ class ForgeConfigTests(unittest.TestCase):
         config.enableCluster("banana")
         self.assertIn("banana", config.get("enabled_clusters"))
 
-    def testDisableCluster(self):
+    def testDisableClusterOldFormat(self):
         config = ForgeConfig(
             FakeConfigBackend({
                 "enabled_clusters": ["forge-big-1", "banana"],
@@ -1013,3 +1013,62 @@ class ForgeConfigTests(unittest.TestCase):
         self.assertIn("banana", config.get("enabled_clusters"))
         config.disableCluster("banana")
         self.assertNotIn("banana", config.get("enabled_clusters"))
+
+    def testEnableClusterNewFormat(self) -> None:
+        config = ForgeConfig(
+            FakeConfigBackend({
+                "enabled_clusters": ["forge-big-1"],
+                "all_clusters": ["forge-big-1", "banana"],
+                "test_suites": {},
+                "use_new_cluster_config": True,
+                "global_clusters": {
+                    "clusters": {
+                        "banana": {
+                            "name": "banana",
+                            "region": "island",
+                        },
+                        "apple": {
+                            "name": "apple",
+                            "region": "forest",
+                        }
+                    },
+                    "enabled_clusters": ["banana"],
+                }
+            })
+        )
+        config.init()
+
+        self.assertNotIn("banana", config.get("enabled_clusters"))
+        config.enableCluster("banana")
+        self.assertIn("banana", config.get("enabled_clusters"))
+
+    def testDisableClusterNewFormat(self):
+        config = ForgeConfig(
+            FakeConfigBackend({
+                "enabled_clusters": ["forge-big-1", "banana"],
+                "all_clusters": ["forge-big-1", "banana"],
+                "test_suites": {},
+                "use_new_cluster_config": True,
+                "global_clusters": {
+                    "clusters": {
+                        "banana": {
+                            "name": "banana",
+                            "region": "island",
+                        },
+                        "apple": {
+                            "name": "apple",
+                            "region": "forest",
+                        }
+                    },
+                    "enabled_clusters": ["banana"],
+                }
+            })
+        )
+        config.init()
+
+        # Ensure we are double writing for some time
+        self.assertIn("banana", config.get("enabled_clusters"))
+        self.assertIn("banana", config.dump()["global_clusters"]["enabled_clusters"])
+        config.disableCluster("banana")
+        self.assertNotIn("banana", config.get("enabled_clusters"))
+        self.assertNotIn("banana", config.dump()["global_clusters"]["enabled_clusters"])

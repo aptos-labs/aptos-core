@@ -1838,12 +1838,26 @@ class TestSuiteConfigValue(TypedDict):
     enabled_tests: Dict[str, TestConfigValue]
 
 
+class ForgeClusterConfigValue(TypedDict):
+    name: str
+    region: str
+
+
+class ForgeGlobalConfigValue(TypedDict):
+    clusters: Dict[str, ForgeClusterConfigValue]
+    enabled_clusters: List[str]
+
+
 # All changes to this struct must be backwards compatible
 # i.e. its ok to add a new field, but not to remove one
 class ForgeConfigValue(TypedDict):
-    enabled_clusters: List[str]
-    all_clusters: List[str]
+    enabled_clusters: List[str]  # deprecated
+    all_clusters: List[str]  # deprecated
+
     test_suites: Dict[str, TestSuiteConfigValue]
+
+    use_new_cluster_config: bool
+    global_clusters: ForgeGlobalConfigValue
 
 
 def default_forge_config() -> ForgeConfigValue:
@@ -1940,14 +1954,24 @@ class FilesystemConfigBackend(ForgeConfigBackend):
 
 
 class ForgeConfigClusterMixin:
+    def useNewClusterConfig(self) -> bool:
+        return self.get("use_new_cluster_config", False)
+
     def getEnabledClusters(self) -> List[str]:
         return self.get("enabled_clusters")
 
     def setEnabledClusters(self, enabled_clusters) -> None:
         self.set("enabled_clusters", enabled_clusters)
+        if self.useNewClusterConfig():
+            global_clusters = self.get("global_clusters")
+            global_clusters["enabled_clusters"] = enabled_clusters
+            self.set("global_clusters", global_clusters)
 
     def getAllClusters(self) -> List[str]:
-        return self.get("all_clusters")
+        if self.useNewClusterConfig():
+            return self.get("global_clusters")["clusters"].keys()
+        else:
+            return self.get("all_clusters")
 
     def setAllClusters(
         self,
