@@ -524,6 +524,7 @@ pub async fn install_testnet_resources(
             num_pfns,
             node_image_tag.clone(),
             enable_haproxy,
+            Some(format!("aptos-node-0-genesis-e{new_era}")),
         )?;
 
         let pfn_forge_values_file = dump_string_to_file(
@@ -586,11 +587,15 @@ pub fn construct_pfn_helm_values(
     num_pfns: usize,
     image_tag: String,
     enable_haproxy: bool,
+    genesis_srecret_name: Option<String>,
 ) -> Result<String> {
     let mut value: serde_yaml::Value = serde_yaml::from_str(&base_helm_values)?;
     value["numPfns"] = num_pfns.into();
     value["imageTag"] = image_tag.clone().into();
     value["chain"]["era"] = era.into();
+    if let Some(name) = genesis_srecret_name {
+        value["chain"]["genesisSecret"] = name.into();
+    }
     value["haproxy"]["enabled"] = enable_haproxy.into();
     value["labels"]["forge-namespace"] = kube_namespace.into();
     value["labels"]["forge-image-tag"] = image_tag.into();
