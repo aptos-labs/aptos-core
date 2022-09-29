@@ -114,9 +114,19 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub fn core_mempool_txn_commit_latency(
+    stage: &'static str,
+    scope: &'static str,
+    latency: Duration,
+) {
+    CORE_MEMPOOL_TXN_COMMIT_LATENCY
+        .with_label_values(&[stage, scope])
+        .observe(latency.time_delta.as_secs_f64());
+}
+
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
-pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
@@ -125,7 +135,17 @@ pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<HistogramVec> = Lazy::new(|| {
+pub fn core_mempool_txn_ranking_score(
+    stage: &'static str,
+    status: &'static str,
+    ranking_score: u64,
+) {
+    CORE_MEMPOOL_TXN_RANKING_SCORE
+        .with_label_values(&[stage, status])
+        .observe(ranking_score as f64);
+}
+
+static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_core_mempool_txn_ranking_score",
         "Ranking score of txn reaching various stages in core mempool",
