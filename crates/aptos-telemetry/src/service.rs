@@ -45,6 +45,8 @@ const TELEMETRY_TOKEN_KEY: &str = "TELEMETRY_TOKEN";
 // The default for unknown metric values
 const UNKNOWN_METRIC_VALUE: &str = "UNKNOWN";
 
+const APTOS_NODE_CONFIG_EVENT_NAME: &str = "APTOS_NODE_CONFIG";
+
 /// The random token presented by the node to connect all
 /// telemetry events.
 /// TODO(joshlind): leverage real authentication!
@@ -292,7 +294,7 @@ async fn custom_event_sender(
     node_config: NodeConfig,
     build_info: BTreeMap<String, String>,
 ) {
-    futures::future::join4(
+    futures::future::join5(
         // Periodically send build information
         run_function_periodically(NODE_BUILD_INFO_FREQ_SECS, || {
             send_build_information(
@@ -327,6 +329,14 @@ async fn custom_event_sender(
                 telemetry_sender.clone(),
             )
         }),
+        run_function_periodically(NODE_CONFIG_FREQ_SECS, || {
+            send_node_config(
+                peer_id.clone(),
+                chain_id.to_string(),
+                &node_config,
+                telemetry_sender.clone(),
+            )
+        }),
     )
     .await;
 }
@@ -339,6 +349,33 @@ async fn send_build_information(
     telemetry_sender: Option<TelemetrySender>,
 ) {
     let telemetry_event = create_build_info_telemetry_event(build_info).await;
+    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
+}
+
+/// Collects and sends the core node metrics via telemetry
+async fn send_node_config(
+    peer_id: String,
+    chain_id: String,
+    node_config: &NodeConfig,
+    telemetry_sender: Option<TelemetrySender>,
+) {
+    let node_config: BTreeMap<String, String> = serde_json::to_value(node_config)
+        .map(|value| {
+            value
+                .as_object()
+                .map(|obj| {
+                    obj.into_iter()
+                        .map(|(k, v)| (k.clone(), v.to_string()))
+                        .collect::<BTreeMap<String, String>>()
+                })
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+
+    let telemetry_event = TelemetryEvent {
+        name: APTOS_NODE_CONFIG_EVENT_NAME.into(),
+        params: node_config,
+    };
     send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
