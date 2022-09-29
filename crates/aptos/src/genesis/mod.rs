@@ -160,6 +160,7 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
 
     // Check accounts for employee accounts
     for (i, pool) in employee_vesting_accounts.iter().enumerate() {
+        let mut total_stake_pool_amount = 0;
         for (j, account) in pool.accounts.iter().enumerate() {
             if !initialized_accounts.contains_key(account) {
                 return Err(CliError::UnexpectedError(format!(
@@ -167,7 +168,16 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
                     j, account, i
                 )));
             }
+            total_stake_pool_amount += initialized_accounts.get(account).unwrap();
         }
+
+        if total_stake_pool_amount != pool.validator.validator.stake_amount {
+            return Err(CliError::UnexpectedError(format!(
+                "Stake amount {} in pool #{} does not match combined of accounts {}",
+                pool.validator.validator.stake_amount, i, total_stake_pool_amount
+            )));
+        }
+
         if !initialized_accounts.contains_key(&pool.validator.validator.owner_address) {
             return Err(CliError::UnexpectedError(format!(
                 "Owner address {} in pool #{} is is not in the initialized balances",
@@ -194,8 +204,8 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         }
     }
 
-    validate_validators(&employee_validators, &initialized_accounts, true)?;
-    validate_validators(&validators, &initialized_accounts, false)?;
+    validate_validators(&layout, &employee_validators, &initialized_accounts, true)?;
+    validate_validators(&layout, &validators, &initialized_accounts, false)?;
 
     let framework = client.get_framework()?;
     Ok(MainnetGenesisInfo::new(
@@ -521,6 +531,7 @@ fn parse_optional_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
 }
 
 fn validate_validators(
+    layout: &Layout,
     validators: &[ValidatorConfiguration],
     initialized_accounts: &BTreeMap<AccountAddress, u64>,
     is_pooled_validator: bool,
@@ -549,12 +560,24 @@ fn validate_validators(
         let owner_balance = initialized_accounts
             .get(&validator.owner_account_address)
             .unwrap();
-        // Pooled validators don't use the `stake amount` field
+        // Pooled validators have a combined balance
         // TODO: Make this field optional but checked
         if !is_pooled_validator && *owner_balance < validator.stake_amount {
             return Err(CliError::UnexpectedError(format!(
                 "Owner {} in validator #{} has less in it's balance {} than the stake amount for the validator {}",
                 validator.owner_account_address, i, owner_balance, validator.stake_amount
+            )));
+        }
+        if validator.stake_amount < layout.min_stake {
+            return Err(CliError::UnexpectedError(format!(
+                "Validator #{} has stake {} under the min stake {}",
+                i, validator.stake_amount, layout.min_stake
+            )));
+        }
+        if validator.stake_amount > layout.max_stake {
+            return Err(CliError::UnexpectedError(format!(
+                "Validator #{} has stake {} over the max stake {}",
+                i, validator.stake_amount, layout.max_stake
             )));
         }
 
