@@ -997,7 +997,10 @@ def list_eks_clusters(shell: Shell) -> List[str]:
 
 
 async def write_cluster_config(
-    shell: Shell, forge_cluster_name: str, temp: str
+    shell: Shell,
+    forge_cluster_name: str,
+    aws_region: str,
+    temp: str,
 ) -> None:
     (
         await shell.gen_run(
@@ -1008,6 +1011,8 @@ async def write_cluster_config(
                 "--name",
                 forge_cluster_name,
                 "--kubeconfig",
+                "--region",
+                aws_region,
                 temp,
             ]
         )
@@ -1309,7 +1314,7 @@ async def run_multiple(
 @envoption("FORGE_COMMENT")
 @envoption("GITHUB_STEP_SUMMARY")
 # cluster auth
-@envoption("AWS_REGION", "us-west-2")
+@envoption("AWS_REGION")
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
@@ -1355,7 +1360,7 @@ def test(
     forge_report: Optional[str],
     forge_pre_comment: Optional[str],
     forge_comment: Optional[str],
-    aws_region: str,
+    aws_region: Optional[str],
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
     forge_num_validators: Optional[str],
@@ -1455,8 +1460,8 @@ def test(
 
     # Perform cluster selection
     if not forge_cluster_name or balance_clusters:
-        cluster_names = config.get("enabled_clusters")
-        forge_cluster_name = random.choice(cluster_names)
+        cluster_names = config.getEnabledClusters()
+        forge_cluster_name = random.choice(cluster_names.keys())
 
     assert forge_cluster_name, "Forge cluster name is required"
 
@@ -1538,7 +1543,11 @@ def test(
     
     print(f"Using cluster: {forge_cluster_name}")
     temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp)
+    forge_cluster = ForgeCluster(
+        name=forge_cluster_name,
+        region=aws_region,
+        kubeconf=temp,
+    )
     asyncio.run(forge_cluster.write(context.shell))
 
     forge_context = ForgeContext(
@@ -1660,10 +1669,16 @@ class GetPodsResult(TypedDict):
 @dataclass
 class ForgeCluster:
     name: str
+    region: str
     kubeconf: str
 
     async def write(self, shell: Shell) -> None:
-        await write_cluster_config(shell, self.name, self.kubeconf)
+        await write_cluster_config(
+            shell,
+            self.name,
+            self.region,
+            self.kubeconf
+        )
 
     async def get_jobs(self, shell: Shell) -> List[ForgeJob]:
         pod_result = (
@@ -1703,7 +1718,11 @@ async def get_all_forge_jobs(
     tempfiles = []
     for cluster in clusters:
         temp = context.filesystem.mkstemp()
-        config = ForgeCluster(name=cluster, kubeconf=temp)
+        config = ForgeCluster(
+            name=cluster,
+            region="us-west-2",
+            kubeconf=temp,
+        )
         try:
             await config.write(context.shell)
             tempfiles.append(temp)
@@ -1747,7 +1766,7 @@ def list_jobs(
     phase = phase or ["Running"]
 
     pattern = re.compile(regex or ".*")
-    jobs = asyncio.run(get_all_forge_jobs(context, config.get("all_clusters")))
+    jobs = asyncio.run(get_all_forge_jobs(context, config.getAllClusters()))
 
     for job in jobs:
         if not pattern.match(job.name) or phase and job.phase not in phase:
@@ -1780,7 +1799,7 @@ def tail(
 
     job_name = sanitize_forge_resource_name(job_name)
 
-    all_jobs = asyncio.run(get_all_forge_jobs(context, config.get("all_clusters")))
+    all_jobs = asyncio.run(get_all_forge_jobs(context, config.getAllClusters()))
     found_jobs = [job for job in all_jobs if job.name == job_name]
     if not found_jobs:
         other_jobs = "".join(
@@ -1809,14 +1828,14 @@ DEFAULT_CONFIG = "forge-wrapper-config"
 DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
 
 
-class TestConfig(TypedDict):
+class TestConfigValue(TypedDict):
     name: str
 
 
-class TestSuite(TypedDict):
+class TestSuiteConfigValue(TypedDict):
     name: str
-    all_tests: Dict[str, TestConfig]
-    enabled_tests: Dict[str, TestConfig]
+    all_tests: Dict[str, TestConfigValue]
+    enabled_tests: Dict[str, TestConfigValue]
 
 
 # All changes to this struct must be backwards compatible
@@ -1824,7 +1843,7 @@ class TestSuite(TypedDict):
 class ForgeConfigValue(TypedDict):
     enabled_clusters: List[str]
     all_clusters: List[str]
-    test_suites: Dict[str, TestSuite]
+    test_suites: Dict[str, TestSuiteConfigValue]
 
 
 def default_forge_config() -> ForgeConfigValue:
@@ -1920,7 +1939,38 @@ class FilesystemConfigBackend(ForgeConfigBackend):
         return json.loads(self.system.filesystem.read(self.filename))
 
 
-class ForgeConfig:
+class ForgeConfigClusterMixin:
+    def getEnabledClusters(self) -> List[str]:
+        return self.get("enabled_clusters")
+
+    def setEnabledClusters(self, enabled_clusters) -> None:
+        self.set("enabled_clusters", enabled_clusters)
+
+    def getAllClusters(self) -> List[str]:
+        return self.get("all_clusters")
+
+    def setAllClusters(
+        self,
+        all_clusters: List[str]
+    ) -> None:
+        self.set("all_clusters", all_clusters)
+
+    def disableCluster(self, cluster_name: str) -> None:
+        enabled_clusters = self.getEnabledClusters()
+        enabled_clusters.remove(cluster_name)
+        self.setEnabledClusters(enabled_clusters)
+
+    def enableCluster(self, cluster_name: str) -> None:
+        enabled_clusters = self.getEnabledClusters()
+        if cluster_name in enabled_clusters:
+            raise Exception(
+                f"Cluster {cluster_name} is already enabled"
+            )
+        enabled_clusters.append(cluster_name)
+        self.setEnabledClusters(enabled_clusters)
+
+
+class ForgeConfig(ForgeConfigClusterMixin):
     NONE_SENTINEL = object()
 
     def __init__(self, backend: ForgeConfigBackend) -> None:
@@ -2064,12 +2114,12 @@ def cluster_config_delete(
 
     config.init()
 
-    enabled_clusters = config.get("enabled_clusters")
+    enabled_clusters = config.getEnabledClusters()
     if cluster in enabled_clusters and not force:
         raise Exception(
             f"Cluster {cluster} is enabled, use --force to delete anyway"
         )
-    all_clusters = config.get("all_clusters")
+    all_clusters = config.getAllClusters()
     all_clusters.remove(cluster)
     config.set("all_clusters", all_clusters)
 
@@ -2109,13 +2159,7 @@ def cluster_config_enable(cluster: str) -> None:
 
     config.init()
 
-    enabled_clusters = config.get("enabled_clusters")
-    if cluster in enabled_clusters:
-        raise Exception(
-            f"Cluster {cluster} is already enabled"
-        )
-    enabled_clusters.append(cluster)
-    config.set("enabled_clusters", enabled_clusters)
+    config.enableCluster(cluster)
 
     config.flush()
 
@@ -2133,11 +2177,7 @@ def cluster_config_disable(
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
-
-    enabled_clusters = config.get("enabled_clusters")
-    enabled_clusters.remove(cluster)
-    config.set("enabled_clusters", enabled_clusters)
-
+    config.disableCluster(cluster)
     config.flush()
 
 
@@ -2152,8 +2192,8 @@ def cluster_config_list() -> None:
 
     config.init()
 
-    enabled_clusters = config.get("enabled_clusters")
-    for cluster in config.get("all_clusters"):
+    enabled_clusters = config.getEnabledClusters()
+    for cluster in config.getAllClusters():
         if cluster in enabled_clusters:
             fg = "green"
             enabled = " [enabled]"

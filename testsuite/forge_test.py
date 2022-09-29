@@ -24,6 +24,7 @@ import forge
 from forge import (
     Filesystem,
     ForgeCluster,
+    ForgeConfig,
     ForgeConfigBackend,
     ForgeContext,
     ForgeFormatter,
@@ -305,7 +306,7 @@ def fake_context(
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
         forge_namespace="forge-potato",
-        forge_cluster=ForgeCluster("tomato", "kubeconf"),
+        forge_cluster=ForgeCluster("tomato", "liberland", "kubeconf"),
         forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",
@@ -658,7 +659,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 RunResult(0, b''),
             ),
             (
-                'aws eks update-kubeconfig --name forge-big-1 --kubeconfig temp1',
+                'aws eks update-kubeconfig --name forge-big-1 --kubeconfig --region us-west-banana temp1',
                 RunResult(0, b''),
             ),
             (
@@ -746,6 +747,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     "test",
                     "--forge-cluster-name", "forge-big-1",
                     "--forge-report", "temp-report",
+                    "--aws-region", "us-west-banana",
                     "--forge-pre-comment", "temp-pre-comment",
                     "--forge-comment", "temp-comment",
                     "--github-step-summary", "temp-step-summary",
@@ -828,7 +830,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
             OrderedDict(
                 [
                     (
-                        "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig temp1",
+                        "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig --region us-west-2 temp1",
                         RunResult(0, b""),
                     ),
                     (
@@ -836,7 +838,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                         RunResult(0, json.dumps(fake_first_pods).encode()),
                     ),
                     (
-                        "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig temp2",
+                        "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig --region us-west-2 temp2",
                         RunResult(0, b""),
                     ),
                     (
@@ -857,6 +859,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 phase="Running",
                 cluster=ForgeCluster(
                     name="aptos-forge-banana",
+                    region="us-west-2",
                     kubeconf="temp1",
                 ),
             ),
@@ -865,6 +868,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 phase="Failed",
                 cluster=ForgeCluster(
                     name="aptos-forge-banana",
+                    region="us-west-2",
                     kubeconf="temp1",
                 ),
             ),
@@ -873,6 +877,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 phase="Running",
                 cluster=ForgeCluster(
                     name="aptos-forge-apple-2",
+                    region="us-west-2",
                     kubeconf="temp2",
                 ),
             ),
@@ -881,6 +886,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 phase="Succeeded",
                 cluster=ForgeCluster(
                     name="aptos-forge-apple-2",
+                    region="us-west-2",
                     kubeconf="temp2",
                 ),
             ),
@@ -979,3 +985,31 @@ class ForgeConfigTests(unittest.TestCase):
             shell.assert_commands(self)
             filesystem.assert_reads(self)
             filesystem.assert_writes(self)
+
+    def testEnableCluster(self) -> None:
+        config = ForgeConfig(
+            FakeConfigBackend({
+                "enabled_clusters": ["forge-big-1"],
+                "all_clusters": ["forge-big-1", "banana"],
+                "test_suites": {},
+            })
+        )
+        config.init()
+
+        self.assertNotIn("banana", config.get("enabled_clusters"))
+        config.enableCluster("banana")
+        self.assertIn("banana", config.get("enabled_clusters"))
+
+    def testDisableCluster(self):
+        config = ForgeConfig(
+            FakeConfigBackend({
+                "enabled_clusters": ["forge-big-1", "banana"],
+                "all_clusters": ["forge-big-1", "banana"],
+                "test_suites": {},
+            })
+        )
+        config.init()
+
+        self.assertIn("banana", config.get("enabled_clusters"))
+        config.disableCluster("banana")
+        self.assertNotIn("banana", config.get("enabled_clusters"))
