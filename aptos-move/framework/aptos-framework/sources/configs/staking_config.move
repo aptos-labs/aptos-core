@@ -40,7 +40,7 @@ module aptos_framework::staking_config {
         // Only this % of current total voting power is allowed to join the validator set in each epoch.
         // This is necessary to prevent a massive amount of new stake from joining that can potentially take down the
         // network if corresponding validators are not ready to participate in consensus in time.
-        // This value is within (0, 100%), not inclusive.
+        // This value is within (0, 50%), not inclusive.
         voting_power_increase_limit: u64,
     }
 
