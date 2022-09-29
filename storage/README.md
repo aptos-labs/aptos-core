@@ -77,8 +77,10 @@ storage:
   # AptosDB persists the state authentication structure off the critical path
   # of transaction execution and batch up recent changes for performance. Once
   # the number of buffered state updates exceeds this config, a dump of all
-  # buffered values into a snapshot is triggered.
-  target_snapshot_size: 100000
+  # buffered values into a snapshot is triggered. (Alternatively, if too many
+  # transactions have been processed since last dump, a new dump is processed
+  # as well.)
+  buffered_state_target_items: 100000
   # Determines the maximum memory consumption by the JMT node cache. Larger cache
   # helps with performance but consumes a lot of memory and can compete with
   # the filesystem cache.
