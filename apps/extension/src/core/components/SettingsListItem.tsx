@@ -12,6 +12,7 @@ import {
   secondaryGridHoverBgColor,
   textColor, secondaryAddressFontColor,
 } from 'core/colors';
+import useExplorerAddress from 'core/hooks/useExplorerAddress';
 import ChakraLink from './ChakraLink';
 
 interface BgColorDictType {
@@ -45,6 +46,7 @@ export default function SettingsListItem({
   const { colorMode } = useColorMode();
   const { activeAccount } = useActiveAccount();
   const { lockAccounts } = useInitializedAccounts();
+  const getExplorerAddress = useExplorerAddress();
 
   const gridOnClick = useCallback(async () => {
     // todo: Create an enum for these titles for more typed code
@@ -158,8 +160,8 @@ export default function SettingsListItem({
     }
     if (title === 'View on Explorer') {
       const explorerAddress = activeAccount?.address
-        ? `https://explorer.aptoslabs.com/account/${activeAccount.address}`
-        : 'https://explorer.aptoslabs.com';
+        ? getExplorerAddress(`account/${activeAccount.address}`)
+        : getExplorerAddress();
       return (
         <VStack
           as="a"
@@ -175,7 +177,8 @@ export default function SettingsListItem({
     }
 
     return settingsListItemContent;
-  }, [activeAccount.address, externalLink, path, settingsListItemContent, title]);
+  }, [activeAccount.address, externalLink, getExplorerAddress,
+    path, settingsListItemContent, title]);
 
   return (
     <VStack width="100%" alignItems="flex-start">

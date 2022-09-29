@@ -17,6 +17,7 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
+import useExplorerAddress from 'core/hooks/useExplorerAddress';
 import { useTransferFlow } from 'core/hooks/useTransferFlow';
 import TransferAvatar from './TransferAvatar';
 import TransferInput from './TransferInput';
@@ -32,9 +33,10 @@ export default function TransferDrawerAmount() {
     transferDrawerPage,
     validRecipientAddress,
   } = useTransferFlow();
+  const getExplorerAddress = useExplorerAddress();
 
   const { formState: { isSubmitting }, register } = formMethods;
-  const explorerAddress = `https://explorer.aptoslabs.com/account/${validRecipientAddress}`;
+  const explorerAddress = getExplorerAddress(`account/${validRecipientAddress}`);
 
   return (
     <>

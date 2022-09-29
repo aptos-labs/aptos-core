@@ -10,15 +10,15 @@ import {
   useClipboard,
   Text,
 } from '@chakra-ui/react';
-import React, { useMemo } from 'react';
+import React from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
-import SettingsPaths from 'core/components/SettingsPaths';
 import SettingsListItem from 'core/components/SettingsListItem';
 import { secondaryTextColor } from 'core/colors';
 import { CredentialHeaderAndBodyProps } from 'core/components/CredentialsBody';
 import AccountView from 'core/components/AccountView';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+import useSettingsPaths from 'core/hooks/useSettingsPaths';
 
 export function CredentialRow({
   body,
@@ -47,7 +47,7 @@ export function CredentialRow({
 function Account() {
   const { activeAccount } = useActiveAccount();
   const { activeNetwork } = useNetworks();
-  const settingsPaths = useMemo(() => SettingsPaths(activeAccount), [activeAccount]);
+  const settingsPaths = useSettingsPaths(activeAccount);
 
   return (
     <WalletLayout title="Settings">

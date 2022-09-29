@@ -22,6 +22,7 @@ import { HexString, MaybeHexString } from 'aptos';
 import { useParams } from 'react-router-dom';
 import ChakraLink from 'core/components/ChakraLink';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+import useExplorerAddress from 'core/hooks/useExplorerAddress';
 import { useTransaction } from 'core/queries/transaction';
 import { formatAmount, formatCoin } from 'core/utils/coin';
 import { collapseHexString } from 'core/utils/hex';
@@ -49,6 +50,7 @@ function TransactionBody() {
   const { activeAccountAddress } = useActiveAccount();
   const { version } = useParams();
   const { data: txn } = useTransaction(version ? Number(version) : undefined);
+  const getExplorerAddress = useExplorerAddress();
 
   const fullDatetime = txn !== undefined
     ? new Date(txn.timestamp).toLocaleDateString('en-us', {
@@ -62,7 +64,7 @@ function TransactionBody() {
 
   const userAddress = activeAccountAddress
     && HexString.ensure(activeAccountAddress).toShortString();
-  const explorerAddress = `https://explorer.aptoslabs.com/txn/${version}`;
+  const explorerAddress = getExplorerAddress(`txn/${version}`);
 
   function clickableAddress(address: MaybeHexString) {
     return address === userAddress
