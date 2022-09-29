@@ -87,9 +87,12 @@ function TransferFlow() {
       transactionErrorToast(err);
     }
 
+    // Other queries depend on this, so this needs to complete invalidating
+    // before invalidating other queries
+    await queryClient.invalidateQueries(queryKeys.getAccountResources);
     Promise.all([
       queryClient.invalidateQueries(queryKeys.getAccountOctaCoinBalance),
-      queryClient.invalidateQueries(queryKeys.getAccountResources),
+      queryClient.invalidateQueries(queryKeys.getAccountCoinResources),
       queryClient.invalidateQueries(queryKeys.getActivity),
     ]);
   };

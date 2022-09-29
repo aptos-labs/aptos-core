@@ -50,6 +50,12 @@ export function useFundAccount() {
             coinType: aptosCoinStructTag,
           },
         });
+        // Other queries depend on this, so this needs to complete invalidating
+        // before invalidating other queries
+        await queryClient.invalidateQueries([
+          queryKeys.getAccountResources,
+          address,
+        ]);
         await Promise.all([
           queryClient.invalidateQueries([
             queryKeys.getAccountOctaCoinBalance,
@@ -57,10 +63,6 @@ export function useFundAccount() {
           ]),
           queryClient.invalidateQueries([
             queryKeys.getAccountCoinResources,
-            address,
-          ]),
-          queryClient.invalidateQueries([
-            queryKeys.getAccountResources,
             address,
           ]),
           queryClient.invalidateQueries([
