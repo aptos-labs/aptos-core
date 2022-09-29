@@ -22,6 +22,7 @@ import { useAccounts } from 'core/hooks/useAccounts';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { passwordStrength, mnemonicValues } from 'core/constants';
 import Step from 'core/components/Step';
+import { lookUpAndInitAccounts } from 'core/utils/rotateKey';
 import { MNEMONIC } from 'core/enums';
 import { MnemonicFormValues } from './AddAccountLayout';
 
@@ -91,7 +92,7 @@ function NextButton() {
   const { activeNetwork, aptosClient } = useNetworks();
 
   const {
-    lookUpAndInitAccounts,
+    initAccounts,
   } = useAccounts();
 
   const {
@@ -126,7 +127,9 @@ function NextButton() {
       const aptosAccount = new AptosAccount(seed);
 
       // initialize password and wallet
-      await lookUpAndInitAccounts(aptosClient, aptosAccount, confirmPassword, mnemonic);
+      await lookUpAndInitAccounts({
+        aptosAccount, aptosClient, confirmPassword, initAccounts, mnemonic,
+      });
 
       setIsLoading(false);
       importAccountToast();
@@ -136,12 +139,12 @@ function NextButton() {
     }
     nextStep();
   }, [
-    nextStep,
-    aptosClient,
     activeNetwork,
+    aptosClient,
     confirmPassword,
-    lookUpAndInitAccounts,
+    initAccounts,
     mnemonicArray,
+    nextStep,
   ]);
 
   const intiAccountWithPrivateKey = useCallback(async () => {
@@ -157,7 +160,9 @@ function NextButton() {
       const aptosAccount = new AptosAccount(encodedKey);
 
       // initialize password and wallet
-      await lookUpAndInitAccounts(aptosClient, aptosAccount, confirmPassword);
+      await lookUpAndInitAccounts({
+        aptosAccount, aptosClient, confirmPassword, initAccounts,
+      });
 
       setIsLoading(false);
       importAccountToast();
@@ -170,9 +175,10 @@ function NextButton() {
     aptosClient,
     activeNetwork,
     confirmPassword,
-    lookUpAndInitAccounts,
     nextStep,
-    privateKey]);
+    initAccounts,
+    privateKey,
+  ]);
 
   const nextOnClick = useCallback(async () => {
     switch (activeStep) {

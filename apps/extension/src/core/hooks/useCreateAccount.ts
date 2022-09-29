@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount, HexString, AptosClient } from 'aptos';
+import { AptosAccount } from 'aptos';
 import {
   Account,
 } from 'shared/types';
@@ -25,34 +25,6 @@ const useCreateAccount = ({
   const { fundAccount } = useFundAccount();
   const { addAccount } = useUnlockedAccounts();
   const { trackEvent } = useAnalytics();
-
-  const lookupOriginalAddress = async (
-    aptosClient: AptosClient,
-    aptosAccount: AptosAccount,
-    mnemonic?: string,
-  ) => {
-    // Attempt to look up original address to see
-    // if account key has been rotated previously
-    const originalAddress: HexString = await aptosClient.lookupOriginalAddress(
-      aptosAccount.address(),
-    );
-
-    // if account is looked up successfully, it means account key has been rotated
-    // therefore update the account derived from private key
-    // with the original address
-    const newAptosAccount = AptosAccount.fromAptosAccountObject({
-      ...aptosAccount.toPrivateKeyObject(),
-      address: HexString.ensure(originalAddress).toString(),
-    });
-
-    // pass in mnemonic phrase if account is imported via secret recovery phrase
-    const newAccount = mnemonic ? {
-      mnemonic,
-      ...keysFromAptosAccount(newAptosAccount),
-    } : keysFromAptosAccount(newAptosAccount);
-
-    return newAccount;
-  };
 
   const createAccount = async (): Promise<Account | undefined> => {
     let newAccount;
@@ -93,7 +65,7 @@ const useCreateAccount = ({
     return newAccount;
   };
 
-  return { createAccount, lookupOriginalAddress };
+  return { createAccount };
 };
 
 export default useCreateAccount;

@@ -11,11 +11,14 @@ import { importAccountErrorToast, importAccountToast } from 'core/components/Toa
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
 import { useAnalytics } from 'core/hooks/useAnalytics';
 import { importAccountEvents } from 'core/utils/analytics/events';
+import { lookUpAndAddAccount } from 'core/utils/rotateKey';
+import { useNetworks } from 'core/hooks/useNetworks';
 
 export default function ImportAccountPrivateKey() {
   const navigate = useNavigate();
-  const { lookUpAndAddAccount } = useUnlockedAccounts();
   const { trackEvent } = useAnalytics();
+  const { addAccount } = useUnlockedAccounts();
+  const { aptosClient } = useNetworks();
 
   const onSubmit = useCallback(async (
     data: PrivateKeyFormValues,
@@ -29,7 +32,12 @@ export default function ImportAccountPrivateKey() {
       const aptosAccount = new AptosAccount(encodedKey);
       // TODO: prompt user for confirmation if account is not on chain
 
-      await lookUpAndAddAccount(aptosAccount);
+      await lookUpAndAddAccount({
+        addAccount,
+        aptosAccount,
+        aptosClient,
+      });
+
       importAccountToast();
 
       trackEvent({ eventType: importAccountEvents.IMPORT_PK_ACCOUNT });
@@ -43,7 +51,7 @@ export default function ImportAccountPrivateKey() {
       });
       importAccountErrorToast();
     }
-  }, [navigate, trackEvent, lookUpAndAddAccount]);
+  }, [aptosClient, addAccount, navigate, trackEvent]);
 
   return (
     <ImportAccountPrivateKeyLayout
