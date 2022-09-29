@@ -40,7 +40,9 @@ export class MoveVmError extends Error {
     super();
     this.name = 'MoveVmError';
     Object.setPrototypeOf(this, MoveVmError.prototype);
-    this.message = statusCodeKey ?? 'Generic error';
+    this.message = statusCodeKey
+      ?? (statusCode && MoveStatusCode[statusCode])
+      ?? 'Generic error';
   }
 }
 

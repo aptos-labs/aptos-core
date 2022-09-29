@@ -3,6 +3,7 @@
 
 import { ApiError, Types } from 'aptos';
 import {
+  MoveStatusCode,
   MoveVmError,
   MoveVmStatus,
   parseMoveMiscError,
@@ -38,7 +39,11 @@ export function throwForVmError(txn: Types.UserTransaction) {
  */
 export function handleApiError(err: any) {
   if (err instanceof ApiError) {
-    const statusCodeKey = parseMoveVmError(err.message);
-    throw new MoveVmError(statusCodeKey, 0);
+    const { message } = JSON.parse(err.message);
+    const statusCode = err.vmErrorCode !== undefined
+      ? Number(err.vmErrorCode) as MoveStatusCode
+      : undefined;
+    const statusCodeKey = parseMoveVmError(message);
+    throw new MoveVmError(statusCodeKey, statusCode);
   }
 }
