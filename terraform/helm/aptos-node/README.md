@@ -28,7 +28,7 @@ Aptos blockchain node deployment
 | fullnode.rust_log | string | `"info"` | Log level for the fullnode |
 | fullnode.rust_log_remote | string | `"debug,hyper=off"` | Remote log level for the fullnode |
 | fullnode.storage.class | string | `nil` | Kubernetes storage class to use for fullnode persistent storage |
-| fullnode.storage.size | string | `"300Gi"` | Size of fullnode persistent storage |
+| fullnode.storage.size | string | `"1000Gi"` | Size of fullnode persistent storage |
 | fullnode.tolerations | list | `[]` |  |
 | haproxy.affinity | object | `{}` |  |
 | haproxy.config.send_proxy_protocol | bool | `false` | Whether to send Proxy Protocol v2 |
@@ -81,7 +81,7 @@ Aptos blockchain node deployment
 | validator.rust_log | string | `"info"` | Log level for the validator |
 | validator.rust_log_remote | string | `"debug,hyper=off"` | Remote log level for the validator |
 | validator.storage.class | string | `nil` | Kubernetes storage class to use for validator persistent storage |
-| validator.storage.size | string | `"300Gi"` | Size of validator persistent storage |
+| validator.storage.size | string | `"1000Gi"` | Size of validator persistent storage |
 | validator.tolerations | list | `[]` |  |
 
 ## Resource Descriptions
