@@ -48,7 +48,7 @@ Before joining the network, you need to make sure the validator node is bootstra
 
 1. Stop your node and remove the data directory. **Make sure you remove the `secure-data.json` file too**. [Click here to see the location of the `secure-data.json` file](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team.
-3. Update your `account_address` in the `validator-identity.yaml` file to your **operator** wallet address. Do not change anything else. Keep the keys as they are. 
+3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **owner** wallet address. Do not change anything else. Keep the keys as they are. 
 4. Pull the latest changes from the `mainnet` branch. It should be commit: `843b204dce971d98449b82624f4f684c7a18b991`.
 5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). Add the below configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](/concepts/state-sync#fast-syncing).
     ```yaml
@@ -64,7 +64,7 @@ Before joining the network, you need to make sure the validator node is bootstra
 
 1. Stop your node and remove the data volumes, `docker compose down --volumes`. **Make sure you remove the `secure-data.json` file too.** [Click here to see the location of the `secure-data.json` file](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team.
-3. Update your `account_address` in the `validator-identity.yaml` file to your **operator** wallet address.
+3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **owner** wallet address.
 4. Update your Docker image to use the tag `testnet_843b204dce971d98449b82624f4f684c7a18b991`.
 5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). Add this configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](/concepts/state-sync#fast-syncing).
     ```yaml
@@ -110,7 +110,7 @@ Before joining the network, you need to make sure the validator node is bootstra
     ```
 5. Apply Terraform: `terraform apply`.
 6. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team.
-7. Update your `account_address` in the `validator-identity.yaml` file to your **operator** wallet address. Do not change anything else. Keep the keys as they are.
+7. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **owner** wallet address. Do not change anything else. Keep the keys as they are.
 8. Recreate the secrets. Make sure the secret name matches your `era` number, e.g. if you have `era = 3`, then you should replace the secret name to be:
   ```bash
   ${WORKSPACE}-aptos-node-0-genesis-e3
