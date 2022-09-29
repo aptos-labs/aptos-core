@@ -103,22 +103,7 @@ impl TransactionStore {
         }
     }
 
-    /// Fetch transaction by account address + sequence_number.
-    pub(crate) fn get(
-        &self,
-        address: &AccountAddress,
-        sequence_number: u64,
-    ) -> Option<SignedTransaction> {
-        if let Some(txn) = self
-            .transactions
-            .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
-        {
-            return Some(txn.txn.clone());
-        }
-        None
-    }
-
+    #[inline]
     fn get_mempool_txn(
         &self,
         address: &AccountAddress,
@@ -127,6 +112,30 @@ impl TransactionStore {
         self.transactions
             .get(address)
             .and_then(|txns| txns.get(&sequence_number))
+    }
+
+    /// Fetch transaction by account address + sequence_number.
+    pub(crate) fn get(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<SignedTransaction> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some(txn.txn.clone());
+        }
+        None
+    }
+
+    /// Fetch transaction by account address + sequence_number, including ranking score
+    pub(crate) fn get_with_ranking_score(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<(SignedTransaction, u64)> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some((txn.txn.clone(), txn.ranking_score));
+        }
+        None
     }
 
     pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {

@@ -195,20 +195,20 @@ impl Mempool {
         let result_size = result.len();
         let mut block = Vec::with_capacity(result_size);
         for (address, seq) in result {
-            if let Some(txn) = self.transactions.get(&address, seq) {
+            if let Some((txn, ranking_score)) =
+                self.transactions.get_with_ranking_score(&address, seq)
+            {
                 let txn_size = txn.raw_txn_bytes_len();
                 if total_bytes + txn_size > max_bytes as usize {
                     break;
                 }
                 total_bytes += txn_size;
                 block.push(txn);
-                if let Some(ranking_score) = self.transactions.get_ranking_score(&address, seq) {
-                    counters::core_mempool_txn_ranking_score(
-                        CONSENSUS_PULLED_LABEL,
-                        CONSENSUS_PULLED_LABEL,
-                        ranking_score,
-                    );
-                }
+                counters::core_mempool_txn_ranking_score(
+                    CONSENSUS_PULLED_LABEL,
+                    CONSENSUS_PULLED_LABEL,
+                    ranking_score,
+                );
             }
         }
 
