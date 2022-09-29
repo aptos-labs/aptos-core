@@ -197,6 +197,7 @@ async fn spawn_telemetry_service(
 fn try_spawn_log_env_poll_task(sender: TelemetrySender) {
     if enable_log_env_polling() {
         tokio::spawn(async move {
+            let original_value = env::var(RUST_LOG_TELEMETRY).ok();
             let mut interval = time::interval(Duration::from_secs(LOG_ENV_POLL_FREQ_SECS));
             loop {
                 interval.tick().await;
@@ -208,6 +209,10 @@ fn try_spawn_log_env_poll_task(sender: TelemetrySender) {
                         env
                     );
                     env::set_var(RUST_LOG_TELEMETRY, env)
+                } else if let Some(ref value) = original_value {
+                    env::set_var(RUST_LOG_TELEMETRY, value)
+                } else {
+                    env::remove_var(RUST_LOG_TELEMETRY)
                 }
             }
         });
