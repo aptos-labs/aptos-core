@@ -2,20 +2,23 @@
 title: "Validator Nodes"
 slug: "basics-validator-nodes"
 ---
+
 import BlockQuote from "@site/src/components/BlockQuote";
 
 An Aptos node is an entity of the Aptos ecosystem that tracks the state of the Aptos blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:
-* Validator nodes
-* [Fullnodes](basics-fullnodes.md)
+
+- Validator nodes
+- [Fullnodes](basics-fullnodes.md)
 
 Each Aptos node comprises several logical components:
-* [REST service](/reference/glossary#rest-service)
-* [Mempool](#mempool)
-* [Consensus (disabled in fullnodes)](#consensus)
-* [Execution](#execution)
-* [Virtual Machine](#virtual-machine)
-* [Storage](#storage)
-* [State synchronizer](#state-synchronizer)
+
+- [REST service](/reference/glossary#rest-service)
+- [Mempool](#mempool)
+- [Consensus (disabled in fullnodes)](#consensus)
+- [Execution](#execution)
+- [Virtual Machine](#virtual-machine)
+- [Storage](#storage)
+- [State synchronizer](#state-synchronizer)
 
 The [Aptos-core](/reference/glossary#aptos-core) software can be configured to run as a validator node or as a fullnode.
 
@@ -34,6 +37,7 @@ The AptosBFT consensus protocol provides fault tolerance of up to one-third of m
 ## Validator node components
 
 ![validator.svg](/img/docs/validator.svg)
+
 ### Mempool
 
 Mempool is a component within each node that holds an in-memory buffer of transactions that have been submitted to the blockchain, but not yet agreed upon or executed. This buffer is replicated between validator nodes and fullnodes.

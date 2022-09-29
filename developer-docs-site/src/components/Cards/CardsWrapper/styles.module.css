@@ -19,12 +19,12 @@
   display: grid;
   column-gap: 2rem !important;
   --doc-card-size: 100% !important;
-  width:100% !important;
+  width: 100% !important;
 }
 
 .root.rowOf2 {
   --grid-column-spacing: 10px;
-  --doc-card-size: calc( 100% - var(--grid-column-spacing) );
+  --doc-card-size: calc(100% - var(--grid-column-spacing));
   display: grid;
   grid-column-gap: var(--grid-column-spacing);
   grid-template-columns: 50% 50%;
@@ -60,6 +60,6 @@
 @media large-tablet-breakpoint-query {
   .root {
     /* Account for the margin of the final card on a line */
-    width: calc(100% + calc( var(--horizontal-spacing) * 2 ));
+    width: calc(100% + calc(var(--horizontal-spacing) * 2));
   }
 }

@@ -174,7 +174,6 @@ Run NHC:
 cargo run --release -- server run --baseline-node-config-paths /etc/nhc/ait2_validator.yaml /etc/nhc/devnet_fullnode.yaml
 ```
 
-
 ## Running NHC as a sidecar
 
 When you run NHC as a sidecar, you preconfigure a node that NHC should use as the node under investigation by default:
@@ -211,4 +210,3 @@ cargo run -- server generate-openapi -f json > doc/spec.json
 ```
 
 You can also hit the `/spec.yaml` and `/spec.json` endpoints of the running service.
-

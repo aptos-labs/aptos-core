@@ -16,9 +16,9 @@ This tutorial describes how to create and transfer NFTs on the Aptos blockchain.
 
 Install your preferred SDK from the below list:
 
-* [Typescript SDK][typescript-sdk]
-* [Python SDK][python-sdk]
-* [Rust SDK][rust-sdk]
+- [Typescript SDK][typescript-sdk]
+- [Python SDK][python-sdk]
+- [Rust SDK][rust-sdk]
 
 ---
 
@@ -27,6 +27,7 @@ Install your preferred SDK from the below list:
 Each SDK provides an `examples` directory. This tutorial covers the `simple-nft` example.
 
 Clone the `aptos-core` repo:
+
 ```bash
 git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 ```
@@ -34,43 +35,51 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-  Navigate to the Typescript SDK examples directory:
-  ```bash
-  cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
-  ```
+Navigate to the Typescript SDK examples directory:
 
-  Install the necessary dependencies:
-  ```bash
-  yarn install
-  ```
+```bash
+cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
+```
 
-  Run the Typescript [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_nft.ts) example:
-  ```bash
-  yarn run simple_nft
-  ```
+Install the necessary dependencies:
+
+```bash
+yarn install
+```
+
+Run the Typescript [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_nft.ts) example:
+
+```bash
+yarn run simple_nft
+```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
-  Navigate to the Python SDK directory:
-  ```bash
-  cd ~/aptos-core/ecosystem/python/sdk
-  ```
+Navigate to the Python SDK directory:
 
-  Install the necessary dependencies:
-  ```bash
-  curl -sSL https://install.python-poetry.org | python3
-  poetry update
-  ```
+```bash
+cd ~/aptos-core/ecosystem/python/sdk
+```
 
-  Run the Python [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) example:
-  ```bash
-  poetry run python -m examples.simple-nft
-  ```
+Install the necessary dependencies:
+
+```bash
+curl -sSL https://install.python-poetry.org | python3
+poetry update
+```
+
+Run the Python [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) example:
+
+```bash
+poetry run python -m examples.simple-nft
+```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -139,12 +148,12 @@ Bob's token balance: 0
 
 This example demonstrates:
 
-* Initializing the REST and faucet clients.
-* The creation of two accounts: Alice and Bob.
-* The funding and creation of Alice and Bob's accounts.
-* The creation of a collection and a token using Alice's account.
-* Alice offering a token and Bob claiming it.
-* Bob unilaterally sending the token to Alice via a multiagent transaction.
+- Initializing the REST and faucet clients.
+- The creation of two accounts: Alice and Bob.
+- The funding and creation of Alice and Bob's accounts.
+- The creation of a collection and a token using Alice's account.
+- Alice offering a token and Bob claiming it.
+- Bob unilaterally sending the token to Alice via a multiagent transaction.
 
 ---
 
@@ -156,17 +165,17 @@ This example demonstrates:
 :::tip See the full code
 See [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_nft.ts) for the complete code as you follow the below steps.
 :::
-  </TabItem>
-  <TabItem value="python" label="Python">
+</TabItem>
+<TabItem value="python" label="Python">
 
 :::tip See the full code
 See [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) for the complete code as you follow the below steps.
 :::
-  </TabItem>
-  <TabItem value="rust" label="Rust">
+</TabItem>
+<TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -186,14 +195,17 @@ In the first step the example initializes both the API and faucet clients.
 ```
 
 Using the API client we can create a `TokenClient`, which we use for common token operations such as creating collections and tokens, transferring them, claiming them, and so on.
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_1b
 ```
 
 `common.ts` initializes the URL values as such:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/common.ts section_1
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
@@ -206,20 +218,21 @@ Using the API client we can create a `TokenClient`, which we use for common toke
 ```python
 :!: static/sdks/python/examples/common.py section_1
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
-
 
 :::tip
 
 By default the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
-  - `APTOS_NODE_URL`
-  - `APTOS_FAUCET_URL`
-:::
+
+- `APTOS_NODE_URL`
+- `APTOS_FAUCET_URL`
+  :::
 
 ---
 
@@ -233,17 +246,19 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_2
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_2
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -258,17 +273,19 @@ In Aptos, each account must have an on-chain representation in order to support 
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_3
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_3
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -281,31 +298,37 @@ Now begins the process of creating tokens. First, the creator must create a coll
   <TabItem value="typescript" label="Typescript">
 
 Your application will call `createCollection`:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_4
 ```
 
 The function signature of `createCollection`. It returns a transaction hash:
+
 ```ts
 :!: static/sdks/typescript/src/token_client.ts createCollection
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 Your application will call `create_collection`:
+
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_4
 ```
 
 The function signature of `create_collection`. It returns a transaction hash:
+
 ```python
 :!: static/sdks/python/aptos_sdk/client.py create_collection
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -318,31 +341,37 @@ To create a token, the creator must specify an associated collection. A token mu
   <TabItem value="typescript" label="Typescript">
 
 Your application will call `createToken`:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_5
 ```
 
 The function signature of `createToken`. It returns a transaction hash:
+
 ```ts
 :!: static/sdks/typescript/src/token_client.ts createToken
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 Your application will call `create_token`:
+
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_5
 ```
 
 The function signature of `create_token`. It returns a transaction hash:
+
 ```python
 :!: static/sdks/python/aptos_sdk/client.py create_token
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -355,16 +384,19 @@ Both the collection and token metadata are stored on the creator's account withi
   <TabItem value="typescript" label="Typescript">
 
 To read a collection's metadata:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_6
 ```
 
 To read a token's metadata:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_8
 ```
 
 Here's how `getTokenData` queries the token metadata:
+
 ```ts
 :!: static/sdks/typescript/src/token_client.ts getTokenData
 ```
@@ -373,16 +405,19 @@ Here's how `getTokenData` queries the token metadata:
   <TabItem value="python" label="Python">
 
 To read a collection's metadata:
+
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_6
 ```
 
 To read a token's metadata:
+
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_8
 ```
 
 Here's how `get_token_data` queries the token metadata:
+
 ```python
 :!: static/sdks/python/aptos_sdk/client.py read_token_data_table
 ```
@@ -391,7 +426,7 @@ Here's how `get_token_data` queries the token metadata:
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -406,24 +441,26 @@ Each token within Aptos is a distinct asset, the assets owned by the user are st
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_7
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_7
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
 
 ### Step 4.8: Offering and claiming a token
 
-Many users have received unwanted tokens that may cause minimally embarrassment to serious ramifications. Aptos gives the rights to each owner of an account to dictate whether or not to receive unilateral transfers. By default, unilateral transfers are unsupported. So Aptos provides a framework for *offering* and *claiming* tokens.
+Many users have received unwanted tokens that may cause minimally embarrassment to serious ramifications. Aptos gives the rights to each owner of an account to dictate whether or not to receive unilateral transfers. By default, unilateral transfers are unsupported. So Aptos provides a framework for _offering_ and _claiming_ tokens.
 
 To offer a token:
 
@@ -433,17 +470,19 @@ To offer a token:
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_9
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_9
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon!
-  </TabItem>
+</TabItem>
 </Tabs>
 
 To claim a token:
@@ -454,17 +493,19 @@ To claim a token:
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_10
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_10
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -479,17 +520,19 @@ To support safe unilateral transfers of a token, the sender may first ask the re
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_11
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_11
 ```
+
   </TabItem>
   <TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -502,15 +545,15 @@ Coming soon.
   <TabItem value="python" label="Python">
 
 Coming soon.
-  </TabItem>
-  <TabItem value="rust" label="Rust">
+</TabItem>
+<TabItem value="rust" label="Rust">
 
 Coming soon.
-  </TabItem>
-  <TabItem value="typescript" label="Typescript">
+</TabItem>
+<TabItem value="typescript" label="Typescript">
 
 Coming soon.
-  </TabItem>
+</TabItem>
 </Tabs>
 
 [account_basics]: /concepts/basics-accounts

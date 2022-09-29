@@ -10,8 +10,8 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 The two fundamental concepts at the heart of the Aptos blockchain are transactions and states:
 
-* **Transactions**: Transactions represent the exchange of data (e.g., Aptos Coins or NFTs) between accounts on the Aptos blockchain.
-* **States**: The state, i.e., the Aptos blockchain ledger state, represents the state of all the accounts in the Aptos blockchain. 
+- **Transactions**: Transactions represent the exchange of data (e.g., Aptos Coins or NFTs) between accounts on the Aptos blockchain.
+- **States**: The state, i.e., the Aptos blockchain ledger state, represents the state of all the accounts in the Aptos blockchain.
 
 :::tip Executing a transaction changes the ledger state
 When a transaction is executed, the state of the Aptos blockchain changes.
@@ -40,15 +40,15 @@ The ledger state is versioned using an unsigned 64-bit integer corresponding to 
 
 ## Transactions change ledger state
 
-The above figure shows how executing transaction T<sub>*i*</sub> changes the state of the Aptos blockchain from S<sub>*i-1*</sub> to S<sub>*i*</sub>.
+The above figure shows how executing transaction T<sub>_i_</sub> changes the state of the Aptos blockchain from S<sub>_i-1_</sub> to S<sub>_i_</sub>.
 
 In the figure:
 
-- Accounts **A** and **B**: Represent Alice's and Bob's accounts on the Aptos blockchain. 
-- **S<sub>*i-1*</sub>** : Represents the (*i-1*)-th state of the blockchain. In this state, Alice's account **A** has a balance of 110 APT (Aptos coins), and Bob's account **B** has a balance of 52 APT.
-- **T<sub>*i*</sub>** : This is the *i*-th transaction executed on the blockchain. In this example, it represents Alice sending 10 APT to Bob.
-- **Apply()**: This is a deterministic function that always returns the same final state for a specific initial state and a specific transaction. If the current state of the blockchain is **S<sub>*i-1*</sub>**, and transaction **T<sub>*i*</sub>** is executed on the state **S<sub>*i-1*</sub>**, then the new state of the blockchain is always **S<sub>*i*</sub>**. The Aptos blockchain uses the [Move language](https://move-language.github.io/move/) to implement the deterministic execution function **Apply()**. 
-- **S<sub>*i*</sub>** : This is the *i*-th state of the blockchain. When the transaction **T<sub>*i*</sub>** is applied to the blockchain, it generates the new state **S<sub>*i*</sub>** (an outcome of applying **Apply(S<sub>*i-1*</sub>, T<sub>*i*</sub>)** to **S<sub>*i-1*</sub>** and **T<sub>*i*</sub>**). This causes Alice’s account balance to be reduced by 10 to 100 APT and Bob’s account balance to be increased by 10 to 62 APT. The new state **S<sub>*i*</sub>** shows these updated balances.
+- Accounts **A** and **B**: Represent Alice's and Bob's accounts on the Aptos blockchain.
+- **S<sub>_i-1_</sub>** : Represents the (_i-1_)-th state of the blockchain. In this state, Alice's account **A** has a balance of 110 APT (Aptos coins), and Bob's account **B** has a balance of 52 APT.
+- **T<sub>_i_</sub>** : This is the _i_-th transaction executed on the blockchain. In this example, it represents Alice sending 10 APT to Bob.
+- **Apply()**: This is a deterministic function that always returns the same final state for a specific initial state and a specific transaction. If the current state of the blockchain is **S<sub>_i-1_</sub>**, and transaction **T<sub>_i_</sub>** is executed on the state **S<sub>_i-1_</sub>**, then the new state of the blockchain is always **S<sub>_i_</sub>**. The Aptos blockchain uses the [Move language](https://move-language.github.io/move/) to implement the deterministic execution function **Apply()**.
+- **S<sub>_i_</sub>** : This is the _i_-th state of the blockchain. When the transaction **T<sub>_i_</sub>** is applied to the blockchain, it generates the new state **S<sub>_i_</sub>** (an outcome of applying **Apply(S<sub>_i-1_</sub>, T<sub>_i_</sub>)** to **S<sub>_i-1_</sub>** and **T<sub>_i_</sub>**). This causes Alice’s account balance to be reduced by 10 to 100 APT and Bob’s account balance to be increased by 10 to 62 APT. The new state **S<sub>_i_</sub>** shows these updated balances.
 
 ## Transactions
 
@@ -72,10 +72,11 @@ A [signed transaction](/guides/sign-a-transaction.md) on the blockchain contains
 
 The Aptos blockchain uses proof to verify the authenticity and correctness of the blockchain data.
 
-All data in the Aptos blockchain is stored in a single-version distributed database. Each validator and fullnode's [storage](basics-validator-nodes.md#storage) is responsible for persisting the agreed upon blocks of transactions and their execution results to the database. 
+All data in the Aptos blockchain is stored in a single-version distributed database. Each validator and fullnode's [storage](basics-validator-nodes.md#storage) is responsible for persisting the agreed upon blocks of transactions and their execution results to the database.
 
 The blockchain is represented as an ever-growing [Merkle tree](/reference/glossary#merkle-trees), where each leaf appended to the tree represents a single transaction executed by the blockchain.
 
 All operations executed by the blockchain and all account states can be verified cryptographically. These cryptographic proofs ensure that:
-- The validator nodes agree on the state. 
+
+- The validator nodes agree on the state.
 - The client does not need to trust the entity from which it is receiving data. For example, if a client fetches the last **n** transactions from an account, a proof can attest that no transactions were added, omitted or modified in the response. The client may also query for the state of an account, ask whether a specific transaction was processed, and so on.

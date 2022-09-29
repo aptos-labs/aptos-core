@@ -104,7 +104,7 @@ aptos account create-resource-account --profile $PROFILE --seed 1
 
 ## Publishing modules to the local testnet
 
-You can run any command by adding the `--profile $PROFILE` flag.  In this case, we also use `$PROFILE` as the named address in the `HelloBlockchain` example.
+You can run any command by adding the `--profile $PROFILE` flag. In this case, we also use `$PROFILE` as the named address in the `HelloBlockchain` example.
 
 ```bash
 aptos move publish --profile $PROFILE --package-dir /opt/git/aptos-core/aptos-move/move-examples/hello_blockchain --named-addresses HelloBlockchain=$PROFILE

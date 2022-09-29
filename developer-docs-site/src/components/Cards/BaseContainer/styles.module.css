@@ -2,7 +2,7 @@
 
 .root {
   --border-width: 1px;
-  --transition-speed: .15s;
+  --transition-speed: 0.15s;
   color: var(--doc-primary);
   position: relative;
   transition: box-shadow var(--transition-speed) ease-in-out;
@@ -16,7 +16,7 @@
 
 .root:hover {
   color: var(--doc-primary);
-  box-shadow: 0 12px 15px 0 rgba(0,0,0,0.2);
+  box-shadow: 0 12px 15px 0 rgba(0, 0, 0, 0.2);
   text-decoration: none;
 }
 
@@ -63,7 +63,7 @@
 }
 
 .hasShadow {
-  box-shadow: 0px 8px 15px 0px rgba(0,0,0,0.15);
+  box-shadow: 0px 8px 15px 0px rgba(0, 0, 0, 0.15);
 }
 
 @media small-tablet-breakpoint-query {
@@ -76,11 +76,11 @@ html {
   --doc-card-size: 243px;
 }
 
-html[data-theme='dark'] .root {
+html[data-theme="dark"] .root {
   border: var(--border-width) solid transparent;
 }
 
-html[data-theme='dark'] .root:hover {
+html[data-theme="dark"] .root:hover {
   border-color: white;
-  transition: border-color .2s ease-in-out;
+  transition: border-color 0.2s ease-in-out;
 }

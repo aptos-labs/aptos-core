@@ -12,9 +12,9 @@ hide_table_of_contents: false
 
 :::
 
-This section contains the guides for the Aptos nodes. Topics covered include how to install and manage  Aptos nodes.
+This section contains the guides for the Aptos nodes. Topics covered include how to install and manage Aptos nodes.
 
-## For the Aptos testing networks 
+## For the Aptos testing networks
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-2 g-4">

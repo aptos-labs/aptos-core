@@ -14,7 +14,7 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 2. Delete the data folder (the directory path is what you specified in the configuration file, e.g., `fullnode.yaml`).
 
-    - The default data folder is `/opt/aptos/data`.
+   - The default data folder is `/opt/aptos/data`.
 
 3. Delete the `genesis.blob` file and `waypoint.txt` file (depending on how you configured it, you might not have this file and may instead have a `waypoint` directly in your configuration file).
 

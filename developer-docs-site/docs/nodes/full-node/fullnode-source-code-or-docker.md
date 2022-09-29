@@ -22,10 +22,9 @@ Your public fullnode will be connected to the Aptos devnet with a REST endpoint 
 
 Before you get started with this tutorial, read the following sections:
 
-* [Validator node concepts](/concepts/basics-validator-nodes).
-* [Fullnode concepts](/concepts/basics-fullnodes).
-* [REST specifications](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
-
+- [Validator node concepts](/concepts/basics-validator-nodes).
+- [Fullnode concepts](/concepts/basics-fullnodes).
+- [REST specifications](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
 
 ## Hardware requirements
 
@@ -66,27 +65,27 @@ This document describes how to configure your public fullnode using both methods
 
 1. Clone the Aptos repo.
 
-    ```
-    git clone https://github.com/aptos-labs/aptos-core.git
-    ```
+   ```
+   git clone https://github.com/aptos-labs/aptos-core.git
+   ```
 
 2. `cd` into `aptos-core` directory.
 
-    ```
-    cd aptos-core
-    ```
+   ```
+   cd aptos-core
+   ```
 
 3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment.
 
-    ```
-    ./scripts/dev_setup.sh
-    ```
+   ```
+   ./scripts/dev_setup.sh
+   ```
 
 4. Update your current shell environment.
 
-    ```
-    source ~/.cargo/env
-    ```
+   ```
+   source ~/.cargo/env
+   ```
 
 With your development environment ready, now you can start to setup your fullnode.
 
@@ -95,53 +94,55 @@ With your development environment ready, now you can start to setup your fullnod
 6. Make sure your current working directory is `aptos-core`.
    Run `cp config/src/config/test_data/public_full_node.yaml fullnode.yaml` to create a copy of the fullnode config template. You will edit this file to ensure that your fullnode:
 
-    - Contains the correct genesis blob that is published by the Aptos devnet.
-    - Synchronizes correctly with the devnet, by using the checkpoint file `waypoint.txt` published by the devnet, and
-    - Stores the devnet database at a location of your choice on your local machine.
+   - Contains the correct genesis blob that is published by the Aptos devnet.
+   - Synchronizes correctly with the devnet, by using the checkpoint file `waypoint.txt` published by the devnet, and
+   - Stores the devnet database at a location of your choice on your local machine.
 
 7. Make sure your current working directory is `aptos-core`. The Aptos devnet publishes the `genesis.blob` and `waypoint.txt` files. Download them:
 
-    - Click here [genesis][devnet_genesis] or run the below command on your terminal:
-      ```
-      curl -O https://devnet.aptoslabs.com/genesis.blob
-      ```
+   - Click here [genesis][devnet_genesis] or run the below command on your terminal:
 
-    - Click here [waypoint][devnet_waypoint] and save the file, or run the below command on your terminal:
-      ```
-      curl -O https://devnet.aptoslabs.com/waypoint.txt
-      ```
-  
-    :::tip
-    To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-genesis-waypoint
-    :::
+     ```
+     curl -O https://devnet.aptoslabs.com/genesis.blob
+     ```
+
+   - Click here [waypoint][devnet_waypoint] and save the file, or run the below command on your terminal:
+     ```
+     curl -O https://devnet.aptoslabs.com/waypoint.txt
+     ```
+
+   :::tip
+   To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-genesis-waypoint
+   :::
 
 8. Edit the `fullnode.yaml` file in your current working directory as follows.
 
-    - Specify the correct path to the `waypoint.txt` you just downloaded by editing the `base.waypoint.from_file` in the `fullnode.yaml`. By default it points to `waypoint.txt` in the current working directory.
-    E.g.
-      ```
-      base:
-        waypoint:
-          from_file: "./waypoint.txt"
-      ```
+   - Specify the correct path to the `waypoint.txt` you just downloaded by editing the `base.waypoint.from_file` in the `fullnode.yaml`. By default it points to `waypoint.txt` in the current working directory.
+     E.g.
 
-    - For the `genesis_file_location` key, provide the full path to the `genesis.blob` file. For example:
+     ```
+     base:
+       waypoint:
+         from_file: "./waypoint.txt"
+     ```
 
-      ```
-      genesis_file_location: "./genesis.blob"
-      ```
+   - For the `genesis_file_location` key, provide the full path to the `genesis.blob` file. For example:
 
-    - For the `data_dir` key in the `base` list, specify the directory where on your local computer you want to store the devnet database. This can be anywhere on your computer. For example, you can create a directory `my-full-node/data` in your home directory and specify it as:
+     ```
+     genesis_file_location: "./genesis.blob"
+     ```
 
-      ```
-      data_dir: "/path/to/my/homedir/my-full-node/data"
-      ```
+   - For the `data_dir` key in the `base` list, specify the directory where on your local computer you want to store the devnet database. This can be anywhere on your computer. For example, you can create a directory `my-full-node/data` in your home directory and specify it as:
+
+     ```
+     data_dir: "/path/to/my/homedir/my-full-node/data"
+     ```
 
 9. Start your local fullnode by running the below command:
 
-  ```
-  cargo run -p aptos-node --release -- -f ./fullnode.yaml
-  ```
+```
+cargo run -p aptos-node --release -- -f ./fullnode.yaml
+```
 
 You have now successfully configured and started running a fullnode connected to Aptos devnet.
 
@@ -170,22 +171,23 @@ If M1/M2 support is important to you, please comment on and follow this issue: h
    mkdir aptos-fullnode && cd aptos-fullnode
    ```
 3. Run the following script to prepare your local config and data dir for Devnet:
-    ```bash
-    mkdir data && \
-    curl -O https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/config/src/config/test_data/public_full_node.yaml && \
-    curl -O https://devnet.aptoslabs.com/waypoint.txt && \
-    curl -O https://devnet.aptoslabs.com/genesis.blob
-    ```
 
-    :::tip
-    To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-genesis-waypoint
-    :::
+   ```bash
+   mkdir data && \
+   curl -O https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/config/src/config/test_data/public_full_node.yaml && \
+   curl -O https://devnet.aptoslabs.com/waypoint.txt && \
+   curl -O https://devnet.aptoslabs.com/genesis.blob
+   ```
+
+   :::tip
+   To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-genesis-waypoint
+   :::
 
 4. Finally, start the fullnode via docker:
    ```bash
     docker run --pull=always --rm -p 8080:8080 -p 9101:9101 -p 6180:6180 -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data --workdir /opt/aptos/etc --name=aptos-fullnode aptoslabs/validator:devnet aptos-node -f /opt/aptos/etc/public_full_node.yaml
    ```
-Ensure you have opened the relevant ports - 8080, 9101 and 6180 and you may also need to update the 127.0.0.1 with 0.0.0.0 in the public_full_node.yaml - listen_address and api\address
+   Ensure you have opened the relevant ports - 8080, 9101 and 6180 and you may also need to update the 127.0.0.1 with 0.0.0.0 in the public_full_node.yaml - listen_address and api\address
 
 ## Verify the correctness of your fullnode
 
@@ -293,6 +295,7 @@ full_node_networks:
             role: "Upstream"
 ...
 ```
+
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt

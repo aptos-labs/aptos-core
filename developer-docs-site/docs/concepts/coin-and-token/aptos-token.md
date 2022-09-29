@@ -2,6 +2,7 @@
 title: "Aptos Token"
 id: "aptos-token"
 ---
+
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
@@ -10,7 +11,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 :::tip Aptos token tutorial
 Also see the tutorial [Your First NFT](/tutorials/your-first-nft.md).
 :::
-
 
 ## Overview of NFT
 
@@ -48,8 +48,8 @@ In addition to the standard token attributes, the Aptos token standard provides 
 
 Fungible tokens share the same default property values. However, these property values can evolve over time and become different from each other. To support such evolution of token properties, the Aptos token standard provides the `property_version` field. Here is how it works:
 
-- During the token creation (minting), all tokens initially have `property_version` set to `0` and these tokens can be stacked together as fungible token. 
-- When the creators mutate the default properties of a token, the mutated token would be assigned a unique `property_version` to create a new [`token_id`](https://github.com/aptos-labs/aptos-core/blob/bba1690d7268759bd86ccd7459d7967172f1da24/aptos-move/framework/aptos-token/sources/token.move#L288) to differentiate it from other fungible tokens. This unique `token_id` allows the token to have its own property values, and all further mutation of this token does **not** change the `property_version` again. This token essentially becomes an NFT now. 
+- During the token creation (minting), all tokens initially have `property_version` set to `0` and these tokens can be stacked together as fungible token.
+- When the creators mutate the default properties of a token, the mutated token would be assigned a unique `property_version` to create a new [`token_id`](https://github.com/aptos-labs/aptos-core/blob/bba1690d7268759bd86ccd7459d7967172f1da24/aptos-move/framework/aptos-token/sources/token.move#L288) to differentiate it from other fungible tokens. This unique `token_id` allows the token to have its own property values, and all further mutation of this token does **not** change the `property_version` again. This token essentially becomes an NFT now.
 
 #### Configuring mutability
 
@@ -105,28 +105,28 @@ You can also store the token metadata in a JSON file located in an off-chain sto
 
 To protect a user from receiving undesired NFTs, a user must be first offered an NFT, followed by the user claiming the offered NFTs. Then only these NFTs will be deposited in the user's token store. This is the default token transfer behavior. For example:
 
-- If Alice wants to send Bob an NFT, she must first offer Bob this NFT. This NFT is still stored under Alice’s account. 
-- Only when Bob claims the NFT, this NFT will be removed from Alice’s account and stored in Bob’s token store. 
+- If Alice wants to send Bob an NFT, she must first offer Bob this NFT. This NFT is still stored under Alice’s account.
+- Only when Bob claims the NFT, this NFT will be removed from Alice’s account and stored in Bob’s token store.
 
 :::tip Token transfer module
-The token transfer is implemented in the [`token_transfer`](https://github.com/aptos-labs/aptos-core/blob/c238d8d1156b842ec768e3ad646643f1b4165f5b/aptos-move/framework/aptos-token/sources/token_transfers.move) module. 
+The token transfer is implemented in the [`token_transfer`](https://github.com/aptos-labs/aptos-core/blob/c238d8d1156b842ec768e3ad646643f1b4165f5b/aptos-move/framework/aptos-token/sources/token_transfers.move) module.
 :::
 
 ### Direct transfer
 
-On the other hand, if a user wants to receive direct transfer of the NFT, skipping the initial steps of offer and claim, then the user can call [`opt_in_direct_transfer`](https://github.com/aptos-labs/aptos-core/blob/283348c6ea4ce198fb27eb3ef1c1e471739aa1aa/aptos-move/framework/aptos-token/sources/token.move#L297) to allow other people to directly transfer the NFTs into the user's token store.  
+On the other hand, if a user wants to receive direct transfer of the NFT, skipping the initial steps of offer and claim, then the user can call [`opt_in_direct_transfer`](https://github.com/aptos-labs/aptos-core/blob/283348c6ea4ce198fb27eb3ef1c1e471739aa1aa/aptos-move/framework/aptos-token/sources/token.move#L297) to allow other people to directly transfer the NFTs into the user's token store.
 
-Note that in both the default token transfer and the direct transfer method, the user will receive the NFT into the user's token store. 
+Note that in both the default token transfer and the direct transfer method, the user will receive the NFT into the user's token store.
 
 :::tip Turning off direct transfer
-The user can also turn off this direct transfer behavior by calling the same `opt_in_direct_transfer` function to reset the behavior to the default behavior. 
+The user can also turn off this direct transfer behavior by calling the same `opt_in_direct_transfer` function to reset the behavior to the default behavior.
 :::
 
 ## Token data model
 
 <ThemedImage
-  alt="Signed Transaction Flow"
-  sources={{
+alt="Signed Transaction Flow"
+sources={{
     light: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
     dark: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
   }}
@@ -138,21 +138,21 @@ The token related data are stored at both creator’s account and owner’s acco
 
 ### Resource stored at the creator’s address
 
-| Field | Description |
-| --- | --- |
-| `Collections` | Maintains a table called `collection_data`, which maps the collection name to the `CollectionData`. It also stores all the `TokenData` that this creator creates. |
-| `CollectionData` | Store the collection metadata. The supply is the number of tokens created for the current collection. maxium is the upper bound of tokens in this collection. |
-| `CollectionMutabilityConfig` | Specify which field is mutable. |
-| `TokenData` | The main struct for holding the token metadata. Properties is a where user can add their own properties that are not defined in the token data. User can mint more tokens based on the `TokenData` and they share the same `TokenData`. |
-| `TokenMutabilityConfig` | Control which fields are mutable. |
-| `TokenDataId` | An id used for representing and querying `TokenData` on-chain. This id mainly contains 3 fields including creator address, collection name and token name. |
-| Royalty | Specify the denominator and numerator for calculating the royalty fee. It also has payee account address for depositing the Royalty. |
-| `PropertyValue` | Contains both value of a property and type of property. |
+| Field                        | Description                                                                                                                                                                                                                             |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Collections`                | Maintains a table called `collection_data`, which maps the collection name to the `CollectionData`. It also stores all the `TokenData` that this creator creates.                                                                       |
+| `CollectionData`             | Store the collection metadata. The supply is the number of tokens created for the current collection. maxium is the upper bound of tokens in this collection.                                                                           |
+| `CollectionMutabilityConfig` | Specify which field is mutable.                                                                                                                                                                                                         |
+| `TokenData`                  | The main struct for holding the token metadata. Properties is a where user can add their own properties that are not defined in the token data. User can mint more tokens based on the `TokenData` and they share the same `TokenData`. |
+| `TokenMutabilityConfig`      | Control which fields are mutable.                                                                                                                                                                                                       |
+| `TokenDataId`                | An id used for representing and querying `TokenData` on-chain. This id mainly contains 3 fields including creator address, collection name and token name.                                                                              |
+| Royalty                      | Specify the denominator and numerator for calculating the royalty fee. It also has payee account address for depositing the Royalty.                                                                                                    |
+| `PropertyValue`              | Contains both value of a property and type of property.                                                                                                                                                                                 |
 
 ### Resource stored at the owner’s address
 
-| Field | Description |
-| --- | --- |
-| `TokenStore` | The main struct for storing the token owned by this address. It maps `TokenId` to the actual token. |
-| `Token` | amount is the number of tokens. |
-| `TokenId` | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |
+| Field        | Description                                                                                                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TokenStore` | The main struct for storing the token owned by this address. It maps `TokenId` to the actual token.                                                                    |
+| `Token`      | amount is the number of tokens.                                                                                                                                        |
+| `TokenId`    | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |

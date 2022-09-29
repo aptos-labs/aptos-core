@@ -6,7 +6,7 @@ slug: "index"
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Owner 
+# Owner
 
 This document describes how to use [Aptos CLI](/docs/cli-tools/aptos-cli-tool/index.md) to perform owner operations during validation.
 
@@ -18,7 +18,7 @@ This document assumes that you are using [Petra wallet](/docs/guides/install-pet
 
 :::tip Examples using testnet
 The CLI command examples used in this section use testnet. You can use the same command for mainnet by passing the mainnet URL for the `--rest-url` parameter.
-::: 
+:::
 
 ### Initialize CLI
 
@@ -54,7 +54,7 @@ aptos account transfer \
 
 ```bash
 aptos stake set-operator \
-  --operator-address <new-operator-address> \ 
+  --operator-address <new-operator-address> \
   --profile testnet-owner
 ```
 
@@ -62,7 +62,7 @@ aptos stake set-operator \
 
 ```bash
 aptos stake set-delegated-voter \
-  --voter-address <new-voter-address> \ 
+  --voter-address <new-voter-address> \
   --profile testnet-owner
 ```
 

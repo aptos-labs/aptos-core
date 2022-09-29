@@ -28,7 +28,7 @@ source ~/.profile
 
 # Types of information collected
 
-* **Aptos node information**, e.g., public IP address and core metrics (including node type, synced version and number of network connections).
-* **Aptos tooling usage**, e.g., the commands and subcommands run by the Aptos CLI tool.
-* **Rust build information**, e.g., the rust version, cargo version, build target architecture and build tag.
-* **System information**, e.g., operating system information (including versions), hardware information and resource utilization (including CPU, memory and disk).
+- **Aptos node information**, e.g., public IP address and core metrics (including node type, synced version and number of network connections).
+- **Aptos tooling usage**, e.g., the commands and subcommands run by the Aptos CLI tool.
+- **Rust build information**, e.g., the rust version, cargo version, build target architecture and build tag.
+- **System information**, e.g., operating system information (including versions), hardware information and resource utilization (including CPU, memory and disk).

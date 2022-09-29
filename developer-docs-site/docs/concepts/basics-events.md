@@ -5,17 +5,19 @@ slug: "basics-events"
 
 Events are emitted during the execution of a transaction. Each Move module can define its own events and choose when to emit the events upon execution of the module. For example, during a [coin transfer][coin_transfer], both the sender and receiver's accounts will emit `SentEvent` and `ReceivedEvent`, respectively. This data is stored within the ledger and can be queried via the REST interface's [Get events by event handle][get_events].
 
-Assuming that an account `0xc40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd` had sent coins to another account, the following query could be made to the REST interface: `https://fullnode.devnet.aptoslabs.com/v1/accounts/c40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`. The output would be all `WithdrawEvent`s stored on that account, it would look like 
+Assuming that an account `0xc40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd` had sent coins to another account, the following query could be made to the REST interface: `https://fullnode.devnet.aptoslabs.com/v1/accounts/c40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`. The output would be all `WithdrawEvent`s stored on that account, it would look like
 
 ```json
-[{
-  "key":"0x0000000000000000caa60eb4a01756955ab9b2d1caca52ed",
-  "sequence_number":"0",
-  "type":"0x1::coin::WithdrawEvent",
-  "data":{
-    "amount":"1000"
+[
+  {
+    "key": "0x0000000000000000caa60eb4a01756955ab9b2d1caca52ed",
+    "sequence_number": "0",
+    "type": "0x1::coin::WithdrawEvent",
+    "data": {
+      "amount": "1000"
+    }
   }
-}]
+]
 ```
 
 Each registered event has a unique `key`. The key `0x0000000000000000c40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd` maps to the event `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/sent_events` registered on account `0xc40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd`. This key can then be used to directly make event queries, e.g., `https://fullnode.devnet.aptoslabs.com/v1/events/0000000000000000c40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd`.

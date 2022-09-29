@@ -15,9 +15,10 @@ This guide (in concert with the [Move module tutorial][your-first-move-module]) 
 be up to date. The most recent framework can be found in the source code, [here][aptos_framework].
 
 The core functions provided to users within the Aptos Framework include:
-* Sending and receiving the network coin `Coin<AptosCoin>`
-* Creating a new account
-* Publishing a new Move module
+
+- Sending and receiving the network coin `Coin<AptosCoin>`
+- Creating a new account
+- Publishing a new Move module
 
 Note: this document assumes readers are already familiar with submitting transactions, as described in the [Your first transaction tutorial][your-first-transaction].
 

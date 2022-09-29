@@ -14,9 +14,9 @@ This tutorial introduces how you can compile, deploy, and mint your own coin, na
 
 Install your preferred SDK from the below list:
 
-* [Typescript SDK][typescript-sdk]
-* [Python SDK][python-sdk]
-* [Rust SDK][rust-sdk]
+- [Typescript SDK][typescript-sdk]
+- [Python SDK][python-sdk]
+- [Rust SDK][rust-sdk]
 
 ---
 
@@ -130,6 +130,7 @@ Bob's initial MoonCoin balance: 0.
 Alice mints Bob some of the new coin.
 Bob's updated MoonCoin balance: 100.
 ```
+
 ---
 
 ## Step 4: MoonCoin in depth
@@ -169,7 +170,7 @@ These are read by the example and published to the Aptos blockchain:
 
 ### Step 4.2: Understanding the MoonCoin module
 
-The MoonCoin module defines the `MoonCoin` struct, or the distinct type of coin type. In addition, it contains a function called `init_module`. The `init_module` function is called when the module is published. In this case, MoonCoin initializes the `MoonCoin` coin type as a `ManagedCoin`, which is maintained by the owner of the account. 
+The MoonCoin module defines the `MoonCoin` struct, or the distinct type of coin type. In addition, it contains a function called `init_module`. The `init_module` function is called when the module is published. In this case, MoonCoin initializes the `MoonCoin` coin type as a `ManagedCoin`, which is maintained by the owner of the account.
 
 :::tip ManagedCoin framework
 [`ManagedCoin`](https://github.com/aptos-labs/aptos-core/blob/f81ccb01f00227f9c0f36856fead4879f185a9f6/aptos-move/framework/aptos-framework/sources/managed_coin.move#L1) is a simple coin management framework for coins directly managed by users. It provides convenience wrappers around `mint` and `burn`.

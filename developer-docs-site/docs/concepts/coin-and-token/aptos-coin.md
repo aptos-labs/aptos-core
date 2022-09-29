@@ -2,14 +2,15 @@
 title: "Aptos Coin"
 id: "aptos-coin"
 ---
+
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Aptos Coin
 
-[Coin](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) provides a standard, typesafe framework for simple, fungible tokens or coins. 
+[Coin](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) provides a standard, typesafe framework for simple, fungible tokens or coins.
 
-:::tip 
+:::tip
 Coin is stored in `0x1::coin`.
 :::
 
@@ -96,7 +97,7 @@ public fun initialize<CoinType>(
 
 The creator has the opportunity to define a name, symbol, decimals, and whether or not the total supply for the coin is monitored. The following applies:
 
-- The first three of the above (`name`, `symbol`, `decimals`)  are purely metadata and have no impact for on-chain applications. Some applications may use decimal to equate a single Coin from fractional coin. 
+- The first three of the above (`name`, `symbol`, `decimals`) are purely metadata and have no impact for on-chain applications. Some applications may use decimal to equate a single Coin from fractional coin.
 - Monitoring supply (`monitor_supply`) helps track total coins in supply. However, due to the way the parallel executor works, turning on this option will prevent any parallel execution of mint and burn. If the coin will be regularly minted or burned, consider disabling `monitor_supply`.
 
 ### Minting Coins
@@ -139,8 +140,6 @@ The function `burn` eliminates the total value stored in the coin, while `burn_f
 Burning coins from an account does not emit a `WithdrawEvent` as the `withdraw` function does.
 :::
 
-
-
 ### Freezing Accounts
 
 If the creator or manager would like to freeze a `CoinStore` on a specific account, they must retrieve a reference to their `FreezeCapability`, which was produced in `initialize`, and call:
@@ -165,7 +164,7 @@ public fun merge<CoinType>(
 
 ### Extracting Coins
 
-A Coin can have value deducted to  create another Coin by calling:
+A Coin can have value deducted to create another Coin by calling:
 
 ```rust
 public fun extract<CoinType>(
@@ -199,6 +198,7 @@ public fun deposit<CoinType>(
 		coin: Coin<CoinType>,
 ) acquires CoinStore {
 ```
+
 :::tip
 This function will emit a `DepositEvent`.
 :::

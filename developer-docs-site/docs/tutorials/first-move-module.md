@@ -22,17 +22,18 @@ This tutorial details how to compile, test, publish and interact with Move modul
 
 ---
 
-## Step 2: Create an account and fund it 
+## Step 2: Create an account and fund it
 
-After installing the CLI binary, next step is to create and fund an account on the Aptos blockchain. 
+After installing the CLI binary, next step is to create and fund an account on the Aptos blockchain.
 
-1. Begin by starting a new terminal and run the below command to initialize a new local account: 
+1. Begin by starting a new terminal and run the below command to initialize a new local account:
 
 ```bash
 aptos init
 ```
 
-The output will be similar to below. 
+The output will be similar to below.
+
 ```text
 Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com/v1]
 
@@ -50,14 +51,16 @@ Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c
 }
 ```
 
-The account address in the above output:  `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account, and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are interchangeable.
+The account address in the above output: `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account, and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are interchangeable.
 
-2. Now fund this account by running this command: 
+2. Now fund this account by running this command:
 
 ```bash
 aptos account fund-with-faucet --account default
 ```
+
 You will see an output similar to the below:
+
 ```
 {
   "Result": "Added 10000 coins to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
@@ -68,19 +71,19 @@ You will see an output similar to the below:
 
 ## Step 3: Compile and test the module
 
-Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory. Open a terminal and change directories into the `hello_blockchain` directory: 
+Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory. Open a terminal and change directories into the `hello_blockchain` directory:
 
 ```bash
 cd aptos-core/aptos-move/move-examples/hello_blockchain
 ```
 
-Run the below command to compile the `hello_blockchain` module: 
+Run the below command to compile the `hello_blockchain` module:
 
 ```bash
 aptos move compile --named-addresses hello_blockchain=default
 ```
 
-To test the module run: 
+To test the module run:
 
 ```bash
 aptos move test --named-addresses hello_blockchain=default
@@ -167,15 +170,15 @@ which, after the first execution contains the following:
 
 ```json
 {
-  "type":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder",
-  "data":{
-    "message":"hello, blockchain",
-    "message_change_events":{
-      "counter":"0",
-      "guid":{
-        "id":{
-          "addr":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
-          "creation_num":"3"
+  "type": "0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder",
+  "data": {
+    "message": "hello, blockchain",
+    "message_change_events": {
+      "counter": "0",
+      "guid": {
+        "id": {
+          "addr": "0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
+          "creation_num": "3"
         }
       }
     }
@@ -185,22 +188,24 @@ which, after the first execution contains the following:
 
 Notice that the `message` field contains `hello, blockchain`.
 
-Each successful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API: 
+Each successful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API:
 
 ```bash
 http://127.0.0.1:8080/v1/accounts/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a/events/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder/message_change_events
 ```
 
 where, after a call to set the message to `hello, blockchain, again`, the event stream would contain the following:
+
 ```json
 [
   {
-    "version":"8556",
-    "key":"0x0300000000000000a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
-    "sequence_number":"0","type":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageChangeEvent",
-    "data":{
-      "from_message":"hello, blockchain",
-      "to_message":"hello, blockchain, again"
+    "version": "8556",
+    "key": "0x0300000000000000a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
+    "sequence_number": "0",
+    "type": "0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageChangeEvent",
+    "data": {
+      "from_message": "hello, blockchain",
+      "to_message": "hello, blockchain, again"
     }
   }
 ]

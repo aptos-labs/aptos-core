@@ -31,13 +31,15 @@ slug: "glossary"
 
 Aptos-core is the open source technology on which the Aptos Payment Network runs. Aptos-core contains software for
 
-* the Aptos blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
-* the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos blockchain immutable ledger.
+- the Aptos blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
+- the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos blockchain immutable ledger.
 
 ## Aptos Framework
+
 The Aptos Framework defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Aptos functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.
 
 ## Aptos node
+
 An Aptos node is a peer entity of the Aptos network that tracks the state of the Aptos blockchain. There are two types of Aptos nodes, [validators](#validator) and [fullnodes](#fullnode)).
 
 ## Aptos Protocol

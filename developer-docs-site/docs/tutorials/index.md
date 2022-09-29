@@ -5,15 +5,15 @@ slug: "aptos-quickstarts"
 
 # Developer Tutorials
 
-If you are new to the Aptos blockchain, begin with these quickstarts before you get into in-depth development. These tutorials will help you become familiar with how to develop for the Aptos blockchain using the Aptos SDK. 
+If you are new to the Aptos blockchain, begin with these quickstarts before you get into in-depth development. These tutorials will help you become familiar with how to develop for the Aptos blockchain using the Aptos SDK.
 
 ### [Your First Transaction](first-transaction.md)
 
-How to generate, submit and verify a transaction to the Aptos blockchain. 
+How to generate, submit and verify a transaction to the Aptos blockchain.
 
 ### [Your First Move Module](first-move-module.md)
 
-Write your first Move module for the Aptos blockchain. 
+Write your first Move module for the Aptos blockchain.
 
 :::tip
 Make sure to run the above [Your First Transaction](first-transaction.md) tutorial before running this.

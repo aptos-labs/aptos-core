@@ -8,10 +8,10 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Operator
 
-If you are an operator participating in the Aptos network, then use this document to perform the operator tasks such as deploying a validator node and validator fullnode, registering the nodes on the Aptos community platform, and performing the validation. 
+If you are an operator participating in the Aptos network, then use this document to perform the operator tasks such as deploying a validator node and validator fullnode, registering the nodes on the Aptos community platform, and performing the validation.
 
 :::tip Both validator node and validator fullnode are required for mainnet
-For participating in the Aptos mainnet, you must deploy both a validator node and a validator fullnode. 
+For participating in the Aptos mainnet, you must deploy both a validator node and a validator fullnode.
 :::
 
 ## Deploy the nodes and register

@@ -8,7 +8,7 @@ slug: "running-a-local-multi-node-network"
 This guide describes how to run a local network with multiple validator nodes and validator fullnodes. You will use the [Aptos Forge CLI](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/forge-cli/src) for this.
 
 :::tip Use only for test deployments
-The method described in this guide should be used only for test deployments of multi-node local networks. Do not use this guide for deploying in production environments. Currently this is the only guide for multi-node deployments. 
+The method described in this guide should be used only for test deployments of multi-node local networks. Do not use this guide for deploying in production environments. Currently this is the only guide for multi-node deployments.
 
 For deploying a local network with a single node, see [Running Local Testnet](/nodes/local-testnet/index.md) and [Local testnet development flow](/guides/local-testnet-dev-flow.md).
 :::
@@ -54,7 +54,7 @@ cargo run -p forge-cli \
         --num-validators 4 test local-swarm
 ```
 
-This will start a local network of 4 validators, each running in their own process. The network will run forever unless you manually terminate it. 
+This will start a local network of 4 validators, each running in their own process. The network will run forever unless you manually terminate it.
 
 The terminal output will display the locations of the validator files (for example, the genesis files, logs, node configurations, etc.) and the commands that were run to start each node. The process id (PID) of each node and server addresses (e.g., REST APIs) are also displayed when it starts. For example, if you run the above command you should see:
 
@@ -90,7 +90,7 @@ cargo run --bin aptos-faucet \
         -c TESTING \
         --mint-key <Root/mint key displayed above> \
         -s <URL for node 0 REST API> \
-        -p 8081   
+        -p 8081
 ```
 
 The above command will run a faucet locally, listening on port `8081`. Using this faucet, you could then mint tokens to your test accounts, for example:
@@ -109,6 +109,7 @@ Also see how to use the [Aptos CLI](https://aptos.dev/cli-tools/aptos-cli-tool/u
 ## Validator fullnodes
 
 To also run validator fullnodes inside the network, use the `--num-validator-fullnodes` flag. For example:
+
 ```bash
 cargo run -p forge-cli \
         -- \
@@ -120,6 +121,7 @@ cargo run -p forge-cli \
 ## Additional usage
 
 To see all tool usage options, run:
+
 ```bash
 cargo run -p forge-cli --help
 ```

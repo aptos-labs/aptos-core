@@ -6,7 +6,7 @@ hidden: false
 
 # Aptos Concepts
 
-Start here to get into the core concepts of the Aptos blockchain. 
+Start here to get into the core concepts of the Aptos blockchain.
 
 - ### [Transactions and States](basics-txns-states.md)
 - ### [Accounts](basics-accounts.md)

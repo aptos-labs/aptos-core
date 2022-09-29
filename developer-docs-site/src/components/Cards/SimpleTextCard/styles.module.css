@@ -2,11 +2,8 @@
   align-items: center;
   background-color: var(--ifm-card-background-color);
   display: inline-flex;
-  padding:
-    calc( 19px + var(--border-width) )
-    calc( 14px + var(--border-width) )
-    calc( 19px + var(--border-width) )
-    calc( 19px + var(--border-width) );
+  padding: calc(19px + var(--border-width)) calc(14px + var(--border-width)) calc(19px + var(--border-width))
+    calc(19px + var(--border-width));
 }
 
 .image {

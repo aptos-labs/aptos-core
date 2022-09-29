@@ -7,20 +7,18 @@ slug: "guide-move-transactional-testing"
 
 :::caution Exploratory feature
 
-The Move transactional testing feature described in this document is in exploratory phase. Support for it will depend on its usage and adoption by the Aptos community. 
+The Move transactional testing feature described in this document is in exploratory phase. Support for it will depend on its usage and adoption by the Aptos community.
 :::
 
+If you are a smart contract developer using the Move language, then you can use the Move transactional tests to write and run end-to-end tests.
 
+This tutorial walks you through the steps for writing and running end-to-end Move transactional tests using the [Aptos CLI](/cli-tools/aptos-cli-tool/index.md).
 
-If you are a smart contract developer using the Move language, then you can use the Move transactional tests to write and run end-to-end tests. 
-
-This tutorial walks you through the steps for writing and running end-to-end Move transactional tests using the [Aptos CLI](/cli-tools/aptos-cli-tool/index.md). 
-
-Compared to the Move unit tests, which are useful for verifying the intra-module code correctness, the Move transactional tests enable you to test a broader spectrum of use cases, such as publishing the Move modules and the inter-module interactions. 
+Compared to the Move unit tests, which are useful for verifying the intra-module code correctness, the Move transactional tests enable you to test a broader spectrum of use cases, such as publishing the Move modules and the inter-module interactions.
 
 ## Overview
 
-See this `aptos_test_harness` [GitHub folder](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-transactional-test-harness/tests/aptos_test_harness) for how Move transactional tests look like. 
+See this `aptos_test_harness` [GitHub folder](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-transactional-test-harness/tests/aptos_test_harness) for how Move transactional tests look like.
 
 A Move transactional test suite consists of two types of files:
 
@@ -29,27 +27,28 @@ A Move transactional test suite consists of two types of files:
 
 ## Quickstart
 
-Before you get into the details, you can follow the below steps to run a sample Move transactional test and see the results. 
+Before you get into the details, you can follow the below steps to run a sample Move transactional test and see the results.
 
 ### Step 1: Install Aptos CLI
 
-Make sure you have installed `aptos` , the Aptos CLI tool. See [Aptos CLI](/cli-tools/aptos-cli-tool/index.md) for how to install and use the `aptos` CLI tool. 
+Make sure you have installed `aptos` , the Aptos CLI tool. See [Aptos CLI](/cli-tools/aptos-cli-tool/index.md) for how to install and use the `aptos` CLI tool.
 
 ### Step 2: Run the Move transactional test suite
 
 - Clone or download the `aptos-core` [GitHub repo](https://github.com/aptos-labs/aptos-core.git).
 - The Move transactional test suite is located in `aptos-core/aptos-move/aptos-transactional-test-harness/test` .
 - Run the `aptos` CLI command with the option `move transactional-test`.
-:::tip Use UB=1
-When you run the `aptos` CLI command make sure to include the `UB=1` **only during the first time or if you have updated the tests**, as shown below. 
-:::
+  :::tip Use UB=1
+  When you run the `aptos` CLI command make sure to include the `UB=1` **only during the first time or if you have updated the tests**, as shown below.
+  :::
 
 ```bash
 UB=1 aptos move transactional-test --root-path aptos-core/aptos-move/aptos-transactional-test-harness/test
 ```
-- The `--root-path` specifies where all the tests are located. 
-- The test runner walks down the directory hierarchies and finds the tests, specified as comments with the special prefix `//#`, in the files whose names end with `.move` or `.mvir`. 
-- The Move transactional test runner runs the tests and compares the output of the tests with the baseline files. Baseline files hold the contents of the results that were generated during the first run. 
+
+- The `--root-path` specifies where all the tests are located.
+- The test runner walks down the directory hierarchies and finds the tests, specified as comments with the special prefix `//#`, in the files whose names end with `.move` or `.mvir`.
+- The Move transactional test runner runs the tests and compares the output of the tests with the baseline files. Baseline files hold the contents of the results that were generated during the first run.
 
 ## Examples
 
@@ -61,10 +60,10 @@ This section presents examples showing how to write and run various Move transac
 //# create_account —name Alice [--initial-coins 10000]
 ```
 
-The `create_account` command generates a deterministic private key,  public key pair and creates a named account address (Alice in the above example). 
+The `create_account` command generates a deterministic private key, public key pair and creates a named account address (Alice in the above example).
 
 :::tip Default value
-Initial coins can be specified, otherwise, a default value of `10000` is used. 
+Initial coins can be specified, otherwise, a default value of `10000` is used.
 :::
 
 ### Publish modules
@@ -78,7 +77,7 @@ module Alice::first_module {
 }
 ```
 
-The `publish` command publishes a Move module to a designated account (**Alice** in the above example). Optionally, the number of gas units allowed for publishing the transaction can be specified via `--gas-budget`. 
+The `publish` command publishes a Move module to a designated account (**Alice** in the above example). Optionally, the number of gas units allowed for publishing the transaction can be specified via `--gas-budget`.
 
 :::tip Default value
 The default value is the maximum coins available at the sender account.
@@ -90,7 +89,7 @@ The default value is the maximum coins available at the sender account.
 //# run --signers Alice [--args x"68656C6C6F20776F726C64"] [--type-args "0x1::aptos_coin::AptosCoin"] [--expiration 1658432810] [--sequence-number 1] [--gas-price 1] [--show-events] -- Alice::first_module::function_name
 ```
 
-The `run` command runs a module script function by sending a transaction. 
+The `run` command runs a module script function by sending a transaction.
 
 In the above example:
 
@@ -134,7 +133,7 @@ The `view_resource` prints out the resources contained at an address.
 ### View tables
 
 ```rust
-//# view_table --table_handle 5713946181763753045826830927579154558 --key_type 0x1::string::String --key_value x"68656C6C6F20776F726C64" --value_type 0x1::token::Collection 
+//# view_table --table_handle 5713946181763753045826830927579154558 --key_type 0x1::string::String --key_value x"68656C6C6F20776F726C64" --value_type 0x1::token::Collection
 ```
 
 The `view_table` prints out an item in a table by the item’s key. For example, in the below Move code:

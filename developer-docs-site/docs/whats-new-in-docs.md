@@ -45,7 +45,7 @@ The [hardware requirements](/docs/nodes/validator-node/operator/node-requirement
 
 ## 12 September 2022
 
-- A new set of documents on Aptos [Coin and Token](/concepts/coin-and-token/index.md) are posted. 
+- A new set of documents on Aptos [Coin and Token](/concepts/coin-and-token/index.md) are posted.
 - A new document describing how to [bootstrap a new fullnode using data restore](/nodes/full-node/bootstrap-fullnode.md) is posted.
 
 ## 06 September 2022
@@ -61,7 +61,6 @@ The [hardware requirements](/docs/nodes/validator-node/operator/node-requirement
 ## 25 August 2022
 
 - A new guide describing [Upgrading the Move Code](/guides/move-guides/upgrading-move-code.md) is posted.
-
 
 ## 24 August 2022
 

@@ -5,7 +5,7 @@ slug: "your-first-dapp"
 
 # Your First Dapp
 
-In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos blockchain. A dapp usually consists of a user interface written in JavaScript, which  interacts with one or more Move modules.
+In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos blockchain. A dapp usually consists of a user interface written in JavaScript, which interacts with one or more Move modules.
 
 For this tutorial, we will use the Move module `HelloBlockchain` described in [Your First Move Module](first-move-module.md) and focus on building the user interface.
 
@@ -73,18 +73,18 @@ Open up `src/index.tsx` and change the following code snippet:
 root.render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 ```
 
 to this:
 
 ```typescript
-window.addEventListener('load', () => {
+window.addEventListener("load", () => {
   root.render(
     <React.StrictMode>
       <App />
-    </React.StrictMode>
+    </React.StrictMode>,
   );
 });
 ```
@@ -97,7 +97,9 @@ If you are using TypeScript, you may also want to inform the compiler of the exi
 
 ```typescript
 declare global {
-  interface Window { aptos: any; }
+  interface Window {
+    aptos: any;
+  }
 }
 ```
 
@@ -108,19 +110,21 @@ This lets us use the `window.aptos` API without having to do `(window as any).ap
 Our app is now ready to use the `window.aptos` API. We will change `src/App.tsx` to retrieve the value of `window.aptos.account()` (the wallet account) on initial render, store it in state, and then display it:
 
 ```typescript
-import React from 'react';
-import './App.css';
+import React from "react";
+import "./App.css";
 
 function App() {
   // Retrieve aptos.account on initial render and store it.
   const [address, setAddress] = React.useState<string | null>(null);
   React.useEffect(() => {
-    window.aptos.account().then((data : {address: string}) => setAddress(data.address));
+    window.aptos.account().then((data: { address: string }) => setAddress(data.address));
   }, []);
 
   return (
     <div className="App">
-      <p><code>{ address }</code></p>
+      <p>
+        <code>{address}</code>
+      </p>
     </div>
   );
 }
@@ -135,7 +139,9 @@ Refresh the page and you will see your account address.
 Next, replace the contents of `src/App.css`:
 
 ```css
-a, input, textarea {
+a,
+input,
+textarea {
   display: block;
 }
 
@@ -169,10 +175,10 @@ Now we can import the SDK and create an `AptosClient` to interact with the block
 As our wallet account is on devnet, we will set up the `AptosClient` to interact with devnet as well. Add the following to `src/App.tsx`:
 
 ```typescript
-import { Types, AptosClient } from 'aptos';
+import { Types, AptosClient } from "aptos";
 
 // Create an AptosClient to interact with devnet.
-const client = new AptosClient('https://fullnode.devnet.aptoslabs.com/v1');
+const client = new AptosClient("https://fullnode.devnet.aptoslabs.com/v1");
 
 function App() {
   // ...
@@ -186,8 +192,12 @@ function App() {
 
   return (
     <div className="App">
-      <p><code>{ address }</code></p>
-      <p><code>{ account?.sequence_number }</code></p>
+      <p>
+        <code>{address}</code>
+      </p>
+      <p>
+        <code>{account?.sequence_number}</code>
+      </p>
     </div>
   );
 }
@@ -247,21 +257,14 @@ You can also verify that the module was published by going to the [Aptos Explore
       "name": "get_message",
       "visibility": "public",
       "genericTypeParams": [],
-      "params": [
-        "address"
-      ],
-      "_return": [
-        "0x1::string::String"
-      ]
+      "params": ["address"],
+      "_return": ["0x1::string::String"]
     },
     {
       "name": "set_message",
       "visibility": "script",
       "genericTypeParams": [],
-      "params": [
-        "signer",
-        "vector"
-      ],
+      "params": ["signer", "vector"],
       "_return": []
     }
   ],
@@ -269,10 +272,7 @@ You can also verify that the module was published by going to the [Aptos Explore
     {
       "name": "MessageChangeEvent",
       "isNative": false,
-      "abilities": [
-        "drop",
-        "store"
-      ],
+      "abilities": ["drop", "store"],
       "genericTypeParams": [],
       "fields": [
         {
@@ -288,9 +288,7 @@ You can also verify that the module was published by going to the [Aptos Explore
     {
       "name": "MessageHolder",
       "isNative": false,
-      "abilities": [
-        "key"
-      ],
+      "abilities": ["key"],
       "genericTypeParams": [],
       "fields": [
         {
@@ -326,21 +324,16 @@ function App() {
     client.getAccountModules(address).then(setModules);
   }, [address]);
 
-  const hasModule = modules.some((m) => m.abi?.name === 'Message');
+  const hasModule = modules.some((m) => m.abi?.name === "Message");
   const publishInstructions = (
     <pre>
       Run this command to publish the module:
       <br />
-      aptos move publish --package-dir /path/to/hello_blockchain/
-      --named-addresses HelloBlockchain={address}
+      aptos move publish --package-dir /path/to/hello_blockchain/ --named-addresses HelloBlockchain={address}
     </pre>
   );
 
-  return (
-    <div className="App">
-      {!hasModule && publishInstructions}
-    </div>
-  );
+  return <div className="App">{!hasModule && publishInstructions}</div>;
 }
 ```
 
@@ -440,11 +433,12 @@ function App() {
           <textarea ref={ref} />
           <input disabled={isSaving} type="submit" />
         </form>
-      ) : publishInstructions}
+      ) : (
+        publishInstructions
+      )}
     </div>
   );
 }
-
 ```
 
 To test it:
@@ -488,16 +482,16 @@ function App() {
   }, [address]);
   const resourceType = `${address}::message::MessageHolder`;
   const resource = resources.find((r) => r.type === resourceType);
-  const data = resource?.data as {message: string} | undefined;
+  const data = resource?.data as { message: string } | undefined;
   const message = data?.message;
 
   return (
     // ...
-          <textarea ref={ref} defaultValue={message} />
+    <textarea ref={ref} defaultValue={message} />
     // ...
   );
 }
-  ```
+```
 
 To test it:
 
@@ -528,7 +522,7 @@ function App() {
     if (urlAddress) {
       setAddress(urlAddress);
     } else {
-      window.aptos.account().then((data : {address: string}) => setAddress(data.address));
+      window.aptos.account().then((data: { address: string }) => setAddress(data.address));
     }
   }, [urlAddress]);
 
@@ -539,10 +533,12 @@ function App() {
       {hasModule ? (
         <form onSubmit={handleSubmit}>
           <textarea ref={ref} defaultValue={message} readOnly={!isEditable} />
-          {isEditable && (<input disabled={isSaving} type="submit" />)}
-          {isEditable && (<a href={address!}>Get public URL</a>)}
+          {isEditable && <input disabled={isSaving} type="submit" />}
+          {isEditable && <a href={address!}>Get public URL</a>}
         </form>
-      ) : publishInstructions}
+      ) : (
+        publishInstructions
+      )}
     </div>
   );
 }
