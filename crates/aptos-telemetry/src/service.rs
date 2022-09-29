@@ -287,16 +287,16 @@ async fn custom_event_sender(
     node_config: NodeConfig,
     build_info: BTreeMap<String, String>,
 ) {
-    // Send build information once (only on startup)
-    send_build_information(
-        peer_id.clone(),
-        chain_id.to_string(),
-        build_info,
-        telemetry_sender.clone(),
-    )
-    .await;
-
-    futures::future::join3(
+    futures::future::join4(
+        // Periodically send build information
+        run_function_periodically(NODE_BUILD_INFO_FREQ_SECS, || {
+            send_build_information(
+                peer_id.clone(),
+                chain_id.to_string(),
+                build_info.clone(),
+                telemetry_sender.clone(),
+            )
+        }),
         // Periodically send system information
         run_function_periodically(NODE_SYS_INFO_FREQ_SECS, || {
             send_system_information(
