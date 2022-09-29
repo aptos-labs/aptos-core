@@ -910,7 +910,7 @@ impl CliTestFramework {
     }
 
     pub fn rest_options(&self) -> RestOptions {
-        RestOptions::new(Some(self.endpoint.clone()))
+        RestOptions::new(Some(self.endpoint.clone()), None)
     }
 
     pub fn faucet_options(&self) -> FaucetOptions {
