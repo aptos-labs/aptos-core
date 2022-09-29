@@ -60,11 +60,6 @@ export default function getSettingsPaths(account: Account): SettingsListItemProp
       title: settingsItemLabel.MANAGE_ACCOUNT,
     },
     {
-      iconAfter: FiChevronRight,
-      path: Routes.export_public_private_key.path,
-      title: settingsItemLabel.EXPORT_PUBLIC_PRIVATE_KEY,
-    },
-    {
       externalLink: `https://explorer.aptoslabs.com/account/${account.address}`,
       iconAfter: FiChevronRight,
       path: null,

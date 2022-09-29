@@ -15,7 +15,7 @@ interface SensitiveTextProps {
 }
 
 function SensitiveText({
-  height, value,
+  height = 12, value,
 }: SensitiveTextProps) {
   const { colorMode } = useColorMode();
   return (

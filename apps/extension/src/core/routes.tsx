@@ -30,7 +30,6 @@ import ChangePassword from 'pages/ChangePassword';
 import AutoLockTimer from 'pages/AutoLockTimer';
 import Welcome from 'pages/Welcome';
 import Reauthenticate from 'pages/Reauthenticate';
-import ExportPublicPrivateKey from 'pages/ExportPublicPrivateKey';
 import RemoveAccount from 'pages/RemoveAccount';
 import ManageAccount from 'pages/ManageAccount';
 import ManageAccountShowPrivateKey from 'pages/ManageAccountShowPrivateKey';
@@ -82,13 +81,6 @@ export const Routes = Object.freeze({
   createWalletViaImportAccount: {
     element: <CreateWalletViaImportAccount />,
     path: '/create-wallet/import-account',
-  },
-  export_public_private_key: {
-    element:
-  <Reauthenticate title="Export Keys">
-    <ExportPublicPrivateKey />
-  </Reauthenticate>,
-    path: '/settings/export_public_private_key',
   },
   gallery: {
     element: <Gallery />,
@@ -235,7 +227,6 @@ export const routes = [
               Routes.activity,
               Routes.transaction,
               Routes.remove_account,
-              Routes.export_public_private_key,
               Routes.account,
               Routes.rotate_key_main,
               Routes.rotate_key_onboarding,
