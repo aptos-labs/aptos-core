@@ -3,8 +3,8 @@
 
 use crate::common::types::OptionalPoolAddressArgs;
 use crate::common::utils::read_from_file;
-use crate::genesis::git::FRAMEWORK_NAME;
 use crate::genesis::git::{from_yaml, BALANCES_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE};
+use crate::genesis::git::{FRAMEWORK_NAME, OWNER_FILE};
 use crate::genesis::keys::{GenerateLayoutTemplate, PUBLIC_KEYS_FILE};
 use crate::{
     common::{
@@ -22,7 +22,11 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
-use aptos_genesis::config::{HostAndPort, Layout};
+use aptos_genesis::config::{
+    AccountBalanceMap, EmployeePoolConfig, EmployeePoolMap, HostAndPort, Layout,
+    OwnerConfiguration, ValidatorConfiguration,
+};
+use aptos_genesis::keys::PublicIdentity;
 use aptos_keygen::KeyGen;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
@@ -32,7 +36,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, EmployeePool, TestValidator, ValidatorWithCommissionRate};
+use vm_genesis::{AccountBalance, TestValidator};
 
 const INITIAL_BALANCE: u64 = 100_000_000_000_000;
 
@@ -68,20 +72,38 @@ async fn test_mainnet_genesis_e2e_flow() {
     let employee_2 = AccountAddress::from_hex_literal("0x202").unwrap();
     let employee_3 = AccountAddress::from_hex_literal("0x203").unwrap();
     let employee_4 = AccountAddress::from_hex_literal("0x204").unwrap();
-    let admin = AccountAddress::from_hex_literal("0x301").unwrap();
+    let admin_dir = generate_keys(dir.path(), 2).await;
+    let admin_identity: PublicIdentity = from_yaml(
+        &String::from_utf8(read_from_file(admin_dir.join(PUBLIC_KEYS_FILE).as_path()).unwrap())
+            .unwrap(),
+    )
+    .unwrap();
 
     // Create initial balances and employee vesting account files.
     let git_dir = git_options.local_repository_dir.as_ref().unwrap().as_path();
+
+    // Load the standalone staking pools
+    let staker_0 = get_owner_address(git_options.clone(), 0);
+    let staker_1 = get_owner_address(git_options.clone(), 1);
+
     create_account_balances_file(
         PathBuf::from(git_dir),
         vec![
-            account_1, account_2, employee_1, employee_2, employee_3, employee_4, admin,
+            staker_0,
+            staker_1,
+            account_1,
+            account_2,
+            employee_1,
+            employee_2,
+            employee_3,
+            employee_4,
+            admin_identity.account_address,
         ],
     )
     .await;
     create_employee_vesting_accounts_file(
         PathBuf::from(git_dir),
-        admin,
+        admin_identity,
         &vec![vec![employee_1, employee_2], vec![employee_3, employee_4]],
         &[true, false],
     )
@@ -98,6 +120,18 @@ async fn test_mainnet_genesis_e2e_flow() {
     assert!(waypoint_file.exists());
     let genesis_file = output_dir.join("genesis.blob");
     assert!(genesis_file.exists());
+}
+
+fn get_owner_address(git_options: GitOptions, index: u64) -> AccountAddress {
+    let git_client = git_options.get_client().unwrap();
+    let owner_config: OwnerConfiguration = git_client
+        .get(
+            Path::new(&format!("user-{}", index))
+                .join(OWNER_FILE)
+                .as_path(),
+        )
+        .unwrap();
+    owner_config.owner_account_address
 }
 
 async fn create_users(
@@ -212,6 +246,7 @@ async fn create_layout_file(
     layout.users = users;
     layout.chain_id = chain_id;
     layout.is_test = true;
+    layout.total_supply = Some(INITIAL_BALANCE * 9);
 
     write_to_file(
         file,
@@ -259,7 +294,7 @@ async fn set_validator_config(
 }
 
 async fn create_account_balances_file(path: PathBuf, addresses: Vec<AccountAddress>) {
-    let account_balances: &Vec<AccountBalance> = &addresses
+    let account_balances: Vec<AccountBalance> = addresses
         .iter()
         .map(|account_address| AccountBalance {
             account_address: *account_address,
@@ -267,48 +302,83 @@ async fn create_account_balances_file(path: PathBuf, addresses: Vec<AccountAddre
         })
         .collect();
 
+    let balance_map = AccountBalanceMap::try_from(account_balances).unwrap();
+
     write_to_file(
         &path.join(BALANCES_FILE),
         BALANCES_FILE,
-        serde_yaml::to_string(&account_balances).unwrap().as_bytes(),
+        serde_yaml::to_string(&balance_map).unwrap().as_bytes(),
     )
     .unwrap();
 }
 
 async fn create_employee_vesting_accounts_file(
     path: PathBuf,
-    admin_address: AccountAddress,
+    admin_identity: PublicIdentity,
     employee_groups: &Vec<Vec<AccountAddress>>,
     join_during_genesis: &[bool],
 ) {
-    let test_validators =
-        TestValidator::new_test_set(Some(employee_groups.len()), Some(INITIAL_BALANCE));
+    TestValidator::new_test_set(Some(employee_groups.len()), Some(INITIAL_BALANCE));
     let employee_vesting_accounts: Vec<_> = employee_groups
         .iter()
         .enumerate()
-        .map(|(index, account)| {
-            let mut validator = test_validators[index].data.clone();
-            validator.owner_address = admin_address;
-            validator.operator_address = admin_address;
-            validator.voter_address = admin_address;
-            EmployeePool {
-                accounts: account.clone(),
-                validator: ValidatorWithCommissionRate {
-                    validator,
-                    validator_commission_percentage: 10,
-                    join_during_genesis: join_during_genesis[index],
-                },
+        .map(|(index, accounts)| {
+            let validator_config = if *join_during_genesis.get(index).unwrap() {
+                let admin_identity = admin_identity.clone();
+
+                ValidatorConfiguration {
+                    owner_account_address: admin_identity.account_address,
+                    owner_account_public_key: admin_identity.account_public_key.clone(),
+                    operator_account_address: admin_identity.account_address,
+                    operator_account_public_key: admin_identity.account_public_key.clone(),
+                    voter_account_address: admin_identity.account_address,
+                    voter_account_public_key: admin_identity.account_public_key,
+                    consensus_public_key: admin_identity.consensus_public_key,
+                    proof_of_possession: admin_identity.consensus_proof_of_possession,
+                    validator_network_public_key: admin_identity.validator_network_public_key,
+                    validator_host: Some(HostAndPort::from_str("localhost:8080").unwrap()),
+                    full_node_network_public_key: admin_identity.full_node_network_public_key,
+                    full_node_host: Some(HostAndPort::from_str("localhost:8081").unwrap()),
+                    stake_amount: 2 * INITIAL_BALANCE,
+                    commission_percentage: 0,
+                    join_during_genesis: true,
+                }
+            } else {
+                ValidatorConfiguration {
+                    owner_account_address: admin_identity.account_address,
+                    owner_account_public_key: admin_identity.account_public_key.clone(),
+                    operator_account_address: admin_identity.account_address,
+                    operator_account_public_key: admin_identity.account_public_key.clone(),
+                    voter_account_address: admin_identity.account_address,
+                    voter_account_public_key: admin_identity.account_public_key.clone(),
+                    consensus_public_key: None,
+                    proof_of_possession: None,
+                    validator_network_public_key: None,
+                    validator_host: None,
+                    full_node_network_public_key: None,
+                    full_node_host: None,
+                    stake_amount: 2 * INITIAL_BALANCE,
+                    commission_percentage: 0,
+                    join_during_genesis: false,
+                }
+            };
+
+            EmployeePoolConfig {
+                accounts: accounts.clone(),
+                validator: validator_config,
                 vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
                 vesting_schedule_denominator: 48,
-                beneficiary_resetter: admin_address,
+                beneficiary_resetter: admin_identity.account_address,
             }
         })
         .collect();
-
+    let employee_vesting_map = EmployeePoolMap {
+        inner: employee_vesting_accounts,
+    };
     write_to_file(
         &path.join(EMPLOYEE_VESTING_ACCOUNTS_FILE),
         EMPLOYEE_VESTING_ACCOUNTS_FILE,
-        serde_yaml::to_string(&employee_vesting_accounts)
+        serde_yaml::to_string(&employee_vesting_map)
             .unwrap()
             .as_bytes(),
     )
