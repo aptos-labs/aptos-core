@@ -28,7 +28,7 @@ use channel::{self, aptos_channel, message_queues::QueueStyle};
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use netcore::transport::memory::MemoryTransport;
 use netcore::transport::{
-    tcp::{TcpSocket, TcpTransport},
+    tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
     Transport,
 };
 use std::{clone::Clone, collections::HashMap, fmt::Debug, net::IpAddr, sync::Arc};
@@ -82,6 +82,7 @@ struct PeerManagerContext {
     inbound_connection_limit: usize,
     inbound_rate_limit_config: Option<RateLimitConfig>,
     outbound_rate_limit_config: Option<RateLimitConfig>,
+    tcp_buffer_cfg: TCPBufferCfg,
 }
 
 impl PeerManagerContext {
@@ -107,6 +108,7 @@ impl PeerManagerContext {
         inbound_connection_limit: usize,
         inbound_rate_limit_config: Option<RateLimitConfig>,
         outbound_rate_limit_config: Option<RateLimitConfig>,
+        tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         Self {
             pm_reqs_tx,
@@ -126,6 +128,7 @@ impl PeerManagerContext {
             inbound_connection_limit,
             inbound_rate_limit_config,
             outbound_rate_limit_config,
+            tcp_buffer_cfg,
         }
     }
 
@@ -186,6 +189,7 @@ impl PeerManagerBuilder {
         inbound_connection_limit: usize,
         inbound_rate_limit_config: Option<RateLimitConfig>,
         outbound_rate_limit_config: Option<RateLimitConfig>,
+        tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         // Setup channel to send requests to peer manager.
         let (pm_reqs_tx, pm_reqs_rx) = aptos_channel::new(
@@ -223,6 +227,7 @@ impl PeerManagerBuilder {
                 inbound_connection_limit,
                 inbound_rate_limit_config,
                 outbound_rate_limit_config,
+                tcp_buffer_cfg,
             )),
             peer_manager: None,
             listen_address,
@@ -278,11 +283,15 @@ impl PeerManagerBuilder {
             ),
         };
 
+        let mut aptos_tcp_transport = APTOS_TCP_TRANSPORT.clone();
+        let tcp_cfg = self.get_tcp_buffers_cfg();
+        aptos_tcp_transport.set_tcp_buffers(&tcp_cfg);
+
         self.peer_manager = match self.listen_address.as_slice() {
             [Ip4(_), Tcp(_)] | [Ip6(_), Tcp(_)] => {
                 Some(TransportPeerManager::Tcp(self.build_with_transport(
                     AptosNetTransport::new(
-                        APTOS_TCP_TRANSPORT.clone(),
+                        aptos_tcp_transport,
                         self.network_context,
                         self.time_service.clone(),
                         key,
@@ -404,6 +413,13 @@ impl PeerManagerBuilder {
             .as_mut()
             .expect("Cannot add an event listener if PeerManager has already been built.")
             .add_connection_event_listener()
+    }
+
+    pub fn get_tcp_buffers_cfg(&self) -> TCPBufferCfg {
+        self.peer_manager_context
+            .as_ref()
+            .expect("Cannot add an event listener if PeerManager has already been built.")
+            .tcp_buffer_cfg
     }
 
     /// Register a peer-to-peer service (i.e., both client and service) for given
