@@ -126,8 +126,8 @@ impl DeltaOp {
         // In this cases we compute the absolute sum of deltas (A+B) and use plus
         // or minus sign accordingly.
         macro_rules! update_same_sign {
-            ($sign: ident, $prev_value: ident, $self_value: ident) => {
-                self.update = $sign(addition($prev_value, $self_value, self.limit)?)
+            ($sign: ident, $a: ident, $b: ident) => {
+                self.update = $sign(addition($a, $b, self.limit)?)
             };
         }
 
@@ -135,11 +135,11 @@ impl DeltaOp {
         // as +A-B and -A+B. In these cases we have to check which of A or B is greater
         // and possibly flip a sign.
         macro_rules! update_different_sign {
-            ($first: ident, $second: ident) => {
-                if $first >= $second {
-                    self.update = Plus(subtraction($first, $second)?);
+            ($a: ident, $b: ident) => {
+                if $a >= $b {
+                    self.update = Plus(subtraction($a, $b)?);
                 } else {
-                    self.update = Minus(subtraction($second, $first)?);
+                    self.update = Minus(subtraction($b, $a)?);
                 }
             };
         }
