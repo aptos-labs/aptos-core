@@ -22,7 +22,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Move Virtual Machine (VM)
 
-|Error |Message  | Recommendation|
+|Error |Meaning  | Recommendation|
 --- | :---: | :---:|
 |UNKNOWN_VALIDATION_STATUS|We don't want the default value to be valid.|?|
 |INVALID_SIGNATURE|The transaction has a bad signature.|?|
@@ -75,7 +75,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Move Standard Library (stdlib)
 
-|Error |Message  | Recommendation|
+|Error |Meaning  | Recommendation|
 --- | :---: | :---:|
 |INVALID_ARGUMENT|Caller specified an invalid argument (http: 400).|?|
 |OUT_OF_RANGE|An input or result of a computation is out of range (http: 400).|?|
@@ -93,7 +93,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Aptos accounts
 
-|Error |Message  | Recommendation|
+|Error |Meaning  | Recommendation|
 --- | :---: | :---:|
 |EACCOUNT_ALREADY_EXISTS|Account already exists.|?|
 |EACCOUNT_DOES_NOT_EXIST|Account does not exist.|?|
@@ -112,7 +112,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Aptos coins
 
-|Error |Message  | Recommendation|
+|Error |Meaning  | Recommendation|
 --- | :---: | :---:|
 |ECOIN_INFO_ADDRESS_MISMATCH|Address of account which is used to initialize a coin `CoinType` doesn't match the deployer of module.|?|
 |ECOIN_INFO_ALREADY_PUBLISHED|`CoinType` is already initialized as a coin.|?|
@@ -129,7 +129,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Aptos tokens
 
-|Error |Message  | Recommendation|
+|Error |Meaning  | Recommendation|
 --- | :---: | :---:|
 |EALREADY_HAS_BALANCE|The token has balance and cannot be initialized.|?|
 |ECOLLECTIONS_NOT_PUBLISHED|There isn't any collection under this account.|?|
