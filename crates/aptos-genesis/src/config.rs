@@ -494,7 +494,40 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
                 anyhow::bail!("Numerators don't add up to the denominator {} (with the last one {} being repeated for pool #{}", denominator, last_numerator, i)
             }
 
-            // TODO: Any other checks other than just that accounts are duplicated?
+            // I'm going to assume no one wants to pay more than 50% of their rewards away
+            if pool.validator.commission_percentage > 50 {
+                anyhow::bail!(
+                    "Commission percentage is larger than 50% ({}%) for pool #{}",
+                    pool.validator.commission_percentage,
+                    i
+                );
+            }
+
+            // If joining during genesis, it needs all the setup
+            if pool.validator.join_during_genesis {
+                if pool.validator.consensus_public_key.is_none() {
+                    anyhow::bail!("Pool #{} is setup to join during genesis but missing a consensus public key", i);
+                }
+                if pool.validator.proof_of_possession.is_none() {
+                    anyhow::bail!("Pool #{} is setup to join during genesis but missing a proof of possession", i);
+                }
+                if pool.validator.validator_host.is_none() {
+                    anyhow::bail!(
+                        "Pool #{} is setup to join during genesis but missing a validator host",
+                        i
+                    );
+                }
+                if pool.validator.validator_network_public_key.is_none() {
+                    anyhow::bail!("Pool #{} is setup to join during genesis but missing a validator network public key", i);
+                }
+                if pool.validator.stake_amount < 100000000000 {
+                    anyhow::bail!(
+                        "Pool #{} is setup to join during genesis but has a low stake amount {} < 1000 APT",
+                        i,
+                        pool.validator.stake_amount
+                    );
+                }
+            }
 
             pools.push(EmployeePool::try_from(pool)?);
         }
