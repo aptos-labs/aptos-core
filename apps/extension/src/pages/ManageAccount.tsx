@@ -4,7 +4,7 @@
 import React from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import {
-  VStack, Button, Text, Input, useColorMode, Box, HStack, Flex, Icon, ButtonGroup, Textarea,
+  VStack, Button, Text, Input, useColorMode, Box, HStack, Flex, Icon, ButtonGroup,
 } from '@chakra-ui/react';
 import { useForm } from 'react-hook-form';
 import { RiRotateLockFill } from '@react-icons/all-files/ri/RiRotateLockFill';
@@ -16,6 +16,7 @@ import {
 } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
+import SensitiveText from 'core/components/SensitiveText';
 
 export default function ManageAccount() {
   const { colorMode } = useColorMode();
@@ -131,13 +132,8 @@ export default function ManageAccount() {
               </HStack>
             </Copyable>
           </Flex>
-          <Textarea
-            marginTop={4}
-            color={secondaryTextColor[colorMode]}
-            height={20}
-            readOnly
-            variant="filled"
-            fontSize={16}
+          <SensitiveText
+            height={12}
             value={activeAccount.publicKey}
           />
         </Box>

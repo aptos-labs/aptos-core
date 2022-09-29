@@ -6,20 +6,17 @@ import {
   VStack,
   Text,
   Flex,
-  useColorMode,
   HStack,
   Box,
-  Textarea,
   Icon,
 } from '@chakra-ui/react';
 import { RiFileCopyLine } from '@react-icons/all-files/ri/RiFileCopyLine';
-import { secondaryTextColor } from 'core/colors';
 import Copyable from 'core/components/Copyable';
 import WalletLayout from 'core/layouts/WalletLayout';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+import SensitiveText from 'core/components/SensitiveText';
 
 export default function ManageAccountShowPrivateKey() {
-  const { colorMode } = useColorMode();
   const { activeAccount } = useActiveAccount();
   return (
     <WalletLayout
@@ -54,13 +51,8 @@ export default function ManageAccountShowPrivateKey() {
                 </HStack>
               </Copyable>
             </Flex>
-            <Textarea
-              marginTop={4}
-              color={secondaryTextColor[colorMode]}
-              height={24}
-              readOnly
-              variant="filled"
-              fontSize={18}
+            <SensitiveText
+              height={12}
               value={activeAccount.privateKey}
             />
           </Box>
