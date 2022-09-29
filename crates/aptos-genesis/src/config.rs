@@ -241,7 +241,7 @@ impl TryFrom<ValidatorConfiguration> for Validator {
 const LOCALHOST: &str = "localhost";
 
 /// Combined Host (DnsName or IP) and port
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct HostAndPort {
     pub host: DnsName,
     pub port: u16,

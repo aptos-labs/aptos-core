@@ -621,7 +621,26 @@ fn validate_validators(
                         i
                     )));
                 }
-                _ => {}
+                (Some(full_node_host), Some(full_node_network_public_key)) => {
+                    // Ensure that the validator and the full node aren't the same
+                    let validator_host = validator.validator_host.as_ref().unwrap();
+                    let validator_network_public_key =
+                        validator.validator_network_public_key.as_ref().unwrap();
+                    if validator_host == full_node_host {
+                        return Err(CliError::UnexpectedError(format!(
+                            "Validator #{} has a validator and a full node host that are the same {:?}",
+                            i,
+                            validator_host
+                        )));
+                    }
+                    if validator_network_public_key == full_node_network_public_key {
+                        return Err(CliError::UnexpectedError(format!(
+                            "Validator #{} has a validator and a full node network public key that are the same {}",
+                            i,
+                            validator_network_public_key
+                        )));
+                    }
+                }
             }
         } else {
             if validator.validator_network_public_key.is_some() {
