@@ -79,9 +79,13 @@ pub const SENT_LABEL: &str = "sent";
 // invalid ACK type labels
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
-// Inserted transaction scope
+// Inserted transaction scope labels
 pub const LOCAL_LABEL: &str = "local";
 pub const E2E_LABEL: &str = "e2e";
+
+// Event types for ranking_score
+pub const INSERT_LABEL: &str = "insert";
+pub const REMOVE_LABEL: &str = "remove";
 
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {

@@ -3,7 +3,9 @@
 
 //! Mempool is used to track transactions which have been submitted but not yet
 //! agreed upon.
-use crate::counters::{E2E_LABEL, LOCAL_LABEL};
+use crate::counters::{
+    CONSENSUS_PULLED_LABEL, E2E_LABEL, GET_BLOCK_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL,
+};
 use crate::{
     core_mempool::{
         index::TxnPointer,
@@ -61,6 +63,9 @@ impl Mempool {
             counters::COMMIT_ACCEPTED_LABEL
         };
         self.log_latency(*sender, sequence_number, metric_label);
+        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+            counters::core_mempool_txn_ranking_score(REMOVE_LABEL, metric_label, ranking_score);
+        }
 
         self.transactions
             .remove(sender, sequence_number, is_rejected, metric_label);
@@ -125,7 +130,11 @@ impl Mempool {
         );
 
         let status = self.transactions.insert(txn_info);
-        counters::core_mempool_txn_ranking_score("insert", &status.code.to_string(), ranking_score);
+        counters::core_mempool_txn_ranking_score(
+            INSERT_LABEL,
+            &status.code.to_string(),
+            ranking_score,
+        );
         status
     }
 
@@ -195,6 +204,16 @@ impl Mempool {
                 }
                 total_bytes += txn_size;
                 block.push(txn);
+                if let Some(ranking_score) = self
+                    .transactions
+                    .get_ranking_score(&address, sequence_number)
+                {
+                    counters::core_mempool_txn_ranking_score(
+                        CONSENSUS_PULLED_LABEL,
+                        CONSENSUS_PULLED_LABEL,
+                        ranking_score,
+                    );
+                }
             }
         }
 

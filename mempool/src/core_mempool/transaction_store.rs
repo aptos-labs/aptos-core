@@ -143,15 +143,22 @@ impl TransactionStore {
         address: &AccountAddress,
         sequence_number: u64,
     ) -> Option<(&SystemTime, bool)> {
-        if let Some(txn) = self
-            .transactions
-            .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
-        {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
             return Some((
                 &txn.insertion_time,
                 txn.timeline_state != TimelineState::NonQualified,
             ));
+        }
+        None
+    }
+
+    pub(crate) fn get_ranking_score(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<u64> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some(txn.ranking_score);
         }
         None
     }
@@ -163,10 +170,6 @@ impl TransactionStore {
         is_rejected: bool,
         metric_label: &str,
     ) {
-        if let Some(txn) = self.get_mempool_txn(sender, sequence_number) {
-            core_mempool_txn_ranking_score("remove", metric_label, txn.ranking_score);
-        }
-
         let current_seq_number = self.get_sequence_number(sender).map_or(0, |v| *v);
         if is_rejected {
             if sequence_number >= current_seq_number {
