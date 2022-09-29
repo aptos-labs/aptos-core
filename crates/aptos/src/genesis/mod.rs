@@ -125,9 +125,23 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
     let client = git_options.get_client()?;
     let layout: Layout = client.get(Path::new(LAYOUT_FILE))?;
 
-    let account_balance_map: AccountBalanceMap = client.get(Path::new(BALANCES_FILE))?;
+    let total_supply = layout.total_supply.ok_or_else(|| {
+        CliError::UnexpectedError("Layout file does not have `total_supply`".to_string())
+    })?;
 
+    let account_balance_map: AccountBalanceMap = client.get(Path::new(BALANCES_FILE))?;
     let accounts: Vec<AccountBalance> = account_balance_map.try_into()?;
+
+    // Check that the supply matches the total
+    let total_balance_supply: u64 = accounts.iter().map(|inner| inner.balance).sum();
+    if total_supply != total_balance_supply {
+        return Err(CliError::UnexpectedError(format!(
+            "Total supply seen {} doesn't match expected total supply {}",
+            total_balance_supply, total_supply
+        )));
+    }
+
+    // Keep track of accounts for later lookup of balances
     let initialized_accounts: BTreeMap<AccountAddress, u64> = accounts
         .iter()
         .map(|inner| (inner.account_address, inner.balance))
