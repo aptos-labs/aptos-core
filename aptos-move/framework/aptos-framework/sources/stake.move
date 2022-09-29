@@ -389,16 +389,8 @@ module aptos_framework::stake {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
-        remove_validators_internal(validator_set, validators);
-    }
-
-    /// Helper function to remove the `validators` from the `active_validators`.
-    /// This function helps proving the global invariant.
-    fun remove_validators_internal(
-        validator_set: &mut ValidatorSet,
-        validators: &vector<address>,
-    ) {
         let active_validators = &mut validator_set.active_validators;
+        let pending_inactive = &mut validator_set.pending_inactive;
         let len = vector::length(validators);
         let i = 0;
         // Remove each validator from the validator set.
@@ -406,6 +398,8 @@ module aptos_framework::stake {
             spec {
                 invariant spec_validators_are_initialized(active_validators);
                 invariant spec_validator_indices_are_valid(active_validators);
+                invariant spec_validators_are_initialized(pending_inactive);
+                invariant spec_validator_indices_are_valid(pending_inactive);
             };
             i < len
         }) {
@@ -413,7 +407,7 @@ module aptos_framework::stake {
             let validator_index = find_validator(active_validators, validator);
             if (option::is_some(&validator_index)) {
                 let validator_info = vector::swap_remove(active_validators, *option::borrow(&validator_index));
-                vector::push_back(&mut validator_set.pending_inactive, validator_info);
+                vector::push_back(pending_inactive, validator_info);
             };
             i = i + 1;
         };
