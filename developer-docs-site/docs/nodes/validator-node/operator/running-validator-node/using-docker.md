@@ -91,47 +91,16 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-6. Create a layout template file, which defines the node in the Aptos `validatorSet`. 
+6. Download the genesis blob and waypoint for the network you want to connect to, you can find a full list of networks [here](https://github.com/aptos-labs/aptos-genesis-waypoint)
+
+  For example, to download testnet genesis and waypoint:
 
   ```
-  aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
-  ```
-  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
-
-  ```
-  root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"
-  users: ["<username you specified from previous step>"]
-  chain_id: 43
-  allow_new_validators: false
-  epoch_duration_secs: 7200
-  is_test: true
-  min_stake: 100000000000000
-  min_voting_threshold: 100000000000000
-  max_stake: 100000000000000000
-  recurring_lockup_duration_secs: 86400
-  required_proposer_stake: 100000000000000
-  rewards_apy_percentage: 10
-  voting_duration_secs: 43200
-  voting_power_increase_limit: 20
+  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/waypoint.txt -o waypoint.txt
+  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/genesis.blob -o genesis.blob
   ```
 
-  Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
-
-7. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
-
-    ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb -P ~/$WORKSPACE
-    ```
-
-8. Compile genesis blob and waypoint
-
-    ```
-    aptos genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
-    ```
-
-    This will create two files in your working directory, `genesis.blob` and `waypoint.txt`.
-
-9. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
+7. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
 
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `keys` folder, which includes:
@@ -142,25 +111,23 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
     - `username` folder, which includes: 
       - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 5).
       - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 5). 
-    - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 6).
-    - `framework.mrb`: The AptosFramework Move package (from step 7).
-    - `waypoint.txt`: The waypoint for the genesis transaction (from step 8).
-    - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 8).
+    - `waypoint.txt`: The waypoint for the genesis transaction (from step 6).
+    - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 6).
 
-10. Run docker-compose: `docker-compose up`. (or `docker compose up` depends on your version)
+8. Run docker-compose: `docker-compose up`. (or `docker compose up` depends on your version)
 
-Now you have completed setting up your validator node in test mode. You can continue to our [Aptos community platform](https://community.aptoslabs.com/) website for registration. Additionally, you can also setup a fullnode following the instructions below.
+Now you have completed setting up your validator node. Additionally, you can also setup a validator fullnode following the instructions below.
 
-11.  [Optional] <span id="docker-vfn">Now let's setup fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine.</span>
+9. <span id="docker-vfn">Now let's setup fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine.</span>
 
     ```
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose-fullnode.yaml
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/fullnode.yaml
     ```
 
-12.  Edit `fullnode.yaml` file to update the IP address for validator node.
+10.  Edit `fullnode.yaml` file to update the IP address for validator node.
 
-13.  [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on fullnode machine.
+11.  Copy the `validator-full-node-identity.yaml`, download `genesis.blob` and `waypoint.txt` files into the same working directory on fullnode machine.
 
-14.  [Optional] Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
-Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community platform](https://community.aptoslabs.com/) website for registration.
+12.  Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
+Now you have successfully completed setting up your node.
