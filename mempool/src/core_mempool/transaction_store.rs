@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::core_mempool_txn_ranking_score;
+use crate::counters::{
+    core_mempool_txn_ranking_score, BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL,
+    CONSENSUS_READY_LABEL, E2E_LABEL, LOCAL_LABEL,
+};
 use crate::{
     core_mempool::{
         index::{
@@ -388,8 +391,31 @@ impl TransactionStore {
                     while let Some(txn) = txns.get_mut(&min_seq) {
                         self.priority_index.insert(txn);
 
+                        let mut broadcast_ready = false;
                         if txn.timeline_state == TimelineState::NotReady {
                             self.timeline_index.insert(txn);
+                            broadcast_ready = true;
+                        }
+
+                        if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
+                            if broadcast_ready {
+                                counters::core_mempool_txn_commit_latency(
+                                    CONSENSUS_READY_LABEL,
+                                    E2E_LABEL,
+                                    time_delta,
+                                );
+                                counters::core_mempool_txn_commit_latency(
+                                    BROADCAST_READY_LABEL,
+                                    E2E_LABEL,
+                                    time_delta,
+                                );
+                            } else {
+                                counters::core_mempool_txn_commit_latency(
+                                    CONSENSUS_READY_LABEL,
+                                    LOCAL_LABEL,
+                                    time_delta,
+                                );
+                            }
                         }
 
                         // Remove txn from parking lot after it has been promoted to
@@ -530,6 +556,13 @@ impl TransactionStore {
                     batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
                     if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                         last_timeline_id = timeline_id;
+                    }
+                    if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time) {
+                        counters::core_mempool_txn_commit_latency(
+                            BROADCAST_BATCHED_LABEL,
+                            E2E_LABEL,
+                            time_delta,
+                        );
                     }
                 }
             }

@@ -20,10 +20,13 @@ pub const PARKING_LOT_INDEX_LABEL: &str = "parking_lot";
 pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
 pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 
-// Core mempool commit stages labels
-pub const GET_BLOCK_STAGE_LABEL: &str = "get_block";
+// Core mempool stages labels
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
+pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
+pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
+pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
+pub const BROADCAST_BATCHED_LABEL: &str = "broadcast_batched";
 
 // Core mempool GC type labels
 pub const GC_SYSTEM_TTL_LABEL: &str = "system_ttl";

@@ -66,16 +66,18 @@ impl Mempool {
             .remove(sender, sequence_number, is_rejected, metric_label);
     }
 
-    fn log_latency(&self, account: AccountAddress, sequence_number: u64, metric: &str) {
+    fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &str) {
         if let Some((&insertion_time, is_end_to_end)) = self
             .transactions
             .get_insertion_time(&account, sequence_number)
         {
             if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
-                counters::core_mempool_txn_commit_latency(metric, LOCAL_LABEL, time_delta);
-                if is_end_to_end {
-                    counters::core_mempool_txn_commit_latency(metric, E2E_LABEL, time_delta);
-                }
+                let scope = if is_end_to_end {
+                    E2E_LABEL
+                } else {
+                    LOCAL_LABEL
+                };
+                counters::core_mempool_txn_commit_latency(stage, scope, time_delta);
             }
         }
     }
@@ -212,7 +214,7 @@ impl Mempool {
             self.log_latency(
                 transaction.sender(),
                 transaction.sequence_number(),
-                counters::GET_BLOCK_STAGE_LABEL,
+                counters::CONSENSUS_PULLED_LABEL,
             );
         }
         block
