@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::{
+    BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL, LOCAL_LABEL,
+};
 use crate::{
     core_mempool::{
         index::{
@@ -100,18 +103,37 @@ impl TransactionStore {
         }
     }
 
+    #[inline]
+    fn get_mempool_txn(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<&MempoolTransaction> {
+        self.transactions
+            .get(address)
+            .and_then(|txns| txns.get(&sequence_number))
+    }
+
     /// Fetch transaction by account address + sequence_number.
     pub(crate) fn get(
         &self,
         address: &AccountAddress,
         sequence_number: u64,
     ) -> Option<SignedTransaction> {
-        if let Some(txn) = self
-            .transactions
-            .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
-        {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
             return Some(txn.txn.clone());
+        }
+        None
+    }
+
+    /// Fetch transaction by account address + sequence_number, including ranking score
+    pub(crate) fn get_with_ranking_score(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<(SignedTransaction, u64)> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some((txn.txn.clone(), txn.ranking_score));
         }
         None
     }
@@ -123,19 +145,28 @@ impl TransactionStore {
         }
     }
 
+    /// Return (SystemTime, is the timestamp for end-to-end)
     pub(crate) fn get_insertion_time(
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<&SystemTime> {
-        if let Some(txn) = self
-            .transactions
-            .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
-        {
-            if txn.timeline_state != TimelineState::NonQualified {
-                return Some(&txn.insertion_time);
-            }
+    ) -> Option<(&SystemTime, bool)> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some((
+                &txn.insertion_time,
+                txn.timeline_state != TimelineState::NonQualified,
+            ));
+        }
+        None
+    }
+
+    pub(crate) fn get_ranking_score(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<u64> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some(txn.ranking_score);
         }
         None
     }
@@ -370,8 +401,32 @@ impl TransactionStore {
                     while let Some(txn) = txns.get_mut(&min_seq) {
                         self.priority_index.insert(txn);
 
+                        let mut broadcast_ready = false;
                         if txn.timeline_state == TimelineState::NotReady {
                             self.timeline_index.insert(txn);
+                            broadcast_ready = true;
+                        }
+
+                        if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time)
+                        {
+                            if broadcast_ready {
+                                counters::core_mempool_txn_commit_latency(
+                                    CONSENSUS_READY_LABEL,
+                                    E2E_LABEL,
+                                    time_delta,
+                                );
+                                counters::core_mempool_txn_commit_latency(
+                                    BROADCAST_READY_LABEL,
+                                    E2E_LABEL,
+                                    time_delta,
+                                );
+                            } else {
+                                counters::core_mempool_txn_commit_latency(
+                                    CONSENSUS_READY_LABEL,
+                                    LOCAL_LABEL,
+                                    time_delta,
+                                );
+                            }
                         }
 
                         // Remove txn from parking lot after it has been promoted to
@@ -512,6 +567,13 @@ impl TransactionStore {
                     batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
                     if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                         last_timeline_id = timeline_id;
+                    }
+                    if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time) {
+                        counters::core_mempool_txn_commit_latency(
+                            BROADCAST_BATCHED_LABEL,
+                            E2E_LABEL,
+                            time_delta,
+                        );
                     }
                 }
             }
