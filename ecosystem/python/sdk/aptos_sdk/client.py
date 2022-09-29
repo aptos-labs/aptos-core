@@ -160,7 +160,7 @@ class RestClient:
         return response.json()["type"] == "pending_transaction"
 
     def wait_for_transaction(self, txn_hash: str) -> None:
-        """Waits up to 10 seconds for a transaction to move past pending state."""
+        """Waits up to 20 seconds for a transaction to move past pending state."""
 
         count = 0
         while self.transaction_pending(txn_hash):
