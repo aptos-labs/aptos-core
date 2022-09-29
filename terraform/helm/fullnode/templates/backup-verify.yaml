@@ -40,7 +40,7 @@ spec:
             - /opt/aptos/etc/{{ .Values.backup.config.location }}.toml
             env:
             - name: RUST_LOG
-              value: "debug"
+              value: "info"
             - name: RUST_BACKTRACE
               value: "1"
             - name: STRUCT_LOG_TCP_ADDR
