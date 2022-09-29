@@ -389,15 +389,16 @@ module aptos_framework::stake {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
-        remove_validators_internal(&mut validator_set.active_validators, validators);
+        remove_validators_internal(validator_set, validators);
     }
 
     /// Helper function to remove the `validators` from the `active_validators`.
     /// This function helps proving the global invariant.
     fun remove_validators_internal(
-        active_validators: &mut vector<ValidatorInfo>,
+        validator_set: &mut ValidatorSet,
         validators: &vector<address>,
     ) {
+        let active_validators = &mut validator_set.active_validators;
         let len = vector::length(validators);
         let i = 0;
         // Remove each validator from the validator set.
@@ -411,7 +412,8 @@ module aptos_framework::stake {
             let validator = *vector::borrow(validators, i);
             let validator_index = find_validator(active_validators, validator);
             if (option::is_some(&validator_index)) {
-                vector::remove(active_validators, *option::borrow(&validator_index));
+                let validator_info = vector::swap_remove(active_validators, *option::borrow(&validator_index));
+                vector::push_back(&mut validator_set.pending_inactive, validator_info);
             };
             i = i + 1;
         };
@@ -2435,8 +2437,10 @@ module aptos_framework::stake {
         assert!(vector::length(&borrow_global<ValidatorSet>(@aptos_framework).active_validators) == 2, 0);
 
         // Remove validator 1 from the active validator set. Only validator 2 remains.
-        remove_validators(aptos_framework, &vector[signer::address_of(validator_1)]);
+        let validator_to_remove = signer::address_of(validator_1);
+        remove_validators(aptos_framework, &vector[validator_to_remove]);
         assert!(vector::length(&borrow_global<ValidatorSet>(@aptos_framework).active_validators) == 1, 0);
+        assert!(get_validator_state(validator_to_remove) == VALIDATOR_STATUS_PENDING_INACTIVE, 1);
     }
 
     #[test_only]
