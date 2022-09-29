@@ -19,7 +19,7 @@ use aptos_types::{
 };
 
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use move_deps::move_core_types::{
+use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };

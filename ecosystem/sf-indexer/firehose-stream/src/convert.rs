@@ -14,7 +14,7 @@ use aptos_logger::warn;
 use aptos_protos::extractor::v1 as extractor;
 use aptos_protos::util::timestamp;
 use hex;
-use move_deps::move_binary_format::file_format::Ability;
+use move_binary_format::file_format::Ability;
 use std::time::Duration;
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> extractor::MoveModuleId {

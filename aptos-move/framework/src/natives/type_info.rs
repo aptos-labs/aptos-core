@@ -144,10 +144,8 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_deps::{
-        move_core_types::{account_address::AccountAddress, identifier::Identifier},
-        move_vm_types::values::VMValueCast,
-    };
+    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+    use move_vm_types::values::VMValueCast;
 
     #[test]
     fn test_type_of_internal() {

@@ -15,10 +15,9 @@ use aptos_protos::extractor::v1::{
 };
 
 use aptos_sdk::types::{account_config::aptos_test_root_address, LocalAccount};
-use move_deps::{
-    move_core_types::{account_address::AccountAddress, value::MoveValue},
-    move_package::BuildConfig,
-};
+
+use move_core_types::{account_address::AccountAddress, value::MoveValue};
+use move_package::BuildConfig;
 use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
 

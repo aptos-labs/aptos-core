@@ -3,18 +3,16 @@
 
 use std::borrow::Borrow;
 
-use move_deps::{
-    move_binary_format::{
-        access::{ModuleAccess, ScriptAccess},
-        file_format::{
-            AddressIdentifierIndex, CompiledModule, CompiledScript, FieldDefinition,
-            FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
-            ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, StructDefinition,
-            StructFieldInformation, StructHandle, StructHandleIndex,
-        },
+use move_binary_format::{
+    access::{ModuleAccess, ScriptAccess},
+    file_format::{
+        AddressIdentifierIndex, CompiledModule, CompiledScript, FieldDefinition,
+        FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
+        ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, StructDefinition,
+        StructFieldInformation, StructHandle, StructHandleIndex,
     },
-    move_core_types::{account_address::AccountAddress, identifier::IdentStr},
 };
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 use crate::{
     move_types::{

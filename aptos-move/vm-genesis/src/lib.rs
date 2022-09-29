@@ -31,16 +31,14 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use framework::{ReleaseBundle, ReleasePackage};
-use move_deps::{
-    move_core_types::{
-        account_address::AccountAddress,
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-        resolver::MoveResolver,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    resolver::MoveResolver,
+    value::{serialize_values, MoveValue},
 };
+use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};

@@ -120,6 +120,13 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 1
 
+  check-vm-features:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
+      - run: cargo test --features check-vm-features -p aptos-node
+
   python-unit-test:
     uses: ./.github/workflows/python-unit-test.yaml
 

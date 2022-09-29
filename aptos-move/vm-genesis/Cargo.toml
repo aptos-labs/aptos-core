@@ -23,15 +23,18 @@ aptos-types = { path = "../../types" }
 aptos-vm = { path = "../aptos-vm" }
 cached-packages =  { path = "../framework/cached-packages" }
 framework =  { path = "../framework" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
+
+move-core-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5", features = ["address32"] }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
 
 [dev-dependencies]
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "fuzzing"] }
+
+move-core-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5", features = ["address32", "fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["aptos-types/fuzzing", "move-deps/fuzzing"]
+fuzzing = ["aptos-types/fuzzing", "move-core-types/fuzzing", "move-vm-types/fuzzing"]

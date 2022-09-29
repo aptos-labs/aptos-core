@@ -33,8 +33,8 @@ use std::fmt::Display;
 
 use super::accept_type::AcceptType;
 use aptos_api_types::{Address, AptosError, AptosErrorCode, HashValue, LedgerInfo};
-use move_deps::move_core_types::identifier::{IdentStr, Identifier};
-use move_deps::move_core_types::language_storage::StructTag;
+use move_core_types::identifier::{IdentStr, Identifier};
+use move_core_types::language_storage::StructTag;
 use poem_openapi::{payload::Json, types::ToJSON, ResponseContent};
 use serde_json::Value;
 

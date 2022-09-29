@@ -20,8 +20,8 @@ use aptos_types::account_state::AccountState;
 use aptos_types::event::EventHandle;
 use aptos_types::event::EventKey;
 use aptos_types::state_store::state_key::StateKey;
-use move_deps::move_core_types::value::MoveValue;
-use move_deps::move_core_types::{
+use move_core_types::value::MoveValue;
+use move_core_types::{
     identifier::Identifier,
     language_storage::{ResourceKey, StructTag},
     move_resource::MoveStructType,

@@ -4,17 +4,16 @@
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_vm::natives;
 use framework::path_in_crate;
-use move_deps::move_cli::base::test::{run_move_unit_tests, UnitTestResult};
-use move_deps::{
-    move_unit_test::UnitTestingConfig, move_vm_runtime::native_functions::NativeFunctionTable,
-};
+use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
+use move_unit_test::UnitTestingConfig;
+use move_vm_runtime::native_functions::NativeFunctionTable;
 use tempfile::tempdir;
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
     let ok = run_move_unit_tests(
         &pkg_path,
-        move_deps::move_package::BuildConfig {
+        move_package::BuildConfig {
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             ..Default::default()
