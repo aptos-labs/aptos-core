@@ -195,7 +195,7 @@ const sendRequest = async <T>(
     headers: Record<string, string>,
     onCancel: OnCancel
 ): Promise<AxiosResponse<T>> => {
-    const source = axios.CancelToken.source();
+    const controller = new AbortController();
 
     const requestConfig: AxiosRequestConfig = {
         url,
@@ -203,10 +203,10 @@ const sendRequest = async <T>(
         data: body ?? formData,
         method: options.method,
         withCredentials: config.WITH_CREDENTIALS,
-        cancelToken: source.token,
+        signal: controller.signal
     };
 
-    onCancel(() => source.cancel('The user aborted a request.'));
+    onCancel(() => controller.abort());
 
     try {
         return await axios.request(requestConfig);
