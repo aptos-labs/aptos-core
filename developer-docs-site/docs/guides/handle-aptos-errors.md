@@ -7,9 +7,7 @@ import TabItem from '@theme/TabItem';
 
 # Handling Errors in Aptos and Move
 
-This page catalogs common errors encountered in the Aptos blockchain and explains how to resolve them wherever possible. As with all software, the code itself is the source of truth for error handling and will always contain entries not found here.
-
-Instead, this matrix aims to help you address those errors most typically found, misunderstood, or both.
+This page catalogs common errors encountered in the Aptos blockchain and explains how to resolve them wherever possible. As with all software, the code itself is the source of truth for error handling and will always contain entries not found here. Instead, this matrix aims to help you address those errors most typically found, misunderstood, or both.
 
 For the sources of these errors, see:
 
@@ -20,11 +18,11 @@ For the sources of these errors, see:
   * [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move)
   * [token_transfers.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token_transfers.move)
 
-Of course, many more errors exist in many more files. Help us update this list by sending pull requests containing the errors you encounter. If you don't know how to resolve the error, as described int the *Action* column, simply leave it blank.
+Help us update this list by sending pull requests containing the errors you encounter. If you don't know how to resolve the error, as described int the *Action* column, simply leave it blank.
 
 ## Move Virtual Machine (VM)
 
-|Error |Message  | Action|
+|Error |Message  | Recommendation|
 --- | :---: | :---:|
 |UNKNOWN_VALIDATION_STATUS|We don't want the default value to be valid.|?|
 |INVALID_SIGNATURE|The transaction has a bad signature.|?|
