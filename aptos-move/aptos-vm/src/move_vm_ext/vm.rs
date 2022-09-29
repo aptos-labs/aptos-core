@@ -30,12 +30,13 @@ impl MoveVmExt {
         treat_friend_as_private: bool,
     ) -> VMResult<Self> {
         Ok(Self {
-            inner: MoveVM::new_with_verifier_config(
+            inner: MoveVM::new_with_configs(
                 aptos_natives(native_gas_params, abs_val_size_gas_params),
                 VerifierConfig {
                     max_loop_depth: Some(5),
                     treat_friend_as_private,
                 },
+                crate::AptosVM::get_runtime_config(),
             )?,
         })
     }
