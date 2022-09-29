@@ -26,8 +26,9 @@ aptos-state-view = { path = "../state-view" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 scratchpad = { path = "../scratchpad" }
+
+move-core-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5", features = ["address32"] }
 
 [dev-dependencies]
 assert_unordered = "0.1.1"

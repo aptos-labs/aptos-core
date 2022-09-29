@@ -898,6 +898,7 @@ mod tests {
         setup_environment(node_config, None, None).unwrap();
     }
 
+    #[cfg(feature = "check-vm-features")]
     #[test]
     fn test_aptos_vm_does_not_have_test_natives() {
         aptos_vm::natives::assert_no_test_natives()

@@ -95,7 +95,7 @@ use aptos_types::{
 use aptos_vm::data_cache::AsMoveResolver;
 use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
-use move_deps::move_resource_viewer::MoveValueAnnotator;
+use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use schemadb::{SchemaBatch, DB};
 use std::{

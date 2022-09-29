@@ -13,7 +13,7 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, ContractEventGen},
 };
 use itertools::Itertools;
-use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use proptest::{
     collection::{hash_set, vec},
     prelude::*,

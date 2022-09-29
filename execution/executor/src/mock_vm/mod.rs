@@ -27,7 +27,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm::VMExecutor;
-use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
+use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 

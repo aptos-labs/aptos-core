@@ -257,10 +257,10 @@ impl EntryFunctionCall {
         let definitions = if local_types {
             vec![
                 (
-                    "move_deps::move_core_types::language_storage",
+                    "move_core_types::language_storage",
                     vec!["ModuleId", "TypeTag"],
                 ),
-                ("move_deps::move_core_types", vec!["ident_str"]),
+                ("move_core_types", vec!["ident_str"]),
                 (
                     "aptos_types::transaction",
                     vec!["TransactionPayload", "EntryFunction"],

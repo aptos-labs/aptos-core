@@ -37,8 +37,8 @@ use aptos_types::{
     transaction::{ExecutionStatus, SignedTransaction},
 };
 use futures::executor::block_on;
-use move_deps::move_binary_format::CompiledModule;
-use move_deps::move_core_types::language_storage::{ModuleId, StructTag};
+use move_binary_format::CompiledModule;
+use move_core_types::language_storage::{ModuleId, StructTag};
 use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

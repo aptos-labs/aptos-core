@@ -4,7 +4,7 @@
 pub use aptos_api_types::deserialize_from_string;
 use aptos_api_types::{Address, U64};
 use aptos_types::transaction::authenticator::AuthenticationKey;
-use move_deps::move_core_types::{language_storage::StructTag, parser::parse_struct_tag};
+use move_core_types::{language_storage::StructTag, parser::parse_struct_tag};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 

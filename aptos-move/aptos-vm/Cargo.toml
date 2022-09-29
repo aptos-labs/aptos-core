@@ -34,12 +34,12 @@ aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 
 framework =  { path = "../framework" }
-mvhashmap = { path = "../mvhashmap" }
 move-binary-format = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
 move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
 move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
 move-core-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5", features = ["address32"] }
 move-stdlib = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
+mvhashmap = { path = "../mvhashmap" }
 
 move-table-extension = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
 move-vm-runtime = { git = "https://github.com/move-language/move", features = ["lazy_natives"], rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }

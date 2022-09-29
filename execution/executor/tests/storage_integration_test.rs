@@ -21,7 +21,7 @@ use executor_test_helpers::{
     },
 };
 use executor_types::BlockExecutorTrait;
-use move_deps::move_core_types::move_resource::MoveStructType;
+use move_core_types::move_resource::MoveStructType;
 use storage_interface::state_view::DbStateViewAtVersion;
 
 #[test]

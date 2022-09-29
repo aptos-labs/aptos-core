@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
-use move_deps::move_core_types::move_resource::MoveResource;
+use move_core_types::move_resource::MoveResource;
 use std::sync::Arc;
 use storage_interface::{
     cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
