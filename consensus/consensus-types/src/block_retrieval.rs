@@ -22,7 +22,6 @@ pub const MAX_FAILED_ATTEMPTS: u32 = 4;
 pub struct BlockRetrievalRequest {
     block_id: HashValue,
     num_blocks: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     target_block_id: Option<HashValue>,
 }
 
