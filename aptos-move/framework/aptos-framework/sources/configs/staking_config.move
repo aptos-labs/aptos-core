@@ -60,11 +60,11 @@ module aptos_framework::staking_config {
         // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
         validate_required_stake(minimum_stake, maximum_stake);
 
+        assert!(recurring_lockup_duration_secs > 0, error::invalid_argument(EZERO_LOCKUP_DURATION));
         assert!(
             rewards_rate_denominator > 0,
             error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
         );
-
         assert!(
             voting_power_increase_limit > 0 && voting_power_increase_limit <= 50,
             error::invalid_argument(EINVALID_VOTING_POWER_INCREASE_LIMIT),
