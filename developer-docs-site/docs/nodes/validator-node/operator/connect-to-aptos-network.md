@@ -5,11 +5,7 @@ slug: "connect-to-aptos-network"
 
 # Connecting to Aptos Network
 
-This document describes how to connect your running validator node and public fullnode to an Aptos network. Follow these instructions only if you received a notification from the Aptos team confirming your eligibility. 
-
-:::tip Only selected validator nodes
-Validator nodes that are not selected will not have enough tokens to join the network. However, you can still run a public fullnode.
-:::
+This document describes how to connect your running validator node and public fullnode to an Aptos network. Follow these instructions only if your validator is meeting the minimal staking requirement. (1M APT token)
 
 ## Initializing the staking pool
 
@@ -46,7 +42,7 @@ The CLI command examples used in this section use testnet. You can use the same 
 
 ## Bootstrapping validator node
 
-Before joining the network, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to production mode. Use one of the below methods to bootstrap your node.
+Before joining the network, you need to make sure the validator node is bootstrapped with the correct genesis blob and waypoint for corresponding network.
 
 ### Using source code
 
@@ -54,7 +50,7 @@ Before joining the network, you need to bootstrap your node with the genesis blo
 2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team.
 3. Update your `account_address` in the `validator-identity.yaml` file to your **operator** wallet address. Do not change anything else. Keep the keys as they are. 
 4. Pull the latest changes from the `mainnet` branch. It should be commit: `843b204dce971d98449b82624f4f684c7a18b991`.
-5. You should use fast sync to bootstrap your node. To sync faster when starting, add the below configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](/concepts/state-sync#fast-syncing).
+5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). Add the below configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](/concepts/state-sync#fast-syncing).
     ```yaml
     state_sync:
      state_sync_driver:
@@ -70,7 +66,7 @@ Before joining the network, you need to bootstrap your node with the genesis blo
 2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team.
 3. Update your `account_address` in the `validator-identity.yaml` file to your **operator** wallet address.
 4. Update your Docker image to use the tag `testnet_843b204dce971d98449b82624f4f684c7a18b991`.
-5. You should use fast sync to bootstrap your node. To sync faster when starting, add this configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](/concepts/state-sync#fast-syncing).
+5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). Add this configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](/concepts/state-sync#fast-syncing).
     ```yaml
     state_sync:
      state_sync_driver:
@@ -85,7 +81,7 @@ Before joining the network, you need to bootstrap your node with the genesis blo
 1. Increase `era` number in your Terraform configuration. When this configuration is applied, it will wipe the data.
 2. Update `chain_id` to 2.
 3. Update your Docker image to use the tag `testnet_843b204dce971d98449b82624f4f684c7a18b991`.
-4. Close the metrics port and the REST API port for validator. Also use fast sync to bootstrap the node by adding the following Helm values in your `main.tf ` file:
+4. Close the metrics port and the REST API port for validator. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). by adding the following Helm values in your `main.tf ` file:
 
     ```json
     module "aptos-node" {

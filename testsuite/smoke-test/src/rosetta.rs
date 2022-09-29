@@ -1892,7 +1892,12 @@ async fn wait_for_transaction(
 ) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
     let hash_value = HashValue::from_str(&txn_hash).unwrap();
     let response = rest_client
-        .wait_for_transaction_by_hash(hash_value, expiry_time.as_secs())
+        .wait_for_transaction_by_hash(
+            hash_value,
+            expiry_time.as_secs(),
+            Some(Duration::from_secs(60)),
+            None,
+        )
         .await;
     match response {
         Ok(response) => {

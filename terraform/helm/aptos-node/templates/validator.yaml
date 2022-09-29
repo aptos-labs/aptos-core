@@ -89,13 +89,17 @@ spec:
         - name: STRUCT_LOG_TCP_ADDR
           value: {{ .remoteLogAddress }}
         {{- end }}
-      {{- end }}
+        {{- if .force_enable_telemetry }}
+        - name: APTOS_FORCE_ENABLE_TELEMETRY
+          value: "true"
+        {{- end }}
         - name: KUBERNETES_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
         - name: RUST_BACKTRACE
           value: "0"
+      {{- end }}
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc

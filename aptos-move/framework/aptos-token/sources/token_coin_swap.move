@@ -1,7 +1,4 @@
-/// A module for
-/// 1. Hold tokens escrow to prevent token been transferred
-/// 2. List token for swapping with a targeted CoinType.
-/// 3. Execute the swapping
+/// This module will be deprecated soon, Please avoid using this contract
 module aptos_token::token_coin_swap {
     use std::signer;
     use std::string::String;

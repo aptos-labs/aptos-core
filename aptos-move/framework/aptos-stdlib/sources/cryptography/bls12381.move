@@ -430,7 +430,6 @@ module aptos_std::bls12381 {
         while (i < std::vector::length(&sigs)) {
             std::vector::push_back(&mut accum_sigs, *std::vector::borrow(&sigs, i));
 
-            std::debug::print(&i);
             let multisig = option::extract(&mut aggregate_signatures(accum_sigs));
 
             // Make sure sigs were aggregated correctly

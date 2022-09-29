@@ -159,47 +159,17 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Create a layout template file, which defines the node in the Aptos `validatorSet`. 
+12. Download the genesis blob and waypoint for the network you want to connect to, you can find a full list of networks [here](https://github.com/aptos-labs/aptos-genesis-waypoint)
+
+  For example, to download testnet genesis and waypoint:
 
   ```
-  aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
-  ```
-  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
-
-  ```
-  root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"
-  users: ["<username you specified from previous step>"]
-  chain_id: 43
-  allow_new_validators: false
-  epoch_duration_secs: 7200
-  is_test: true
-  min_stake: 100000000000000
-  min_voting_threshold: 100000000000000
-  max_stake: 100000000000000000
-  recurring_lockup_duration_secs: 86400
-  required_proposer_stake: 100000000000000
-  rewards_apy_percentage: 10
-  voting_duration_secs: 43200
-  voting_power_increase_limit: 20
+  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/waypoint.txt -o waypoint.txt
+  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/genesis.blob -o genesis.blob
   ```
 
-  Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
 
-13. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
-
-    ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb -P ~/$WORKSPACE
-    ```
-
-14. Compile the genesis blob and waypoint.
-
-    ```
-    aptos genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
-    ``` 
-
-    This will create two files in your working directory: `genesis.blob` and `waypoint.txt`.
-
-15. To summarize, in your working directory you should have a list of files:
+13. To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).
     - `keys` folder, which includes:
       - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 10).
@@ -209,12 +179,10 @@ This will download all the Terraform dependencies into the `.terraform` folder i
     - `username` folder, which includes: 
       - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 11).
       - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 11). 
-    - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 12).
-    - `framework.mrb`: The AptosFramework Move package (from step 13).
-    - `waypoint.txt`: The waypoint for the genesis transaction (from step 14).
-    - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 14).
+    - `waypoint.txt`: The waypoint for the genesis transaction (from step 12).
+    - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 12).
 
-16. Insert `genesis.blob`, `waypoint.txt` and the identity files as secret into k8s cluster.
+14. Insert `genesis.blob`, `waypoint.txt` and the identity files as secret into k8s cluster.
 
     ```
     kubectl create secret generic ${WORKSPACE}-aptos-node-0-genesis-e1 \
@@ -231,7 +199,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
     :::
 
 
-17. Check that all the pods are running.
+15. Check that all the pods are running.
 
     ```
     kubectl get pods
@@ -242,4 +210,4 @@ This will download all the Terraform dependencies into the `.terraform` folder i
     node1-aptos-node-0-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community platform](https://community.aptoslabs.com/) website for registration.
+Now you have successfully completed setting up your node.

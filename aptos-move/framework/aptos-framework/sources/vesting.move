@@ -352,7 +352,6 @@ module aptos_framework::vesting {
             i = i + 1;
         };
         assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
-        pool_u64::update_total_coins(&mut grant_pool, grant_amount);
 
         // If this is the first time this admin account has created a vesting contract, initialize the admin store.
         let admin_address = signer::address_of(admin);
@@ -434,37 +433,14 @@ module aptos_framework::vesting {
             return
         };
 
-        let vested_amount = compute_vested_amount(vesting_contract);
-        if (vested_amount > 0) {
-            vesting_contract.remaining_grant = vesting_contract.remaining_grant - vested_amount;
-            let vesting_schedule = &mut vesting_contract.vesting_schedule;
-            vesting_schedule.last_vested_period = vesting_schedule.last_vested_period + 1;
-            let period_vested = vesting_schedule.last_vested_period;
-            unlock_stake(vesting_contract, vested_amount);
-
-            emit_event(
-                &mut vesting_contract.vest_events,
-                VestEvent {
-                    admin: vesting_contract.admin,
-                    vesting_contract_address: contract_address,
-                    staking_pool_address: vesting_contract.staking.pool_address,
-                    period_vested,
-                    amount: vested_amount,
-                },
-            );
-        }
-    }
-
-    fun compute_vested_amount(vesting_contract: &VestingContract): u64 {
-        // Check if the next vested period has already passed.
-        let vesting_schedule = &vesting_contract.vesting_schedule;
+        // Check if the next vested period has already passed. If not, short-circuit since there's nothing to vest.
+        let vesting_schedule = &mut vesting_contract.vesting_schedule;
         let last_vested_period = vesting_schedule.last_vested_period;
         let next_period_to_vest = last_vested_period + 1;
         let last_completed_period =
             (timestamp::now_seconds() - vesting_schedule.start_timestamp_secs) / vesting_schedule.period_duration;
-        // Short-circuit if the next period to vest has not ended yet.
         if (last_completed_period < next_period_to_vest) {
-            return 0
+            return
         };
 
         // Calculate how much has vested, excluding rewards.
@@ -478,7 +454,23 @@ module aptos_framework::vesting {
             *vector::borrow(schedule, vector::length(schedule) - 1)
         };
         let total_grant = pool_u64::total_coins(&vesting_contract.grant_pool);
-        fixed_point32::multiply_u64(total_grant, vesting_fraction)
+        let vested_amount = fixed_point32::multiply_u64(total_grant, vesting_fraction);
+        // Cap vested amount by the remaining grant amount so we don't try to distribute more than what's remaining.
+        vested_amount = min(vested_amount, vesting_contract.remaining_grant);
+        vesting_contract.remaining_grant = vesting_contract.remaining_grant - vested_amount;
+        vesting_schedule.last_vested_period = next_period_to_vest;
+        unlock_stake(vesting_contract, vested_amount);
+
+        emit_event(
+            &mut vesting_contract.vest_events,
+            VestEvent {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                period_vested: next_period_to_vest,
+                amount: vested_amount,
+            },
+        );
     }
 
     /// Distribute any withdrawable stake from the stake pool.
@@ -590,6 +582,7 @@ module aptos_framework::vesting {
         let old_operator = vesting_contract.staking.operator;
         staking_contract::switch_operator(contract_signer, old_operator, new_operator, commission_percentage);
         vesting_contract.staking.operator = new_operator;
+        vesting_contract.staking.commission_percentage = commission_percentage;
 
         emit_event(
             &mut vesting_contract.update_operator_events,
@@ -828,6 +821,7 @@ module aptos_framework::vesting {
 
     #[test_only]
     use aptos_framework::account::create_account_for_test;
+    use aptos_std::math64::min;
 
     #[test_only]
     const MIN_STAKE: u64 = 100000000000000; // 1M APT coins with 8 decimals.
@@ -873,12 +867,37 @@ module aptos_framework::vesting {
         withdrawal_address: address,
         commission_percentage: u64,
     ): address acquires AdminStore {
+        setup_vesting_contract_with_schedule(
+            admin,
+            shareholders,
+            shares,
+            withdrawal_address,
+            commission_percentage,
+            &vector[3, 2, 1],
+            48,
+        )
+    }
+
+    #[test_only]
+    public fun setup_vesting_contract_with_schedule(
+        admin: &signer,
+        shareholders: &vector<address>,
+        shares: &vector<u64>,
+        withdrawal_address: address,
+        commission_percentage: u64,
+        vesting_numerators: &vector<u64>,
+        vesting_denominator: u64,
+    ): address acquires AdminStore {
+        let schedule = vector::empty<FixedPoint32>();
+        let i = 0;
+        let len = vector::length(vesting_numerators);
+        while (i < len) {
+            let num = *vector::borrow(vesting_numerators, i);
+            vector::push_back(&mut schedule, fixed_point32::create_from_rational(num, vesting_denominator));
+            i = i + 1;
+        };
         let vesting_schedule = create_vesting_schedule(
-            vector[
-                fixed_point32::create_from_rational(3, 48),
-                fixed_point32::create_from_rational(2, 48),
-                fixed_point32::create_from_rational(1, 48),
-            ],
+            schedule,
             timestamp::now_seconds() + VESTING_SCHEDULE_CLIFF,
             VESTING_PERIOD,
         );
@@ -987,8 +1006,8 @@ module aptos_framework::vesting {
         let vested_amount = fraction(GRANT_AMOUNT, 3, 48);
         let remaining_grant = GRANT_AMOUNT - vested_amount;
         let pending_distribution = rewards + vested_amount;
+        assert!(remaining_grant(contract_address) == remaining_grant, remaining_grant(contract_address));
         stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, pending_distribution);
-        assert!(remaining_grant(contract_address) == remaining_grant, 0);
 
         // Fast forward to the end of the fourth period. We can call vest() 3 times to vest the last 3 periods.
         timestamp::fast_forward_seconds(VESTING_PERIOD * 3);
@@ -1194,9 +1213,11 @@ module aptos_framework::vesting {
         setup(aptos_framework, &vector[admin_address, shareholder_address, operator_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
+        assert!(operator_commission_percentage(contract_address) == 0, 0);
 
         // 10% commission will be paid to the operator.
         update_operator(admin, contract_address, operator_address, 10);
+        assert!(operator_commission_percentage(contract_address) == 10, 0);
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
@@ -1256,6 +1277,97 @@ module aptos_framework::vesting {
         // Immediately terminate. Calling unlock_rewards should now fail.
         terminate_vesting_contract(admin, contract_address);
         unlock_rewards(contract_address);
+    }
+
+    #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
+    public entry fun test_vesting_contract_with_zero_vestings(
+        aptos_framework: &signer,
+        admin: &signer,
+        shareholder: &signer,
+    ) acquires AdminStore, VestingContract {
+        let admin_address = signer::address_of(admin);
+        let shareholder_address = signer::address_of(shareholder);
+        setup(aptos_framework, &vector[admin_address, shareholder_address]);
+        let contract_address = setup_vesting_contract_with_schedule(
+            admin,
+            &vector[shareholder_address],
+            &vector[GRANT_AMOUNT],
+            admin_address,
+            0,
+            &vector[0, 3, 0, 2],
+            48,
+        );
+        let stake_pool_address = stake_pool_address(contract_address);
+
+        // First vest() should unlock 0 according to schedule.
+        timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address) + VESTING_PERIOD);
+        vest(contract_address);
+        stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, 0);
+        assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
+
+        // Next period should vest 3/48.
+        timestamp::fast_forward_seconds(VESTING_PERIOD);
+        vest(contract_address);
+        let vested_amount = fraction(GRANT_AMOUNT, 3, 48);
+        let remaining_grant = GRANT_AMOUNT - vested_amount;
+        stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, vested_amount);
+        assert!(remaining_grant(contract_address) == remaining_grant, 0);
+
+        timestamp::fast_forward_seconds(VESTING_PERIOD);
+        // Distribute the previous vested amount.
+        distribute(contract_address);
+        // Next period should vest 0 again.
+        vest(contract_address);
+        stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, 0);
+        assert!(remaining_grant(contract_address) == remaining_grant, 0);
+
+        // Next period should vest 2/48.
+        timestamp::fast_forward_seconds(VESTING_PERIOD);
+        vest(contract_address);
+        let vested_amount = fraction(GRANT_AMOUNT, 2, 48);
+        remaining_grant = remaining_grant - vested_amount;
+        stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, vested_amount);
+        assert!(remaining_grant(contract_address) == remaining_grant, 0);
+    }
+
+    #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
+    public entry fun test_last_vest_should_distribute_remaining_amount(
+        aptos_framework: &signer,
+        admin: &signer,
+        shareholder: &signer,
+    ) acquires AdminStore, VestingContract {
+        let admin_address = signer::address_of(admin);
+        let shareholder_address = signer::address_of(shareholder);
+        setup(aptos_framework, &vector[admin_address, shareholder_address]);
+        let contract_address = setup_vesting_contract_with_schedule(
+            admin,
+            &vector[shareholder_address],
+            &vector[GRANT_AMOUNT],
+            admin_address,
+            0,
+            // First vest = 3/4 but last vest should only be for the remaining 1/4.
+            &vector[3],
+            4,
+        );
+        let stake_pool_address = stake_pool_address(contract_address);
+
+        // First vest is 3/48
+        timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address) + VESTING_PERIOD);
+        vest(contract_address);
+        let vested_amount = fraction(GRANT_AMOUNT, 3, 4);
+        let remaining_grant = GRANT_AMOUNT - vested_amount;
+        stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, vested_amount);
+        assert!(remaining_grant(contract_address) == remaining_grant, 0);
+
+        timestamp::fast_forward_seconds(VESTING_PERIOD);
+        // Distribute the previous vested amount.
+        distribute(contract_address);
+        // Last vest should be the remaining amount (1/4).
+        vest(contract_address);
+        let vested_amount = remaining_grant;
+        remaining_grant = 0;
+        stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, vested_amount);
+        assert!(remaining_grant(contract_address) == remaining_grant, 0);
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]

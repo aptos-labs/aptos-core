@@ -86,7 +86,7 @@ pub(crate) struct StateStore {
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
     buffered_state: Mutex<BufferedState>,
-    target_snapshot_size: usize,
+    buffered_state_target_items: usize,
 }
 
 impl Deref for StateStore {
@@ -269,7 +269,7 @@ impl StateStore {
         state_merkle_db: Arc<DB>,
         state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
-        target_snapshot_size: usize,
+        buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
@@ -286,7 +286,7 @@ impl StateStore {
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(
                 &state_db,
-                target_snapshot_size,
+                buffered_state_target_items,
                 hack_for_tests,
             )
             .expect("buffered state creation failed."),
@@ -294,13 +294,13 @@ impl StateStore {
         Self {
             state_db,
             buffered_state,
-            target_snapshot_size,
+            buffered_state_target_items,
         }
     }
 
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
-        target_snapshot_size: usize,
+        buffered_state_target_items: usize,
         hack_for_tests: bool,
     ) -> Result<BufferedState> {
         let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
@@ -329,7 +329,7 @@ impl StateStore {
                 usage,
                 latest_snapshot_version,
             ),
-            target_snapshot_size,
+            buffered_state_target_items,
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
@@ -405,7 +405,7 @@ impl StateStore {
     pub fn reset(&self) {
         *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
-            self.target_snapshot_size,
+            self.buffered_state_target_items,
             false,
         )
         .expect("buffered state creation failed.");
