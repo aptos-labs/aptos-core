@@ -44,15 +44,3 @@ Aptos Labs will also observe the on-chain events such as proposals per hour on y
 
 Aptos Labs’ own analytics system will aggregate all the off-chain telemetry data and all on-chain participation events to calculate your node’s health. Node health will be displayed on the community platform site as well as on a separate validator leaderboard for each testnet.
 
-### Troubleshooting
-
-If your validator node is facing persistent issues, for example, it is unable to propose or fails to synchronize, open a GitHub issue here ([https://github.com/aptos-labs/aptos-ait2/issues](https://github.com/aptos-labs/aptos-ait2/issues)) and provide the following:
-- Your node setup, i.e., if you're running it from source, Docker or Terraform. Include the source code version, i.e., the image tag or branch).
-- A description of the issues you are facing and how long they have been occurring.
-- **Important**: The logs for your node (going as far back as possible). Without the detailed logs the Aptos team will unlikely be able to debug the issue.
-- We may also ask you to enable the debug logs for the node. You can do this by updating your node configuration file (e.g., `validator.yaml`) by adding:
-```
- logger:
-   level: DEBUG
-```
-- Make sure to also include any other information you think might be useful and whether or not restarting your validator helps.
