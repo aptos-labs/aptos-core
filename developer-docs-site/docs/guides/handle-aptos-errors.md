@@ -75,7 +75,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Move Standard Library (stdlib)
 
-|Error |Message  | Action|
+|Error |Message  | Recommendation|
 --- | :---: | :---:|
 |INVALID_ARGUMENT|Caller specified an invalid argument (http: 400).|?|
 |OUT_OF_RANGE|An input or result of a computation is out of range (http: 400).|?|
@@ -93,7 +93,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Aptos accounts
 
-|Error |Message  | Action|
+|Error |Message  | Recommendation|
 --- | :---: | :---:|
 |EACCOUNT_ALREADY_EXISTS|Account already exists.|?|
 |EACCOUNT_DOES_NOT_EXIST|Account does not exist.|?|
@@ -112,7 +112,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Aptos coins
 
-|Error |Message  | Action|
+|Error |Message  | Recommendation|
 --- | :---: | :---:|
 |ECOIN_INFO_ADDRESS_MISMATCH|Address of account which is used to initialize a coin `CoinType` doesn't match the deployer of module.|?|
 |ECOIN_INFO_ALREADY_PUBLISHED|`CoinType` is already initialized as a coin.|?|
@@ -129,7 +129,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 ## Aptos tokens
 
-|Error |Message  | Action|
+|Error |Message  | Recommendation|
 --- | :---: | :---:|
 |EALREADY_HAS_BALANCE|The token has balance and cannot be initialized.|?|
 |ECOLLECTIONS_NOT_PUBLISHED|There isn't any collection under this account.|?|
