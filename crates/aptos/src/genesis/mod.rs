@@ -135,6 +135,12 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
 
     let employee_vesting_accounts: EmployeePoolMap =
         client.get(Path::new(EMPLOYEE_VESTING_ACCOUNTS_FILE))?;
+
+    let employee_validators: Vec<_> = employee_vesting_accounts
+        .inner
+        .iter()
+        .map(|inner| inner.validator.clone())
+        .collect();
     let employee_vesting_accounts: Vec<EmployeePool> = employee_vesting_accounts.try_into()?;
     let validators = get_validator_configs(&client, &layout, true).map_err(parse_error)?;
 
@@ -174,118 +180,8 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         }
     }
 
-    // check accounts for validators
-    for (i, validator) in validators.iter().enumerate() {
-        if !initialized_accounts.contains_key(&validator.owner_account_address) {
-            return Err(CliError::UnexpectedError(format!(
-                "Owner {} in validator #{} is is not in the initialized balances",
-                validator.owner_account_address, i
-            )));
-        }
-        if !initialized_accounts.contains_key(&validator.operator_account_address) {
-            return Err(CliError::UnexpectedError(format!(
-                "Operator {} in validator #{} is is not in the initialized balances",
-                validator.operator_account_address, i
-            )));
-        }
-        if !initialized_accounts.contains_key(&validator.voter_account_address) {
-            return Err(CliError::UnexpectedError(format!(
-                "Voter {} in validator #{} is is not in the initialized balances",
-                validator.voter_account_address, i
-            )));
-        }
-
-        let owner_balance = initialized_accounts
-            .get(&validator.owner_account_address)
-            .unwrap();
-        if *owner_balance < validator.stake_amount {
-            return Err(CliError::UnexpectedError(format!(
-                "Owner {} in validator #{} has less in it's balance {} than the stake amount for the validator {}",
-                validator.owner_account_address, i, owner_balance, validator.stake_amount
-            )));
-        }
-
-        // Ensure that the validator is setup correctly if it's joining in genesis
-        if validator.join_during_genesis {
-            if validator.validator_network_public_key.is_none() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} does not have a validator network public key, though it's joining during genesis",
-                    i
-                )));
-            }
-            if validator.validator_host.is_none() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} does not have a validator host, though it's joining during genesis",
-                    i
-                )));
-            }
-            if validator.consensus_public_key.is_none() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} does not have a consensus public key, though it's joining during genesis",
-                    i
-                )));
-            }
-            if validator.proof_of_possession.is_none() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} does not have a consensus proof of possession, though it's joining during genesis",
-                    i
-                )));
-            }
-
-            match (
-                validator.full_node_host.as_ref(),
-                validator.full_node_network_public_key.as_ref(),
-            ) {
-                (None, None) => {
-                    info!("Validator #{} does not have a full node setup", i);
-                }
-                (Some(_), None) | (None, Some(_)) => {
-                    return Err(CliError::UnexpectedError(format!(
-                        "Validator #{} has a full node host or public key but not both",
-                        i
-                    )));
-                }
-                _ => {}
-            }
-        } else {
-            if validator.validator_network_public_key.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a validator network public key, but it is *NOT* joining during genesis",
-                    i
-                )));
-            }
-            if validator.validator_host.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a validator host, but it is *NOT* joining during genesis",
-                    i
-                )));
-            }
-            if validator.consensus_public_key.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a consensus public key, but it is *NOT* joining during genesis",
-                    i
-                )));
-            }
-            if validator.proof_of_possession.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a consensus proof of possession, but it is *NOT* joining during genesis",
-                    i
-                )));
-            }
-            if validator.full_node_network_public_key.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a full node public key, but it is *NOT* joining during genesis",
-                    i
-                )));
-            }
-            if validator.full_node_host.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a full node host, but it is *NOT* joining during genesis",
-                    i
-                )));
-            }
-        }
-    }
+    validate_validators(&employee_validators, &initialized_accounts, true)?;
+    validate_validators(&validators, &initialized_accounts, false)?;
 
     let framework = client.get_framework()?;
     Ok(MainnetGenesisInfo::new(
@@ -608,4 +504,126 @@ fn parse_optional_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
     } else {
         Ok(None)
     }
+}
+
+fn validate_validators(
+    validators: &[ValidatorConfiguration],
+    initialized_accounts: &BTreeMap<AccountAddress, u64>,
+    is_pooled_validator: bool,
+) -> CliTypedResult<()> {
+    // check accounts for validators
+    for (i, validator) in validators.iter().enumerate() {
+        if !initialized_accounts.contains_key(&validator.owner_account_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Owner {} in validator #{} is is not in the initialized balances",
+                validator.owner_account_address, i
+            )));
+        }
+        if !initialized_accounts.contains_key(&validator.operator_account_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Operator {} in validator #{} is is not in the initialized balances",
+                validator.operator_account_address, i
+            )));
+        }
+        if !initialized_accounts.contains_key(&validator.voter_account_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Voter {} in validator #{} is is not in the initialized balances",
+                validator.voter_account_address, i
+            )));
+        }
+
+        let owner_balance = initialized_accounts
+            .get(&validator.owner_account_address)
+            .unwrap();
+        // Pooled validators don't use the `stake amount` field
+        // TODO: Make this field optional but checked
+        if !is_pooled_validator && *owner_balance < validator.stake_amount {
+            return Err(CliError::UnexpectedError(format!(
+                "Owner {} in validator #{} has less in it's balance {} than the stake amount for the validator {}",
+                validator.owner_account_address, i, owner_balance, validator.stake_amount
+            )));
+        }
+
+        // Ensure that the validator is setup correctly if it's joining in genesis
+        if validator.join_during_genesis {
+            if validator.validator_network_public_key.is_none() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} does not have a validator network public key, though it's joining during genesis",
+                    i
+                )));
+            }
+            if validator.validator_host.is_none() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} does not have a validator host, though it's joining during genesis",
+                    i
+                )));
+            }
+            if validator.consensus_public_key.is_none() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} does not have a consensus public key, though it's joining during genesis",
+                    i
+                )));
+            }
+            if validator.proof_of_possession.is_none() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} does not have a consensus proof of possession, though it's joining during genesis",
+                    i
+                )));
+            }
+
+            match (
+                validator.full_node_host.as_ref(),
+                validator.full_node_network_public_key.as_ref(),
+            ) {
+                (None, None) => {
+                    info!("Validator #{} does not have a full node setup", i);
+                }
+                (Some(_), None) | (None, Some(_)) => {
+                    return Err(CliError::UnexpectedError(format!(
+                        "Validator #{} has a full node host or public key but not both",
+                        i
+                    )));
+                }
+                _ => {}
+            }
+        } else {
+            if validator.validator_network_public_key.is_some() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} has a validator network public key, but it is *NOT* joining during genesis",
+                    i
+                )));
+            }
+            if validator.validator_host.is_some() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} has a validator host, but it is *NOT* joining during genesis",
+                    i
+                )));
+            }
+            if validator.consensus_public_key.is_some() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} has a consensus public key, but it is *NOT* joining during genesis",
+                    i
+                )));
+            }
+            if validator.proof_of_possession.is_some() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} has a consensus proof of possession, but it is *NOT* joining during genesis",
+                    i
+                )));
+            }
+            if validator.full_node_network_public_key.is_some() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} has a full node public key, but it is *NOT* joining during genesis",
+                    i
+                )));
+            }
+            if validator.full_node_host.is_some() {
+                return Err(CliError::UnexpectedError(format!(
+                    "Validator #{} has a full node host, but it is *NOT* joining during genesis",
+                    i
+                )));
+            }
+        }
+    }
+    Ok(())
 }
