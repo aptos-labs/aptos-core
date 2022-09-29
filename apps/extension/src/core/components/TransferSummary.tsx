@@ -19,7 +19,7 @@ export default function TransferSummary() {
     validRecipientAddress,
   } = useTransferFlow();
   const collapsedAddress = validRecipientAddress ? collapseHexString(validRecipientAddress) : '';
-  const amountAPTString = formatCoin(amountOcta);
+  const amountAPTString = formatCoin(amountOcta, { decimals: 8 });
   const estimatedGasFeeAPTString = formatCoin(estimatedGasFeeOcta, { decimals: 8 });
   const totalOctas = (amountOcta || 0n) + BigInt(estimatedGasFeeOcta ?? 0);
   const totalString = formatCoin(totalOctas, { decimals: 8 });
