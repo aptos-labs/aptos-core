@@ -3,6 +3,7 @@
 
 //! Mempool is used to track transactions which have been submitted but not yet
 //! agreed upon.
+use crate::counters::{CONSENSUS_PULLED_LABEL, E2E_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL};
 use crate::{
     core_mempool::{
         index::TxnPointer,
@@ -60,20 +61,26 @@ impl Mempool {
             counters::COMMIT_ACCEPTED_LABEL
         };
         self.log_latency(*sender, sequence_number, metric_label);
+        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+            counters::core_mempool_txn_ranking_score(REMOVE_LABEL, metric_label, ranking_score);
+        }
 
         self.transactions
             .remove(sender, sequence_number, is_rejected);
     }
 
-    fn log_latency(&self, account: AccountAddress, sequence_number: u64, metric: &str) {
-        if let Some(&insertion_time) = self
+    fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
+        if let Some((&insertion_time, is_end_to_end)) = self
             .transactions
             .get_insertion_time(&account, sequence_number)
         {
             if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
-                counters::CORE_MEMPOOL_TXN_COMMIT_LATENCY
-                    .with_label_values(&[metric])
-                    .observe(time_delta.as_secs_f64());
+                let scope = if is_end_to_end {
+                    E2E_LABEL
+                } else {
+                    LOCAL_LABEL
+                };
+                counters::core_mempool_txn_commit_latency(stage, scope, time_delta);
             }
         }
     }
@@ -120,7 +127,13 @@ impl Mempool {
             now,
         );
 
-        self.transactions.insert(txn_info)
+        let status = self.transactions.insert(txn_info);
+        counters::core_mempool_txn_ranking_score(
+            INSERT_LABEL,
+            status.code.to_string().as_str(),
+            ranking_score,
+        );
+        status
     }
 
     /// Fetches next block of transactions for consensus.
@@ -182,13 +195,20 @@ impl Mempool {
         let result_size = result.len();
         let mut block = Vec::with_capacity(result_size);
         for (address, seq) in result {
-            if let Some(txn) = self.transactions.get(&address, seq) {
+            if let Some((txn, ranking_score)) =
+                self.transactions.get_with_ranking_score(&address, seq)
+            {
                 let txn_size = txn.raw_txn_bytes_len();
                 if total_bytes + txn_size > max_bytes as usize {
                     break;
                 }
                 total_bytes += txn_size;
                 block.push(txn);
+                counters::core_mempool_txn_ranking_score(
+                    CONSENSUS_PULLED_LABEL,
+                    CONSENSUS_PULLED_LABEL,
+                    ranking_score,
+                );
             }
         }
 
@@ -208,7 +228,7 @@ impl Mempool {
             self.log_latency(
                 transaction.sender(),
                 transaction.sequence_number(),
-                counters::GET_BLOCK_STAGE_LABEL,
+                counters::CONSENSUS_PULLED_LABEL,
             );
         }
         block
