@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/forge-continuous.yaml'
       - '.github/workflows/run-forge.yaml'
+      - 'testsuite/**.py'
 
 # cancel redundant builds
 concurrency:
