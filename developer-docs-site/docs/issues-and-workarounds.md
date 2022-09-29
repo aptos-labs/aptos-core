@@ -25,7 +25,7 @@ When running terraform, the command errors out with a connection refused error m
 
 #### Workaround
 
-This likely means that the state of the install is out of sync with the saved terraform state file located in the storage bucket.  (configured during `terraform init` statement).  This could happen if the cluster or other components were deleted outside of terraform.  Or if terraform had an error and did not finish.  Use the following commands to check the state.  Delete the state that is related to the error message.  You will likely need to run terraform destroy, clean up the environment, and run the terraform script again.  
+This likely means that the state of the install is out of sync with the saved terraform state file located in the storage bucket (configured during `terraform init` statement).  This could happen if the cluster or other components were deleted outside of terraform, or if terraform had an error and did not finish.  Use the following commands to check the state.  Delete the state that is related to the error message.  You will likely need to run terraform destroy, clean up the environment, and run the terraform script again.  
 
   ```
   terraform state list
@@ -33,7 +33,7 @@ This likely means that the state of the install is out of sync with the saved te
   terraform state rm <state>
   ```
 
-### Fullnode "NoAvailablePeers" Error message
+### Fullnode "NoAvailablePeers" error
 
 #### Description
 
@@ -43,7 +43,7 @@ If your node cannot state sync, and the logs are showing "NoAvailablePeers", it'
 
 You can try add some extra upstream peers for your fullnode to state sync from. See the guide [Add upstream seed peers](/nodes/full-node/fullnode-source-code-or-docker#add-upstream-seed-peers).
 
-### When starting the node, it throws a YAML-parsing error.
+### Starting a node throws a YAML-parsing error
 
 #### Workaround
 
@@ -53,22 +53,22 @@ YAML files are sensitive to formatting errors. Use a dedicated YAML editor or us
 
 #### Description
 
-When I start a node with `cargo run -p ...` command I get "Unable to fetch any peers to poll" error. It looks like I have no peers on the available node testers. I have no output when I run:
+When starting a node with the `cargo run -p ...` command, you receive a "Unable to fetch any peers to poll" error. It looks like you have no peers on the available node testers. You have no output when running:
 
 ```bash
 curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{type=\"synced\"}"
 ```
 
-Also my sync version does not increase, indicating that I am not syncing.
+Also sync version does not increase, indicating syncing is not working.
 
 #### Workaround
 
-The devnet validator fullnodes will only accept a maximum of connections. If Aptos devnet is experiencing high network connection volume, your fullnode might not able to connect. It is also possible that you do not have proper network configuration with firewall rules to allow outbound traffic.
+The devnet validator fullnodes will accept only a maximum of connections. If Aptos devnet is experiencing high network connection volume, your fullnode might not able to connect. It is also possible that you do not have proper network configuration with firewall rules to allow outbound traffic.
 
 You can workaround this by:
 
-1. Checking your network configuration, and
-2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See this section: [Add upstream seed peers](/nodes/full-node/fullnode-source-code-or-docker#add-upstream-seed-peers).
+1. Checking your network configuration.
+2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Add upstream seed peers](/nodes/full-node/fullnode-source-code-or-docker#add-upstream-seed-peers).
 
 For example, after you add a single peer to the `seeds` section in your `public_full_node.yaml` file like below, restart the `cargo run -p ...` command:
 
@@ -91,10 +91,10 @@ full_node_networks:
 
 #### Workaround
 
-If your validator node is facing persistent issues, for example, it is unable to propose or fails to synchronize, open a GitHub issue here ([https://github.com/aptos-labs/aptos-ait2/issues](https://github.com/aptos-labs/aptos-ait2/issues)) and provide the following:
+If your validator node is facing persistent issues, for example, it is unable to propose or fails to synchronize, open an [aptos-ait2](https://github.com/aptos-labs/aptos-ait2/issues) GitHub issue and provide the following:
 - Your node setup, i.e., if you're running it from source, Docker or Terraform. Include the source code version, i.e., the image tag or branch).
 - A description of the issues you are facing and how long they have been occurring.
-- **Important**: The logs for your node (going as far back as possible). Without the detailed logs the Aptos team will unlikely be able to debug the issue.
+- **Important**: The logs for your node (going as far back as possible). Without the detailed logs, the Aptos team will likely be unable to debug the issue.
 - We may also ask you to enable the debug logs for the node. You can do this by updating your node configuration file (e.g., `validator.yaml`) by adding:
 ```yaml
  logger:
