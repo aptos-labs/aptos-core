@@ -30,6 +30,12 @@ const config = {
           editUrl: "https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/",
           remarkPlugins: [codeInjector],
         },
+        sitemap: {
+          changefreq: "daily",
+          priority: 0.5,
+          ignorePatterns: ["/tags/**"],
+          filename: "sitemap.xml",
+        },
         blog: false,
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
