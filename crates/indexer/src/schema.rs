@@ -71,6 +71,42 @@ table! {
         default_properties -> Jsonb,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
+    }
+}
+
+table! {
+    current_token_escrows (owner_address, token_data_id_hash, property_version) {
+        owner_address -> Varchar,
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        collection_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        amount -> Numeric,
+        locked_until_secs -> Timestamp,
+        table_handle -> Varchar,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    current_token_listings (token_data_id_hash, property_version, lister_address) {
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        lister_address -> Varchar,
+        collection_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        coin_type -> Varchar,
+        min_price_per_token -> Numeric,
+        amount -> Numeric,
+        table_handle -> Varchar,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -84,6 +120,25 @@ table! {
         name -> Varchar,
         amount -> Numeric,
         token_properties -> Jsonb,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
+        table_type -> Text,
+    }
+}
+
+table! {
+    current_token_pending_claims (token_data_id_hash, property_version, from_address, to_address) {
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        from_address -> Varchar,
+        to_address -> Varchar,
+        collection_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        amount -> Numeric,
+        table_handle -> Varchar,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }
@@ -194,6 +249,28 @@ table! {
 }
 
 table! {
+    token_activities (transaction_version, event_account_address, event_creation_number, event_sequence_number) {
+        transaction_version -> Int8,
+        event_account_address -> Varchar,
+        event_creation_number -> Int8,
+        event_sequence_number -> Int8,
+        collection_data_id_hash -> Varchar,
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        transfer_type -> Varchar,
+        from_address -> Nullable<Varchar>,
+        to_address -> Nullable<Varchar>,
+        token_amount -> Numeric,
+        coin_type -> Nullable<Text>,
+        coin_amount -> Nullable<Numeric>,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
     token_datas (token_data_id_hash, transaction_version) {
         token_data_id_hash -> Varchar,
         transaction_version -> Int8,
@@ -214,6 +291,24 @@ table! {
         royalty_mutable -> Bool,
         default_properties -> Jsonb,
         inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
+    }
+}
+
+table! {
+    token_escrows (table_handle, token_data_id_hash, property_version, transaction_version) {
+        table_handle -> Varchar,
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        transaction_version -> Int8,
+        collection_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        owner_address -> Nullable<Varchar>,
+        amount -> Numeric,
+        locked_until_secs -> Timestamp,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -230,6 +325,7 @@ table! {
         amount -> Numeric,
         table_type -> Nullable<Text>,
         inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
     }
 }
 
@@ -243,6 +339,7 @@ table! {
         name -> Varchar,
         token_properties -> Jsonb,
         inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
     }
 }
 
@@ -301,7 +398,10 @@ allow_tables_to_appear_in_same_query!(
     collection_datas,
     current_collection_datas,
     current_token_datas,
+    current_token_escrows,
+    current_token_listings,
     current_token_ownerships,
+    current_token_pending_claims,
     events,
     ledger_infos,
     move_modules,
@@ -310,7 +410,9 @@ allow_tables_to_appear_in_same_query!(
     signatures,
     table_items,
     table_metadatas,
+    token_activities,
     token_datas,
+    token_escrows,
     token_ownerships,
     tokens,
     transactions,
