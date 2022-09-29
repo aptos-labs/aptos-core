@@ -33,7 +33,7 @@ const sidebars = {
         "tutorials/first-coin",
       ],
     },
-    
+
     {
       type: "category",
       label: "Concepts",
@@ -88,9 +88,9 @@ const sidebars = {
       ],
     },
     {
-      type: 'html',
-      value: 'Nodes',
-      className: 'sidebar-title',
+      type: "html",
+      value: "Nodes",
+      className: "sidebar-title",
     },
     "nodes/aptos-deployments",
     "nodes/leaderboard-metrics",
@@ -107,7 +107,7 @@ const sidebars = {
         
       ],
     },  */
-    
+
     {
       type: "category",
       label: "Validators",
@@ -121,8 +121,7 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           link: { type: "doc", id: "nodes/validator-node/owner/index" },
-          items: [
-          ],
+          items: [],
         },
         {
           type: "category",
@@ -139,16 +138,16 @@ const sidebars = {
               collapsed: true,
               link: { type: "doc", id: "nodes/validator-node/operator/running-validator-node/index" },
               items: [
-              "nodes/validator-node/operator/running-validator-node/using-aws", 
-              "nodes/validator-node/operator/running-validator-node/using-azure", 
-              "nodes/validator-node/operator/running-validator-node/using-gcp", 
-              "nodes/validator-node/operator/running-validator-node/using-docker", 
-              "nodes/validator-node/operator/running-validator-node/using-source-code", 
+                "nodes/validator-node/operator/running-validator-node/using-aws",
+                "nodes/validator-node/operator/running-validator-node/using-azure",
+                "nodes/validator-node/operator/running-validator-node/using-gcp",
+                "nodes/validator-node/operator/running-validator-node/using-docker",
+                "nodes/validator-node/operator/running-validator-node/using-source-code",
               ],
             },
-          "nodes/validator-node/operator/node-liveness-criteria",
-          "nodes/validator-node/operator/connect-to-aptos-network",
-          "nodes/validator-node/operator/shutting-down-nodes",
+            "nodes/validator-node/operator/node-liveness-criteria",
+            "nodes/validator-node/operator/connect-to-aptos-network",
+            "nodes/validator-node/operator/shutting-down-nodes",
           ],
         },
         {
@@ -157,8 +156,7 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           link: { type: "doc", id: "nodes/validator-node/voter/index" },
-          items: [ 
-          ],
+          items: [],
         },
       ],
     },
@@ -296,9 +294,9 @@ const sidebars = {
     },
     */
     {
-      type: 'html',
-      value: 'Tools',
-      className: 'sidebar-title',
+      type: "html",
+      value: "Tools",
+      className: "sidebar-title",
     },
     {
       type: "category",
@@ -328,11 +326,11 @@ const sidebars = {
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
     {
-      type: 'html',
-      value: 'White Paper',
-      className: 'sidebar-title',
+      type: "html",
+      value: "White Paper",
+      className: "sidebar-title",
     },
-   
+
     {
       type: "category",
       label: "Aptos White Paper",
@@ -342,9 +340,9 @@ const sidebars = {
       items: ["aptos-white-paper/in-korean"],
     },
     {
-      type: 'html',
-      value: 'Misc',
-      className: 'sidebar-title',
+      type: "html",
+      value: "Misc",
+      className: "sidebar-title",
     },
     "reference/glossary",
   ],
