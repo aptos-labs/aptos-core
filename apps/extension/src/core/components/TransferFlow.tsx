@@ -50,7 +50,7 @@ function TransferFlow() {
     canSubmitForm,
     closeDrawer,
     doesRecipientAccountExist,
-    estimatedGasFeeOcta,
+    estimatedGasFee,
     formMethods,
     validRecipientAddress,
   } = useTransferFlow();
@@ -60,7 +60,7 @@ function TransferFlow() {
 
   const {
     mutateAsync: submitCoinTransfer,
-  } = useCoinTransferTransaction({ estimatedGasFee: estimatedGasFeeOcta });
+  } = useCoinTransferTransaction({ estimatedGasFee });
 
   const onSubmit: SubmitHandler<CoinTransferFormData> = async (data, event) => {
     event?.preventDefault();

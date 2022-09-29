@@ -79,6 +79,10 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
     refetchInterval: 5000,
   });
 
+  const estimatedGasFee = (debouncedNumberAmountOcta > 0n && simulationResult !== undefined)
+    ? simulationResult.gasFee
+    : undefined;
+
   const estimatedGasFeeOcta = (debouncedNumberAmountOcta > 0n && simulationResult !== undefined)
     ? simulationResult.gasFee * simulationResult.gasUnitPrice
     : undefined;
@@ -121,6 +125,7 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
     coinBalanceApt,
     coinBalanceOcta,
     doesRecipientAccountExist,
+    estimatedGasFee,
     estimatedGasFeeApt,
     estimatedGasFeeOcta,
     formMethods,
