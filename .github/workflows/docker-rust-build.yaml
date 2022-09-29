@@ -20,6 +20,9 @@ on:
         default: false
         required: false
         type: boolean
+      DOCKER_BUILD_TARGET:
+        required: false
+        type: string
 
 env:
   GIT_SHA: ${{ inputs.GIT_SHA }}
@@ -55,8 +58,9 @@ jobs:
       - uses: imjasonh/setup-crane@v0.1
 
       - name: Build and Push Rust images
-        run: docker/docker-bake-rust-all.sh
+        run: docker/docker-bake-rust-all.sh $DOCKER_BUILD_TARGET
         env:
           PROFILE: ${{ env.PROFILE }}
           FEATURES: ${{ env.FEATURES }}
           BUILD_TEST_IMAGES: ${{ env.BUILD_TEST_IMAGES }}
+          DOCKER_BUILD_TARGET: ${{ env.DOCKER_BUILD_TARGET }}
