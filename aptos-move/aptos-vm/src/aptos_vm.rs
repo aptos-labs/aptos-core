@@ -57,6 +57,7 @@ use move_deps::{
         transaction_argument::convert_txn_args,
         value::{serialize_values, MoveValue},
     },
+    move_vm_runtime::move_vm::RuntimeConfig,
     move_vm_types::gas::UnmeteredGasMeter,
 };
 use num_cpus;
@@ -73,6 +74,7 @@ use std::{
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
+static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
 
 /// Remove this once the bundle is removed from the code.
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
@@ -111,6 +113,29 @@ impl AptosVM {
         match EXECUTION_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
             None => 1,
+        }
+    }
+
+    /// Sets runtime config when invoked the first time.
+    pub fn set_runtime_config(paranoid_type_checks: bool, paranoid_hot_potato_checks: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        RUNTIME_CHECKS
+            .set(RuntimeConfig {
+                paranoid_type_checks,
+                paranoid_hot_potato_checks,
+            })
+            .ok();
+    }
+
+    /// Get the concurrency level if already set, otherwise return default true
+    /// (paranoid execution mode).
+    pub fn get_runtime_config() -> RuntimeConfig {
+        match RUNTIME_CHECKS.get() {
+            Some(config) => *config,
+            None => RuntimeConfig {
+                paranoid_type_checks: true,
+                paranoid_hot_potato_checks: true,
+            },
         }
     }
 

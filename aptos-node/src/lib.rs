@@ -608,6 +608,10 @@ pub fn setup_environment(
     } else {
         info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");
     }
+    AptosVM::set_runtime_config(
+        node_config.execution.paranoid_type_verification,
+        node_config.execution.paranoid_hot_potato_verification,
+    );
     AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
