@@ -7,6 +7,15 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
+/// Count the number of transactions that brake invariants of VM.
+pub static TRANSACTIONS_INVARIANT_VIOLATION: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_vm_transactions_invariant_violation",
+        "Number of transactions that broke VM invariant",
+    )
+    .unwrap()
+});
+
 /// Count the number of transactions validated, with a "status" label to
 /// distinguish success or failure results.
 pub static TRANSACTIONS_VALIDATED: Lazy<IntCounterVec> = Lazy::new(|| {
