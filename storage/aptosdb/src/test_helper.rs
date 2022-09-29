@@ -307,7 +307,7 @@ pub fn test_save_blocks_impl(
 ) {
     let tmp_dir = TempPath::new();
     let db =
-        AptosDB::new_for_test_with_snapshot_delta_target_items(&tmp_dir, snapshot_size_threshold);
+        AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
     let mut in_memory_state = db
         .state_store
@@ -809,7 +809,7 @@ pub fn test_sync_transactions_impl(
 ) {
     let tmp_dir = TempPath::new();
     let db =
-        AptosDB::new_for_test_with_snapshot_delta_target_items(&tmp_dir, snapshot_size_threshold);
+        AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
     let mut in_memory_state = db
         .state_store

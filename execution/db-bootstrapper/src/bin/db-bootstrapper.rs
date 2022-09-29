@@ -3,8 +3,8 @@
 
 use anyhow::{ensure, format_err, Context, Result};
 use aptos_config::config::{
-    RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
-    SNAPSHOT_DELTA_TARGET_ITEMS,
+    RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
         RocksdbConfigs::default(),
         false, /* indexer */
-        SNAPSHOT_DELTA_TARGET_ITEMS,
+        BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )
     .expect("Failed to open DB.");

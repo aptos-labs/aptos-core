@@ -57,8 +57,8 @@ use anyhow::{bail, ensure, Result};
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_config::config::{
-    PrunerConfig, RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG,
-    SNAPSHOT_DELTA_TARGET_ITEMS,
+    PrunerConfig, RocksdbConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 
 use aptos_crypto::hash::HashValue;
@@ -263,7 +263,7 @@ impl AptosDB {
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
         pruner_config: PrunerConfig,
-        snapshot_delta_target_items: usize,
+        buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
@@ -282,7 +282,7 @@ impl AptosDB {
             Arc::clone(&arc_state_merkle_rocksdb),
             state_pruner,
             epoch_snapshot_pruner,
-            snapshot_delta_target_items,
+            buffered_state_target_items,
             max_nodes_per_lru_cache_shard,
             hack_for_tests,
         ));
@@ -315,7 +315,7 @@ impl AptosDB {
         pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
         enable_indexer: bool,
-        snapshot_delta_target_items: usize,
+        buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
         ensure!(
@@ -363,7 +363,7 @@ impl AptosDB {
             ledger_db,
             state_merkle_db,
             pruner_config,
-            snapshot_delta_target_items,
+            buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             readonly,
         );
@@ -456,7 +456,7 @@ impl AptosDB {
                 state_merkle_db_column_families(),
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
-            SNAPSHOT_DELTA_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS,
             0,
             true,
         ))
@@ -466,7 +466,7 @@ impl AptosDB {
     fn new_without_pruner<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
-        snapshot_delta_target_items: usize,
+        buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
     ) -> Self {
@@ -476,7 +476,7 @@ impl AptosDB {
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfigs::default(),
             enable_indexer,
-            snapshot_delta_target_items,
+            buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
         )
         .expect("Unable to open AptosDB")
@@ -488,7 +488,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             false,
-            SNAPSHOT_DELTA_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false,
         )
@@ -497,7 +497,7 @@ impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner and cache.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, SNAPSHOT_DELTA_TARGET_ITEMS, 0, false)
+        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS, 0, false)
     }
 
     /// This opens db in non-readonly mode, without the pruner, and with the indexer
@@ -506,7 +506,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             false,
-            SNAPSHOT_DELTA_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             true,
         )
@@ -514,14 +514,14 @@ impl AptosDB {
 
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_for_test_with_snapshot_delta_target_items<P: AsRef<Path> + Clone>(
+    pub fn new_for_test_with_buffered_state_target_items<P: AsRef<Path> + Clone>(
         db_root_path: P,
-        snapshot_delta_target_items: usize,
+        buffered_state_target_items: usize,
     ) -> Self {
         Self::new_without_pruner(
             db_root_path,
             false,
-            snapshot_delta_target_items,
+            buffered_state_target_items,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false,
         )
@@ -533,7 +533,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             true,
-            SNAPSHOT_DELTA_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false,
         )

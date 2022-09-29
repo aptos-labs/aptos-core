@@ -8,7 +8,7 @@ use aptos_config::{
 };
 
 use aptos_config::config::{
-    PrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, SNAPSHOT_DELTA_TARGET_ITEMS,
+    PrunerConfig, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
@@ -62,7 +62,7 @@ fn bootstrap_with_genesis(db_dir: impl AsRef<Path>) {
             NO_OP_STORAGE_PRUNER_CONFIG,
             rocksdb_configs,
             false, /* indexer */
-            SNAPSHOT_DELTA_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )
         .expect("DB should open."),
