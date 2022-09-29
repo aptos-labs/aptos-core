@@ -1,4 +1,4 @@
 apiVersion: v2
 appVersion: 1.5.0-rc.1
-name: aptos-fullnode
+name: pfn
 version: 1.5.0-rc.1

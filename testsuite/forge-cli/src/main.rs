@@ -18,6 +18,7 @@ use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
+use testcases::pfn_test::PfnTest;
 use testcases::state_sync_performance::StateSyncValidatorPerformance;
 use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
 use testcases::twin_validator_test::TwinValidatorTest;
@@ -146,6 +147,8 @@ struct Resize {
     num_validators: usize,
     #[structopt(long, default_value = "1")]
     num_fullnodes: usize,
+    #[structopt(long, default_value = "0")]
+    num_pfns: usize,
     #[structopt(
         long,
         help = "Override the image tag used for validators",
@@ -281,6 +284,7 @@ fn main() -> Result<()> {
                     resize.namespace,
                     resize.num_validators,
                     resize.num_fullnodes,
+                    resize.num_pfns,
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.move_modules_dir,
@@ -690,6 +694,30 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_network_tests(vec![&TwinValidatorTest])
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
             .with_initial_fullnode_count(5)
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            }))
+            .with_success_criteria(SuccessCriteria::new(
+                6000,
+                10000,
+                true,
+                Some(Duration::from_secs(60)),
+                Some(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
+                Some(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+            )),
+        "pfn_test" => config
+            .with_network_tests(vec![&PfnTest])
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
+            .with_initial_fullnode_count(1)
+            .with_initial_pfn_count(1)
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))

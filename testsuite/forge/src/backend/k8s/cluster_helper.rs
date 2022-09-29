@@ -7,8 +7,9 @@ use crate::{
     Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
     FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
     GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN,
-    MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS,
-    VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
+    MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, PFN_HELM_CHART_PATH,
+    PFN_HELM_RELEASE_NAME, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
+    VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{bail, format_err};
@@ -371,6 +372,15 @@ fn upgrade_aptos_node_helm(options: &[String], kube_namespace: String) -> Result
     )
 }
 
+fn upgrade_pfn_helm(options: &[String], kube_namespace: String) -> Result<()> {
+    upgrade_helm_release(
+        PFN_HELM_RELEASE_NAME.to_string(),
+        PFN_HELM_CHART_PATH.to_string(),
+        options,
+        kube_namespace,
+    )
+}
+
 // runs helm upgrade on the installed aptos-genesis release named "genesis"
 // if a new "era" is specified, a new genesis will be created, and old resources will be destroyed
 fn upgrade_genesis_helm(options: &[String], kube_namespace: String) -> Result<()> {
@@ -412,6 +422,7 @@ pub async fn install_testnet_resources(
     kube_namespace: String,
     num_validators: usize,
     num_fullnodes: usize,
+    num_pfns: usize,
     node_image_tag: String,
     genesis_image_tag: String,
     genesis_modules_path: Option<String>,
@@ -430,16 +441,18 @@ pub async fn install_testnet_resources(
     // generate a random era to wipe the network state
     let new_era = generate_new_era();
 
+    let base_helm_values = fs::read_to_string(get_node_default_helm_path())
+        .expect("Not able to read default value file");
+
     // get forge override helm values and cache it
     let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
-        node_helm_config_fn,
-        fs::read_to_string(get_node_default_helm_path())
-            .expect("Not able to read default value file"),
+        node_helm_config_fn.clone(),
+        base_helm_values.clone(),
         kube_namespace.clone(),
         new_era.clone(),
         num_validators,
         num_fullnodes,
-        node_image_tag,
+        node_image_tag.clone(),
         enable_haproxy,
     )?;
 
@@ -500,6 +513,36 @@ pub async fn install_testnet_resources(
         kube_namespace.clone(),
     )?;
 
+    if num_pfns >= 2 {
+        unimplemented!()
+    } else if num_pfns == 1 {
+        let pfn_forge_helm_values_yaml = construct_pfn_helm_values(
+            node_helm_config_fn.clone(),
+            base_helm_values.clone(),
+            kube_namespace.clone(),
+            new_era.clone(),
+            num_pfns,
+            node_image_tag.clone(),
+            enable_haproxy,
+        )?;
+
+        let pfn_forge_values_file = dump_string_to_file(
+            "pfn-values.yaml".to_string(),
+            pfn_forge_helm_values_yaml,
+            &tmp_dir,
+        )?;
+
+        let pfn_upgrade_options = vec![
+            // use the old values
+            "-f".to_string(),
+            pfn_forge_values_file,
+        ];
+
+        upgrade_pfn_helm(pfn_upgrade_options.as_slice(), kube_namespace.clone())?;
+    } else {
+        // Do nothing.
+    }
+
     let (validators, fullnodes) = collect_running_nodes(
         &kube_client,
         kube_namespace,
@@ -529,6 +572,31 @@ pub fn construct_node_helm_values(
     value["haproxy"]["enabled"] = enable_haproxy.into();
     value["labels"]["forge-namespace"] = kube_namespace.into();
     value["labels"]["forge-image-tag"] = image_tag.into();
+    if let Some(config_fn) = node_helm_config_fn {
+        (config_fn)(&mut value);
+    }
+    serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
+}
+
+pub fn construct_pfn_helm_values(
+    node_helm_config_fn: Option<NodeConfigFn>,
+    base_helm_values: String,
+    kube_namespace: String,
+    era: String,
+    num_pfns: usize,
+    image_tag: String,
+    enable_haproxy: bool,
+) -> Result<String> {
+    let mut value: serde_yaml::Value = serde_yaml::from_str(&base_helm_values)?;
+    value["numPfns"] = num_pfns.into();
+    value["imageTag"] = image_tag.clone().into();
+    value["chain"]["era"] = era.into();
+    value["haproxy"]["enabled"] = enable_haproxy.into();
+    value["labels"]["forge-namespace"] = kube_namespace.into();
+    value["labels"]["forge-image-tag"] = image_tag.into();
+    value["resources"]["requests"]["cpu"] = 1.into();
+    value["resources"]["requests"]["memory"] = "4Gi".into();
+    value["storage"]["class"] = "gp3".into();
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
