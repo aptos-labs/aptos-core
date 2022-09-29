@@ -72,6 +72,8 @@ module aptos_framework::stake {
     const EOWNER_CAP_ALREADY_EXISTS: u64 = 16;
     /// Validator is not defined in the ACL of entities allowed to be validators
     const EINELIGIBLE_VALIDATOR: u64 = 17;
+    /// Cannot update stake pool's lockup to earlier than current lockup.
+    const EINVALID_LOCKUP: u64 = 18;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -724,14 +726,16 @@ module aptos_framework::stake {
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let old_locked_until_secs = stake_pool.locked_until_secs;
-        stake_pool.locked_until_secs = timestamp::now_seconds() + staking_config::get_recurring_lockup_duration(&config);
+        let new_locked_until_secs = timestamp::now_seconds() + staking_config::get_recurring_lockup_duration(&config);
+        assert!(old_locked_until_secs < new_locked_until_secs, error::invalid_argument(EINVALID_LOCKUP));
+        stake_pool.locked_until_secs = new_locked_until_secs;
 
         event::emit_event(
             &mut stake_pool.increase_lockup_events,
             IncreaseLockupEvent {
                 pool_address,
                 old_locked_until_secs,
-                new_locked_until_secs: stake_pool.locked_until_secs,
+                new_locked_until_secs,
             },
         );
     }
@@ -1646,6 +1650,23 @@ module aptos_framework::stake {
         assert!(get_validator_state(validator_address) == VALIDATOR_STATUS_ACTIVE, 2);
         assert!(get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS / 2 - EPOCH_DURATION, 3);
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10012)]
+    public entry fun test_cannot_reduce_lockup(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test(aptos_framework);
+        initialize_test_validator(validator, 100, false, false);
+
+        // Increase lockup.
+        increase_lockup(validator);
+        // Reduce recurring lockup to 0.
+        staking_config::update_recurring_lockup_duration_secs(aptos_framework, 1);
+        // INcrease lockup should now fail because the new lockup < old lockup.
+        increase_lockup(validator);
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
