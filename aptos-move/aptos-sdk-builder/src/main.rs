@@ -27,7 +27,7 @@ struct Options {
     abi_directories: Vec<PathBuf>,
 
     /// Language for code generation.
-    #[structopt(long, possible_values = &Language::variants(), case_insensitive = true, default_value = "Python3")]
+    #[structopt(long, possible_values = &Language::variants(), case_insensitive = true, default_value = "Rust")]
     language: Language,
 
     /// Directory where to write generated modules (otherwise print code on stdout).
