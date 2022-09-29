@@ -462,7 +462,7 @@ pub async fn execute_and_wait_transactions(
             (indices, txns)
         };
 
-        let results = client.submit_batch_bcs(&txns).await.unwrap().into_inner();
+        let results = client.submit_batch_bcs(&txns).await?.into_inner();
         let mut failures = results
             .transaction_failures
             .into_iter()
