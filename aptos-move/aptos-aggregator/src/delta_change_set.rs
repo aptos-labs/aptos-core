@@ -14,7 +14,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSetMut},
 };
-use move_deps::move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 
 /// When `Addition` operation overflows the `limit`.
 const EADD_OVERFLOW: u64 = 0x02_0001;

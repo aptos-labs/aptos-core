@@ -29,10 +29,12 @@ aptos-state-view = { path = "../state-view" }
 aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 schemadb = { path = "../schemadb" }
 scratchpad = { path = "../scratchpad" }
 storage-interface = { path = "../storage-interface" }
+
+move-core-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5", features = ["address32"] }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
 
 [dev-dependencies]
 proptest = "1.0.0"

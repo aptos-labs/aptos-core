@@ -130,7 +130,7 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction, TransactionOutput, VMValidatorResult},
     vm_status::VMStatus,
 };
-use move_deps::move_core_types::{
+use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ResourceKey, StructTag},
 };

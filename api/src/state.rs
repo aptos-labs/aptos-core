@@ -23,7 +23,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle},
 };
 use aptos_vm::data_cache::AsMoveResolver;
-use move_deps::move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
+use move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,

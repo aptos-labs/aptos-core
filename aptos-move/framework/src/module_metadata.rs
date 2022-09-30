@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::AbortInfo;
-use move_deps::move_core_types::errmap::ErrorDescription;
+use move_core_types::errmap::ErrorDescription;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

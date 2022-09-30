@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::account_config::constants::CORE_CODE_ADDRESS;
-use move_deps::move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
 use once_cell::sync::Lazy;
 
 pub const EVENT_MODULE_IDENTIFIER: &IdentStr = ident_str!("event");

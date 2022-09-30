@@ -31,17 +31,15 @@ use aptos_types::{
 use dashmap::DashMap;
 use fail::fail_point;
 use framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
-use move_deps::{
-    move_binary_format::{errors::VMResult, CompiledModule},
-    move_core_types::{
-        language_storage::ModuleId,
-        move_resource::MoveStructType,
-        resolver::ResourceResolver,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_runtime::logging::expect_no_verification_errors,
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_binary_format::{errors::VMResult, CompiledModule};
+use move_core_types::{
+    language_storage::ModuleId,
+    move_resource::MoveStructType,
+    resolver::ResourceResolver,
+    value::{serialize_values, MoveValue},
 };
+use move_vm_runtime::logging::expect_no_verification_errors;
+use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
 #[derive(Clone)]

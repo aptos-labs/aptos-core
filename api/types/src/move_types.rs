@@ -4,23 +4,21 @@
 use crate::{Address, Bytecode, IdentifierWrapper, VerifyInput, VerifyInputWithRecursion};
 use anyhow::{bail, format_err};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
-use move_deps::{
-    move_binary_format::{
-        access::ModuleAccess,
-        file_format::{
-            Ability, AbilitySet, CompiledModule, CompiledScript, StructTypeParameter, Visibility,
-        },
+
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{
+        Ability, AbilitySet, CompiledModule, CompiledScript, StructTypeParameter, Visibility,
     },
-    move_core_types,
-    move_core_types::{
-        account_address::AccountAddress,
-        identifier::Identifier,
-        language_storage::{ModuleId, StructTag, TypeTag},
-        parser::{parse_struct_tag, parse_type_tag},
-        transaction_argument::TransactionArgument,
-    },
-    move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
 };
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    parser::{parse_struct_tag, parse_type_tag},
+    transaction_argument::TransactionArgument,
+};
+use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 use poem_openapi::types::Type;
 use poem_openapi::{Enum, Object, Union};
@@ -1212,14 +1210,12 @@ mod tests {
     use super::*;
 
     use aptos_types::account_address::AccountAddress;
-    use move_deps::{
-        move_binary_format::file_format::AbilitySet,
-        move_core_types::{
-            identifier::Identifier,
-            language_storage::{StructTag, TypeTag},
-        },
-        move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
+    use move_binary_format::file_format::AbilitySet;
+    use move_core_types::{
+        identifier::Identifier,
+        language_storage::{StructTag, TypeTag},
     };
+    use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
     use serde::{de::DeserializeOwned, Serialize};
     use serde_json::{json, to_value, Value};

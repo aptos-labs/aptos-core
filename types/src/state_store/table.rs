@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::move_core_types::{
+use move_core_types::{
     account_address::{AccountAddress, AccountAddressParseError},
     language_storage::TypeTag,
 };
@@ -27,8 +27,8 @@ impl FromStr for TableHandle {
     }
 }
 
-impl From<move_deps::move_table_extension::TableHandle> for TableHandle {
-    fn from(hdl: move_deps::move_table_extension::TableHandle) -> Self {
+impl From<move_table_extension::TableHandle> for TableHandle {
+    fn from(hdl: move_table_extension::TableHandle) -> Self {
         Self(hdl.0)
     }
 }
