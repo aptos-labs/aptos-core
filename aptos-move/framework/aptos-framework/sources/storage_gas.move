@@ -88,13 +88,8 @@
 ///
 /// For example, if an operation mutates a `u8` field in a resource that
 /// has 5 other `u128` fields, the per-byte gas write cost will account
-/// for $(5 * 128) / 8 + 1 = 81$ bytes.
-///
-/// Byte-wise fees are similarly assessed on vectors, meaning that a
-/// struct having a single `vector<u8>` field with $n$ elements will
-/// account for $n$ bytes during per-byte calculations: reading the
-/// last element in a vector of 100 `u8` elements will be treated as a
-/// 100-byte read.
+/// for $(5 * 128) / 8 + 1 = 81$ bytes. Vectors are similarly treated
+/// as fields.
 ///
 /// # Function dependencies
 ///

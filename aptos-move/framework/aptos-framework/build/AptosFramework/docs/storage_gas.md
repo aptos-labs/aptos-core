@@ -121,13 +121,8 @@ bytes in an *entire item*.
 
 For example, if an operation mutates a <code>u8</code> field in a resource that
 has 5 other <code>u128</code> fields, the per-byte gas write cost will account
-for $(5 * 128) / 8 + 1 = 81$ bytes.
-
-Byte-wise fees are similarly assessed on vectors, meaning that a
-struct having a single <code><a href="">vector</a>&lt;u8&gt;</code> field with $n$ elements will
-account for $n$ bytes during per-byte calculations: reading the
-last element in a vector of 100 <code>u8</code> elements will be treated as a
-100-byte read.
+for $(5 * 128) / 8 + 1 = 81$ bytes. Vectors are similarly treated
+as fields.
 
 
 <a name="@Function_dependencies_7"></a>
