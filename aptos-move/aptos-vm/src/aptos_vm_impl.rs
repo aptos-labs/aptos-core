@@ -62,7 +62,7 @@ impl AptosVMImpl {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters
-        let (gas_params, gas_feature_version): (Option<AptosGasParameters>, u64) =
+        let (mut gas_params, gas_feature_version): (Option<AptosGasParameters>, u64) =
             match GasScheduleV2::fetch_config(&storage) {
                 Some(gas_schedule) => {
                     let feature_version = gas_schedule.feature_version;
@@ -81,11 +81,23 @@ impl AptosVMImpl {
                 },
             };
 
-        let storage_gas_params = match gas_feature_version {
+        let storage_gas_params: Option<StorageGasParameters> = match gas_feature_version {
             0 => None,
             _ => StorageGasSchedule::fetch_config(&storage)
                 .map(|storage_gas_schedule| storage_gas_schedule.into()),
         };
+
+        if gas_feature_version >= 2 {
+            if let (Some(gas_params), Some(storage_gas_params)) =
+                (&mut gas_params, &storage_gas_params)
+            {
+                gas_params.natives.table.common.load_base =
+                    u64::from(storage_gas_params.per_item_read).into();
+                gas_params.natives.table.common.load_per_byte =
+                    u64::from(storage_gas_params.per_byte_read).into();
+                gas_params.natives.table.common.load_failure = 0.into();
+            }
+        }
 
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
         //            This only happens in a edge case that is probably related to write set transactions or genesis,

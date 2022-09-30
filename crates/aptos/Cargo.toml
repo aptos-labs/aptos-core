@@ -72,6 +72,7 @@ default = []
 fuzzing = []
 no-upload-proposal = []
 indexer = ["aptos-node/indexer"]
+cli-framework-test-move = []
 
 [build-dependencies]
 shadow-rs = "0.16.2"

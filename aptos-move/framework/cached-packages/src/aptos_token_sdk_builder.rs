@@ -87,7 +87,6 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    /// Deprecated function call
     TokenInitializeTokenScript {},
 
     /// Mint more token from an existing token_data. Mint only adds more token to property_version 0
@@ -482,7 +481,6 @@ pub fn token_direct_transfer_script(
     ))
 }
 
-/// Deprecated function call
 pub fn token_initialize_token_script() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
