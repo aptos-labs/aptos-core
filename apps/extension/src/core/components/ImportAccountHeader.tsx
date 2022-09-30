@@ -51,7 +51,7 @@ export default function ImportAccountHeader({
         <IconButton
           size="lg"
           aria-label="back"
-          colorScheme="teal"
+          colorScheme="salmon"
           icon={<ArrowBackIcon fontSize={26} />}
           variant="filled"
           onClick={handleClickBack}

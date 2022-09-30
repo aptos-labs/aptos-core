@@ -62,13 +62,13 @@ export default function TransferDrawerConfirm() {
         px={4}
       >
         <Grid gap={4} width="100%" templateColumns="1fr 1fr">
-          <Button onClick={backOnClick}>
+          <Button variant="outline" onClick={backOnClick}>
             Back
           </Button>
           <Button
             isLoading={isSubmitting}
             isDisabled={!canSubmitForm}
-            colorScheme="teal"
+            colorScheme="salmon"
             type="submit"
             form={transferAptFormId}
           >

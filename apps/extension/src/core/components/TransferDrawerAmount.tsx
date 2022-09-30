@@ -116,13 +116,13 @@ export default function TransferDrawerAmount() {
         px={4}
       >
         <Grid gap={4} width="100%" templateColumns="1fr 1fr">
-          <Button onClick={closeDrawer}>
+          <Button variant="outline" onClick={closeDrawer}>
             Cancel
           </Button>
           <Button
             isLoading={isSubmitting}
             isDisabled={!canSubmitForm}
-            colorScheme="teal"
+            colorScheme="salmon"
             onClick={nextOnClick}
           >
             Next

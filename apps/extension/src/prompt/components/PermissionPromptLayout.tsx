@@ -83,7 +83,7 @@ function PermissionRequestFooter() {
       <FooterButton w="50%" variant="outline" onClick={onCancelPressed}>
         Cancel
       </FooterButton>
-      <FooterButton w="50%" colorScheme="teal" isDisabled={!canApprove} onClick={onApprovePressed}>
+      <FooterButton w="50%" colorScheme="salmon" isDisabled={!canApprove} onClick={onApprovePressed}>
         Approve
       </FooterButton>
     </HStack>

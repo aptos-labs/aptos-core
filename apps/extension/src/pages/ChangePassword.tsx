@@ -123,7 +123,7 @@ function ChangePassword() {
             paddingBottom={6}
           />
         </VStack>
-        <Button width="full" colorScheme="teal" height={14} onClick={handleClickSave} disabled={shouldDisableSaveButton}>Save</Button>
+        <Button width="full" colorScheme="salmon" height={14} onClick={handleClickSave} disabled={shouldDisableSaveButton}>Save</Button>
       </VStack>
     </WalletLayout>
   );

@@ -95,7 +95,7 @@ const AccountView = React.forwardRef(({
     <Tooltip label="Rename">
       <Button
         borderRadius="100%"
-        colorScheme="teal"
+        colorScheme="gray"
         variant="ghost"
         bg="none"
         p={0}

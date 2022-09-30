@@ -53,7 +53,7 @@ export default function NetworkBody() {
       <HStack justifyContent="end">
         <ChakraLink to={Routes.addNetwork.path}>
           <Button
-            colorScheme="teal"
+            colorScheme="salmon"
             size="sm"
             leftIcon={<AddIcon />}
           >

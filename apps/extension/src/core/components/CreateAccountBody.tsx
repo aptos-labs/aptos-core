@@ -55,7 +55,7 @@ export default function CreateAccountBody(
         </Copyable>
         <Button
           width="100%"
-          colorScheme="teal"
+          colorScheme="salmon"
           type="submit"
           isLoading={isLoading}
           px={8}

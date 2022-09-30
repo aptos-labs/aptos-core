@@ -85,7 +85,7 @@ export default function RemoveAccount() {
         <Flex width="375px" justify="flex-end" alignItems="center" px={4} py={4} borderTop="1px" borderColor={buttonBorderColor[colorMode]}>
           <VStack width="100%">
             <Button width="100%" bgColor={removeButtonBg[colorMode]} color="white" onClick={handleRemove}>Remove</Button>
-            <Button width="100%" onClick={handleCancel}>Cancel</Button>
+            <Button width="100%" variant="outline" onClick={handleCancel}>Cancel</Button>
           </VStack>
         </Flex>
       </VStack>

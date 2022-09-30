@@ -373,7 +373,7 @@ function CreateWalletViaImportLayoutFC({
           position="absolute"
           size="md"
           aria-label="back"
-          colorScheme="teal"
+          colorScheme="salmon"
           icon={<ArrowBackIcon fontSize={20} />}
           variant="filled"
           onClick={handleClickPrev}

@@ -157,7 +157,7 @@ function AddNetworkBody() {
               <FormErrorMessage>{ errors.faucetUrl?.message }</FormErrorMessage>
             </FormControl>
             <Button
-              colorScheme="teal"
+              colorScheme="salmon"
               width="100%"
               type="submit"
               isDisabled={!isValid}

@@ -8,6 +8,9 @@ import {
   TransferDrawerPage, useTransferFlow,
 } from 'core/hooks/useTransferFlow';
 import React, { useMemo } from 'react';
+import {
+  customColors, opacityColor,
+} from 'core/colors';
 import TransferDrawerConfirm from './TransferDrawerConfirm';
 import TransferDrawerAmount from './TransferDrawerAmount';
 
@@ -38,9 +41,8 @@ export default function TransferDrawer() {
       isOpen={isDrawerOpen}
       onClose={closeDrawer}
       placement="bottom"
-      // onCloseComplete={onCloseComplete}
     >
-      <DrawerOverlay bgColor="rgba(57,178,172, 0.4)" backdropFilter="blur(1rem)" />
+      <DrawerOverlay bgColor={opacityColor(customColors.navy[900], 0.5)} backdropFilter="blur(1rem)" />
       <DrawerContent className="drawer-content" borderTopRadius=".5rem">
         <TransferDrawerSwitch />
       </DrawerContent>
