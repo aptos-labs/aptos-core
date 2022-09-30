@@ -103,6 +103,17 @@ pub fn get_build_information() -> BTreeMap<String, String> {
     build_information
 }
 
+pub fn get_git_hash() -> String {
+    // Docker builds don't have the git directory so it has to be provided by this variable
+    // Otherwise, shadow will have the right commit hash
+    if let Ok(git_sha) = std::env::var("GIT_SHA") {
+        git_sha
+    } else {
+        shadow!(build);
+        build::COMMIT_HASH.into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
