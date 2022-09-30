@@ -1186,8 +1186,7 @@ def create_forge_command(
             "--duration-secs", forge_runner_duration_secs
         ])
 
-    if forge_num_validators:
-        forge_args.extend(["--num-validators", forge_num_validators])
+    forge_args.extend(["--num-validators", "100"])
     if forge_num_validator_fullnodes:
         forge_args.extend([
             "--num-validator-fullnodes",
@@ -1213,8 +1212,7 @@ def create_forge_command(
         forge_args.append("--reuse")
     if forge_namespace_keep == "true":
         forge_args.append("--keep")
-    if forge_enable_haproxy == "true":
-        forge_args.append("--enable-haproxy")
+    forge_args.append("--enable-haproxy")
 
     if test_args:
         forge_args.extend(test_args)
@@ -1457,7 +1455,7 @@ def test(
     if not forge_cluster_name or balance_clusters:
         cluster_names = config.get("enabled_clusters")
         forge_cluster_name = random.choice(cluster_names)
-
+    forge_cluster_name = "aptos-forge-big-3"
     assert forge_cluster_name, "Forge cluster name is required"
 
     # These features and profile flags are set as strings
@@ -1535,7 +1533,7 @@ def test(
         forge_cli_args=forge_cli_args,
         test_args=test_args,
     )
-    
+
     print(f"Using cluster: {forge_cluster_name}")
     temp = context.filesystem.mkstemp()
     forge_cluster = ForgeCluster(forge_cluster_name, temp)
