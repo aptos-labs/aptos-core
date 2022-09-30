@@ -579,9 +579,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_fullnode_count(10)
             .with_network_tests(vec![&LoadVsPerfBenchmark {
                 test: &PerformanceBenchmarkWithFN,
-                tps: &[
-                    200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
-                ],
+                tps: &[7500, 8000, 9000, 10000, 12000, 15000],
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 // no epoch change.
