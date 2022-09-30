@@ -30,7 +30,7 @@ use aptos_api_types::{
     UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{info, sample, sample::SampleRate, sample::Sampling, warn};
+use aptos_logger::{debug, info, sample, sample::SampleRate, sample::Sampling};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
@@ -573,7 +573,7 @@ impl Client {
                     }
                     sample!(
                         SampleRate::Duration(Duration::from_secs(30)),
-                        warn!(
+                        debug!(
                             "Cannot yet find transaction in mempool on {:?}, continuing to wait.",
                             self.path_prefix_string(),
                         )
@@ -608,7 +608,7 @@ impl Client {
             if elapsed.as_secs() > 30 {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(30)),
-                    warn!(
+                    debug!(
                         "Continuing to wait for transaction {}, ledger on endpoint ({}) is {}",
                         hash,
                         self.path_prefix_string(),
