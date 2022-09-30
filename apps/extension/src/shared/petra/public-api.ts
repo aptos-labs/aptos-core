@@ -26,6 +26,10 @@ export interface SignMessageResponse {
   signature: string;
 }
 
+export interface SignTransactionOptions {
+  sender?: string;
+}
+
 export interface PetraPublicApi {
   account(): Promise<PublicAccount>;
   connect(): Promise<PublicAccount>;
@@ -34,7 +38,10 @@ export interface PetraPublicApi {
   network(): Promise<string>;
   signAndSubmitTransaction(payload: EntryFunctionPayload): Promise<PendingTransaction>;
   signMessage(payload: SignMessagePayload): Promise<SignMessageResponse>;
-  signTransaction(payload: EntryFunctionPayload): Promise<Uint8Array>;
+  signTransaction(
+    payload: EntryFunctionPayload,
+    options: SignTransactionOptions
+  ): Promise<Uint8Array>;
 }
 
 export default PetraPublicApi;

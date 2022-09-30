@@ -18,7 +18,7 @@ import {
   PermissionHandler,
   SignTransactionPermissionApproval,
 } from 'shared/permissions';
-import { PetraPublicApi, SignMessagePayload } from './public-api';
+import { PetraPublicApi, SignMessagePayload, SignTransactionOptions } from './public-api';
 
 // region Utils
 
@@ -86,13 +86,14 @@ async function getAptosAccount(address: string) {
  */
 async function signTransaction(
   client: AptosClient,
+  senderAddress: string,
   signerAddress: string,
   payload: Types.EntryFunctionPayload,
   gasUnitPrice: number,
   maxGasFee: number,
 ) {
   const signer = await getAptosAccount(signerAddress);
-  const txn = await client.generateTransaction(signerAddress, payload, {
+  const txn = await client.generateTransaction(senderAddress, payload, {
     gas_unit_price: `${gasUnitPrice}`,
     max_gas_amount: `${maxGasFee}`,
   });
@@ -195,6 +196,7 @@ export const PetraPublicApiImpl = {
       const signedTxn = await signTransaction(
         aptosClient,
         address,
+        address,
         payload,
         gasUnitPrice,
         maxGasFee,
@@ -268,7 +270,11 @@ export const PetraPublicApiImpl = {
    * @throws {DappErrorType.TIME_OUT} if the request timed out
    * @throws {DappError} if the transaction fails
    */
-  async signTransaction(dappInfo: DappInfo, payload: Types.EntryFunctionPayload) {
+  async signTransaction(
+    dappInfo: DappInfo,
+    payload: Types.EntryFunctionPayload,
+    options: SignTransactionOptions = {},
+  ) {
     const { address } = await ensureAccountConnected(dappInfo.domain);
     const { gasUnitPrice, maxGasFee } = await PermissionHandler.requestPermission(
       dappInfo,
@@ -280,6 +286,7 @@ export const PetraPublicApiImpl = {
     try {
       return await signTransaction(
         aptosClient,
+        options.sender ?? address,
         address,
         payload,
         gasUnitPrice,
