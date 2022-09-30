@@ -218,6 +218,7 @@ dependencies = [
  "anyhow",
  "aptos-api-test-context",
  "aptos-api-types",
+ "aptos-build-info",
  "aptos-config",
  "aptos-crypto",
  "aptos-gas",

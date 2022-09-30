@@ -14,7 +14,7 @@ pub mod state;
 pub mod types;
 
 pub use aptos_api_types::{
-    self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
+    self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
 };
 pub use state::State;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
@@ -26,8 +26,8 @@ use aptos_api_types::{
     deserialize_from_string,
     mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
     AptosError, BcsBlock, Block, Bytecode, ExplainVMStatus, GasEstimation, HexEncodedBytes,
-    MoveModuleId, TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult,
-    UserTransaction, VersionedEvent,
+    IndexResponse, MoveModuleId, TransactionData, TransactionOnChainData,
+    TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate, sample::Sampling};
@@ -281,7 +281,7 @@ impl Client {
         self.get(self.build_path("")?).await
     }
 
-    pub async fn get_index_bcs(&self) -> AptosResult<Response<IndexResponse>> {
+    pub async fn get_index_bcs(&self) -> AptosResult<Response<IndexResponseBcs>> {
         let url = self.build_path("")?;
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)

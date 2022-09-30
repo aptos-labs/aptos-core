@@ -29,6 +29,7 @@ tokio = { version = "1.21.0", features = ["full"] }
 url = "2.2.2"
 
 aptos-api-types = { path = "./types", package = "aptos-api-types" }
+aptos-build-info = { path = "../crates/aptos-build-info" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-gas = { path = "../aptos-move/aptos-gas" }

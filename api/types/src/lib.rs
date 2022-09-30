@@ -26,7 +26,7 @@ pub use convert::{new_vm_utf8_string, AsConverter, ExplainVMStatus, MoveConverte
 pub use error::{AptosError, AptosErrorCode};
 pub use hash::HashValue;
 pub use headers::*;
-pub use index::IndexResponse;
+pub use index::{IndexResponse, IndexResponseBcs};
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
     verify_field_identifier, verify_function_identifier, verify_module_identifier, EntryFunctionId,
