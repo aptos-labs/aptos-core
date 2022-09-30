@@ -25,11 +25,11 @@ This section contains the guides for the Aptos nodes. Topics covered include how
     <h2 class="card-title">Validator for the Aptos testnet </h2>
     <p class="card-text"><a href="https://aptos.dev/nodes/ait/node-requirements" class="card-link" target="_self"><strong>Make sure to first check the Node Requirements.</strong></a> Pick your preferred installation method from below:</p>
         <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/using-source-code/" class="card-link" target="_self">Using Aptos source</a></li>
-          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/using-aws" class="card-link" target="_self">Using AWS</a></li>
-          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/using-gcp" class="card-link" target="_self">Using GCP</a></li>
-          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/using-docker" class="card-link" target="_self">Using Docker</a></li>
-          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/using-azure" class="card-link" target="_self">Using Azure</a></li>
+          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/run-validator-node-using-source" class="card-link" target="_self">Using Aptos source</a></li>
+          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/run-validator-node-using-aws" class="card-link" target="_self">Using AWS</a></li>
+          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/run-validator-node-using-gcp" class="card-link" target="_self">Using GCP</a></li>
+          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/run-validator-node-using-docker" class="card-link" target="_self">Using Docker</a></li>
+          <li class="list-group-item"><a href="https://aptos.dev/nodes/validator-node/operator/running-validator-node/run-validator-node-using-azure" class="card-link" target="_self">Using Azure</a></li>
         </ul>
 </div>
 </div>
