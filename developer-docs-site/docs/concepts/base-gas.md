@@ -230,11 +230,11 @@ Payload gas is defined in [`transaction.rs`], which incorporates storage gas wit
 <!--- Alphabetized reference links -->
 
 [#4540]:                           https://github.com/aptos-labs/aptos-core/pull/4540/files
-[`base_8192_exponential_curve()`]: ../../../aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
-[`initialize()`]:                  ../../../aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_initialize
-[`instr.rs`]:                      ../../../aptos-move/aptos-gas/src/instr.rs
-[`on_reconfig()`]:                 ../../../aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_on_reconfig
-[`storage_gas.md`]:                ../../../aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md
-[`storage_gas.move`]:              ../../../aptos-move/framework/aptos-framework/sources/storage_gas.move
-[`StorageGas`]:                    ../../../aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_StorageGas
-[`transaction.rs`]:                ../../../aptos-move/aptos-gas/src/transaction.rs
+[`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/e30f24f6c5a9b5bb0e1815284cd7278b28f83b1d/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
+[`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/e30f24f6c5a9b5bb0e1815284cd7278b28f83b1d/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_initialize
+[`instr.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/instr.rs
+[`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/e30f24f6c5a9b5bb0e1815284cd7278b28f83b1d/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_on_reconfig
+[`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/e30f24f6c5a9b5bb0e1815284cd7278b28f83b1d/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md
+[`storage_gas.move`]:              https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/storage_gas.move
+[`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/e30f24f6c5a9b5bb0e1815284cd7278b28f83b1d/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_StorageGas
+[`transaction.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction.rs
