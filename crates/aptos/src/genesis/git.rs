@@ -161,6 +161,7 @@ impl Client {
                     ));
                 }
 
+                eprintln!("Reading {}", path.display());
                 let mut file = std::fs::File::open(path.as_path())
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
 
