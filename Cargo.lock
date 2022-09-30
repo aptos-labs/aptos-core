@@ -9187,6 +9187,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-secure-net",
  "aptos-state-view",
