@@ -131,6 +131,10 @@ impl AptosVMImpl {
         vm
     }
 
+    pub(crate) fn mark_loader_cache_as_invalid(&self) {
+        self.move_vm.mark_loader_cache_as_invalid();
+    }
+
     /// Provides access to some internal APIs of the VM.
     pub fn internals(&self) -> AptosVMInternals {
         AptosVMInternals(self)

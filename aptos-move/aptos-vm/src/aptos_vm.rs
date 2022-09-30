@@ -535,11 +535,25 @@ impl AptosVM {
                 }
             }
 
-            // Publish the bundle
-            session.publish_module_bundle(bundle.into_inner(), destination, gas_meter)?;
-
-            // Execute initializers
-            self.execute_module_initialization(session, gas_meter, &modules, exists, &[destination])
+            // Publish the bundle and execute initializers
+            session
+                .publish_module_bundle(bundle.into_inner(), destination, gas_meter)
+                .and_then(|_| {
+                    self.execute_module_initialization(
+                        session,
+                        gas_meter,
+                        &modules,
+                        exists,
+                        &[destination],
+                    )
+                })
+                .map_err(|e| {
+                    // Be sure to flash the loader cache to align storage with the cache.
+                    // None of the modules in the bundle will be committed to storage,
+                    // but some of them may have ended up in the cache.
+                    self.0.mark_loader_cache_as_invalid();
+                    e
+                })
         } else {
             Ok(())
         }
