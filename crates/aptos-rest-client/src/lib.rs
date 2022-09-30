@@ -308,8 +308,7 @@ impl Client {
     pub async fn simulate(
         &self,
         txn: &SignedTransaction,
-    ) -> AptosResult<Response<Vec<UserTransaction
-    {
+    ) -> AptosResult<Response<Vec<UserTransaction>>> {
         let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions/simulate")?;
 

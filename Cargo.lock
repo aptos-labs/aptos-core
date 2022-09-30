@@ -3238,7 +3238,7 @@ dependencies = [
  "chrono",
  "diesel_derives",
  "itoa 1.0.3",
- "num-bigint 0.4.3",
+ "num-bigint 0.2.3",
  "num-integer",
  "num-traits 0.2.15",
  "pq-sys",

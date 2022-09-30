@@ -35,11 +35,20 @@ impl fmt::Display for TransactionSummary {
 pub enum Payload {
     Empty,
     DirectMempool(Vec<SignedTransaction>),
+    InQuorumStore(Vec<ProofOfStore>),
 }
 
 impl Payload {
     pub fn empty() -> Self {
         Payload::Empty
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Payload::DirectMempool(txns) => txns.len(),
+            Payload::InQuorumStore(pos) => pos.len(), // quorum store TODO
+            Payload::Empty => 0,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
