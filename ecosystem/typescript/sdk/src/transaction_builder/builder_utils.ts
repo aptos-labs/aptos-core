@@ -155,7 +155,7 @@ export class TypeTagParser {
     }
 
     // Pop left most element out
-    const [tokenTy, tokenVal] = this.tokens.shift();
+    const [tokenTy, tokenVal] = this.tokens.shift()!;
 
     if (tokenVal === "u8") {
       return new TypeTagU8();
@@ -181,12 +181,12 @@ export class TypeTagParser {
     if (tokenTy === "IDENT" && (tokenVal.startsWith("0x") || tokenVal.startsWith("0X"))) {
       const address = tokenVal;
       this.consume("::");
-      const [moduleTokenTy, module] = this.tokens.shift();
+      const [moduleTokenTy, module] = this.tokens.shift()!;
       if (moduleTokenTy !== "IDENT") {
         bail("Invalid type tag.");
       }
       this.consume("::");
-      const [nameTokenTy, name] = this.tokens.shift();
+      const [nameTokenTy, name] = this.tokens.shift()!;
       if (nameTokenTy !== "IDENT") {
         bail("Invalid type tag.");
       }

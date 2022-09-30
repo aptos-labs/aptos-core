@@ -16,7 +16,7 @@ use aptos_rest_client::{Response, Transaction};
 use aptos_rosetta::common::BlockHash;
 use aptos_rosetta::types::{
     AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
-    TransactionType,
+    TransactionType, STAKING_CONTRACT_MODULE, SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
 };
 use aptos_rosetta::{
     client::RosettaClient,
@@ -435,6 +435,7 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
+    /* TODO: Support operator stake account in the future
     account_has_balance(
         &rosetta_client,
         chain_id,
@@ -443,7 +444,7 @@ async fn test_account_balance() {
         1,
     )
     .await
-    .unwrap();
+    .unwrap();*/
 }
 
 async fn create_staking_contract(
@@ -893,38 +894,8 @@ async fn test_block() {
     .await
     .unwrap_err();
 
-    // Successfully, and fail setting a voter
-    set_voter_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        Some(account_id_1),
-        account_id_1,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Set voter should work!");
-    set_voter_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        Some(account_id_3),
-        account_id_1,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect_err("Set voter shouldn't work with the wrong operator!");
-
     // This one will fail (and skip estimation of gas)
-    let maybe_final_txn = transfer_and_wait(
+    transfer_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
@@ -939,12 +910,35 @@ async fn test_block() {
     .await
     .unwrap_err();
 
-    let final_txn = match maybe_final_txn {
-        ErrorWrapper::BeforeSubmission(err) => {
-            panic!("Failed prior to submission of transaction {:?}", err)
-        }
-        ErrorWrapper::AfterSubmission(txn) => txn,
-    };
+    // Successfully, and fail setting a voter
+    set_voter_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        Some(account_id_3),
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect_err("Set voter shouldn't work with the wrong operator!");
+    let final_txn = set_voter_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        Some(account_id_1),
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Set voter should work!");
 
     let final_block_to_check = rest_client
         .get_block_by_version(final_txn.info.version.0, false)
@@ -1338,8 +1332,24 @@ async fn parse_operations(
                         ref payload,
                     ) = txn.payload()
                     {
-                        let actual_operator_address: AccountAddress =
-                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let actual_operator_address: AccountAddress = match (
+                            *payload.module().address(),
+                            payload.module().name().as_str(),
+                            payload.function().as_str(),
+                        ) {
+                            (
+                                AccountAddress::ONE,
+                                STAKING_CONTRACT_MODULE,
+                                SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
+                            ) => bcs::from_bytes(payload.args().last().unwrap()).unwrap(),
+                            (
+                                AccountAddress::ONE,
+                                STAKING_CONTRACT_MODULE,
+                                "create_staking_contract",
+                            ) => bcs::from_bytes(payload.args().first().unwrap()).unwrap(),
+                            _ => panic!("Unsupported entry function for set operator! {:?}", txn),
+                        };
+
                         let operator = operation
                             .metadata
                             .as_ref()
@@ -1450,6 +1460,9 @@ async fn parse_operations(
                         panic!("Gas transactions should be user transactions!")
                     }
                 };
+            }
+            OperationType::InitializeStakePool => {
+                // This is not supported in block reads
             }
         }
     }
@@ -1872,7 +1885,12 @@ async fn wait_for_transaction(
 ) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
     let hash_value = HashValue::from_str(&txn_hash).unwrap();
     let response = rest_client
-        .wait_for_transaction_by_hash(hash_value, expiry_time.as_secs())
+        .wait_for_transaction_by_hash(
+            hash_value,
+            expiry_time.as_secs(),
+            Some(Duration::from_secs(60)),
+            None,
+        )
         .await;
     match response {
         Ok(response) => {

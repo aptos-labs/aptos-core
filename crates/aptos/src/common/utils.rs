@@ -6,8 +6,8 @@ use crate::{
     CliResult,
 };
 use aptos_build_info::build_information;
-use aptos_crypto::HashValue;
 use aptos_logger::{debug, Level};
+use aptos_rest_client::aptos_api_types::HashValue;
 use aptos_rest_client::{Account, Client};
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use itertools::Itertools;
@@ -323,6 +323,7 @@ pub async fn fund_account(
             "{}mint?amount={}&auth_key={}",
             faucet_url, num_octas, address
         ))
+        .body("{}")
         .send()
         .await
         .map_err(|err| CliError::ApiError(err.to_string()))?;

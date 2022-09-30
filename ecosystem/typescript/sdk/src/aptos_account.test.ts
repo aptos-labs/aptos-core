@@ -34,7 +34,7 @@ test("generates derive path accounts", () => {
 
 test("accepts custom address", () => {
   const address = "0x777";
-  const a1 = new AptosAccount(null, address);
+  const a1 = new AptosAccount(undefined, address);
   expect(a1.address().hex()).toBe(address);
 });
 

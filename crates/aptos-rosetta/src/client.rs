@@ -254,6 +254,7 @@ impl RosettaClient {
             sender,
             old_operator.map(AccountIdentifier::base_account),
             AccountIdentifier::base_account(new_operator),
+            None,
         )];
 
         self.submit_operations(
@@ -306,6 +307,49 @@ impl RosettaClient {
             max_gas,
             gas_unit_price,
             operator.is_none(),
+        )
+        .await
+    }
+
+    pub async fn create_stake_pool(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        new_operator: Option<AccountAddress>,
+        new_voter: Option<AccountAddress>,
+        stake_amount: Option<u64>,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let sender = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+        let mut keys = HashMap::new();
+        keys.insert(sender, private_key);
+
+        // A transfer operation is made up of a withdraw and a deposit
+
+        let operations = vec![Operation::create_stake_pool(
+            0,
+            None,
+            sender,
+            new_operator,
+            new_voter,
+            stake_amount,
+        )];
+
+        self.submit_operations(
+            sender,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+            true,
         )
         .await
     }

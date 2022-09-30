@@ -3,11 +3,9 @@
 
 use crate::delta_change_set::{addition, deserialize, subtraction};
 use aptos_types::vm_status::StatusCode;
-use move_deps::{
-    move_binary_format::errors::{PartialVMError, PartialVMResult},
-    move_core_types::account_address::AccountAddress,
-    move_table_extension::{TableHandle, TableResolver},
-};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::account_address::AccountAddress;
+use move_table_extension::{TableHandle, TableResolver};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Describes the state of each aggregator instance.

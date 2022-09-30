@@ -3,20 +3,21 @@
 
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use framework::natives::{
-    aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
-    cryptography::ristretto255_point::NativeRistrettoPointContext,
-    transaction_context::NativeTransactionContext,
-};
-use move_deps::{
-    move_stdlib, move_table_extension, move_unit_test,
-    move_vm_runtime::{
-        native_extensions::NativeContextExtensions, native_functions::NativeFunctionTable,
-    },
-    move_vm_test_utils::BlankStorage,
-};
-use once_cell::sync::Lazy;
+use move_vm_runtime::native_functions::NativeFunctionTable;
 
+#[cfg(feature = "testing")]
+use {
+    framework::natives::{
+        aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
+        cryptography::ristretto255_point::NativeRistrettoPointContext,
+        transaction_context::NativeTransactionContext,
+    },
+    move_vm_runtime::native_extensions::NativeContextExtensions,
+    move_vm_test_utils::BlankStorage,
+    once_cell::sync::Lazy,
+};
+
+#[cfg(feature = "testing")]
 static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
 
 pub fn aptos_natives(
@@ -25,6 +26,7 @@ pub fn aptos_natives(
 ) -> NativeFunctionTable {
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
+        .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             gas_params.aptos_framework,
@@ -48,10 +50,24 @@ pub fn aptos_natives(
         .collect()
 }
 
+pub fn assert_no_test_natives() {
+    assert!(aptos_natives(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros()
+    )
+    .into_iter()
+    .all(
+        |(_, module_name, func_name, _)| module_name.as_str() != "unit_test"
+            && func_name.as_str() != "create_signers_for_testing"
+    ))
+}
+
+#[cfg(feature = "testing")]
 pub fn configure_for_unit_test() {
     move_unit_test::extensions::set_extension_hook(Box::new(unit_test_extensions_hook))
 }
 
+#[cfg(feature = "testing")]
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeCodeContext::default());
     exts.add(NativeTransactionContext::new(vec![1]));

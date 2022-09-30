@@ -11,7 +11,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::WriteOp,
 };
-use move_deps::move_binary_format::errors::Location;
+use move_binary_format::errors::Location;
 
 pub(crate) struct VersionedView<'a, S: StateView> {
     base_view: &'a S,

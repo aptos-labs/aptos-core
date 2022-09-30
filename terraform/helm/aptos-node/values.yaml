@@ -70,26 +70,20 @@ validator:
     # -- Kubernetes storage class to use for validator persistent storage
     class:
     # -- Size of validator persistent storage
-    size: 300Gi
+    size: 1000Gi
   # -- Log level for the validator
   rust_log: info
   # -- Remote log level for the validator
   rust_log_remote: debug,hyper=off
   # -- Address for remote logging. See `logger` helm chart
   remoteLogAddress:
+  # -- Flag to force enable telemetry service (useful for forge tests)
+  force_enable_telemetry: false
   nodeSelector: {}
   tolerations: []
   affinity: {}
   # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
-  config:
-    base: {}
-    consensus: {}
-    execution: {}
-    full_node_networks: []
-    mempool: {}
-    api: {}
-    storage: {}
-    validator_network: {}
+  config: {}
 
   # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
   enableNetworkPolicy: true
@@ -110,48 +104,32 @@ fullnode:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:
     # -- Size of fullnode persistent storage
-    size: 300Gi
+    size: 1000Gi
   # -- Log level for the fullnode
   rust_log: info
   # -- Remote log level for the fullnode
   rust_log_remote: debug,hyper=off
+  # -- Flag to force enable telemetry service (useful for forge tests)
+  force_enable_telemetry: false
   nodeSelector: {}
   tolerations: []
   affinity: {}
   # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
-    base: {}
-    consensus: {}
-    execution: {}
-    # The below default values correctly configure a VFN to the onboard validator
-    # It's not recommended that you change it unless you know what you're doing
+    # This full_node_networks config block allows changing only the below parameters for public fullnode networks
+    # The rest of the configs are inherited from fullnode-base.yaml
+    # Arrays in helm are immutable, so we fall back to string templating
     full_node_networks:
+      # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
-        discovery_method: "onchain"
-        listen_address: "/ip4/0.0.0.0/tcp/6182"
-        identity:
-          type: "from_file"
-          path: "/opt/aptos/genesis/validator-full-node-identity.yaml"
-        enable_proxy_protocol: *send_proxy_protocol
         max_inbound_connections: 100
         seeds: {}
-    inspection_service: {}
-    logger: {}
     mempool:
       shared_mempool_max_concurrent_inbound_syncs: 16 # default 4
       max_broadcasts_per_peer: 4 # default 1
       default_failovers: 0 # default 3
       shared_mempool_batch_size: 200 # default 100
       shared_mempool_tick_interval_ms: 10 # default 50
-    metrics: {}
-    peer_monitoring_service: {}
-    api: {}
-    state_sync: {}
-    firehose_stream: {}
-    storage: {}
-    test: {}
-    validator_network: {}
-    failpoints: {}
 
 service:
   # -- If set, the base domain name to use for External DNS

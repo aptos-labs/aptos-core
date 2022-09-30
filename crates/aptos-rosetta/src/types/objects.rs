@@ -24,15 +24,16 @@ use aptos_rest_client::aptos_api_types::TransactionOnChainData;
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::account_config::{AccountResource, CoinStoreResource, WithdrawEvent};
 use aptos_types::contract_event::ContractEvent;
-use aptos_types::stake_pool::{DistributeRewardsEvent, StakePool, WithdrawStakeEvent};
+use aptos_types::stake_pool::{SetOperatorEvent, StakePool};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
-use aptos_types::write_set::WriteOp;
+use aptos_types::write_set::{WriteOp, WriteSet};
 use aptos_types::{account_address::AccountAddress, event::EventKey};
 use cached_packages::aptos_stdlib;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -194,6 +195,29 @@ impl Operation {
         }
     }
 
+    /// TODO: This is experimental and should not be used outside of testing
+    pub fn create_stake_pool(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountAddress>,
+        voter: Option<AccountAddress>,
+        staked_balance: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::InitializeStakePool,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::create_stake_pool(
+                operator.map(AccountIdentifier::base_account),
+                voter.map(AccountIdentifier::base_account),
+                staked_balance,
+            )),
+        )
+    }
+
     pub fn create_account(
         operation_index: u64,
         status: Option<OperationStatusType>,
@@ -295,6 +319,7 @@ impl Operation {
         owner: AccountAddress,
         old_operator: Option<AccountIdentifier>,
         new_operator: AccountIdentifier,
+        staked_balance: Option<u64>,
     ) -> Operation {
         Operation::new(
             OperationType::SetOperator,
@@ -302,7 +327,11 @@ impl Operation {
             status,
             AccountIdentifier::base_account(owner),
             None,
-            Some(OperationMetadata::set_operator(old_operator, new_operator)),
+            Some(OperationMetadata::set_operator(
+                old_operator,
+                new_operator,
+                staked_balance,
+            )),
         )
     }
 
@@ -366,6 +395,8 @@ pub struct OperationMetadata {
     pub new_operator: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_voter: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staked_balance: Option<U64>,
 }
 
 impl OperationMetadata {
@@ -379,10 +410,12 @@ impl OperationMetadata {
     pub fn set_operator(
         old_operator: Option<AccountIdentifier>,
         new_operator: AccountIdentifier,
+        staked_balance: Option<u64>,
     ) -> Self {
         OperationMetadata {
             old_operator,
             new_operator: Some(new_operator),
+            staked_balance: staked_balance.map(U64::from),
             ..Default::default()
         }
     }
@@ -391,6 +424,19 @@ impl OperationMetadata {
         OperationMetadata {
             operator,
             new_voter: Some(new_voter),
+            ..Default::default()
+        }
+    }
+
+    pub fn create_stake_pool(
+        new_operator: Option<AccountIdentifier>,
+        new_voter: Option<AccountIdentifier>,
+        staked_balance: Option<u64>,
+    ) -> Self {
+        OperationMetadata {
+            new_operator,
+            new_voter,
+            staked_balance: staked_balance.map(U64::from),
             ..Default::default()
         }
     }
@@ -543,6 +589,7 @@ impl Transaction {
                     maybe_user_txn.map(|inner| inner.payload()),
                     txn.version,
                     operation_index,
+                    &txn.changes,
                 )
                 .await?;
                 operation_index += ops.len() as u64;
@@ -730,6 +777,7 @@ async fn parse_operations_from_write_set(
     _maybe_payload: Option<&TransactionPayload>,
     version: u64,
     operation_index: u64,
+    changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
     let (struct_tag, address) = match state_key {
         StateKey::AccessPath(path) => {
@@ -772,13 +820,8 @@ async fn parse_operations_from_write_set(
             )
         }
         (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE, 0) => {
-            parse_staking_contract_resource_changes(
-                server_context,
-                address,
-                data,
-                events,
-                operation_index,
-            )
+            parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
+                .await
         }
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
@@ -842,223 +885,297 @@ fn parse_account_resource_changes(
 }
 
 fn parse_stake_pool_resource_changes(
-    server_context: &RosettaContext,
-    version: u64,
-    pool_address: AccountAddress,
-    data: &[u8],
-    events: &[ContractEvent],
-    mut operation_index: u64,
+    _server_context: &RosettaContext,
+    _version: u64,
+    _pool_address: AccountAddress,
+    _data: &[u8],
+    _events: &[ContractEvent],
+    _operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
-    let mut operations = Vec::new();
+    let operations = Vec::new();
 
     // We at this point only care about balance changes from the stake pool
-    if let Some(owner_address) = server_context.pool_address_to_owner.get(&pool_address) {
-        if let Ok(stakepool) = bcs::from_bytes::<StakePool>(data) {
-            let total_stake_account = AccountIdentifier::total_stake_account(*owner_address);
-            let operator_stake_account = AccountIdentifier::operator_stake_account(
-                *owner_address,
-                stakepool.operator_address,
-            );
-
-            // Retrieve add stake events
-            let add_stake_events = filter_events(
-                events,
-                stakepool.add_stake_events.key(),
-                |event_key, event| {
-                    if let Ok(event) = bcs::from_bytes::<aptos_types::stake_pool::AddStakeEvent>(
-                        event.event_data(),
-                    ) {
-                        Some(event)
-                    } else {
-                        warn!(
-                            "Failed to parse add stake event!  Skipping for {}:{}",
-                            event_key.get_creator_address(),
-                            event_key.get_creation_number()
-                        );
-                        None
-                    }
-                },
-            );
-
-            // For every stake event, we distribute to the two sub balances.  The withdrawal from the account
-            // is handled in coin
-            for event in add_stake_events {
-                operations.push(Operation::deposit(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    total_stake_account.clone(),
-                    native_coin(),
-                    event.amount_added,
-                ));
-                operation_index += 1;
-                operations.push(Operation::deposit(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    operator_stake_account.clone(),
-                    native_coin(),
-                    event.amount_added,
-                ));
-                operation_index += 1;
-            }
-
-            // Retrieve withdraw stake events
-            let withdraw_stake_events = filter_events(
-                events,
-                stakepool.withdraw_stake_events.key(),
-                |event_key, event| {
-                    if let Ok(event) = bcs::from_bytes::<WithdrawStakeEvent>(event.event_data()) {
-                        Some(event)
-                    } else {
-                        warn!(
-                            "Failed to parse withdraw stake event!  Skipping for {}:{}",
-                            event_key.get_creator_address(),
-                            event_key.get_creation_number()
-                        );
-                        None
-                    }
-                },
-            );
-
-            // For every withdraw event, we have to remove the amounts from the stake pools
-            for event in withdraw_stake_events {
-                operations.push(Operation::withdraw(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    total_stake_account.clone(),
-                    native_coin(),
-                    event.amount_withdrawn,
-                ));
-                operation_index += 1;
-                operations.push(Operation::withdraw(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    operator_stake_account.clone(),
-                    native_coin(),
-                    event.amount_withdrawn,
-                ));
-                operation_index += 1;
-            }
-
-            // Retrieve staking rewards events
-            let distribute_rewards_events = filter_events(
-                events,
-                stakepool.distribute_rewards_events.key(),
-                |event_key, event| {
-                    if let Ok(event) = bcs::from_bytes::<DistributeRewardsEvent>(event.event_data())
-                    {
-                        Some(event)
-                    } else {
-                        warn!(
-                            "Failed to parse distribute rewards event!  Skipping for {}:{}",
-                            event_key.get_creator_address(),
-                            event_key.get_creation_number()
-                        );
-                        None
-                    }
-                },
-            );
-
-            // For every distribute rewards events, add to the staking pools
-            for event in distribute_rewards_events {
-                operations.push(Operation::staking_reward(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    total_stake_account.clone(),
-                    native_coin(),
-                    event.rewards_amount,
-                ));
-                operation_index += 1;
-                operations.push(Operation::staking_reward(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    operator_stake_account.clone(),
-                    native_coin(),
-                    event.rewards_amount,
-                ));
-                operation_index += 1;
-            }
-
-            // Set voter has to be done at the `staking_contract` because there's no event for it here...
-
-            // Handle set operator events
-            let set_operator_events = filter_events(
-                events,
-                stakepool.set_operator_events.key(),
-                |event_key, event| {
-                    if let Ok(event) = bcs::from_bytes::<aptos_types::stake_pool::SetOperatorEvent>(
-                        event.event_data(),
-                    ) {
-                        Some(event)
-                    } else {
-                        // If we can't parse the withdraw event, then there's nothing
-                        warn!(
-                            "Failed to parse set operator event!  Skipping for {}:{}",
-                            event_key.get_creator_address(),
-                            event_key.get_creation_number()
-                        );
-                        None
-                    }
-                },
-            );
-
-            // For every set operator event, change the operator, and transfer the money between them
-            // We do this after balance transfers so the balance changes are easier
-            let final_staked_amount = stakepool.get_total_staked_amount();
-            for event in set_operator_events {
-                operations.push(Operation::set_operator(
-                    operation_index,
-                    Some(OperationStatusType::Success),
+    // TODO: Balance changes are not supported for staking at this time
+    /*    if let Some(owner_address) = server_context.pool_address_to_owner.get(&pool_address) {
+            if let Ok(stakepool) = bcs::from_bytes::<StakePool>(data) {
+                let total_stake_account = AccountIdentifier::total_stake_account(*owner_address);
+                let operator_stake_account = AccountIdentifier::operator_stake_account(
                     *owner_address,
-                    Some(AccountIdentifier::base_account(event.old_operator)),
-                    AccountIdentifier::base_account(event.new_operator),
-                ));
-                operation_index += 1;
+                    stakepool.operator_address,
+                );
 
-                let old_operator_account =
-                    AccountIdentifier::operator_stake_account(*owner_address, event.old_operator);
-                operations.push(Operation::withdraw(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    old_operator_account,
-                    native_coin(),
-                    final_staked_amount,
-                ));
-                operation_index += 1;
-                let new_operator_account =
-                    AccountIdentifier::operator_stake_account(*owner_address, event.old_operator);
-                operations.push(Operation::deposit(
-                    operation_index,
-                    Some(OperationStatusType::Success),
-                    new_operator_account,
-                    native_coin(),
-                    final_staked_amount,
-                ));
-                operation_index += 1;
+                // Retrieve add stake events
+                let add_stake_events = filter_events(
+                    events,
+                    stakepool.add_stake_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<aptos_types::stake_pool::AddStakeEvent>(
+                            event.event_data(),
+                        ) {
+                            Some(event)
+                        } else {
+                            warn!(
+                                "Failed to parse add stake event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                // For every stake event, we distribute to the two sub balances.  The withdrawal from the account
+                // is handled in coin
+                for event in add_stake_events {
+                    operations.push(Operation::deposit(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        total_stake_account.clone(),
+                        native_coin(),
+                        event.amount_added,
+                    ));
+                    operation_index += 1;
+                    operations.push(Operation::deposit(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        operator_stake_account.clone(),
+                        native_coin(),
+                        event.amount_added,
+                    ));
+                    operation_index += 1;
+                }
+
+                // Retrieve withdraw stake events
+                let withdraw_stake_events = filter_events(
+                    events,
+                    stakepool.withdraw_stake_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<WithdrawStakeEvent>(event.event_data()) {
+                            Some(event)
+                        } else {
+                            warn!(
+                                "Failed to parse withdraw stake event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                // For every withdraw event, we have to remove the amounts from the stake pools
+                for event in withdraw_stake_events {
+                    operations.push(Operation::withdraw(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        total_stake_account.clone(),
+                        native_coin(),
+                        event.amount_withdrawn,
+                    ));
+                    operation_index += 1;
+                    operations.push(Operation::withdraw(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        operator_stake_account.clone(),
+                        native_coin(),
+                        event.amount_withdrawn,
+                    ));
+                    operation_index += 1;
+                }
+
+                // Retrieve staking rewards events
+                let distribute_rewards_events = filter_events(
+                    events,
+                    stakepool.distribute_rewards_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<DistributeRewardsEvent>(event.event_data())
+                        {
+                            Some(event)
+                        } else {
+                            warn!(
+                                "Failed to parse distribute rewards event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                // For every distribute rewards events, add to the staking pools
+                for event in distribute_rewards_events {
+                    operations.push(Operation::staking_reward(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        total_stake_account.clone(),
+                        native_coin(),
+                        event.rewards_amount,
+                    ));
+                    operation_index += 1;
+                    operations.push(Operation::staking_reward(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        operator_stake_account.clone(),
+                        native_coin(),
+                        event.rewards_amount,
+                    ));
+                    operation_index += 1;
+                }
+
+                // Set voter has to be done at the `staking_contract` because there's no event for it here...
+
+                // Handle set operator events
+                let set_operator_events = filter_events(
+                    events,
+                    stakepool.set_operator_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<aptos_types::stake_pool::SetOperatorEvent>(
+                            event.event_data(),
+                        ) {
+                            Some(event)
+                        } else {
+                            // If we can't parse the withdraw event, then there's nothing
+                            warn!(
+                                "Failed to parse set operator event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                // For every set operator event, change the operator, and transfer the money between them
+                // We do this after balance transfers so the balance changes are easier
+                let final_staked_amount = stakepool.get_total_staked_amount();
+                for event in set_operator_events {
+                    operations.push(Operation::set_operator(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        *owner_address,
+                        Some(AccountIdentifier::base_account(event.old_operator)),
+                        AccountIdentifier::base_account(event.new_operator),
+                    ));
+                    operation_index += 1;
+
+                    let old_operator_account =
+                        AccountIdentifier::operator_stake_account(*owner_address, event.old_operator);
+                    operations.push(Operation::withdraw(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        old_operator_account,
+                        native_coin(),
+                        final_staked_amount,
+                    ));
+                    operation_index += 1;
+                    let new_operator_account =
+                        AccountIdentifier::operator_stake_account(*owner_address, event.old_operator);
+                    operations.push(Operation::deposit(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        new_operator_account,
+                        native_coin(),
+                        final_staked_amount,
+                    ));
+                    operation_index += 1;
+                }
+            } else {
+                warn!(
+                    "Failed to parse stakepool for {} at version {}",
+                    pool_address, version
+                );
             }
-        } else {
-            warn!(
-                "Failed to parse stakepool for {} at version {}",
-                pool_address, version
-            );
         }
-    }
-
+    */
     Ok(operations)
 }
 
-fn parse_staking_contract_resource_changes(
-    _server_context: &RosettaContext,
+async fn parse_staking_contract_resource_changes(
     owner_address: AccountAddress,
     data: &[u8],
     events: &[ContractEvent],
     mut operation_index: u64,
+    changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
     let mut operations = Vec::new();
 
     // This only handles the voter events from the staking contract
     // If there are direct events on the pool, they will be ignored
     if let Ok(store) = bcs::from_bytes::<Store>(data) {
-        // Handle set voter events
+        // Collect all the stake pools that were created
+        let stake_pools: BTreeMap<AccountAddress, StakePool> = changes
+            .iter()
+            .filter_map(|(state_key, write_op)| {
+                let data = match write_op {
+                    WriteOp::Creation(data) => Some(data),
+                    WriteOp::Modification(data) => Some(data),
+                    WriteOp::Deletion => None,
+                };
+
+                let mut ret = None;
+                if let (StateKey::AccessPath(path), Some(data)) = (state_key, data) {
+                    if let Some(struct_tag) = path.get_struct_tag() {
+                        if let (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE) = (
+                            struct_tag.address,
+                            struct_tag.module.as_str(),
+                            struct_tag.name.as_str(),
+                        ) {
+                            if let Ok(pool) = bcs::from_bytes::<StakePool>(data) {
+                                ret = Some((path.address, pool))
+                            }
+                        }
+                    }
+                }
+
+                ret
+            })
+            .collect();
+
+        // Collect all operator events for all the stake pools, and add the total stake
+        let mut set_operator_operations = vec![];
+        let mut total_stake = 0;
+        for (operator, staking_contract) in store.staking_contracts {
+            if let Some(stake_pool) = stake_pools.get(&staking_contract.pool_address) {
+                // Skip mismatched operators
+                if operator != stake_pool.operator_address {
+                    continue;
+                }
+                total_stake += stake_pool.get_total_staked_amount();
+
+                // Get all set operator events for this stake pool
+                let set_operator_events = filter_events(
+                    events,
+                    stake_pool.set_operator_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<SetOperatorEvent>(event.event_data()) {
+                            Some(event)
+                        } else {
+                            // If we can't parse the withdraw event, then there's nothing
+                            warn!(
+                                "Failed to parse set operator event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                for event in set_operator_events.iter() {
+                    set_operator_operations.push(Operation::set_operator(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        owner_address,
+                        Some(AccountIdentifier::base_account(event.old_operator)),
+                        AccountIdentifier::base_account(event.new_operator),
+                        None,
+                    ));
+                    operation_index += 1;
+                }
+            }
+        }
+
+        // Handle set voter events, there are no events on the stake pool
         let set_voter_events = filter_events(
             events,
             store.update_voter_events.key(),
@@ -1087,6 +1204,14 @@ fn parse_staking_contract_resource_changes(
                 AccountIdentifier::base_account(event.new_voter),
             ));
             operation_index += 1;
+        }
+
+        // Attach all set operators now, but with the total stake listed
+        for mut operation in set_operator_operations.into_iter() {
+            if let Some(inner) = operation.metadata.as_mut() {
+                inner.staked_balance = Some(total_stake.into())
+            }
+            operations.push(operation);
         }
     }
 
@@ -1187,6 +1312,7 @@ pub enum InternalOperation {
     Transfer(Transfer),
     SetOperator(SetOperator),
     SetVoter(SetVoter),
+    InitializeStakePool(InitializeStakePool),
 }
 
 impl InternalOperation {
@@ -1196,6 +1322,39 @@ impl InternalOperation {
             1 => {
                 if let Some(operation) = operations.first() {
                     match OperationType::from_str(&operation.operation_type) {
+                        Ok(OperationType::InitializeStakePool) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    new_operator,
+                                    new_voter,
+                                    staked_balance,
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let owner_address = account.account_address()?;
+                                let operator_address = if let Some(address) = new_operator {
+                                    address.account_address()?
+                                } else {
+                                    owner_address
+                                };
+                                let voter_address = if let Some(address) = new_voter {
+                                    address.account_address()?
+                                } else {
+                                    owner_address
+                                };
+
+                                return Ok(Self::InitializeStakePool(InitializeStakePool {
+                                    owner: owner_address,
+                                    operator: operator_address,
+                                    voter: voter_address,
+                                    amount: staked_balance.map(u64::from).unwrap_or_default(),
+                                    commission_percentage: 0,
+                                    seed: vec![],
+                                }));
+                            }
+                        }
                         Ok(OperationType::CreateAccount) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1281,6 +1440,7 @@ impl InternalOperation {
             Self::Transfer(inner) => inner.sender,
             Self::SetOperator(inner) => inner.owner,
             Self::SetVoter(inner) => inner.owner,
+            Self::InitializeStakePool(inner) => inner.owner,
         }
     }
 
@@ -1327,6 +1487,16 @@ impl InternalOperation {
                     set_voter.owner,
                 )
             }
+            InternalOperation::InitializeStakePool(init_stake_pool) => (
+                aptos_stdlib::staking_contract_create_staking_contract(
+                    init_stake_pool.operator,
+                    init_stake_pool.voter,
+                    init_stake_pool.amount,
+                    init_stake_pool.commission_percentage,
+                    init_stake_pool.seed.clone(),
+                ),
+                init_stake_pool.owner,
+            ),
         })
     }
 }
@@ -1468,4 +1638,14 @@ pub struct SetVoter {
     pub owner: AccountAddress,
     pub operator: Option<AccountAddress>,
     pub new_voter: AccountAddress,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct InitializeStakePool {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+    pub voter: AccountAddress,
+    pub amount: u64,
+    pub commission_percentage: u64,
+    pub seed: Vec<u8>,
 }

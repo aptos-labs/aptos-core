@@ -7,7 +7,8 @@ use aptos_aggregator::{
 };
 use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
-use move_deps::{move_binary_format::errors::Location, move_table_extension::TableResolver};
+use move_binary_format::errors::Location;
+use move_table_extension::TableResolver;
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},
@@ -122,11 +123,13 @@ impl AggregatorChangeSet {
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Write(new_data);
                         }
-                        (Merge(mut delta1), Merge(delta2)) => {
-                            delta1
-                                .merge_with(delta2)
+                        (Merge(delta1), Merge(mut delta2)) => {
+                            // `delta1` occurred before `delta2`, therefore we must ensure we merge the latter
+                            // one to the initial delta.
+                            delta2
+                                .merge_onto(delta1)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                            *entry_mut = Merge(delta1)
+                            *entry_mut = Merge(delta2)
                         }
                         // Hashing properties guarantee that aggregator keys should
                         // not collide, making this case impossible.
@@ -145,7 +148,7 @@ mod test {
     use aptos_aggregator::aggregator_extension::AggregatorHandle;
     use aptos_types::account_address::AccountAddress;
     use claims::assert_matches;
-    use move_deps::move_table_extension::TableHandle;
+    use move_table_extension::TableHandle;
 
     struct EmptyStorage;
 

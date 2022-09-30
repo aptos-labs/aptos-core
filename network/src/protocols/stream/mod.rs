@@ -60,15 +60,22 @@ impl Debug for StreamFragment {
 
 pub struct InboundStreamBuffer {
     stream: Option<InboundStream>,
+    max_fragments: usize,
 }
 
 impl InboundStreamBuffer {
-    pub fn new() -> Self {
-        Self { stream: None }
+    pub fn new(max_fragments: usize) -> Self {
+        Self {
+            stream: None,
+            max_fragments,
+        }
     }
 
     pub fn new_stream(&mut self, header: StreamHeader) -> anyhow::Result<()> {
-        if let Some(old) = self.stream.replace(InboundStream::new(header)?) {
+        if let Some(old) = self
+            .stream
+            .replace(InboundStream::new(header, self.max_fragments)?)
+        {
             bail!("Discard existing stream {}", old.request_id)
         } else {
             Ok(())
@@ -100,10 +107,14 @@ pub struct InboundStream {
 }
 
 impl InboundStream {
-    fn new(header: StreamHeader) -> anyhow::Result<Self> {
+    fn new(header: StreamHeader, max_fragments: usize) -> anyhow::Result<Self> {
         ensure!(
             !matches!(header.message, NetworkMessage::Error(_)),
             "Error message is not expected for stream"
+        );
+        ensure!(
+            header.num_fragments as usize <= max_fragments,
+            "Stream header exceeds max fragments limit"
         );
         Ok(Self {
             request_id: header.request_id,

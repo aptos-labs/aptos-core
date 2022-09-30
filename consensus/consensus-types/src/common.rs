@@ -5,6 +5,7 @@ use crate::proof_of_store::ProofOfStore;
 use aptos_crypto::HashValue;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
@@ -34,7 +35,6 @@ impl fmt::Display for TransactionSummary {
 pub enum Payload {
     Empty,
     DirectMempool(Vec<SignedTransaction>),
-    InQuorumStore(Vec<ProofOfStore>),
 }
 
 impl Payload {
@@ -55,6 +55,19 @@ impl Payload {
             Payload::DirectMempool(_) => true,
             Payload::InQuorumStore(_) => false,
             Payload::Empty => false,
+        }
+    }
+
+    /// This is computationally expensive on the first call
+    pub fn size(&self) -> usize {
+        match self {
+            Payload::DirectMempool(txns) => txns
+                .par_iter()
+                .with_min_len(100)
+                .map(|txn| txn.raw_txn_bytes_len())
+                .sum(),
+            Payload::InQuorumStore(_) => 0, // quorum store TODO
+            Payload::Empty => 0,
         }
     }
 

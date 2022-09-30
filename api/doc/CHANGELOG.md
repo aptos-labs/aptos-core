@@ -4,6 +4,14 @@ All notable changes to the Aptos Node API will be captured in this file. This ch
 
 **Note**: The Aptos Node API does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the API will follow semantic versioning closely.
 
+## Unreleased
+N/A
+
+## 1.2.0 (2022-09-29)
+- **[Breaking Changes]** Following the deprecation notice from the previous release, the following breaking changes have landed in this release. Please see the notes from last release for information on the new endpoints you must migrate to:
+    - The `/events/{event_key}` endpoint has been removed.
+    - The `key` field in the `Event` struct has been removed.
+
 ## 1.1.0 (2022-09-08)
 - A new endpoint has been added for getting events: `/accounts/{address}/events/{creation_number}`. If you would make a request to `/events/{event_key}` like in `Example A` below, you would use the new endpoint like in `Example B`. See [#4012](https://github.com/aptos-labs/aptos-core/pull/4012) for more information on this change.
 - **[Deprecated]** The `/events/{event_key}` endpoint is now deprecated. In the next release it will be removed entirely. You must migrate to the new endpoint, `/accounts/{address}/events/{creation_number}`, by then.

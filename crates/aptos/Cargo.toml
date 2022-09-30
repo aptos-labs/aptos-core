@@ -1,6 +1,6 @@
 [package]
 name = "aptos"
-version = "0.3.5"
+version = "0.3.7"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos tool for management of nodes and interacting with the blockchain"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -54,19 +54,25 @@ aptos-telemetry = { path = "../aptos-telemetry" }
 aptos-temppath = { path = "../aptos-temppath" }
 aptos-transactional-test-harness = { path = "../../aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "../../types" }
-aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["testing"] }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
 
 backup-cli = { path = "../../storage/backup/backup-cli" }
 cached-packages = { path = '../../aptos-move/framework/cached-packages' }
 framework = { path = '../../aptos-move/framework' }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "testing", "table-extension"] }
+move-deps = { path = "../../aptos-move/move-deps", features = [
+  "address32",
+  "testing",
+  "table-extension",
+] }
 storage-interface = { path = "../../storage/storage-interface" }
 
 [features]
 default = []
 fuzzing = []
 no-upload-proposal = []
+indexer = ["aptos-node/indexer"]
+cli-framework-test-move = []
 
 [build-dependencies]
 shadow-rs = "0.16.2"

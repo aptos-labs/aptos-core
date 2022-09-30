@@ -2,6 +2,7 @@ chain:
   era: 1
   name: devnet
   genesisConfigmap:
+  genesisSecret:
 
 aptos_chains:
   devnet:
@@ -55,7 +56,7 @@ affinity: {}
 storage:
   # Set this to a StorageClass available on your Kubernetes cluster
   class:
-  size: 512Gi
+  size: 1000Gi
 
 service:
   # Change this to LoadBalancer to expose the REST API, aptosnet endpoint externally
@@ -110,6 +111,8 @@ backup:
       account:
       container:
       sas:
+    state_snapshot_interval_epochs: 1
+    transaction_batch_size: 1000000
 
 backup_verify:
   schedule: '@daily'

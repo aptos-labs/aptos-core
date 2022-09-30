@@ -67,3 +67,15 @@ A [signed transaction](/guides/sign-a-transaction.md) on the blockchain contains
 - **Maximum gas amount**: The [maximum gas amount](/concepts/basics-gas-txn-fee#gas-and-transaction-fee-on-the-aptos-blockchain) is the maximum gas units the transaction is allowed to consume.
 - **Sequence number**: This is an unsigned integer that must be equal to the sender's account [sequence number](/concepts/basics-accounts#account-sequence-number) at the time of execution.
 - **Expiration time**: A timestamp after which the transaction ceases to be valid (i.e., expires).
+
+## Proofs
+
+The Aptos blockchain uses proof to verify the authenticity and correctness of the blockchain data.
+
+All data in the Aptos blockchain is stored in a single-version distributed database. Each validator and fullnode's [storage](basics-validator-nodes.md#storage) is responsible for persisting the agreed upon blocks of transactions and their execution results to the database. 
+
+The blockchain is represented as an ever-growing [Merkle tree](/reference/glossary#merkle-trees), where each leaf appended to the tree represents a single transaction executed by the blockchain.
+
+All operations executed by the blockchain and all account states can be verified cryptographically. These cryptographic proofs ensure that:
+- The validator nodes agree on the state. 
+- The client does not need to trust the entity from which it is receiving data. For example, if a client fetches the last **n** transactions from an account, a proof can attest that no transactions were added, omitted or modified in the response. The client may also query for the state of an account, ask whether a specific transaction was processed, and so on.

@@ -119,12 +119,7 @@ spec aptos_framework::stake {
     }
 
     spec remove_validators {
-        pragma disable_invariants_in_body;
-    }
-
-    spec remove_validators_internal {
-        requires spec_validators_are_initialized(active_validators);
-        requires spec_validator_indices_are_valid(active_validators);
+        requires chain_status::is_operating();
     }
 
     spec is_current_epoch_validator {

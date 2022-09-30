@@ -21,7 +21,14 @@ use move_vm_types::{
 };
 use std::collections::BTreeMap;
 
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 1;
+// Change log:
+// - V2
+//   - Table
+//     - Fix the gas formula for loading resources so that they are consistent with other
+//       global operations.
+// - V1
+//   - TBA
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 2;
 
 /// A trait for converting from a map representation of the on-chain gas schedule.
 pub trait FromOnChainGasSchedule: Sized {

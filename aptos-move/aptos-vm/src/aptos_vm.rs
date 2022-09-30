@@ -44,21 +44,19 @@ use aptos_types::{
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
-use move_deps::{
-    move_binary_format::{
-        access::ModuleAccess,
-        errors::{verification_error, Location, PartialVMError, VMError, VMResult},
-        CompiledModule, IndexKind,
-    },
-    move_core_types::{
-        account_address::AccountAddress,
-        ident_str,
-        language_storage::ModuleId,
-        transaction_argument::convert_txn_args,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_binary_format::{
+    access::ModuleAccess,
+    errors::{verification_error, Location, PartialVMError, VMError, VMResult},
+    CompiledModule, IndexKind,
 };
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::ModuleId,
+    transaction_argument::convert_txn_args,
+    value::{serialize_values, MoveValue},
+};
+use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{
@@ -537,11 +535,25 @@ impl AptosVM {
                 }
             }
 
-            // Publish the bundle
-            session.publish_module_bundle(bundle.into_inner(), destination, gas_meter)?;
-
-            // Execute initializers
-            self.execute_module_initialization(session, gas_meter, &modules, exists, &[destination])
+            // Publish the bundle and execute initializers
+            session
+                .publish_module_bundle(bundle.into_inner(), destination, gas_meter)
+                .and_then(|_| {
+                    self.execute_module_initialization(
+                        session,
+                        gas_meter,
+                        &modules,
+                        exists,
+                        &[destination],
+                    )
+                })
+                .map_err(|e| {
+                    // Be sure to flash the loader cache to align storage with the cache.
+                    // None of the modules in the bundle will be committed to storage,
+                    // but some of them may have ended up in the cache.
+                    self.0.mark_loader_cache_as_invalid();
+                    e
+                })
         } else {
             Ok(())
         }

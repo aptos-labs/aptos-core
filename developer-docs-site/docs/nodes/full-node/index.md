@@ -20,9 +20,6 @@ This section explains how to install a public fullnode to connect to the Aptos n
 
 - [Network Identity For Fullnode](network-identity-fullnode.md)
 
-- [Troubleshooting Fullnode Setup](troubleshooting-fullnode.md)
-
 ## [Run a Fullnode on GCP](run-a-fullnode-on-gcp.md)
-
 
 ## [Bootstrap a new Fullnode](bootstrap-fullnode.md)

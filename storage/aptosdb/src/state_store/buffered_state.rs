@@ -41,7 +41,7 @@ pub struct BufferedState {
     // state after the latest checkpoint.
     state_after_checkpoint: StateDelta,
     state_commit_sender: SyncSender<CommitMessage<Arc<StateDelta>>>,
-    target_snapshot_size: usize,
+    target_items: usize,
     snapshot_ready_receivers: VecDeque<Receiver<()>>,
     join_handle: Option<JoinHandle<()>>,
 }
@@ -60,7 +60,7 @@ impl BufferedState {
     pub(crate) fn new(
         state_db: &Arc<StateDb>,
         state_after_checkpoint: StateDelta,
-        target_snapshot_size: usize,
+        target_items: usize,
     ) -> Self {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
@@ -79,7 +79,7 @@ impl BufferedState {
             state_until_checkpoint: None,
             state_after_checkpoint,
             state_commit_sender,
-            target_snapshot_size,
+            target_items,
             snapshot_ready_receivers: VecDeque::from([initial_snapshot_ready_receiver]),
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
@@ -128,7 +128,7 @@ impl BufferedState {
             let take_out_to_commit = {
                 let state_until_checkpoint =
                     self.state_until_checkpoint.as_ref().expect("Must exist");
-                state_until_checkpoint.updates_since_base.len() >= self.target_snapshot_size
+                state_until_checkpoint.updates_since_base.len() >= self.target_items
                     || state_until_checkpoint.current_version.map_or(0, |v| v + 1)
                         - state_until_checkpoint.base_version.map_or(0, |v| v + 1)
                         >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION

@@ -103,15 +103,6 @@ pub static APTOS_SCHEMADB_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_SCHEMADB_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_storage_range_deletes",
-        "Aptos storage range delete calls",
-        &["cf_name"]
-    )
-    .unwrap()
-});
-
 pub static APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name

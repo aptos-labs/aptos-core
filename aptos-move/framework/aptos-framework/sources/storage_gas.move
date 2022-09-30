@@ -174,12 +174,12 @@ module aptos_framework::storage_gas {
             error::already_exists(ESTORAGE_GAS)
         );
         move_to(aptos_framework, StorageGas {
-            per_item_read: 8000,
-            per_item_create: 1280000,
-            per_item_write: 160000,
-            per_byte_read: 1000,
-            per_byte_create: 10000,
-            per_byte_write: 10000,
+            per_item_read: 80000,
+            per_item_create: 2000000,
+            per_item_write: 400000,
+            per_byte_read: 40,
+            per_byte_create: 1000,
+            per_byte_write: 200,
         });
     }
 
