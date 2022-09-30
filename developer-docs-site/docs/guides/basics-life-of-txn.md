@@ -43,7 +43,14 @@ The raw transaction includes the following fields:
 In this section, we will describe the lifecycle of transaction T<sub>5</sub>, from when the client submits it to when it is committed to the Aptos blockchain.
 
 For the relevant steps, we've included a link to the corresponding inter-component interactions of the validator node. After you are familiar with all the steps in the lifecycle of the transaction, you may want to refer to the information on the corresponding inter-component interactions for each step.
-![Figure 1.0 Lifecycle of a transaction](/img/docs/validator-sequence.svg)
+
+<ThemedImage
+alt="Lifecycle of a transaction"
+sources={{
+    light: useBaseUrl('/img/docs/lifecycle-transaction-light.svg'),
+    dark: useBaseUrl('/img/docs/lifecycle-transaction-dark.svg'),
+  }}
+/>
 <small className="figure">Figure 1.0 Lifecycle of a transaction</small>
 
 <BlockQuote type="warning">
