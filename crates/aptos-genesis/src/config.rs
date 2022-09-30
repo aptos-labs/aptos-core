@@ -25,8 +25,8 @@ use vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissio
 ///
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Layout {
-    /// Root key for the blockchain
-    /// TODO: In the future, we won't need a root key
+    /// Root key for the blockchain only for test chains
+    #[serde(default)]
     pub root_key: Option<Ed25519PublicKey>,
     /// List of usernames or identifiers
     pub users: Vec<String>,
