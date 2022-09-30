@@ -22,7 +22,7 @@ injectScript();
 
 // inpage -> contentscript
 window.addEventListener('message', (event) => {
-  if (!isProxiedRequest(event.data)) {
+  if (event?.data === undefined || !isProxiedRequest(event.data)) {
     return;
   }
 

@@ -18,26 +18,17 @@ type SendProxiedResult = (result: ProxiedResponse) => void;
 // The fetch adapter is necessary to use axios from a service worker
 axios.defaults.adapter = fetchAdapter;
 
-chrome.runtime.onMessage.addListener(async (
+chrome.runtime.onMessage.addListener((
   request,
   sender,
   sendResponse: SendProxiedResult,
 ) => {
-  if (request.type === 'popupOpened') {
+  if (request && request.type === 'popupOpened') {
     // clear all pending alarm in case there's any pending alarm that is inflight
     chrome.alarms.clearAll();
-
-    const { autolockTimer } = await PersistentStorage.get(['autolockTimer']);
-
-    // starts timer to lock wallet by default after 15 mins when wallet opens
-    // or by number of minutes that user set in Settings
-    // for security compliance
-    chrome.alarms.create('autolockTimer', {
-      delayInMinutes: autolockTimer ?? 15,
-    });
   }
 
-  if (!isProxiedRequest(request)) {
+  if (request === undefined || !isProxiedRequest(request)) {
     return false;
   }
 

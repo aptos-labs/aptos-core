@@ -32,7 +32,9 @@ export class PetraPublicApiProxy extends PetraEventListener implements PetraPubl
       window.postMessage(makeProxiedRequest(currRequestId, method, args));
       window.addEventListener('message', function handler({ data: response }: MessageEvent<any>) {
         // Just ignore response from non-matching requests
-        if (!isProxiedResponse(response) || response.id !== currRequestId) {
+        if (response === undefined
+          || !isProxiedResponse(response)
+          || response.id !== currRequestId) {
           return;
         }
         this.removeEventListener('message', handler);
