@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,13 @@ impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.sender, self.sequence_number,)
     }
+}
+
+#[derive(Clone)]
+pub struct RejectedTransactionSummary {
+    pub sender: AccountAddress,
+    pub sequence_number: u64,
+    pub hash: HashValue,
 }
 
 /// The payload in block.
