@@ -182,7 +182,6 @@ fn handle_commit_notification<V>(
             })
             .collect(),
         msg.block_timestamp_usecs,
-        false,
     );
     smp.validator.write().notify_commit();
     let counter_result = if mempool_listener.ack_commit_notification(msg).is_err() {
