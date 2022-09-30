@@ -183,7 +183,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(2 * 60 * 60 as u64);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -574,25 +574,28 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 }),
             )),
         // not scheduled on continuous
-        "load_vs_perf_benchmark" => config
-            .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-            .with_initial_fullnode_count(10)
-            .with_network_tests(vec![&LoadVsPerfBenchmark {
-                test: &PerformanceBenchmarkWithFN,
-                tps: &[7500, 8000, 9000, 10000, 12000, 15000],
-            }])
-            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                // no epoch change.
-                helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
-            }))
-            .with_success_criteria(SuccessCriteria::new(
-                0,
-                10000,
-                true,
-                Some(Duration::from_secs(60)),
-                None,
-                None,
-            )),
+        "load_vs_perf_benchmark" => {
+            config
+                .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+                .with_initial_fullnode_count(10)
+                .with_network_tests(vec![&LoadVsPerfBenchmark {
+                    test: &PerformanceBenchmarkWithFN,
+                    tps: &[7500, 8000, 9000, 10000, 12000, 15000],
+                }])
+                .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                    // no epoch change.
+                    helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+                }))
+                .with_success_criteria(SuccessCriteria::new(
+                    0,
+                    10000,
+                    true,
+                    Some(Duration::from_secs(60)),
+                    None,
+                    None,
+                ))
+                .with_
+        }
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
         // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
