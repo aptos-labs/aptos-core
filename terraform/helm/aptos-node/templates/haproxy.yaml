@@ -1,7 +1,7 @@
 {{- if .Values.haproxy.enabled }}
 {{- range $i, $e := until (int .Values.numValidators) }}
 ---
-# make the validator index available in tpl using $.Values.i 
+# make the validator index available in tpl using $.Values.i
 {{ $_ := set $.Values "i" $i }}
 apiVersion: v1
 kind: ConfigMap
@@ -36,6 +36,8 @@ spec:
   ports:
   - name: validator
     port: 6180
+  - name: vfn
+    port: 6181
   {{- if $.Values.service.validator.enableMetricsPort }}
   - name: metrics
     port: 9101
@@ -77,6 +79,8 @@ spec:
     app.kubernetes.io/name: haproxy
     app.kubernetes.io/instance: haproxy-{{$i}}
   ports:
+  - name: vfn
+    port: 6181
   - name: aptosnet
     port: 6182
     targetPort: {{ add 6182 $index }}
@@ -99,7 +103,7 @@ spec:
   # Use externalTrafficPolicy if service type is LoadBalancer or Nodeport
   {{- if and (ne "ClusterIP" $.Values.service.fullnode.external.type) $.Values.service.fullnode.externalTrafficPolicy }}
   externalTrafficPolicy: {{ $.Values.service.fullnode.externalTrafficPolicy }}
-  {{- end }}  
+  {{- end }}
   {{- with (index $.Values.service $config.name).loadBalancerSourceRanges }}
   loadBalancerSourceRanges:
     {{- toYaml . | nindent 4 }}
@@ -148,6 +152,7 @@ spec:
           {{- toYaml .resources | nindent 10 }}
         ports:
         - containerPort: 6180
+        - containerPort: 6181
         - containerPort: 6182
         - containerPort: 8080
         - containerPort: 8180
