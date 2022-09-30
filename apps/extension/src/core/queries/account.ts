@@ -13,7 +13,10 @@ import {
 } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { CoinInfoData } from 'shared/types/resource';
-import { useFetchAccountResources } from 'core/queries/useAccountResources';
+import {
+  useFetchAccountResource,
+  useFetchAccountResources,
+} from 'core/queries/useAccountResources';
 import useCachedRestApi from 'core/hooks/useCachedRestApi';
 import getCoinStoresByCoinType from 'core/utils/resource';
 
@@ -63,11 +66,10 @@ export function useAccountOctaCoinBalance(
   address: string | undefined,
   options?: UseQueryOptions<bigint>,
 ) {
-  const { aptosClient } = useNetworks();
-
+  const fetchAccountResource = useFetchAccountResource();
   return useQuery<bigint>(
     [accountQueryKeys.getAccountOctaCoinBalance, address],
-    async () => aptosClient.getAccountResource(address!, aptosCoinStoreStructTag)
+    async () => fetchAccountResource(address!, aptosCoinStoreStructTag)
       .then((res: any) => BigInt(res.data.coin.value))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
