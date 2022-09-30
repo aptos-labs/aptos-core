@@ -32,9 +32,11 @@ export default function SwitchAccountBody() {
   };
 
   return (
-    <VStack pt={4} alignItems="stretch" height="100%">
-      <VStack gap={1} flex={1}>
-        {
+    <Box width="100%" height="100%" position="relative">
+      <Box background="navy.900" height="15%" position="absolute" width="100%" />
+      <VStack position="absolute" pt={4} alignItems="stretch" height="100%" width="100%">
+        <VStack gap={1} flex={1}>
+          {
           accountsList.map((account: Account) => (
             <Box px={4} width="100%" key={account.address}>
               <AccountView
@@ -47,18 +49,19 @@ export default function SwitchAccountBody() {
             </Box>
           ))
         }
+        </VStack>
+        <Box px={4} width="100%" minHeight="58px">
+          <Button
+            size="lg"
+            width="100%"
+            onClick={handleClickAddAccount}
+            bgColor={secondaryHeaderInputBgColor[colorMode]}
+            leftIcon={<AddIcon fontSize="xs" />}
+          >
+            Add Account
+          </Button>
+        </Box>
       </VStack>
-      <Box px={4} width="100%" minHeight="58px">
-        <Button
-          size="lg"
-          width="100%"
-          onClick={handleClickAddAccount}
-          bgColor={secondaryHeaderInputBgColor[colorMode]}
-          leftIcon={<AddIcon fontSize="xs" />}
-        >
-          Add Account
-        </Button>
-      </Box>
-    </VStack>
+    </Box>
   );
 }

@@ -15,7 +15,7 @@ import {
 import { Routes } from 'core/routes';
 import { ArrowBackIcon } from '@chakra-ui/icons';
 import {
-  secondaryBackButtonBgColor, secondaryBorderColor, walletBgColor, walletTextColor,
+  secondaryBorderColor, walletBackButtonColor, walletBgColor, walletTextColor,
 } from 'core/colors';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AccountCircle from 'core/components/AccountCircle';
@@ -44,6 +44,7 @@ export default function WalletHeader({
   const borderBottomColor = useMemo(() => {
     switch (pathname) {
       case Routes.wallet.path:
+      case Routes.switchAccount.path:
         return 'transparent';
       default:
         return secondaryBorderColor[colorMode];
@@ -89,6 +90,7 @@ export default function WalletHeader({
 
   const bgColor = useMemo(() => walletBgColor(pathname), [pathname]);
   const textColor = useMemo(() => walletTextColor(pathname), [pathname]);
+  const backButtonColor = useMemo(() => walletBackButtonColor(pathname), [pathname]);
 
   const backOnClick = () => {
     navigate(-1);
@@ -118,7 +120,7 @@ export default function WalletHeader({
                 icon={<ArrowBackIcon fontSize={26} />}
                 variant="filled"
                 onClick={backOnClick}
-                bgColor={secondaryBackButtonBgColor[colorMode]}
+                bgColor={backButtonColor}
                 borderRadius="1rem"
               />
             ) : null

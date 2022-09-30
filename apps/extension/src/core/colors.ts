@@ -89,12 +89,9 @@ export const secondaryButtonColor = {
 
 // Background
 
-// color hex code come from https://chakra-ui.com/docs/styled-system/theme#green
-// for some reason green.100 and green.400 does not work
-// TODO investigate why
 export const checkCircleSuccessBg = {
-  dark: '#C6F6D5',
-  light: '#48BB78',
+  dark: customColors.green[500],
+  light: customColors.green[500],
 };
 
 export const removeButtonBg = {
@@ -229,6 +226,7 @@ export const assetSecondaryBgColor = {
 export const walletBgColor = (pathname: string) => {
   switch (pathname) {
     case Routes.wallet.path:
+    case Routes.switchAccount.path:
       return 'navy.900';
     default:
       return undefined;
@@ -238,9 +236,20 @@ export const walletBgColor = (pathname: string) => {
 export const walletTextColor = (pathname: string) => {
   switch (pathname) {
     case Routes.wallet.path:
+    case Routes.switchAccount.path:
       return 'white';
     default:
       return undefined;
+  }
+};
+
+export const walletBackButtonColor = (pathname: string) => {
+  switch (pathname) {
+    case Routes.wallet.path:
+    case Routes.switchAccount.path:
+      return 'navy.800';
+    default:
+      return 'gray.100';
   }
 };
 
@@ -258,7 +267,3 @@ export const bgColorButtonPopup = {
   dark: 'gray.800',
   light: 'white',
 };
-
-export function opacityColor(color: string, opacity: number) {
-  return `${color}${Math.round(opacity * 255).toString(16)}`;
-}
