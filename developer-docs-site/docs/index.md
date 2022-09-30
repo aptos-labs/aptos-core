@@ -8,7 +8,7 @@ hide_table_of_contents: true
 
 # Aptos Developer Documentation
 
-Welcome! At Aptos Labs we are building a Layer 1 for everyone. Aptos supports the blockchain-specific [Move programming language](https://github.com/move-language/move) in its purest form, derived directly from Rust. Aptos let's you write smart contracts in Move without needing to learn [complex modifications to the language itself](https://medium.com/@fidika/aptos-vs-sui-detailed-dev-comparison-5d24df53eee8). And the results are lightning-speed transactions created with little effort and executed in parallel.
+Welcome! At Aptos Labs we are building a Layer 1 for everyone. Aptos supports the blockchain-specific [Move programming language](https://github.com/move-language/move) in its purest form, derived directly from Rust. Aptos let's you write smart contracts in Move without needing to learn complex modifications to the language itself. And the results are lightning-speed transactions created with little effort and executed in parallel.
 
 This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the ever-growing Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
