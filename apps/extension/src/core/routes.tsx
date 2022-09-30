@@ -15,7 +15,6 @@ import SwitchAccount from 'pages/SwitchAccount';
 import Token from 'pages/Token';
 import Wallet from 'pages/Wallet';
 import React from 'react';
-import RecoveryPhrase from 'pages/RecoveryPhrase';
 import Transaction from 'pages/Transaction';
 import NoWallet from 'pages/NoWallet';
 import AddAccount from 'pages/AddAccount';
@@ -135,14 +134,6 @@ export const Routes = Object.freeze({
     element: <Password />,
     path: '/password',
   },
-  recovery_phrase: {
-    element: (
-      <Reauthenticate title="Show Secret Recovery Phrase">
-        <RecoveryPhrase />
-      </Reauthenticate>
-    ),
-    path: '/settings/recovery_phrase',
-  },
   remove_account: {
     element:
   <Reauthenticate title="Remove account">
@@ -238,7 +229,6 @@ export const routes = [
               Routes.rename_account,
               Routes.network,
               Routes.addNetwork,
-              Routes.recovery_phrase,
               Routes.manage_account,
               Routes.security_privacy,
               Routes.help,

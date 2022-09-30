@@ -67,14 +67,6 @@ export default function getSettingsPaths(account: Account): SettingsListItemProp
     },
   ];
 
-  if (account.mnemonic) {
-    items.push({
-      iconAfter: FiChevronRight,
-      path: Routes.recovery_phrase.path,
-      title: settingsItemLabel.SECRET_RECOVERY_PHRASE,
-    });
-  }
-
   items = items.concat(
     [
       {

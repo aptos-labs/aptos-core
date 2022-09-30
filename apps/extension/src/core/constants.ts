@@ -32,7 +32,6 @@ export const settingsItemLabel = {
   MANAGE_ACCOUNT: 'Manage account',
   NETWORK: 'Network',
   REMOVE_ACCOUNT: 'Remove account',
-  SECRET_RECOVERY_PHRASE: 'Show secret recovery phrase',
   SHOW_CREDENTIALS: 'Show credentials',
   SWITCH_ACCOUNT: 'Switch account',
 };
