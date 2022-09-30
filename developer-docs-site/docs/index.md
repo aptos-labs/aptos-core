@@ -116,7 +116,7 @@ This documentation will help you develop applications for the Aptos blockchain, 
 
 ## Connect to Aptos networks
 
-Aptos offers a local testnet and online devnet and testnet, with mainnet on the way. See the [System Integrators Guide](docs/guides/system-integrators-guide.md#getting-started) for a summary of the available networks and the means to connect to them.
+Aptos offers a local testnet and online devnet and testnet, with mainnet on the way. See the [System Integrators Guide](guides/system-integrators-guide.md#getting-started) for a summary of the available networks and the means to connect to them.
 
 
 :::tip Aptos Devnet Resets
