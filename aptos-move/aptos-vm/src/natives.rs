@@ -25,6 +25,7 @@ pub fn aptos_natives(
 ) -> NativeFunctionTable {
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
+        .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             gas_params.aptos_framework,

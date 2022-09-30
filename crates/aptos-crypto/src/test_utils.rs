@@ -4,6 +4,7 @@
 //! Internal module containing convenience utility functions mainly for testing
 
 use crate::traits::Uniform;
+use rand::distributions;
 use serde::{Deserialize, Serialize};
 
 /// A deterministic seed for PRNGs related to keys
@@ -191,6 +192,15 @@ where
     vec.sort_unstable();
 
     vec
+}
+
+/// Returns n random bytes.
+pub fn random_bytes<R>(rng: &mut R, n: usize) -> Vec<u8>
+where
+    R: ::rand::Rng + Copy,
+{
+    let range = distributions::Uniform::from(0u8..u8::MAX);
+    rng.sample_iter(&range).take(n).collect()
 }
 
 /// Generates `num_signers` random key-pairs.

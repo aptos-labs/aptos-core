@@ -81,17 +81,19 @@ fn test_transaction_metrics() {
         TimelineState::NonQualified,
     );
 
-    // Check timestamp returned for broadcast-able transaction
-    assert!(mempool
+    // Check timestamp returned as end-to-end for broadcast-able transaction
+    let (&_insertion_time, is_end_to_end) = mempool
         .get_transaction_store()
         .get_insertion_time(&TestTransaction::get_address(0), 0)
-        .is_some());
+        .unwrap();
+    assert!(is_end_to_end);
 
-    // Check timestamp not returned for non-broadcast-able transaction
-    assert!(mempool
+    // Check timestamp returned as not end-to-end for non-broadcast-able transaction
+    let (&_insertion_time, is_end_to_end) = mempool
         .get_transaction_store()
         .get_insertion_time(&TestTransaction::get_address(1), 0)
-        .is_none());
+        .unwrap();
+    assert!(!is_end_to_end);
 }
 
 #[test]

@@ -1,4 +1,4 @@
-module resource_account::resource_account {
+module resource_account::simple_defi {
     use std::signer;
     use std::string;
 
@@ -9,14 +9,11 @@ module resource_account::resource_account {
 
     struct ModuleData has key {
         resource_signer_cap: account::SignerCapability,
+        burn_cap: BurnCapability<ChloesCoin>,
+        mint_cap: MintCapability<ChloesCoin>,
     }
 
-    struct CoinCapabilities has key {
-        burn_cap: BurnCapability<WrappedAptosCoin>,
-        mint_cap: MintCapability<WrappedAptosCoin>,
-    }
-
-    struct WrappedAptosCoin {
+    struct ChloesCoin {
         aptos_coin: AptosCoin
     }
 
@@ -31,10 +28,10 @@ module resource_account::resource_account {
         let resource_signer_cap = resource_account::retrieve_resource_account_cap(account, @0xcafe);
         let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
 
-        let (wrapped_burn_cap, freeze_cap, wrapped_mint_cap) = coin::initialize<WrappedAptosCoin>(
+        let (wrapped_burn_cap, freeze_cap, wrapped_mint_cap) = coin::initialize<ChloesCoin>(
             &resource_signer,
-            string::utf8(b"Wrapepd Aptos Coin"),
-            string::utf8(b"WAPT"),
+            string::utf8(b"Chloe's Coin"),
+            string::utf8(b"CCOIN"),
             8,
             false,
         );
@@ -42,31 +39,28 @@ module resource_account::resource_account {
         coin::destroy_freeze_cap(freeze_cap);
 
         coin::register<AptosCoin>(account);
-        coin::register<WrappedAptosCoin>(account);
+        coin::register<ChloesCoin>(account);
 
         move_to(account, ModuleData {
             resource_signer_cap,
-        });
-
-        move_to(account, CoinCapabilities {
             burn_cap: wrapped_burn_cap,
             mint_cap: wrapped_mint_cap,
         });
     }
 
     // Exchange AptosCoin to WrappedAptosCoin
-    public fun exchange_to(coin: Coin<AptosCoin>): Coin<WrappedAptosCoin> acquires CoinCapabilities {
-        let coin_cap = borrow_global_mut<CoinCapabilities>(@resource_account);
+    public fun exchange_to(coin: Coin<AptosCoin>): Coin<ChloesCoin> acquires ModuleData {
+        let coin_cap = borrow_global_mut<ModuleData>(@resource_account);
         let amount = coin::value(&coin);
         coin::deposit(@resource_account, coin);
-        coin::mint<WrappedAptosCoin>(amount, &coin_cap.mint_cap)
+        coin::mint<ChloesCoin>(amount, &coin_cap.mint_cap)
     }
 
     // Exchange WrappedAptosCoin to AptosCoin
-    public fun exchange_from(coin: Coin<WrappedAptosCoin>): Coin<AptosCoin> acquires ModuleData, CoinCapabilities {
+    public fun exchange_from(coin: Coin<ChloesCoin>): Coin<AptosCoin> acquires ModuleData {
         let amount = coin::value(&coin);
-        let coin_cap = borrow_global_mut<CoinCapabilities>(@resource_account);
-        coin::burn<WrappedAptosCoin>(coin, &coin_cap.burn_cap);
+        let coin_cap = borrow_global_mut<ModuleData>(@resource_account);
+        coin::burn<ChloesCoin>(coin, &coin_cap.burn_cap);
 
         let module_data = borrow_global_mut<ModuleData>(@resource_account);
         let resource_signer = account::create_signer_with_capability(&module_data.resource_signer_cap);
@@ -74,17 +68,17 @@ module resource_account::resource_account {
     }
 
     // Entry function version of exchange_to() for e2e tests
-    public entry fun exchange_to_entry(account: &signer, amount: u64) acquires CoinCapabilities {
+    public entry fun exchange_to_entry(account: &signer, amount: u64) acquires ModuleData {
         let coin = coin::withdraw<AptosCoin>(account, amount);
         let wrapped_aptos_coin = exchange_to(coin);
 
-        coin::register<WrappedAptosCoin>(account);
+        coin::register<ChloesCoin>(account);
         coin::deposit(signer::address_of(account), wrapped_aptos_coin);
     }
 
     // Entry function version of exchange_from() for e2e tests
-    public entry fun exchange_from_entry(account: &signer, amount: u64) acquires ModuleData, CoinCapabilities {
-        let coin = coin::withdraw<WrappedAptosCoin>(account, amount);
+    public entry fun exchange_from_entry(account: &signer, amount: u64) acquires ModuleData {
+        let coin = coin::withdraw<ChloesCoin>(account, amount);
         let aptos_coin = exchange_from(coin);
 
         coin::deposit(signer::address_of(account), aptos_coin);
@@ -102,7 +96,7 @@ module resource_account::resource_account {
     }
 
     #[test(origin_account = @0xcafe, resource_account = @0x0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a, framework = @aptos_framework)]
-    public entry fun test_exchange_to_and_exchange_from(origin_account: signer, resource_account: signer, framework: signer) acquires ModuleData, CoinCapabilities {
+    public entry fun test_exchange_to_and_exchange_from(origin_account: signer, resource_account: signer, framework: signer) acquires ModuleData {
         use aptos_framework::aptos_coin;
 
         set_up_test(&origin_account, &resource_account);
@@ -113,13 +107,13 @@ module resource_account::resource_account {
         let wrapped_coins = exchange_to(five_aptos_coins);
         assert!(coin::value(&wrapped_coins) == 5, 0);
         assert!(coin::balance<AptosCoin>(signer::address_of(&resource_account)) == 5, 1);
-        assert!(coin::balance<WrappedAptosCoin>(signer::address_of(&resource_account)) == 0, 2);
+        assert!(coin::balance<ChloesCoin>(signer::address_of(&resource_account)) == 0, 2);
 
         // exchange from 5 wrapped aptos coins to 5 aptos coins & assert the results are expected
         let aptos_coins = exchange_from(wrapped_coins);
         assert!(coin::value(&aptos_coins) == 5, 0);
         assert!(coin::balance<AptosCoin>(signer::address_of(&resource_account)) == 0, 3);
-        assert!(coin::balance<WrappedAptosCoin>(signer::address_of(&resource_account)) == 0, 4);
+        assert!(coin::balance<ChloesCoin>(signer::address_of(&resource_account)) == 0, 4);
 
         // burn the remaining coins & destroy the capabilities since they aren't droppable
         coin::burn(aptos_coins, &aptos_coin_burn_cap);
