@@ -73,7 +73,7 @@ module std::bit_vector {
     }
     spec unset {
         include UnsetAbortsIf;
-        ensures bitvector.bit_field[bit_index];
+        ensures !bitvector.bit_field[bit_index];
     }
     spec schema UnsetAbortsIf {
         bitvector: BitVector;
