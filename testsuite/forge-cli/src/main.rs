@@ -594,7 +594,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     None,
                     None,
                 ))
-                .with_
         }
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
