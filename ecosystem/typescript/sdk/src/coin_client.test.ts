@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient } from "./aptos_client";
-import { FAUCET_URL, NODE_URL } from "./utils/test_helper.test";
-import { FaucetClient } from "./faucet_client";
+import { getFaucetClient, NODE_URL } from "./utils/test_helper.test";
 import { AptosAccount } from "./aptos_account";
 import { CoinClient } from "./coin_client";
 
@@ -11,7 +10,7 @@ test(
   "transferCoins and checkBalance works",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
     const coinClient = new CoinClient(client);
 
     const alice = new AptosAccount();
