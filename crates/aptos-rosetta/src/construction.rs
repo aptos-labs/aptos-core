@@ -220,37 +220,8 @@ async fn construction_hash(
     })
 }
 
-/// Construction metadata command
-///
-/// Retrieve sequence number for submitting transactions
-///
-/// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionmetadata)
-async fn construction_metadata(
-    request: ConstructionMetadataRequest,
-    server_context: RosettaContext,
-) -> ApiResult<ConstructionMetadataResponse> {
-    debug!("/construction/metadata {:?}", request);
-    check_network(request.network_identifier, &server_context)?;
-
-    let rest_client = server_context.rest_client()?;
-    let address = request.options.internal_operation.sender();
-    let response = get_account(&rest_client, address).await?;
-
-    // Ensure this network really is the one we expect it to be
-    if server_context.chain_id.id() != response.state().chain_id {
-        return Err(ApiError::ChainIdMismatch);
-    }
-
-    let sequence_number = if let Some(sequence_number) = request.options.sequence_number {
-        sequence_number.0
-    } else {
-        // Retrieve the sequence number from the rest server if one wasn't provided
-        response.inner().sequence_number
-    };
-
-    // We have to cheat the set operator and set voter operations right here
-    let mut internal_operation = request.options.internal_operation;
-
+/// Fills in the operator for actions that require it but don't have one
+async fn fill_in_operator(rest_client: &aptos_rest_client::Client, mut internal_operation: InternalOperation) -> ApiResult<InternalOperation> {
     match &mut internal_operation {
         InternalOperation::SetOperator(op) => {
             // If there was no old operator set, and there is only one, we should use that
@@ -312,6 +283,40 @@ async fn construction_metadata(
         }
         _ => {}
     }
+
+    Ok(internal_operation)
+}
+
+/// Construction metadata command
+///
+/// Retrieve sequence number for submitting transactions
+///
+/// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionmetadata)
+async fn construction_metadata(
+    request: ConstructionMetadataRequest,
+    server_context: RosettaContext,
+) -> ApiResult<ConstructionMetadataResponse> {
+    debug!("/construction/metadata {:?}", request);
+    check_network(request.network_identifier, &server_context)?;
+
+    let rest_client = server_context.rest_client()?;
+    let address = request.options.internal_operation.sender();
+    let response = get_account(&rest_client, address).await?;
+
+    // Ensure this network really is the one we expect it to be
+    if server_context.chain_id.id() != response.state().chain_id {
+        return Err(ApiError::ChainIdMismatch);
+    }
+
+    let sequence_number = if let Some(sequence_number) = request.options.sequence_number {
+        sequence_number.0
+    } else {
+        // Retrieve the sequence number from the rest server if one wasn't provided
+        response.inner().sequence_number
+    };
+
+    // We have to cheat the set operator and set voter operations right here
+    let mut internal_operation = fill_in_operator(rest_client.as_ref(), request.options.internal_operation);
 
     // If both are present, we skip simulation
     let (suggested_fee, gas_unit_price, max_gas_amount) =
