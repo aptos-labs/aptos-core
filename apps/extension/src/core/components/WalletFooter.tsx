@@ -4,13 +4,13 @@
 import {
   Center, IconButton, SimpleGrid, Text, useColorMode,
 } from '@chakra-ui/react';
-import { IoMdImage } from '@react-icons/all-files/io/IoMdImage';
-import { RiCopperCoinFill } from '@react-icons/all-files/ri/RiCopperCoinFill';
-import { RiFileListFill } from '@react-icons/all-files/ri/RiFileListFill';
+import { IoGrid } from '@react-icons/all-files/io5/IoGrid';
+import { RiHome2Fill } from '@react-icons/all-files/ri/RiHome2Fill';
+import { RiFlashlightFill } from '@react-icons/all-files/ri/RiFlashlightFill';
+import { RiSettings4Fill } from '@react-icons/all-files/ri/RiSettings4Fill';
 import { IoIosWater } from '@react-icons/all-files/io/IoIosWater';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { SettingsIcon } from '@chakra-ui/icons';
 import Routes from 'core/routes';
 import { secondaryBorderColor } from 'core/colors';
 import ChakraLink from './ChakraLink';
@@ -47,7 +47,7 @@ export default function WalletFooter() {
               size="md"
               aria-label="Wallet"
               fontSize="xl"
-              icon={<RiCopperCoinFill size={26} />}
+              icon={<RiHome2Fill size={26} />}
               display="flex"
               height="20px"
             />
@@ -72,7 +72,7 @@ export default function WalletFooter() {
               variant="unstyled"
               size="md"
               aria-label="Gallery"
-              icon={<IoMdImage size={26} />}
+              icon={<IoGrid size={26} />}
               fontSize="xl"
               display="flex"
               height="20px"
@@ -124,7 +124,7 @@ export default function WalletFooter() {
               variant="unstyled"
               size="md"
               aria-label="Activity"
-              icon={<RiFileListFill size={26} />}
+              icon={<RiFlashlightFill size={26} />}
               fontSize="xl"
               display="flex"
               height="20px"
@@ -150,7 +150,7 @@ export default function WalletFooter() {
               variant="unstyled"
               size="md"
               aria-label="Account"
-              icon={<SettingsIcon fontSize={24} />}
+              icon={<RiSettings4Fill fontSize={26} />}
               fontSize="xl"
               display="flex"
               height="20px"
