@@ -17,8 +17,6 @@ This document will guide you through the following tasks to integrate with Aptos
 1. Wait for the outcome of the transaction.
 1. Query historical transactions and interactions for a given account with a specific account, i.e., withdraws and deposits.
 
-TODO: Link into specific docs or sections from above before pushing this PR.
-
 ## Networks
 
 There are three well-supported networks for integrating with the Aptos blockchain:
@@ -30,20 +28,20 @@ There are three well-supported networks for integrating with the Aptos blockchai
 ### Local testnet
 
 There are two options to run a local testnet:
-* Directly [run a local testnet](/nodes/local-testnet/run-a-local-testnet/) using either the [Aptos-core source code](/nodes/local-testnet/run-a-local-testnet/#using-the-aptos-core-source-code) or a [Docker image](/nodes/local-testnet/run-a-local-testnet/#using-docker). These paths are useful for testing changes to the Aptos-core codebase or ramework, or for building services on top of the Aptos blockchain, respectively.
+* Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](/nodes/local-testnet/run-a-local-testnet/#using-the-aptos-core-source-code) or a [Docker image](/nodes/local-testnet/run-a-local-testnet/#using-docker). These paths are useful for testing changes to the Aptos-core codebase or ramework, or for building services on top of the Aptos blockchain, respectively.
 * [Install the Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
 
 Either of these methods will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
 
 ### Aptos Devnet
 
-Faucet service: https://faucet.devnet.aptoslabs.com
-REST API service: https://fullnode.devnet.aptoslabs.com/v1
+* Faucet service: https://faucet.devnet.aptoslabs.com
+* REST API service: https://fullnode.devnet.aptoslabs.com/v1
 
 ### Access Testnet
 
-Faucet service: https://faucet.testnet.aptoslabs.com
-REST API service: https://fullnode.testnet.aptoslabs.com/v1
+* Faucet service: https://faucet.testnet.aptoslabs.com
+* REST API service: https://fullnode.testnet.aptoslabs.com/v1
 
 ### SDKs
 
@@ -53,12 +51,9 @@ Aptos currently provides three SDKs:
 3. [Rust](/sdks/rust-sdk)
 
 
-### Other Areas
+### Other tools
 
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
-* [Typescript SDK](/sdks/ts-sdk/index)
-* [Python SDK](/sdks/python-sdk)
-* [Rust SDK](/sdks/rust-sdk)
 * [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
 * [Local testnet development flow](/guides/local-testnet-dev-flow)
 
@@ -76,46 +71,44 @@ At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88
 
 ### Account identifiers
 
-Currently, Aptos only supports a single, unified identifier for an account. Accounts on Aptos are universally represented as a 32-byte hex string. A hex string shorter than 32-bytes is also valid: in those scenarios, the hex string is padded with leading zeroes, e.g., `0x1` => `0x0000000000000...01`.
+Currently, Aptos supports only a single, unified identifier for an account. Accounts on Aptos are universally represented as a 32-byte hex string. A hex string shorter than 32-bytes is also valid: in those scenarios, the hex string is padded with leading zeroes, e.g., `0x1` => `0x0000000000000...01`.
 
 ### Creating an account address
 
-Account addresses are defined at creation time as a one-way function from the public key(s) and signature algorithm used for authentication for the account.
+[Account addresses](../concepts/basics-accounts.md#account-address) are defined at creation time as a one-way function from the public key(s) and signature algorithm used for authentication for the account.
 
 :::tip Read more
-This is covered in depth in the [Accounts](https://aptos.dev/concepts/basics-accounts/) documentation and demonstrated in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_account.ts#L66) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/account_address.py#L43). Note that currently these SDKs only demonstrate how to generate an address from an Ed25519 single signer.
+This is covered in depth in the [Accounts](../concepts/basics-accounts.md) documentation and demonstrated in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_account.ts#L66) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/account_address.py#L43). Note that currently these SDKs demonstrate only how to generate an address from an Ed25519 single signer.
 :::
 
 ### Rotating the keys
 
-An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts. Keys can be rotated via [`account::rotate_authentication_key`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L183) function.
-
-:::tip Read more
-See more in [Account address](/concepts/basics-accounts#account-address).
-:::
+An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts. Keys can be rotated via the [`account::rotate_authentication_key`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L183) function.
 
 Refreshing the keys is generally regarded as good hygiene in the security field. However, this presents a challenge for system integrators who are used to using a mnemonic to represent both a private key and its associated account. To simplify this for the system integrators, Aptos will provide an on-chain mapping, before the launch of the mainnet. The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address.
 
+TODO: When will we provide an on-chain mapping, before the launch of the mainnet?
+
 ### Preventing replay attacks
 
-When the Aptos blockchain processes the transaction, it looks at the sequence number in the transaction and compares it with the sequence number in the sender’s account (as stored on the blockchain at the current ledger version). The transaction is executed only if the sequence number in the transaction is the same as the sequence number for the sender account, and rejects if they do not match. In this way past transactions, which necessarily contain older sequence numbers, cannot be replayed, hence preventing replay attacks.
+When the Aptos blockchain processes the transaction, it looks at the sequence number in the transaction and compares it with the sequence number in the sender’s account (as stored on the blockchain at the current ledger version). The transaction is executed only if the sequence number in the transaction is the same as the sequence number for the sender account, and the transaction is rejected if those two numbers do not match. In this way past transactions, which necessarily contain older sequence numbers, cannot be replayed, hence preventing replay attacks.
 
 :::tip Read more
-See more on [Account sequence number here](/concepts/basics-accounts#account-sequence-number).
+See more on [Account sequence numbering](/concepts/basics-accounts#account-sequence-number).
 :::
 
 ## Transactions
 
-Aptos [transactions](/concepts/basics-txns-states) are encoded in [BCS](https://github.com/diem/bcs) (Binary Canonical Serialization). Transactions contain  information such as the sender’s account address, authentication from the sender, the desired operation to be performed on the Aptos blockchain, and the amount of gas the sender is willing to pay to execute the transaction.
+Aptos [transactions](/concepts/basics-txns-states) are encoded in [Binary Canonical Serialization (BCS)](https://github.com/diem/bcs). Transactions contain  information such as the sender’s account address, authentication from the sender, the desired operation to be performed on the Aptos blockchain, and the amount of gas the sender is willing to pay to execute the transaction.
 
 ### Transaction states
 
 A transaction may end in one of the following states:
 
-1. Committed on the blockchain and executed. This is considered as a successful transaction.
-2. Committed on the blockchain and aborted. The abort code indicates why the transaction failed to execute.
-3. Discarded during transaction submission due to a validation check such as insufficient gas, invalid transaction format, or incorrect key.
-4. Discarded after transaction submission but before attempted execution. This could be due to timeouts or insufficient gas due to other transactions affecting the account.
+* Committed on the blockchain and executed. This is considered as a successful transaction.
+* Committed on the blockchain and aborted. The abort code indicates why the transaction failed to execute.
+* Discarded during transaction submission due to a validation check such as insufficient gas, invalid transaction format, or incorrect key.
+* Discarded after transaction submission but before attempted execution. This could be due to timeouts or insufficient gas due to other transactions affecting the account.
 
 The sender’s account will be charged gas for any committed transactions.
 
