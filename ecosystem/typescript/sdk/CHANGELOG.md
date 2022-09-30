@@ -5,9 +5,15 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+
+N/A
+
+## 1.3.15 (2022-09-30)
+
 - **[Breaking Changes]** Following the deprecation notice in the release notes of 1.3.13, the following breaking changes have landed in this release. Please see the notes from last release for information on the new endpoints you must migrate to:
-    - The `getEventsByEventKey` function has been removed.
-    - The `key` field in the `Event` struct has been removed.
+  - The `getEventsByEventKey` function has been removed.
+  - The `key` field in the `Event` struct has been removed.
+- Turn on `strict` in tsconfig
 
 ## 1.3.14 (2022-09-20)
 
