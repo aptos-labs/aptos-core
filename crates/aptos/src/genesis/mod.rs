@@ -125,6 +125,12 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
     let client = git_options.get_client()?;
     let layout: Layout = client.get(Path::new(LAYOUT_FILE))?;
 
+    if layout.root_key.is_some() {
+        return Err(CliError::UnexpectedError(
+            "Root key must not be set for mainnet.".to_string(),
+        ));
+    }
+
     let total_supply = layout.total_supply.ok_or_else(|| {
         CliError::UnexpectedError("Layout file does not have `total_supply`".to_string())
     })?;
