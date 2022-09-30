@@ -5,13 +5,13 @@ slug: "node-requirements"
 
 # Node Requirements
 
-To make your validator node and validator fullnode deployment hassle-free, make sure you have the resources specified in this document. 
+To make your validator node and validator fullnode deployment hassle-free, make sure you have the resources specified in this document.
 
 ## Validator and validator fullnode
 
 - **Both a validator node and a validator fullnode required:** For the Aptos mainnet, we require that you run a validator node and a validator fullnode. We strongly recommend that you run the validator node and the validator fullnode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the validator and the validator fullnode will help ensure smooth deployment of these nodes.
-- **Public fullnode is optional:** We recommend that optionally you run a public fullnode also. However, a public fullnode is not required. If you run public fullnode also, then we strongly recommend that you run the public fullnode on a third machine that is separate and independent from either the validator or the validator fullnode machines. 
-- **Cloud is preferred:** For best availability and stability, **we recommend that you deploy your nodes on the cloud**. 
+- **Public fullnode is optional:** We recommend that optionally you run a public fullnode also. However, a public fullnode is not required. If you run public fullnode also, then we strongly recommend that you run the public fullnode on a third machine that is separate and independent from either the validator or the validator fullnode machines.
+- **Cloud is preferred:** For best availability and stability, **we recommend that you deploy your nodes on the cloud**.
 :::tip Terraform support
 For deploying the nodes in cloud we have provided Terraform support on two cloud providers: **GCP** and **AWS**. See [**Running Validator Node**](running-validator-node/index.md).
 :::
@@ -48,7 +48,11 @@ The current hardware requirements are set considering the estimated growth over 
 
 **Local SSD vs. network storage**
 
-Cloud deployments require choosing between using local or network storage such as AWS EBS, GCP PD. Local SSD provides lower latency and cost, especially relative to IOPS. 
+<<<<<<< HEAD
+Cloud deployments require choosing between using local or network storage such as AWS EBS, GCP PD. Local SSD provides lower latency and cost, especially relative to IOPS.
+=======
+Cloud deployments typically must make a decision between using local or network storage (for example, AWS EBS, GCP PD). Local SSD typically provides lower latency and cost, especially relative to IOPS.
+>>>>>>> 0f28540b9e (doc file)
 
 On the one hand, network storage requires additional CPU support to scale IOPS, but on the other hand, the network storage provides better support for backup snapshots and provide resilience for the nodes in scenarios where the instance is stopped. Network storage makes it easier to support storage needs for high availability.
 
@@ -62,7 +66,10 @@ There are three types of Aptos networks. Your node can be configured so that eac
 2. **The public network:** A public fullnode connects to this network.
 3. **The validator fullnode network (VFN network):** A validator fullnode connects to this network. The VFN network allows the validator fullnode to connect to the specific validator.
 
-You can configure the port settings on your node using the configuration YAML file. See the [example configuration YAML here](https://github.com/aptos-labs/aptos-core/blob/4ce85456853c7b19b0a751fb645abd2971cc4c0c/docker/compose/aptos-node/fullnode.yaml#L10-L9). With this configuration YAML on your node, the public network connects to your node on port 6182 and the VFN network on 6181. Because these port settings are configurable, we don't explicitly say port X is for network Y.
+You can configure the port settings on your node using the configuration YAML file.
+See the [example configuration YAML here](https://github.com/aptos-labs/aptos-core/blob/4ce85456853c7b19b0a751fb645abd2971cc4c0c/docker/compose/aptos-node/fullnode.yaml#L10-L9).
+With this configuration YAML on your node, the public network connects to your node on port 6182 and the VFN network on 6181.
+Because these port settings are configurable, we don't explicitly say port X is for network Y.
 
 ### Port settings
 
@@ -70,12 +77,12 @@ For the validator:
 
 - Open the TCP port 6180, to enable the validators to talk to each other.
 - Open the TCP port 9101, to send the validator metrics to validate the health stats.
-- Make sure to keep the TCP port 6186 open for the local backup storage service. 
+- Make sure to keep the TCP port 6186 open for the local backup storage service.
 
 For the public fullnode:
 
 - Open the TCP port 6182, to enable the fullnodes to talk to each other.
 - Open the TCP port 9101, to send the fullnode metrics to validate the health stats (only needed during registration stage).
 - Open the TCP port 80/8080, for the REST API access.
-- Make sure to keep the TCP port 6186 open for the local backup storage service. 
+- Make sure to keep the TCP port 6186 open for the local backup storage service.
 
