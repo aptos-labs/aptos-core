@@ -615,7 +615,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 // to test different timings)
                 check_period_s: 27,
             },
-            false,
         ),
         "changing_working_quorum_test" => changing_working_quorum_test(
             20,
@@ -634,7 +633,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 // to test different timings)
                 check_period_s: 27,
             },
-            false,
         ),
         "changing_working_quorum_test_high_load" => changing_working_quorum_test(
             20,
@@ -653,9 +651,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 // to test different timings)
                 check_period_s: 27,
             },
-            // Max load cannot be sustained without gaps in progress.
-            // Using high load instead.
-            false,
         ),
         // not scheduled on continuous
         "large_test_only_few_nodes_down" => changing_working_quorum_test(
@@ -671,7 +666,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 add_execution_delay: false,
                 check_period_s: 27,
             },
-            false,
         ),
         "different_node_speed_and_reliability_test" => changing_working_quorum_test(
             20,
@@ -686,7 +680,34 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 add_execution_delay: true,
                 check_period_s: 27,
             },
-            false,
+        ),
+        "slow_processing_catching_up" => changing_working_quorum_test(
+            10,
+            300,
+            3000,
+            2500,
+            &ChangingWorkingQuorumTest {
+                min_tps: 1500,
+                always_healthy_nodes: 2,
+                max_down_nodes: 0,
+                num_large_validators: 2,
+                add_execution_delay: true,
+                check_period_s: 57,
+            },
+        ),
+        "failures_catching_up" => changing_working_quorum_test(
+            10,
+            300,
+            3000,
+            2500,
+            &ChangingWorkingQuorumTest {
+                min_tps: 1500,
+                always_healthy_nodes: 2,
+                max_down_nodes: 1,
+                num_large_validators: 2,
+                add_execution_delay: false,
+                check_period_s: 27,
+            },
         ),
         "twin_validator_test" => config
             .with_network_tests(vec![&TwinValidatorTest])
@@ -879,7 +900,6 @@ fn changing_working_quorum_test(
     target_tps: usize,
     min_avg_tps: usize,
     test: &'static ChangingWorkingQuorumTest,
-    max_load: bool,
 ) -> ForgeConfig<'static> {
     let config = ForgeConfig::default();
     let num_large_validators = test.num_large_validators;
@@ -910,13 +930,7 @@ fn changing_working_quorum_test(
         }))
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(if max_load {
-                    EmitJobMode::MaxLoad {
-                        mempool_backlog: 20000,
-                    }
-                } else {
-                    EmitJobMode::ConstTps { tps: target_tps }
-                })
+                .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
                     (TransactionType::P2P, 80),
                     (TransactionType::AccountGeneration, 20),
