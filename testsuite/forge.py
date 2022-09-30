@@ -1213,8 +1213,7 @@ def create_forge_command(
         forge_args.append("--reuse")
     if forge_namespace_keep == "true":
         forge_args.append("--keep")
-    if forge_enable_haproxy == "true":
-        forge_args.append("--enable-haproxy")
+    forge_args.append("--enable-haproxy")
 
     if test_args:
         forge_args.extend(test_args)
@@ -1535,7 +1534,7 @@ def test(
         forge_cli_args=forge_cli_args,
         test_args=test_args,
     )
-    
+
     print(f"Using cluster: {forge_cluster_name}")
     temp = context.filesystem.mkstemp()
     forge_cluster = ForgeCluster(forge_cluster_name, temp)
