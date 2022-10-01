@@ -65,37 +65,54 @@ pub async fn handle_metrics_ingest(
 
     let start_timer = Instant::now();
 
-    let res = context
-        .metrics_client()
-        .post_prometheus_metrics(metrics_body, extra_labels, encoding.unwrap_or_default())
-        .await;
+    let post_futures = context.metrics_client().values().map(|client| {
+        client.post_prometheus_metrics(
+            metrics_body.clone(),
+            extra_labels.clone(),
+            encoding.clone().unwrap_or_default(),
+        )
+    });
 
-    match res {
-        Ok(res) => {
-            METRICS_INGEST_BACKEND_REQUEST_DURATION
-                .with_label_values(&[res.status().as_str()])
-                .observe(start_timer.elapsed().as_secs_f64());
-            if res.status().is_success() {
-                debug!("remote write to victoria metrics succeeded");
-            } else {
-                error!(
-                    "remote write failed to victoria_metrics: {}",
-                    res.error_for_status().err().unwrap()
-                );
-                return Err(reject::custom(ServiceError::internal(
-                    MetricsIngestError::IngestionError.into(),
-                )));
+    let results = futures::future::join_all(post_futures)
+        .await
+        .into_iter()
+        .zip(context.metrics_client().keys())
+        .map(|(res, name)| {
+            match res {
+                Ok(res) => {
+                    METRICS_INGEST_BACKEND_REQUEST_DURATION
+                        .with_label_values(&[name, res.status().as_str()])
+                        .observe(start_timer.elapsed().as_secs_f64());
+                    if res.status().is_success() {
+                        debug!("remote write to victoria metrics succeeded");
+                    } else {
+                        error!(
+                            "remote write failed to victoria_metrics for client {}: {}",
+                            name,
+                            res.error_for_status().err().unwrap()
+                        );
+                        return Err(());
+                    }
+                }
+                Err(err) => {
+                    METRICS_INGEST_BACKEND_REQUEST_DURATION
+                        .with_label_values(&[name, "Unknown"])
+                        .observe(start_timer.elapsed().as_secs_f64());
+                    error!(
+                        "error sending remote write request for client {}: {}",
+                        name, err
+                    );
+                    return Err(());
+                }
             }
-        }
-        Err(err) => {
-            METRICS_INGEST_BACKEND_REQUEST_DURATION
-                .with_label_values(&["Unknown"])
-                .observe(start_timer.elapsed().as_secs_f64());
-            error!("error sending remote write request: {}", err);
-            return Err(reject::custom(ServiceError::internal(
-                MetricsIngestError::IngestionError.into(),
-            )));
-        }
+            Ok(())
+        });
+
+    #[allow(clippy::unnecessary_fold)]
+    if results.fold(true, |acc, r| acc && r.is_err()) {
+        return Err(reject::custom(ServiceError::internal(
+            MetricsIngestError::IngestionError.into(),
+        )));
     }
 
     Ok(reply::with_status(reply::reply(), StatusCode::CREATED))
@@ -106,7 +123,8 @@ fn claims_to_extra_labels(claims: &Claims) -> Vec<String> {
         format!("role={}", claims.node_type),
         format!("chain_name={}", claims.chain_id),
         format!("namespace={}", "telemetry-service"),
-        // for community nodes we cannot determine which pod name they run in (or whether they run in k8s at all), so we use the peer id as an approximation/replacement for pod_name
+        // for community nodes we cannot determine which pod name they run in (or whether they run in k8s at all),
+        // so we use the peer id as an approximation/replacement for pod_name
         // This works well with our existing grafana dashboards
         format!(
             "kubernetes_pod_name=peer_id:{}",
@@ -119,8 +137,14 @@ fn claims_to_extra_labels(claims: &Claims) -> Vec<String> {
 mod test {
     use std::str::FromStr;
 
+    use crate::tests::test_context;
+    use crate::MetricsClient;
+
     use super::*;
     use aptos_types::{chain_id::ChainId, PeerId};
+    use httpmock::MockServer;
+    use reqwest::Url;
+
     #[test]
     fn verify_labels() {
         let claims = claims_to_extra_labels(&super::Claims {
@@ -140,5 +164,113 @@ mod test {
                 "kubernetes_pod_name=peer_id:0x1",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn test_metrics_ingest_all_success() {
+        let mut test_context = test_context::new_test_context().await;
+        let claims = Claims::test();
+        let body = Bytes::from_static(b"hello");
+
+        let server1 = MockServer::start();
+        let mock1 = server1.mock(|when, then| {
+            when.method("POST").path("/api/v1/import/prometheus");
+            then.status(200);
+        });
+
+        let server2 = MockServer::start();
+        let mock2 = server2.mock(|when, then| {
+            when.method("POST").path("/api/v1/import/prometheus");
+            then.status(200);
+        });
+
+        let clients = test_context.inner.metrics_client_mut();
+        clients.insert(
+            "endpoint1".into(),
+            MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
+        );
+        clients.insert(
+            "endpoint2".into(),
+            MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
+        );
+
+        let result =
+            handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
+
+        mock1.assert();
+        mock2.assert();
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_metrics_ingest_partial_success() {
+        let mut test_context = test_context::new_test_context().await;
+        let claims = Claims::test();
+        let body = Bytes::from_static(b"hello");
+
+        let server1 = MockServer::start();
+        let mock1 = server1.mock(|when, then| {
+            when.method("POST").path("/api/v1/import/prometheus");
+            then.status(200);
+        });
+
+        let server2 = MockServer::start();
+        let mock2 = server2.mock(|when, then| {
+            when.method("POST").path("/api/v1/import/prometheus");
+            then.status(500);
+        });
+
+        let clients = test_context.inner.metrics_client_mut();
+        clients.insert(
+            "endpoint1".into(),
+            MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
+        );
+        clients.insert(
+            "endpoint2".into(),
+            MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
+        );
+
+        let result =
+            handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
+
+        mock1.assert();
+        mock2.assert_hits(4);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_metrics_ingest_all_failure() {
+        let mut test_context = test_context::new_test_context().await;
+        let claims = Claims::test();
+        let body = Bytes::from_static(b"hello");
+
+        let server1 = MockServer::start();
+        let mock1 = server1.mock(|when, then| {
+            when.method("POST").path("/api/v1/import/prometheus");
+            then.status(500);
+        });
+
+        let server2 = MockServer::start();
+        let mock2 = server2.mock(|when, then| {
+            when.method("POST").path("/api/v1/import/prometheus");
+            then.status(401);
+        });
+
+        let clients = test_context.inner.metrics_client_mut();
+        clients.insert(
+            "endpoint1".into(),
+            MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
+        );
+        clients.insert(
+            "endpoint2".into(),
+            MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
+        );
+
+        let result =
+            handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
+
+        mock1.assert_hits(4);
+        mock2.assert();
+        assert!(result.is_err());
     }
 }

@@ -18,8 +18,15 @@ use gcp_bigquery_client::Client as BigQueryClient;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
-    path::PathBuf, sync::Arc, time::Duration,
+    collections::{BTreeMap, HashMap},
+    convert::Infallible,
+    env,
+    fs::File,
+    io::Read,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
 };
 use tracing::info;
 use warp::{Filter, Reply};
@@ -80,15 +87,36 @@ impl AptosTelemetryServiceArgs {
             config.custom_event_config.table_id.clone(),
         );
 
-        let victoria_metrics_client = MetricsClient::new(
-            Url::parse(&config.victoria_metrics_base_url)
-                .expect("base url must be provided for victoria metrics"),
-            env::var("VICTORIA_METRICS_AUTH_TOKEN")
+        let victoria_metrics_secrets: HashMap<String, String> = serde_json::from_str(
+            &env::var("VICTORIA_METRICS_AUTH_TOKEN")
                 .expect("environment variable VICTORIA_METRICS_AUTH_TOKEN must be set"),
-        );
+        )
+        .expect("environment variable VICTORIA_METRICS_AUTH_TOKEN must be a map of name to secret");
+
+        let victoria_metrics_clients: BTreeMap<String, MetricsClient> = config
+            .victoria_metrics_endpoints
+            .iter()
+            .map(|(name, url)| {
+                let secret = victoria_metrics_secrets.get(name).unwrap_or_else(|| {
+                    panic!(
+                        "environment variable VICTORIA_METRICS_AUTH_TOKEN is missing secret for {}",
+                        name
+                    )
+                });
+                (
+                    name.clone(),
+                    MetricsClient::new(
+                        Url::parse(url).unwrap_or_else(|e| {
+                            panic!("invalid metrics ingest endpoint URL for {}: {}", name, e)
+                        }),
+                        secret.clone(),
+                    ),
+                )
+            })
+            .collect();
 
         let humio_client = humio::IngestClient::new(
-            Url::parse(&config.humio_url).unwrap(),
+            Url::parse(&config.humio_url).expect("invalid Humio ingest endpoint URL"),
             env::var("HUMIO_INGEST_TOKEN")
                 .expect("environment variable HUMIO_INGEST_TOKEN must be set"),
         );
@@ -115,11 +143,11 @@ impl AptosTelemetryServiceArgs {
                 validator_fullnodes.clone(),
                 public_fullnodes,
             ),
-            Some(ClientTuple::new(
-                bigquery_client,
-                victoria_metrics_client,
-                humio_client,
-            )),
+            ClientTuple::new(
+                Some(bigquery_client),
+                Some(victoria_metrics_clients),
+                Some(humio_client),
+            ),
             chain_set,
             jwt_service,
             config.log_env_map.clone(),
@@ -135,9 +163,9 @@ impl AptosTelemetryServiceArgs {
 
         let metrics_exporter_client = MetricsClient::new(
             Url::parse(&config.metrics_exporter_base_url)
-                .expect("base url must be provided for victoria metrics"),
+                .expect("base url must be provided for victoria metrics exporter url"),
             env::var("METRICS_EXPORTER_AUTH_TOKEN")
-                .expect("environment variable VICTORIA_METRICS_AUTH_TOKEN must be set"),
+                .expect("environment variable METRICS_EXPORTER_AUTH_TOKEN must be set"),
         );
 
         PrometheusExporter::new(metrics_exporter_client).run();
@@ -164,7 +192,7 @@ impl AptosTelemetryServiceArgs {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TelemetryServiceConfig {
     pub address: SocketAddr,
@@ -178,7 +206,8 @@ pub struct TelemetryServiceConfig {
     pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
 
     pub custom_event_config: CustomEventConfig,
-    pub victoria_metrics_base_url: String,
+    pub victoria_metrics_endpoints:
+        HashMap<String /* endpoint name */, String /* endpoint Url */>,
     pub metrics_exporter_base_url: String,
     pub humio_url: String,
 
