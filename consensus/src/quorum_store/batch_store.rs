@@ -149,6 +149,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     }
 
     fn store(&self, persist_request: PersistRequest) -> Option<SignedDigest> {
+        debug!("QS: store");
         let expiration = persist_request.value.expiration.clone();
         // Network listener should filter messages with wrong expiration epoch.
         assert_eq!(
@@ -161,6 +162,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             .save(persist_request.digest, persist_request.value.clone()) // TODO: what is this comes from old epoch?
         {
             Ok(needs_db) => {
+                debug!("QS: sign digest");
                 if needs_db {
                     // TODO: Consider an async call to DB, but it could be a race with clean.
                     self.db

@@ -70,6 +70,7 @@ impl NetworkListener {
                     fragment.take_transactions(),
                 ) {
                     Ok((num_bytes, payload, digest)) => {
+                        debug!("QS: persist to batchstore 1");
                         let persist_cmd = BatchStoreCommand::Persist(PersistRequest::new(
                             source, payload, digest, num_bytes, expiration,
                         ));
@@ -77,13 +78,23 @@ impl NetworkListener {
                             .send(persist_cmd)
                             .await
                             .expect("BatchStore receiver not available");
+                        debug!("QS: persist to batchstore 2");
                     }
                     Err(e) => {
                         debug!("Could not append batch from {:?}, error {:?}", source, e);
                     }
                 }
-            } // Malformed request with an inconsistent expiry epoch.
+            }
+            // Malformed request with an inconsistent expiry epoch.
+            else {
+                debug!(
+                    "QS: got end batch message epoch {} {}",
+                    expiration.epoch(),
+                    self.epoch
+                );
+            }
         } else {
+            debug!("QS: fragment no expiration");
             // debug!(
             //     "QS: got append_batch message from {:?} batch_id {}, fragment_id {}",
             //     source,
@@ -106,6 +117,7 @@ impl NetworkListener {
         //Keep in memory caching in side the DB wrapper.
         //chack id -> self, call PoQSB.
         while let Some(msg) = self.network_msg_rx.next().await {
+            debug!("QS: network_listener msg {:?}", msg);
             match msg {
                 VerifiedEvent::SignedDigest(signed_digest) => {
                     debug!("QS: got SignedDigest from network");

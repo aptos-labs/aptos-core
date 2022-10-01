@@ -131,7 +131,9 @@ pub struct EpochManager {
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
     quorum_store_storage: Arc<QuorumStoreDB>,
-    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    // number of network_listener workers
+    num_network_listener_workers: usize,
+    quorum_store_msg_tx_vec: Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     wrapper_quorum_store_tx: Option<(
         aptos_channel::Sender<AccountAddress, VerifiedEvent>,
         Sender<oneshot::Sender<()>>,
@@ -176,7 +178,8 @@ impl EpochManager {
             epoch_state: None,
             block_retrieval_tx: None,
             quorum_store_storage: Arc::new(QuorumStoreDB::new(path)),
-            quorum_store_msg_tx: None,
+            num_network_listener_workers: 1,
+            quorum_store_msg_tx_vec: Vec::new(),
             wrapper_quorum_store_tx: None,
         }
     }
@@ -474,12 +477,17 @@ impl EpochManager {
             .expect("Unable to get private key");
         let signer = ValidatorSigner::new(self.author, private_key);
 
-        let (quorum_store_msg_tx, quorum_store_msg_rx) =
-            aptos_channel::new::<AccountAddress, VerifiedEvent>(
-                QueueStyle::FIFO,
-                self.config.channel_size,
-                None,
-            );
+        let mut quorum_store_msg_rx_vec = Vec::new();
+        for _ in 0..self.num_network_listener_workers {
+            let (quorum_store_msg_tx, quorum_store_msg_rx) =
+                aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                    QueueStyle::FIFO,
+                    self.config.channel_size,
+                    None,
+                );
+            self.quorum_store_msg_tx_vec.push(quorum_store_msg_tx);
+            quorum_store_msg_rx_vec.push(quorum_store_msg_rx);
+        }
 
         let reader_db = self.storage.aptos_db();
         let latest_ledger_info_with_sigs = reader_db
@@ -499,14 +507,12 @@ impl EpochManager {
             0
         };
 
-        self.quorum_store_msg_tx = Some(quorum_store_msg_tx);
-
         let (quorum_store, batch_reader) = QuorumStore::new(
             self.epoch(),
             last_committed_round,
             self.author,
             self.quorum_store_storage.clone(),
-            quorum_store_msg_rx,
+            quorum_store_msg_rx_vec,
             network_sender,
             config,
             verifier,
@@ -786,7 +792,14 @@ impl EpochManager {
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
+                num_nodes_per_worker_handles: 5,
             };
+
+            // update the number of network_listener workers when start a new round_manager
+            self.num_network_listener_workers = usize::max(
+                1,
+                (epoch_state.verifier.len() / config.num_nodes_per_worker_handles),
+            );
 
             let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
                 tokio::sync::mpsc::channel(config.channel_size);
@@ -1039,11 +1052,13 @@ impl EpochManager {
             quorum_store_event @ (VerifiedEvent::SignedDigest(_)
             | VerifiedEvent::Fragment(_)
             | VerifiedEvent::Batch(_)) => {
-                if let Some(sender) = &mut self.quorum_store_msg_tx {
-                    sender.push(peer_id, quorum_store_event)?;
-                } else {
-                    bail!("QuorumStore not started but received QuorumStore Message");
-                }
+                let idx = peer_id.to_vec()[0] as usize % self.num_network_listener_workers;
+                debug!(
+                    "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
+                    peer_id, self.num_network_listener_workers, idx
+                );
+                let sender = &mut self.quorum_store_msg_tx_vec[idx];
+                sender.push(peer_id, quorum_store_event)?;
             }
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
