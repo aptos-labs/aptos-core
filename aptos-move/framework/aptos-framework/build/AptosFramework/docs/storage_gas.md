@@ -452,10 +452,10 @@ Assumes the following endpoints:
 
 Intermediate points must satisfy:
 
-1. $x_i > x_{i - 1}$ ($x$ is strictly increasing).
-2. $0 \leq x_i \leq 10000$ ($x$ is between 0 and 10000).
-3. $y_i \geq y_{i - 1}$ ($y$ is non-decreasing).
-4. $0 \leq y_i \leq 10000$ ($y$ is between 0 and 10000).
+1. $x_i > x_{i - 1}$ ( $x$ is strictly increasing).
+2. $0 \leq x_i \leq 10000$ ( $x$ is between 0 and 10000).
+3. $y_i \geq y_{i - 1}$ ( $y$ is non-decreasing).
+4. $0 \leq y_i \leq 10000$ ( $y$ is between 0 and 10000).
 
 Lookup between two successive points is calculated via linear
 interpolation, e.g., as if there were a straight line between
