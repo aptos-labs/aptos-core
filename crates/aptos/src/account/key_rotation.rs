@@ -234,7 +234,7 @@ impl CliCommand<RotateSummary> for RotateKey {
     }
 }
 
-/// Command to lookup the account adress through on-chain lookup table
+/// Command to lookup the account address through on-chain lookup table
 ///
 #[derive(Debug, Parser)]
 pub struct LookupAddress {
