@@ -59,10 +59,12 @@ global storage via a <code><b>move_to</b>()</code> operation.
 item-wise and byte-wise storage, then each epoch, gas parameters are
 reconfigured based on the "utilization ratio" for each of the two
 utilization dimensions. The utilization ratio for a given dimension,
-either item-wise or byte-wise, is taken as the the quotient
-of actual utilization and target utilization. For example, given a
-500 GB target and 250 GB actual utilization, the byte-wise
-utilization ratio is 50%.
+either item-wise or byte-wise, is taken as the quotient of actual
+utilization and target utilization. For example, given a 500 GB
+target and 250 GB actual utilization, the byte-wise utilization
+ratio is 50%.
+
+See <code><a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>()</code> for mathematical definitions.
 
 
 <a name="@Gas_curve_lookup_4"></a>
@@ -89,8 +91,7 @@ operations defined in <code><a href="storage_gas.md#0x1_storage_gas_StorageGas">
 For example, if the byte-wise utilization ratio is 50%, then
 per-byte reads will charge the minimum per-byte gas cost, plus
 1.09% of the difference between the maximum and the minimum cost.
-
-See <code><a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>()</code> for the relevant equation.
+See <code><a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>()</code> for a supporting calculation.
 
 
 <a name="@Item-wise_operations_5"></a>
@@ -668,7 +669,7 @@ $$g(u_r) = g_{min} + u_m \Delta_g$$
 ### Example
 
 
-Hence for a utilization ratio of 50% ($u_r = 0.5$):
+Hence for a utilization ratio of 50% ( $u_r = 0.5$ ):
 
 $$g(0.5) = g_{min} + \frac{8192^{0.5} - 1}{8192 - 1} \Delta_g$$
 
