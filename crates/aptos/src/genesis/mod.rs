@@ -474,12 +474,10 @@ fn get_config(
 // TODO: Move into the Crypto libraries
 fn parse_key<T: ValidCryptoMaterial>(num_bytes: usize, str: &str) -> anyhow::Result<T> {
     let num_chars: usize = num_bytes * 2;
-    let mut has_0x = false;
     let mut working = str.trim();
 
     // Checks if it has a 0x at the beginning, which is okay
     if working.starts_with("0x") {
-        has_0x = true;
         working = &working[2..];
     }
 
@@ -490,7 +488,7 @@ fn parse_key<T: ValidCryptoMaterial>(num_bytes: usize, str: &str) -> anyhow::Res
             working.len(),
             num_chars
         )
-    } else if !has_0x && working.len() < num_chars {
+    } else if working.len() < num_chars {
         anyhow::bail!(
             "Key {} is too short {} must be {} hex characters",
             str,
@@ -564,19 +562,19 @@ fn validate_validators(
     for (i, validator) in validators.iter().enumerate() {
         if !initialized_accounts.contains_key(&validator.owner_account_address.into()) {
             return Err(CliError::UnexpectedError(format!(
-                "Owner {} in validator #{} is is not in the initialized balances",
+                "Owner {} in validator #{} is is not in the balances.yaml file",
                 validator.owner_account_address, i
             )));
         }
         if !initialized_accounts.contains_key(&validator.operator_account_address.into()) {
             return Err(CliError::UnexpectedError(format!(
-                "Operator {} in validator #{} is is not in the initialized balances",
+                "Operator {} in validator #{} is is not in the balances.yaml file",
                 validator.operator_account_address, i
             )));
         }
         if !initialized_accounts.contains_key(&validator.voter_account_address.into()) {
             return Err(CliError::UnexpectedError(format!(
-                "Voter {} in validator #{} is is not in the initialized balances",
+                "Voter {} in validator #{} is is not in the balances.yaml file",
                 validator.voter_account_address, i
             )));
         }
@@ -748,7 +746,7 @@ fn validate_employee_accounts(
         for (j, account) in pool.accounts.iter().enumerate() {
             if !initialized_accounts.contains_key(account) {
                 return Err(CliError::UnexpectedError(format!(
-                    "Account #{} '{}' in pool #{} is not in the initialized balances",
+                    "Account #{} '{}' in pool #{} is not in the balances.yaml file",
                     j, account, i
                 )));
             }
@@ -772,25 +770,25 @@ fn validate_employee_accounts(
 
         if !initialized_accounts.contains_key(&pool.validator.validator.owner_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Owner address {} in pool #{} is is not in the initialized balances",
+                "Owner address {} in pool #{} is is not in the balances.yaml file",
                 pool.validator.validator.owner_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.validator.validator.operator_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Operator address {} in pool #{} is is not in the initialized balances",
+                "Operator address {} in pool #{} is is not in the balances.yaml file",
                 pool.validator.validator.operator_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.validator.validator.voter_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Voter address {} in pool #{} is is not in the initialized balances",
+                "Voter address {} in pool #{} is is not in the balances.yaml file",
                 pool.validator.validator.voter_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.beneficiary_resetter) {
             return Err(CliError::UnexpectedError(format!(
-                "Beneficiary resetter {} in pool #{} is is not in the initialized balances",
+                "Beneficiary resetter {} in pool #{} is is not in the balances.yaml file",
                 pool.beneficiary_resetter, i
             )));
         }
