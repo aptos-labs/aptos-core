@@ -19,6 +19,46 @@ diesel::table! {
 }
 
 diesel::table! {
+    coin_activities (transaction_version, event_account_address, event_creation_number, event_sequence_number) {
+        transaction_version -> Int8,
+        event_account_address -> Varchar,
+        event_creation_number -> Int8,
+        event_sequence_number -> Int8,
+        owner_address -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        activity_type -> Varchar,
+        is_gas_fee -> Bool,
+        is_transaction_success -> Bool,
+        entry_function_id_str -> Nullable<Varchar>,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    coin_balances (transaction_version, owner_address, coin_type) {
+        transaction_version -> Int8,
+        owner_address -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    coin_infos (coin_type) {
+        coin_type -> Varchar,
+        transaction_version_created -> Int8,
+        creator_address -> Varchar,
+        name -> Varchar,
+        symbol -> Varchar,
+        decimals -> Int4,
+        supply -> Numeric,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     collection_datas (collection_data_id_hash, transaction_version) {
         collection_data_id_hash -> Varchar,
         transaction_version -> Int8,
@@ -31,6 +71,16 @@ diesel::table! {
         maximum_mutable -> Bool,
         uri_mutable -> Bool,
         description_mutable -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    current_coin_balances (owner_address, coin_type) {
+        owner_address -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        last_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }
 }
@@ -345,7 +395,11 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
+    coin_activities,
+    coin_balances,
+    coin_infos,
     collection_datas,
+    current_coin_balances,
     current_collection_datas,
     current_token_datas,
     current_token_ownerships,

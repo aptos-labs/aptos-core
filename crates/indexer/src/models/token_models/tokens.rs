@@ -341,7 +341,7 @@ impl TableMetadataForToken {
         }
         let resource = MoveResource::from_write_resource(
             write_resource,
-            0,
+            0, // Placeholder, this isn't used anyway
             txn_version,
             0, // Placeholder, this isn't used anyway
         );
