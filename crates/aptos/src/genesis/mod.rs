@@ -18,7 +18,8 @@ use crate::{
     },
     CliCommand, CliResult,
 };
-use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
+use aptos_crypto::{bls12381, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_genesis::builder::GenesisConfiguration;
 use aptos_genesis::config::{
     AccountBalanceMap, EmployeePoolMap, StringOperatorConfiguration, StringOwnerConfiguration,
@@ -29,7 +30,7 @@ use aptos_genesis::{
     GenesisInfo,
 };
 use aptos_logger::info;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::account_address::{AccountAddress, AccountAddressWithChecks};
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::{BTreeMap, BTreeSet};
@@ -297,43 +298,46 @@ fn get_config(
     let owner_config = client.get::<StringOwnerConfiguration>(owner_file)?;
 
     // Check and convert fields in owner file
-    let owner_account_address = parse_required_option(
+    let owner_account_address: AccountAddress = parse_required_option(
         &owner_config.owner_account_address,
         owner_file,
         "owner_account_address",
-        AccountAddress::from_str,
-    )?;
+        AccountAddressWithChecks::from_str,
+    )?
+    .into();
     let owner_account_public_key = parse_required_option(
         &owner_config.owner_account_public_key,
         owner_file,
         "owner_account_public_key",
-        Ed25519PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
 
-    let operator_account_address = parse_required_option(
+    let operator_account_address: AccountAddress = parse_required_option(
         &owner_config.operator_account_address,
         owner_file,
         "operator_account_address",
-        AccountAddress::from_str,
-    )?;
+        AccountAddressWithChecks::from_str,
+    )?
+    .into();
     let operator_account_public_key = parse_required_option(
         &owner_config.operator_account_public_key,
         owner_file,
         "operator_account_public_key",
-        Ed25519PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
 
-    let voter_account_address = parse_required_option(
+    let voter_account_address: AccountAddress = parse_required_option(
         &owner_config.voter_account_address,
         owner_file,
         "voter_account_address",
-        AccountAddress::from_str,
-    )?;
+        AccountAddressWithChecks::from_str,
+    )?
+    .into();
     let voter_account_public_key = parse_required_option(
         &owner_config.voter_account_public_key,
         owner_file,
         "voter_account_public_key",
-        Ed25519PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
 
     let stake_amount = parse_required_option(
@@ -387,41 +391,42 @@ fn get_config(
     let operator_config = client.get::<StringOperatorConfiguration>(operator_file)?;
 
     // Check and convert fields in operator file
-    let operator_account_address_from_file = parse_required_option(
+    let operator_account_address_from_file: AccountAddress = parse_required_option(
         &operator_config.operator_account_address,
         operator_file,
         "operator_account_address",
-        AccountAddress::from_str,
-    )?;
+        AccountAddressWithChecks::from_str,
+    )?
+    .into();
     let operator_account_public_key_from_file = parse_required_option(
         &operator_config.operator_account_public_key,
         operator_file,
         "operator_account_public_key",
-        Ed25519PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
     let consensus_public_key = parse_required_option(
         &operator_config.consensus_public_key,
         operator_file,
         "consensus_public_key",
-        bls12381::PublicKey::from_encoded_string,
+        |str| parse_key(bls12381::PublicKey::LENGTH, str),
     )?;
     let consensus_proof_of_possession = parse_required_option(
         &operator_config.consensus_proof_of_possession,
         operator_file,
         "consensus_proof_of_possession",
-        bls12381::ProofOfPossession::from_encoded_string,
+        |str| parse_key(bls12381::ProofOfPossession::LENGTH, str),
     )?;
     let validator_network_public_key = parse_required_option(
         &operator_config.validator_network_public_key,
         operator_file,
         "validator_network_public_key",
-        x25519::PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
     let full_node_network_public_key = parse_optional_option(
         &operator_config.full_node_network_public_key,
         operator_file,
         "full_node_network_public_key",
-        x25519::PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
 
     // Verify owner & operator agree on operator
@@ -464,6 +469,41 @@ fn get_config(
         commission_percentage,
         join_during_genesis,
     })
+}
+
+// TODO: Move into the Crypto libraries
+fn parse_key<T: ValidCryptoMaterial>(num_bytes: usize, str: &str) -> anyhow::Result<T> {
+    let num_chars: usize = num_bytes * 2;
+    let mut has_0x = false;
+    let mut working = str.trim();
+
+    // Checks if it has a 0x at the beginning, which is okay
+    if working.starts_with("0x") {
+        has_0x = true;
+        working = &working[2..];
+    }
+
+    if working.len() > num_chars {
+        anyhow::bail!(
+            "Key {} is too long {} must be {} hex characters with or without a 0x in front",
+            str,
+            working.len(),
+            num_chars
+        )
+    } else if !has_0x && working.len() < num_chars {
+        anyhow::bail!(
+            "Key {} is too short {} must be {} hex characters",
+            str,
+            working.len(),
+            num_chars
+        )
+    }
+
+    if !working.chars().all(|c| char::is_ascii_hexdigit(&c)) {
+        anyhow::bail!("Key {} contains a non-hex character", str)
+    }
+
+    Ok(T::from_encoded_string(str.trim())?)
 }
 
 fn parse_required_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
