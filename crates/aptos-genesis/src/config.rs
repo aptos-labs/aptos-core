@@ -475,6 +475,8 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
     type Error = anyhow::Error;
 
     fn try_from(map: EmployeePoolMap) -> Result<Self, Self::Error> {
+        let mut vesting_schedule_numbers: Option<(Vec<u64>, u64)> = None;
+
         let mut employee_accounts = HashSet::new();
         let mut pools = vec![];
         for (i, pool) in map.inner.into_iter().enumerate() {
@@ -490,24 +492,39 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
                 }
             }
 
-            // Check vesting schedule adds up properly
-            let mut numerators = 0;
-            let denominator = pool.vesting_schedule_denominator;
-            let mut last_numerator = 0;
-            for numerator in pool.vesting_schedule_numerators.iter() {
-                numerators += *numerator;
-                last_numerator = *numerator;
-            }
+            // Check vesting schedule adds up properly, we only have to check once, then check they are all the same
+            if let Some((numerators, denominator)) = vesting_schedule_numbers.as_ref() {
+                if numerators != &pool.vesting_schedule_numerators {
+                    anyhow::bail!("Numerators are not the same on every pool in pool #{}.  Expected: {:?}, got {:?}", i, numerators, pool.vesting_schedule_numerators);
+                }
 
-            if numerators > denominator {
-                anyhow::bail!(
-                    "Numerators {} add up over the denominator {} for pool #{}",
-                    numerators,
-                    denominator,
-                    i
-                )
-            } else if (denominator - numerators) % last_numerator != 0 {
-                anyhow::bail!("Numerators don't add up to the denominator {} (with the last one {} being repeated for pool #{}", denominator, last_numerator, i)
+                if denominator != &pool.vesting_schedule_denominator {
+                    anyhow::bail!("Denominator are not the same on every pool in pool #{}.  Expected: {:?}, got {:?}", i, denominator, pool.vesting_schedule_denominator);
+                }
+            } else {
+                let mut numerators = 0;
+                let denominator = pool.vesting_schedule_denominator;
+                let mut last_numerator = 0;
+                for numerator in pool.vesting_schedule_numerators.iter() {
+                    numerators += *numerator;
+                    last_numerator = *numerator;
+                }
+
+                if numerators > denominator {
+                    anyhow::bail!(
+                        "Numerators {} add up over the denominator {} for pool #{}",
+                        numerators,
+                        denominator,
+                        i
+                    )
+                } else if (denominator - numerators) % last_numerator != 0 {
+                    anyhow::bail!("Numerators don't add up to the denominator {} (with the last one {} being repeated for pool #{}", denominator, last_numerator, i)
+                }
+
+                vesting_schedule_numbers = Some((
+                    pool.vesting_schedule_numerators.clone(),
+                    pool.vesting_schedule_denominator,
+                ))
             }
 
             // I'm going to assume no one wants to pay more than 50% of their rewards away
