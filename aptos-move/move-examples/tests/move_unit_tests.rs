@@ -81,7 +81,7 @@ fn test_message_board() {
 #[test]
 fn test_minter() {
     let named_address = BTreeMap::new();
-    run_tests_for_pkg("minter_script", named_address);
+    run_tests_for_pkg("scripts/minter", named_address);
 }
 
 #[test]
