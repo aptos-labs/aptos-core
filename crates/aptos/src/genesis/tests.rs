@@ -131,7 +131,7 @@ fn get_owner_address(git_options: GitOptions, index: u64) -> AccountAddress {
                 .as_path(),
         )
         .unwrap();
-    owner_config.owner_account_address
+    owner_config.owner_account_address.into()
 }
 
 async fn create_users(
@@ -327,11 +327,11 @@ async fn create_employee_vesting_accounts_file(
                 let admin_identity = admin_identity.clone();
 
                 ValidatorConfiguration {
-                    owner_account_address: admin_identity.account_address,
+                    owner_account_address: admin_identity.account_address.into(),
                     owner_account_public_key: admin_identity.account_public_key.clone(),
-                    operator_account_address: admin_identity.account_address,
+                    operator_account_address: admin_identity.account_address.into(),
                     operator_account_public_key: admin_identity.account_public_key.clone(),
-                    voter_account_address: admin_identity.account_address,
+                    voter_account_address: admin_identity.account_address.into(),
                     voter_account_public_key: admin_identity.account_public_key,
                     consensus_public_key: admin_identity.consensus_public_key,
                     proof_of_possession: admin_identity.consensus_proof_of_possession,
@@ -345,11 +345,11 @@ async fn create_employee_vesting_accounts_file(
                 }
             } else {
                 ValidatorConfiguration {
-                    owner_account_address: admin_identity.account_address,
+                    owner_account_address: admin_identity.account_address.into(),
                     owner_account_public_key: admin_identity.account_public_key.clone(),
-                    operator_account_address: admin_identity.account_address,
+                    operator_account_address: admin_identity.account_address.into(),
                     operator_account_public_key: admin_identity.account_public_key.clone(),
-                    voter_account_address: admin_identity.account_address,
+                    voter_account_address: admin_identity.account_address.into(),
                     voter_account_public_key: admin_identity.account_public_key.clone(),
                     consensus_public_key: None,
                     proof_of_possession: None,
@@ -364,11 +364,11 @@ async fn create_employee_vesting_accounts_file(
             };
 
             EmployeePoolConfig {
-                accounts: accounts.clone(),
+                accounts: accounts.iter().map(|addr| addr.into()).collect(),
                 validator: validator_config,
                 vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
                 vesting_schedule_denominator: 48,
-                beneficiary_resetter: admin_identity.account_address,
+                beneficiary_resetter: admin_identity.account_address.into(),
             }
         })
         .collect();
