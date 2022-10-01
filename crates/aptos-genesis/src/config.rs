@@ -3,6 +3,7 @@
 
 use aptos_config::config::HANDSHAKE_VERSION;
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519};
+use aptos_types::account_address::AccountAddressWithChecks;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -106,12 +107,12 @@ impl Default for Layout {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidatorConfiguration {
     /// Account address
-    pub owner_account_address: AccountAddress,
+    pub owner_account_address: AccountAddressWithChecks,
     /// Key used for signing transactions with the account
     pub owner_account_public_key: Ed25519PublicKey,
-    pub operator_account_address: AccountAddress,
+    pub operator_account_address: AccountAddressWithChecks,
     pub operator_account_public_key: Ed25519PublicKey,
-    pub voter_account_address: AccountAddress,
+    pub voter_account_address: AccountAddressWithChecks,
     pub voter_account_public_key: Ed25519PublicKey,
     /// Key used for signing in consensus
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -189,28 +190,31 @@ impl TryFrom<ValidatorConfiguration> for Validator {
 
         let auth_key = AuthenticationKey::ed25519(&config.owner_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.owner_account_address != derived_address {
+        let owner_address = AccountAddress::from(config.owner_account_address);
+        if owner_address != derived_address {
             return Err(anyhow::Error::msg(format!(
                 "owner_account_address {} does not match account key derived one {}",
-                config.owner_account_address, derived_address
+                owner_address, derived_address
             )));
         }
 
         let auth_key = AuthenticationKey::ed25519(&config.operator_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.operator_account_address != derived_address {
+        let operator_address = AccountAddress::from(config.operator_account_address);
+        if operator_address != derived_address {
             return Err(anyhow::Error::msg(format!(
                 "operator_account_address {} does not match account key derived one {}",
-                config.operator_account_address, derived_address
+                operator_address, derived_address
             )));
         }
 
         let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.voter_account_address != derived_address {
+        let voter_address = AccountAddress::from(config.voter_account_address);
+        if voter_address != derived_address {
             return Err(anyhow::Error::msg(format!(
                 "voter_account_address {} does not match account key derived one {}",
-                config.voter_account_address, derived_address
+                voter_address, derived_address
             )));
         }
 
@@ -226,9 +230,9 @@ impl TryFrom<ValidatorConfiguration> for Validator {
         };
 
         Ok(Validator {
-            owner_address: config.owner_account_address,
-            operator_address: config.operator_account_address,
-            voter_address: config.voter_account_address,
+            owner_address,
+            operator_address,
+            voter_address,
             consensus_pubkey,
             proof_of_possession,
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
@@ -307,11 +311,11 @@ impl FromStr for HostAndPort {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OwnerConfiguration {
-    pub owner_account_address: AccountAddress,
+    pub owner_account_address: AccountAddressWithChecks,
     pub owner_account_public_key: Ed25519PublicKey,
-    pub voter_account_address: AccountAddress,
+    pub voter_account_address: AccountAddressWithChecks,
     pub voter_account_public_key: Ed25519PublicKey,
-    pub operator_account_address: AccountAddress,
+    pub operator_account_address: AccountAddressWithChecks,
     pub operator_account_public_key: Ed25519PublicKey,
     pub stake_amount: u64,
     pub commission_percentage: u64,
@@ -320,7 +324,7 @@ pub struct OwnerConfiguration {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OperatorConfiguration {
-    pub operator_account_address: AccountAddress,
+    pub operator_account_address: AccountAddressWithChecks,
     pub operator_account_public_key: Ed25519PublicKey,
     pub consensus_public_key: bls12381::PublicKey,
     pub consensus_proof_of_possession: bls12381::ProofOfPossession,
@@ -374,7 +378,16 @@ impl<'de> Deserialize<'de> for AccountBalanceMap {
     where
         D: Deserializer<'de>,
     {
-        let account_balances = <Vec<BTreeMap<AccountAddress, u64>>>::deserialize(deserializer)?;
+        let account_balances =
+            <Vec<BTreeMap<AccountAddressWithChecks, u64>>>::deserialize(deserializer)?;
+        let account_balances = account_balances
+            .into_iter()
+            .map(|map| {
+                map.into_iter()
+                    .map(|(addr, balance)| (addr.into(), balance))
+                    .collect()
+            })
+            .collect();
         Ok(AccountBalanceMap { account_balances })
     }
 }
@@ -541,11 +554,11 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmployeePoolConfig {
-    pub accounts: Vec<AccountAddress>,
+    pub accounts: Vec<AccountAddressWithChecks>,
     pub validator: ValidatorConfiguration,
     pub vesting_schedule_numerators: Vec<u64>,
     pub vesting_schedule_denominator: u64,
-    pub beneficiary_resetter: AccountAddress,
+    pub beneficiary_resetter: AccountAddressWithChecks,
 }
 
 impl TryFrom<EmployeePoolConfig> for EmployeePool {
@@ -556,7 +569,11 @@ impl TryFrom<EmployeePoolConfig> for EmployeePool {
         let join_during_genesis = pool.validator.join_during_genesis;
         let validator = Validator::try_from(pool.validator)?;
         Ok(EmployeePool {
-            accounts: pool.accounts,
+            accounts: pool
+                .accounts
+                .into_iter()
+                .map(|inner| inner.into())
+                .collect(),
             validator: ValidatorWithCommissionRate {
                 validator,
                 validator_commission_percentage,
@@ -564,7 +581,7 @@ impl TryFrom<EmployeePoolConfig> for EmployeePool {
             },
             vesting_schedule_numerators: pool.vesting_schedule_numerators,
             vesting_schedule_denominator: pool.vesting_schedule_denominator,
-            beneficiary_resetter: pool.beneficiary_resetter,
+            beneficiary_resetter: pool.beneficiary_resetter.into(),
         })
     }
 }

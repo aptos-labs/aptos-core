@@ -388,11 +388,11 @@ fn get_config(
     // We don't require the operator file if the validator is not joining during genesis.
     if is_mainnet && !join_during_genesis {
         return Ok(ValidatorConfiguration {
-            owner_account_address,
+            owner_account_address: owner_account_address.into(),
             owner_account_public_key,
-            operator_account_address,
+            operator_account_address: operator_account_address.into(),
             operator_account_public_key,
-            voter_account_address,
+            voter_account_address: voter_account_address.into(),
             voter_account_public_key,
             consensus_public_key: None,
             proof_of_possession: None,
@@ -472,11 +472,11 @@ fn get_config(
 
     // Build Validator configuration
     Ok(ValidatorConfiguration {
-        owner_account_address,
+        owner_account_address: owner_account_address.into(),
         owner_account_public_key,
-        operator_account_address,
+        operator_account_address: operator_account_address.into(),
         operator_account_public_key,
-        voter_account_address,
+        voter_account_address: voter_account_address.into(),
         voter_account_public_key,
         consensus_public_key: Some(consensus_public_key),
         proof_of_possession: Some(consensus_proof_of_possession),
@@ -544,19 +544,19 @@ fn validate_validators(
 ) -> CliTypedResult<()> {
     // check accounts for validators
     for (i, validator) in validators.iter().enumerate() {
-        if !initialized_accounts.contains_key(&validator.owner_account_address) {
+        if !initialized_accounts.contains_key(&validator.owner_account_address.into()) {
             return Err(CliError::UnexpectedError(format!(
                 "Owner {} in validator #{} is is not in the initialized balances",
                 validator.owner_account_address, i
             )));
         }
-        if !initialized_accounts.contains_key(&validator.operator_account_address) {
+        if !initialized_accounts.contains_key(&validator.operator_account_address.into()) {
             return Err(CliError::UnexpectedError(format!(
                 "Operator {} in validator #{} is is not in the initialized balances",
                 validator.operator_account_address, i
             )));
         }
-        if !initialized_accounts.contains_key(&validator.voter_account_address) {
+        if !initialized_accounts.contains_key(&validator.voter_account_address.into()) {
             return Err(CliError::UnexpectedError(format!(
                 "Voter {} in validator #{} is is not in the initialized balances",
                 validator.voter_account_address, i
@@ -564,7 +564,7 @@ fn validate_validators(
         }
 
         let owner_balance = initialized_accounts
-            .get(&validator.owner_account_address)
+            .get(&validator.owner_account_address.into())
             .unwrap();
         // Pooled validators have a combined balance
         // TODO: Make this field optional but checked
