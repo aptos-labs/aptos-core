@@ -11,12 +11,10 @@ use framework::natives::{
     cryptography::ristretto255_point::NativeRistrettoPointContext,
     state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
-use move_deps::{
-    move_binary_format::errors::VMResult,
-    move_bytecode_verifier::VerifierConfig,
-    move_table_extension::NativeTableContext,
-    move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions},
-};
+use move_binary_format::errors::VMResult;
+use move_bytecode_verifier::VerifierConfig;
+use move_table_extension::NativeTableContext;
+use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::ops::Deref;
 
 pub struct MoveVmExt {
@@ -30,12 +28,13 @@ impl MoveVmExt {
         treat_friend_as_private: bool,
     ) -> VMResult<Self> {
         Ok(Self {
-            inner: MoveVM::new_with_verifier_config(
+            inner: MoveVM::new_with_configs(
                 aptos_natives(native_gas_params, abs_val_size_gas_params),
                 VerifierConfig {
                     max_loop_depth: Some(5),
                     treat_friend_as_private,
                 },
+                crate::AptosVM::get_runtime_config(),
             )?,
         })
     }

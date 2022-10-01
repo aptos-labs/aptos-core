@@ -4,8 +4,8 @@
 use crate::{driver_factory::DriverFactory, metadata_storage::PersistentMetadataStorage};
 use aptos_config::{
     config::{
-        RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
-        TARGET_SNAPSHOT_SIZE,
+        RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        NO_OP_STORAGE_PRUNER_CONFIG,
     },
     utils::get_genesis_txn,
 };
@@ -39,7 +39,7 @@ fn test_new_initialized_configs() {
         NO_OP_STORAGE_PRUNER_CONFIG,
         RocksdbConfigs::default(),
         false,
-        TARGET_SNAPSHOT_SIZE,
+        BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )
     .unwrap();

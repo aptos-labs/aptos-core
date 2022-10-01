@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use better_any::{Tid, TidAble};
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_core_types::gas_algebra::InternalGas,
-    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
-    move_vm_types::{
-        loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
-    },
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::gas_algebra::InternalGas;
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
 };
 use smallvec::smallvec;
 use std::collections::VecDeque;

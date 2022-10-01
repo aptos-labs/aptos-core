@@ -476,30 +476,6 @@ impl EventStore {
         self.prune_event_accumulator(start, end, db_batch)?;
         Ok(())
     }
-
-    pub fn prune_events_by_version(
-        &self,
-        event_keys: HashSet<EventKey>,
-        begin: Version,
-        end: Version,
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<()> {
-        for event_key in event_keys {
-            db_batch
-                .delete_range::<EventByVersionSchema>(&(event_key, begin, 0), &(event_key, end, 0));
-        }
-        Ok(())
-    }
-
-    /// Prunes the event schema for a range of version in [begin, end)
-    pub fn prune_event_schema(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<()> {
-        db_batch.delete_range::<EventSchema>(&(begin, 0_u64), &(end, 0_u64))
-    }
 }
 
 struct EventHashReader<'a> {

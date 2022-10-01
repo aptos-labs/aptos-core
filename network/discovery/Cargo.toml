@@ -27,7 +27,6 @@ aptos-types = { path = "../../types" }
 
 channel = { path = "../../crates/channel" }
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 network = { path = "../../network" }
 short-hex-str = { path = "../../crates/short-hex-str" }
 

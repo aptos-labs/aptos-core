@@ -90,9 +90,6 @@ impl DirectMempoolQuorumStore {
                     Ok(txns) => (txns, counters::REQUEST_SUCCESS_LABEL),
                 }
             }
-            _ => {
-                panic!("Unknown payload_filter: {}", payload_filter)
-            }
         };
         counters::quorum_store_service_latency(
             counters::GET_BATCH_LABEL,

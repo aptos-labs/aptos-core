@@ -417,7 +417,7 @@
 //! [^RY07]: The Power of Proofs-of-Possession: Securing Multiparty Signatures against Rogue-Key Attacks; by Ristenpart, Thomas and Yilek, Scott; in Advances in Cryptology - EUROCRYPT 2007; 2007
 
 /// Domain separation tag (DST) for hashing a message before signing it.
-const DST_BLS_SIG_IN_G2_WITH_POP: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+pub const DST_BLS_SIG_IN_G2_WITH_POP: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
 
 pub mod bls12381_keys;
 pub mod bls12381_pop;

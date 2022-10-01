@@ -141,23 +141,23 @@
       }
     },
     {
-      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
       "id": 133,
       "isNew": false,
       "span": 0,
-      "title": "Participating voting power in last 100 rounds",
+      "title": "Participating voting power % in last 100 rounds",
       "description": "Global statistics from the chain, all nodes that are caught up should have the same value.\n\nIf value goes below 80 it is concerning. if it goes below 72 it is a very bad.\n\nIt cannot go below 67%, because chain stops otherwise, and there is no data to show then.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "__auto"
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "participating voting power"
         }
       ],
       "options": {
@@ -167,19 +167,22 @@
       "fieldConfig": {
         "defaults": {
           "unit": "",
+          "min": 66,
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "transparent", "value": null },
-              { "color": "red", "value": 0.6 },
-              { "color": "orange", "value": 0.72 },
-              { "color": "yellow", "value": 0.8 },
-              { "color": "green", "value": 0.9 }
+              { "color": "red", "value": 60 },
+              { "color": "orange", "value": 72 },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 90 }
             ]
           },
           "custom": {
             "axisPlacement": "auto",
+            "axisSoftMin": 66,
+            "axisSoftMax": 100,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -2007,14 +2010,14 @@
       "id": 14,
       "isNew": false,
       "span": 0,
-      "title": "Total QC rounds",
+      "title": "QC round per sec",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_consensus_qc_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(aptos_consensus_qc_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -2064,7 +2067,7 @@
       "id": 16,
       "isNew": false,
       "span": 0,
-      "title": "Total timeout rounds",
+      "title": "Timeout rounds per sec",
       "description": "The total number of rounds that have timeout certificate.",
       "transparent": false,
       "type": "timeseries",
@@ -2072,7 +2075,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -2130,7 +2133,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_consensus_timeout_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(aptos_consensus_timeout_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -2553,7 +2556,7 @@
       "id": 56,
       "isNew": false,
       "span": 0,
-      "title": "Total wait duration",
+      "title": "Wait duration per sec",
       "description": "Total time the node has to wait before inserting the block",
       "transparent": false,
       "type": "timeseries",
@@ -2561,7 +2564,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_consensus_wait_duration_s_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(aptos_consensus_wait_duration_s_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -3134,7 +3137,7 @@
       "id": 21,
       "isNew": false,
       "span": 0,
-      "title": "State sync count",
+      "title": "State sync count per sec",
       "description": "The total count of call to sync to.",
       "transparent": false,
       "type": "timeseries",
@@ -3142,7 +3145,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -3250,7 +3253,7 @@
       "id": 24,
       "isNew": false,
       "span": 0,
-      "title": "Block retrieval count",
+      "title": "Block retrieval count per sec",
       "description": "The total number of block retrieval the node sends. It's required when the node is missing some ancestors of the block to be executed.",
       "transparent": false,
       "type": "timeseries",
@@ -3258,7 +3261,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -3438,7 +3441,7 @@
       "id": 53,
       "isNew": false,
       "span": 0,
-      "title": "Total votes on Nil",
+      "title": "Nil block per sec",
       "description": "The total number the node votes on a NIL block when the round timeout. (when the proposer doesn't send proposal in time).",
       "transparent": false,
       "type": "timeseries",
@@ -3446,7 +3449,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_consensus_vote_nil_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(aptos_consensus_vote_nil_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -4784,6 +4787,268 @@
           }
         }
       }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 241 },
+      "id": 142,
+      "isNew": false,
+      "span": 0,
+      "title": "Participating in consensus",
+      "description": "Participating in consensus in leader election window (either voted in last num_validators rounds, or proposed in last 10*num_validators rounds)",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "clamp_max(aptos_committed_votes_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} + aptos_committed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}, 1)",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 241 },
+      "id": 143,
+      "isNew": false,
+      "span": 0,
+      "title": "Proposal failure rate",
+      "description": "Proposal failure rate in leader election window. Value goes back to 0 once node is not asked to propose at all in the window",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_failed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} / clamp_min(aptos_failed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} + aptos_committed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}, 1)",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 249 },
+      "id": 144,
+      "isNew": false,
+      "span": 0,
+      "title": "Participating voting power % in consensus",
+      "description": "Global statistics from the chain, all nodes that are caught up should have the same value.\n\nIf value goes below 80 it is concerning. if it goes below 72 it is a very bad.\n\nIt cannot go below 67%, because chain stops otherwise, and there is no data to show then.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, aptos_chain_health_participating_voting_power_last_10_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "legendFormat": "last 10 rounds"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, aptos_chain_health_participating_voting_power_last_30_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "legendFormat": "last 30 rounds"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "legendFormat": "last 100 rounds"
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, aptos_chain_health_participating_voting_power_last_300_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "legendFormat": "last 300 rounds"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 60 },
+              { "color": "orange", "value": 72 },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 90 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "area" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 249 },
+      "id": 145,
+      "isNew": false,
+      "span": 0,
+      "title": "Participating nodes % in consensus",
+      "description": "Global statistics from the chain, all nodes that are caught up should have the same value.\n\nIf value goes below 80 it is concerning. if it goes below 72 it is a very bad.\n\nIt cannot go below 67%, because chain stops otherwise, and there is no data to show then.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_10_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "legendFormat": "last 10 rounds"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_30_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "legendFormat": "30"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "legendFormat": "last 100 rounds"
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_300_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} * 100/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "legendFormat": "last 300 rounds"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 60 },
+              { "color": "orange", "value": 72 },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 90 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "area" }
+          }
+        }
+      }
     }
   ],
   "rows": null,
@@ -4961,7 +5226,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 50,
+  "version": 57,
   "links": [
     {
       "title": "Other Dashboards",

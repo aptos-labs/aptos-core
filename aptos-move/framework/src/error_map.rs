@@ -8,14 +8,14 @@
 //! leveraged to do whole program traversals and analysis.
 
 use crate::built_package::BuildOptions;
-use move_deps::move_core_types::account_address::AccountAddress;
-use move_deps::move_core_types::errmap::{ErrorDescription, ErrorMapping};
-use move_deps::move_core_types::identifier::Identifier;
-use move_deps::move_core_types::language_storage::ModuleId;
-use move_deps::move_model::ast::Value;
-use move_deps::move_model::model::{GlobalEnv, ModuleEnv, NamedConstantEnv};
-use move_deps::move_model::symbol::Symbol;
-use move_deps::move_package::{BuildConfig, ModelConfig};
+use move_core_types::account_address::AccountAddress;
+use move_core_types::errmap::{ErrorDescription, ErrorMapping};
+use move_core_types::identifier::Identifier;
+use move_core_types::language_storage::ModuleId;
+use move_model::ast::Value;
+use move_model::model::{GlobalEnv, ModuleEnv, NamedConstantEnv};
+use move_model::symbol::Symbol;
+use move_package::{BuildConfig, ModelConfig};
 use std::path::Path;
 use std::{convert::TryFrom, rc::Rc};
 
@@ -35,6 +35,7 @@ pub(crate) fn generate_error_map(
         test_mode: false,
         force_recompilation: false,
         fetch_deps_only: false,
+        fetch_latest_git_deps: false,
     };
     if let Ok(model) = build_config.move_model_for_package(
         package_path,

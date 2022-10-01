@@ -16,15 +16,18 @@ use crate::common::types::{
     MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
     PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
+
+#[cfg(feature = "cli-framework-test-move")]
 use crate::common::utils::write_to_file;
+
 use crate::move_tool::{
     ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
     InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
-    AnalyzeMode, AnalyzeValidatorPerformance, GetPoolAddress, InitializeValidator,
-    JoinValidatorSet, LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig,
-    ShowValidatorSet, ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
+    AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
+    LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
+    ShowValidatorStake, StakePoolResult, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
@@ -52,7 +55,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
+
+#[cfg(feature = "cli-framework-test-move")]
 use thiserror::__private::PathAsDisplay;
+
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -508,11 +514,12 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn get_pool_address(&self, owner_index: usize) -> CliTypedResult<AccountAddress> {
-        GetPoolAddress {
+    pub async fn get_pool_address(
+        &self,
+        owner_index: usize,
+    ) -> CliTypedResult<Vec<StakePoolResult>> {
+        GetStakePool {
             owner_address: self.account_id(owner_index),
-            operator_address: None,
-            employee_account_index: None,
             rest_options: self.rest_options(),
             profile_options: Default::default(),
         }
@@ -721,6 +728,7 @@ impl CliTestFramework {
         self.move_dir = Some(move_dir.path().to_path_buf());
     }
 
+    #[cfg(feature = "cli-framework-test-move")]
     pub fn add_move_files(&self) {
         let move_dir = self.move_dir();
         let sources_dir = move_dir.join("sources");
@@ -909,7 +917,7 @@ impl CliTestFramework {
     }
 
     pub fn rest_options(&self) -> RestOptions {
-        RestOptions::new(Some(self.endpoint.clone()))
+        RestOptions::new(Some(self.endpoint.clone()), None)
     }
 
     pub fn faucet_options(&self) -> FaucetOptions {

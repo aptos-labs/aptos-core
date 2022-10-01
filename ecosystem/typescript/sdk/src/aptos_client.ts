@@ -50,6 +50,8 @@ interface PaginationArgs {
 export class AptosClient {
   client: Gen.AptosGeneratedClient;
 
+  readonly nodeUrl: string;
+
   /**
    * Build a client configured to connect to an Aptos node at the given URL.
    *
@@ -65,11 +67,13 @@ export class AptosClient {
       throw new Error("Node URL cannot be empty.");
     }
     const conf = config === undefined || config === null ? {} : { ...config };
+
     if (doNotFixNodeUrl) {
-      conf.BASE = nodeUrl;
+      this.nodeUrl = nodeUrl;
     } else {
-      conf.BASE = fixNodeUrl(nodeUrl);
+      this.nodeUrl = fixNodeUrl(nodeUrl);
     }
+    conf.BASE = this.nodeUrl;
 
     // Do not carry cookies when `WITH_CREDENTIALS` is explicitly set to `false`. By default, cookies will be sent
     if (config?.WITH_CREDENTIALS === false) {
@@ -102,7 +106,7 @@ export class AptosClient {
    * Queries transactions sent by given account
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query Optional pagination object
-   * @param query.start The start transaction version of the page. Default is the latest ledger version
+   * @param query.start The sequence number of the start transaction of the page. Default is 0.
    * @param query.limit The max number of transactions should be returned for the page. Default is 25.
    * @returns An array of on-chain transactions, sent by account
    */
@@ -281,19 +285,6 @@ export class AptosClient {
     rawTransaction: TxnBuilderTypes.RawTransaction,
   ): Promise<Uint8Array> {
     return Promise.resolve(AptosClient.generateBCSTransaction(accountFrom, rawTransaction));
-  }
-
-  /**
-   * @deprecated Use `getEventsByCreationNumber` instead. This will be removed in the next release.
-   *
-   * Queries events by event key
-   * @param eventKey Event key for an event stream. It is BCS serialized bytes
-   * of `guid` field in the Move struct `EventHandle`
-   * @returns Array of events assotiated with given key
-   */
-  @parseApiError
-  async getEventsByEventKey(eventKey: string): Promise<Gen.Event[]> {
-    return this.client.events.getEventsByEventKey(eventKey);
   }
 
   /**
@@ -478,7 +469,7 @@ export class AptosClient {
     try {
       const response = await this.client.transactions.getTransactionByHash(txnHash);
       return response.type === "pending_transaction";
-    } catch (e) {
+    } catch (e: any) {
       if (e?.status === 404) {
         return true;
       }
@@ -556,6 +547,12 @@ export class AptosClient {
       await sleep(1000);
       count += 1;
     }
+
+    // There is a chance that lastTxn is still undefined. Let's throw some error here
+    if (lastTxn === undefined) {
+      throw new Error(`Waiting for transaction ${txnHash} failed`);
+    }
+
     if (isPending) {
       throw new WaitForTransactionError(
         `Waiting for transaction ${txnHash} timed out after ${timeoutSecs} seconds`,
@@ -567,7 +564,7 @@ export class AptosClient {
     }
     if (!(lastTxn as any)?.success) {
       throw new FailedTransactionError(
-        `Transaction ${lastTxn.hash} committed to the blockchain but execution failed`,
+        `Transaction ${txnHash} committed to the blockchain but execution failed`,
         lastTxn,
       );
     }

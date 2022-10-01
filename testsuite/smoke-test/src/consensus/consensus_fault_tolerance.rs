@@ -9,8 +9,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::smoke_test_environment::SwarmBuilder;
-use crate::test_utils::{create_and_fund_account, transfer_coins_non_blocking};
+use crate::{
+    smoke_test_environment::SwarmBuilder,
+    test_utils::{create_and_fund_account, transfer_coins_non_blocking},
+};
 use aptos_logger::info;
 use forge::{
     test_utils::consensus_utils::{
@@ -18,14 +20,13 @@ use forge::{
     },
     LocalSwarm, Swarm, SwarmExt,
 };
-use rand::{self, Rng};
-use rand::{rngs::SmallRng, SeedableRng};
+use rand::{self, rngs::SmallRng, Rng, SeedableRng};
 
 pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
     let swarm = SwarmBuilder::new_local(num_nodes)
         .with_init_config(Arc::new(move |_, config, _| {
             config.api.failpoints_enabled = true;
-            config.consensus.max_block_txns = max_block_txns;
+            config.consensus.max_sending_block_txns = max_block_txns;
             config.consensus.round_initial_timeout_ms = 1000;
             // no increase in timeout, to have stable round/second rate.
             config.consensus.round_timeout_backoff_exponent_base = 1.0;

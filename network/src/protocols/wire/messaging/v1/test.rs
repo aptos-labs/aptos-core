@@ -239,7 +239,7 @@ proptest! {
         let (stream_tx, stream_rx) = channel::new_test(1024);
         let (mut msg_tx, msg_rx) = channel::new_test(1024);
         let mut outbound_stream = OutboundStream::new(128, 64 * 255, stream_tx);
-        let mut inbound_stream = InboundStreamBuffer::new();
+        let mut inbound_stream = InboundStreamBuffer::new(255);
 
         let messages_clone = messages.clone();
         let f_stream_all = async move {

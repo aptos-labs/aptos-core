@@ -107,6 +107,10 @@ module aptos_framework::account {
     const EINVALID_ORIGINATING_ADDRESS: u64 = 13;
     /// The signer capability doesn't exist at the given address
     const ENO_SUCH_SIGNER_CAPABILITY: u64 = 14;
+    /// An attempt to create a resource account on a claimed account
+    const ERESOURCE_ACCCOUNT_EXISTS: u64 = 15;
+    /// An attempt to create a resource account on an account that has a committed transaction
+    const EACCOUNT_ALREADY_USED: u64 = 16;
 
     native fun create_signer(addr: address): signer;
 
@@ -380,11 +384,35 @@ module aptos_framework::account {
     }
 
     /// A resource account is used to manage resources independent of an account managed by a user.
-    public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
-        let addr = create_resource_address(&signer::address_of(source), seed);
-        let signer = create_account_unchecked(copy addr);
-        let signer_cap = SignerCapability { account: addr };
-        (signer, signer_cap)
+    /// In Aptos a resource account is created based upon the sha3 256 of the source's address and additional seed data.
+    /// A resource account can only be created once, this is designated by setting the
+    /// `Account::signer_capbility_offer::for` to the address of the resource account. While an entity may call
+    /// `create_account` to attempt to claim an account ahead of the creation of a resource account, if found Aptos will
+    /// transition ownership of the account over to the resource account. This is done by validating that the account has
+    /// yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a
+    /// collision where someone has legitimately produced a private key that maps to a resource account address is less
+    /// than `(1/2)^(256).
+    public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {
+        let resource_addr = create_resource_address(&signer::address_of(source), seed);
+        let resource = if (exists_at(resource_addr)) {
+            let account = borrow_global<Account>(resource_addr);
+            assert!(
+                option::is_none(&account.signer_capability_offer.for),
+                error::already_exists(ERESOURCE_ACCCOUNT_EXISTS),
+            );
+            assert!(
+                account.sequence_number == 0,
+                error::invalid_state(EACCOUNT_ALREADY_USED),
+            );
+            create_signer(resource_addr)
+        } else {
+            create_account_unchecked(resource_addr)
+        };
+
+        let account = borrow_global_mut<Account>(resource_addr);
+        account.signer_capability_offer.for = option::some(resource_addr);
+        let signer_cap = SignerCapability { account: resource_addr };
+        (resource, signer_cap)
     }
 
     /// create the account for system reserved addresses
@@ -453,7 +481,7 @@ module aptos_framework::account {
     }
 
     #[test(user = @0x1)]
-    public entry fun test_create_resource_account(user: signer) {
+    public entry fun test_create_resource_account(user: signer) acquires Account {
         let (resource_account, resource_account_cap) = create_resource_account(&user, x"01");
         let resource_addr = signer::address_of(&resource_account);
         assert!(resource_addr != signer::address_of(&user), 0);
@@ -464,7 +492,7 @@ module aptos_framework::account {
     struct DummyResource has key {}
 
     #[test(user = @0x1)]
-    public entry fun test_module_capability(user: signer) acquires DummyResource {
+    public entry fun test_module_capability(user: signer) acquires Account, DummyResource {
         let (resource_account, signer_cap) = create_resource_account(&user, x"01");
         assert!(signer::address_of(&resource_account) != signer::address_of(&user), 0);
 
@@ -473,6 +501,21 @@ module aptos_framework::account {
 
         move_to(&resource_account_from_cap, DummyResource {});
         borrow_global<DummyResource>(signer::address_of(&resource_account));
+    }
+
+    #[test(user = @0x1)]
+    public entry fun test_resource_account_and_create_account(user: signer) acquires Account {
+        let resource_addr = create_resource_address(&@0x1, x"01");
+        create_account_unchecked(resource_addr);
+
+        create_resource_account(&user, x"01");
+    }
+
+    #[test(user = @0x1)]
+    #[expected_failure(abort_code = 0x8000f)]
+    public entry fun test_duplice_create_resource_account(user: signer) acquires Account {
+        create_resource_account(&user, x"01");
+        create_resource_account(&user, x"01");
     }
 
     ///////////////////////////////////////////////////////////////////////////

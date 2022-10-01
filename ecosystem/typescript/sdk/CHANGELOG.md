@@ -8,6 +8,13 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 N/A
 
+## 1.3.15 (2022-09-30)
+
+- **[Breaking Changes]** Following the deprecation notice in the release notes of 1.3.13, the following breaking changes have landed in this release. Please see the notes from last release for information on the new endpoints you must migrate to:
+  - The `getEventsByEventKey` function has been removed.
+  - The `key` field in the `Event` struct has been removed.
+- Turn on `strict` in tsconfig
+
 ## 1.3.14 (2022-09-20)
 
 - Enable SDK axios client to carry cookies for both the browser and node environments.

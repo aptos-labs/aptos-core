@@ -1117,7 +1117,7 @@ impl TransactionsApi {
 
         // Simulate transaction
         let move_resolver = self.context.move_resolver_poem(&ledger_info)?;
-        let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (_, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
 
         // Apply transaction outputs to build up a transaction
@@ -1127,7 +1127,7 @@ impl TransactionsApi {
         let output = output_ext.into_transaction_output(&move_resolver);
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
-        let exe_status = match status.into() {
+        let exe_status = match output.status().clone() {
             TransactionStatus::Keep(exec_status) => exec_status,
             TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),

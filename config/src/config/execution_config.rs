@@ -20,6 +20,8 @@ pub struct ExecutionConfig {
     pub genesis_file_location: PathBuf,
     pub concurrency_level: u16,
     pub num_proof_reading_threads: u16,
+    pub paranoid_type_verification: bool,
+    pub paranoid_hot_potato_verification: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -46,6 +48,8 @@ impl Default for ExecutionConfig {
             // Parallel execution by default.
             concurrency_level: 8,
             num_proof_reading_threads: 32,
+            paranoid_type_verification: true,
+            paranoid_hot_potato_verification: true,
         }
     }
 }
@@ -150,14 +154,5 @@ mod test {
         temp_dir.create_as_dir().expect("error creating tempdir");
         let execution_config = ExecutionConfig::default();
         (execution_config, temp_dir)
-    }
-
-    #[test]
-    fn print_default_config() {
-        use serde_yaml;
-        println!(
-            "{}",
-            serde_yaml::to_string(&ExecutionConfig::default()).unwrap()
-        );
     }
 }

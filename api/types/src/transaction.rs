@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, AptosError, EntryFunctionId, EventGuid, EventKey, HashValue, HexEncodedBytes,
+    Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes,
     MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType,
     MoveValue, VerifyInput, VerifyInputWithRecursion, U64,
 };
@@ -24,14 +24,13 @@ use aptos_types::{
     },
 };
 use poem_openapi::{Object, Union};
-use serde::de::Error;
-use serde::{Deserialize, Deserializer, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
+use serde::{Deserialize, Serialize};
 use std::{
     boxed::Box,
     convert::{From, Into, TryFrom, TryInto},
     fmt,
     str::FromStr,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 // Warning: Do not add a docstring to a field that uses a type in `derives.rs`,
@@ -512,11 +511,9 @@ pub struct BlockMetadataTransaction {
 }
 
 /// An event from a transaction
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Object)]
+#[derive(Clone, Debug, Deserialize, Eq, Object, PartialEq, Serialize)]
 pub struct Event {
-    pub key: EventKey,
     // The globally unique identifier of this event stream.
-    #[serde(default)]
     pub guid: EventGuid,
     // The sequence number of the event
     pub sequence_number: U64,
@@ -527,49 +524,10 @@ pub struct Event {
     pub data: serde_json::Value,
 }
 
-// Convert old format where EventGuid isn't shown
-#[derive(Serialize, Deserialize)]
-pub struct CompatibleEvent {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub key: Option<EventKey>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub guid: Option<EventGuid>,
-    // The sequence number of the event
-    pub sequence_number: U64,
-    #[serde(rename = "type")]
-    pub typ: MoveType,
-    /// The JSON representation of the event
-    pub data: serde_json::Value,
-}
-
-impl<'de> Deserialize<'de> for Event {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let event = CompatibleEvent::deserialize(deserializer)?;
-        let (key, guid) = match (event.key, event.guid) {
-            (Some(key), Some(guid)) => (key, guid),
-            (Some(key), _) => (key, EventGuid::from(key)),
-            (_, Some(guid)) => (guid.into(), guid),
-            _ => return Err(D::Error::missing_field("key and guid")),
-        };
-
-        Ok(Event {
-            key,
-            guid,
-            sequence_number: event.sequence_number,
-            typ: event.typ,
-            data: event.data,
-        })
-    }
-}
-
 impl From<(&ContractEvent, serde_json::Value)> for Event {
     fn from((event, data): (&ContractEvent, serde_json::Value)) -> Self {
         match event {
             ContractEvent::V0(v0) => Self {
-                key: (*v0.key()).into(),
                 guid: (*v0.key()).into(),
                 sequence_number: v0.sequence_number().into(),
                 typ: v0.type_tag().clone().into(),
@@ -580,10 +538,9 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
 }
 
 /// An event from a transaction with a version
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Object)]
+#[derive(Clone, Debug, Deserialize, Eq, Object, PartialEq, Serialize)]
 pub struct VersionedEvent {
     pub version: U64,
-    pub key: EventKey,
     // The globally unique identifier of this event stream.
     pub guid: EventGuid,
     // The sequence number of the event
@@ -595,52 +552,11 @@ pub struct VersionedEvent {
     pub data: serde_json::Value,
 }
 
-// Convert old format where EventGuid isn't shown
-#[derive(Serialize, Deserialize)]
-pub struct CompatibleVersionedEvent {
-    pub version: U64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub key: Option<EventKey>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub guid: Option<EventGuid>,
-    // The sequence number of the event
-    pub sequence_number: U64,
-    #[serde(rename = "type")]
-    pub typ: MoveType,
-    /// The JSON representation of the event
-    pub data: serde_json::Value,
-}
-
-impl<'de> Deserialize<'de> for VersionedEvent {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let event = CompatibleVersionedEvent::deserialize(deserializer)?;
-        let (key, guid) = match (event.key, event.guid) {
-            (Some(key), Some(guid)) => (key, guid),
-            (Some(key), _) => (key, EventGuid::from(key)),
-            (_, Some(guid)) => (guid.into(), guid),
-            _ => return Err(D::Error::missing_field("key and guid")),
-        };
-
-        Ok(VersionedEvent {
-            version: event.version,
-            key,
-            guid,
-            sequence_number: event.sequence_number,
-            typ: event.typ,
-            data: event.data,
-        })
-    }
-}
-
 impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
     fn from((event, data): (&EventWithVersion, serde_json::Value)) -> Self {
         match &event.event {
             ContractEvent::V0(v0) => Self {
                 version: event.transaction_version.into(),
-                key: (*v0.key()).into(),
                 guid: (*v0.key()).into(),
                 sequence_number: v0.sequence_number().into(),
                 typ: v0.type_tag().clone().into(),
@@ -1344,157 +1260,4 @@ impl TransactionSigningMessage {
 pub struct GasEstimation {
     /// The current estimate for the gas unit price
     pub gas_estimate: u64,
-}
-
-#[cfg(test)]
-mod test {
-    use crate::transaction::{CompatibleEvent, CompatibleVersionedEvent};
-    use crate::{Event, EventGuid, MoveType, VersionedEvent, U64};
-    use aptos_types::account_address::AccountAddress;
-
-    #[test]
-    fn check_event_compatibility() {
-        let creation_number = 42.into();
-        let account_address = AccountAddress::ONE.into();
-        let guid = EventGuid {
-            creation_number,
-            account_address,
-        };
-        let key: crate::EventKey = guid.into();
-        let sequence_number: U64 = 1.into();
-        let move_type = MoveType::Bool;
-        let data = serde_json::json!("{\"key\":\"value\"");
-
-        let both = serde_json::to_string(&CompatibleEvent {
-            key: Some(key),
-            guid: Some(guid),
-            sequence_number,
-            typ: move_type.clone(),
-            data: data.clone(),
-        })
-        .unwrap();
-        let no_key = serde_json::to_string(&CompatibleEvent {
-            key: None,
-            guid: Some(guid),
-            sequence_number,
-            typ: move_type.clone(),
-            data: data.clone(),
-        })
-        .unwrap();
-        let no_guid = serde_json::to_string(&CompatibleEvent {
-            key: Some(key),
-            guid: None,
-            sequence_number,
-            typ: move_type.clone(),
-            data: data.clone(),
-        })
-        .unwrap();
-        let neither = serde_json::to_string(&CompatibleEvent {
-            key: None,
-            guid: None,
-            sequence_number,
-            typ: move_type.clone(),
-            data: data.clone(),
-        })
-        .unwrap();
-
-        let expected = Event {
-            key,
-            guid,
-            sequence_number,
-            typ: move_type,
-            data,
-        };
-
-        assert_eq!(
-            expected,
-            serde_json::from_str(&both).expect("Should parse both fields")
-        );
-        assert_eq!(
-            expected,
-            serde_json::from_str(&no_key).expect("Should parse guid only")
-        );
-        assert_eq!(
-            expected,
-            serde_json::from_str(&no_guid).expect("Should parse key only")
-        );
-        serde_json::from_str::<Event>(&neither)
-            .expect_err("Should not parse missing both key and guid");
-    }
-
-    #[test]
-    fn check_versioned_event_compatibility() {
-        let version = 1337.into();
-        let creation_number = 42.into();
-        let account_address = AccountAddress::ONE.into();
-        let guid = EventGuid {
-            creation_number,
-            account_address,
-        };
-        let key: crate::EventKey = guid.into();
-        let sequence_number: U64 = 1.into();
-        let move_type = MoveType::Bool;
-        let data = serde_json::json!("{\"key\":\"value\"");
-
-        let both = serde_json::to_string(&CompatibleVersionedEvent {
-            version,
-            key: Some(key),
-            guid: Some(guid),
-            sequence_number,
-            typ: move_type.clone(),
-            data: data.clone(),
-        })
-        .unwrap();
-        let no_key = serde_json::to_string(&CompatibleVersionedEvent {
-            version,
-            key: None,
-            guid: Some(guid),
-            sequence_number,
-            typ: move_type.clone(),
-            data: data.clone(),
-        })
-        .unwrap();
-        let no_guid = serde_json::to_string(&CompatibleVersionedEvent {
-            version,
-            key: Some(key),
-            guid: None,
-            sequence_number,
-            typ: move_type.clone(),
-            data: data.clone(),
-        })
-        .unwrap();
-        let neither = serde_json::to_string(&CompatibleVersionedEvent {
-            version,
-            key: None,
-            guid: None,
-            sequence_number,
-            typ: move_type.clone(),
-            data: data.clone(),
-        })
-        .unwrap();
-
-        let expected = VersionedEvent {
-            version,
-            key,
-            guid,
-            sequence_number,
-            typ: move_type,
-            data,
-        };
-
-        assert_eq!(
-            expected,
-            serde_json::from_str(&both).expect("Should parse both fields")
-        );
-        assert_eq!(
-            expected,
-            serde_json::from_str(&no_key).expect("Should parse guid only")
-        );
-        assert_eq!(
-            expected,
-            serde_json::from_str(&no_guid).expect("Should parse key only")
-        );
-        serde_json::from_str::<Event>(&neither)
-            .expect_err("Should not parse missing both key and guid");
-    }
 }

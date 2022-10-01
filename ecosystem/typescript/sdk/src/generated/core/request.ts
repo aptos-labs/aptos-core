@@ -102,16 +102,16 @@ const jar = new CookieJar();
 axios.interceptors.response.use((response) => {
   if (Array.isArray(response.headers["set-cookie"])) {
     response.headers["set-cookie"].forEach((c) => {
-      jar.setCookie(new URL(response.config.url), c);
+      jar.setCookie(new URL(response.config.url!), c);
     });
   }
   return response;
 });
 
 axios.interceptors.request.use(function (config) {
-  const cookies = jar.getCookies(new URL(config.url));
+  const cookies = jar.getCookies(new URL(config.url!));
 
-  if (cookies?.length > 0) {
+  if (cookies?.length > 0 && config.headers) {
     config.headers.cookie = cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
   }
   return config;

@@ -23,17 +23,15 @@ use framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
 };
-use move_deps::{
-    move_binary_format::errors::{Location, VMResult},
-    move_core_types::{
-        account_address::AccountAddress,
-        effects::{ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp},
-        language_storage::ModuleId,
-        vm_status::{StatusCode, VMStatus},
-    },
-    move_table_extension::{NativeTableContext, TableChange, TableChangeSet},
-    move_vm_runtime::session::Session,
+use move_binary_format::errors::{Location, VMResult};
+use move_core_types::{
+    account_address::AccountAddress,
+    effects::{ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp},
+    language_storage::ModuleId,
+    vm_status::{StatusCode, VMStatus},
 };
+use move_table_extension::{NativeTableContext, TableChange, TableChangeSet};
+use move_vm_runtime::session::Session;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 

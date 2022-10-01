@@ -34,6 +34,8 @@ use std::sync::Arc;
 use storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
+    const B: u64 = 1_000_000_000;
+
     let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
@@ -85,30 +87,30 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let tx3 = core_resources_account
         .sign_with_transaction_builder(txn_factory.create_user_account(account3.public_key()));
 
-    // Create account1 with 2M coins.
+    // Create account1 with 2T coins.
     let txn1 = core_resources_account
-        .sign_with_transaction_builder(txn_factory.mint(account1.address(), 2_000_000));
-    // Create account2 with 1.2M coins.
+        .sign_with_transaction_builder(txn_factory.mint(account1.address(), 2_000 * B));
+    // Create account2 with 1.2T coins.
     let txn2 = core_resources_account
-        .sign_with_transaction_builder(txn_factory.mint(account2.address(), 1_200_000));
-    // Create account3 with 1M coins.
+        .sign_with_transaction_builder(txn_factory.mint(account2.address(), 1_200 * B));
+    // Create account3 with 1T coins.
     let txn3 = core_resources_account
-        .sign_with_transaction_builder(txn_factory.mint(account3.address(), 1_000_000));
+        .sign_with_transaction_builder(txn_factory.mint(account3.address(), 1_000 * B));
 
-    // Transfer 20k coins from account1 to account2.
-    // balance: <1.98M, 1.22M, 1M
+    // Transfer 20B coins from account1 to account2.
+    // balance: <1.98T, 1.22T, 1T
     let txn4 =
-        account1.sign_with_transaction_builder(txn_factory.transfer(account2.address(), 20_000));
+        account1.sign_with_transaction_builder(txn_factory.transfer(account2.address(), 20 * B));
 
-    // Transfer 10k coins from account2 to account3.
-    // balance: <1.98M, <1.21M, 1.01M
+    // Transfer 10B coins from account2 to account3.
+    // balance: <1.98T, <1.21T, 1.01T
     let txn5 =
-        account2.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 10_000));
+        account2.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 10 * B));
 
-    // Transfer 70k coins from account1 to account3.
-    // balance: <1.91M, <1.21M, 1.08M
+    // Transfer 70B coins from account1 to account3.
+    // balance: <1.91T, <1.21T, 1.08T
     let txn6 =
-        account1.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 70_000));
+        account1.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 70 * B));
 
     let reconfig1 = core_resources_account
         .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(100)));
@@ -155,7 +157,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     // Create 14 txns transferring 10k from account1 to account3 each.
     for _ in 2..=15 {
         block3.push(UserTransaction(account1.sign_with_transaction_builder(
-            txn_factory.transfer(account3.address(), 10_000),
+            txn_factory.transfer(account3.address(), 10 * B),
         )));
     }
     let block3 = block(block3); // append state checkpoint txn
@@ -229,13 +231,13 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     // test the initial balance.
     let db_state_view = db.reader.state_view_at_version(Some(7)).unwrap();
     let account1_view = db_state_view.as_account_with_state_view(&account1_address);
-    verify_account_balance(get_account_balance(&account1_view), |x| x == 2_000_000).unwrap();
+    verify_account_balance(get_account_balance(&account1_view), |x| x == 2_000 * B).unwrap();
 
     let account2_view = db_state_view.as_account_with_state_view(&account2_address);
-    verify_account_balance(get_account_balance(&account2_view), |x| x == 1_200_000).unwrap();
+    verify_account_balance(get_account_balance(&account2_view), |x| x == 1_200 * B).unwrap();
 
     let account3_view = db_state_view.as_account_with_state_view(&account3_address);
-    verify_account_balance(get_account_balance(&account3_view), |x| x == 1_000_000).unwrap();
+    verify_account_balance(get_account_balance(&account3_view), |x| x == 1_000 * B).unwrap();
 
     // test the final balance.
     let db_state_view = db
@@ -243,13 +245,22 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .state_view_at_version(Some(current_version))
         .unwrap();
     let account1_view = db_state_view.as_account_with_state_view(&account1_address);
-    verify_account_balance(get_account_balance(&account1_view), |x| x == 1_910_000).unwrap();
+    verify_account_balance(get_account_balance(&account1_view), |x| {
+        approx_eq(x, 1_910 * B)
+    })
+    .unwrap();
 
     let account2_view = db_state_view.as_account_with_state_view(&account2_address);
-    verify_account_balance(get_account_balance(&account2_view), |x| x == 1_210_000).unwrap();
+    verify_account_balance(get_account_balance(&account2_view), |x| {
+        approx_eq(x, 1_210 * B)
+    })
+    .unwrap();
 
     let account3_view = db_state_view.as_account_with_state_view(&account3_address);
-    verify_account_balance(get_account_balance(&account3_view), |x| x == 1_080_000).unwrap();
+    verify_account_balance(get_account_balance(&account3_view), |x| {
+        approx_eq(x, 1_080 * B)
+    })
+    .unwrap();
 
     let transaction_list_with_proof = db
         .reader
@@ -407,10 +418,16 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
 
     let account1_view = db_state_view.as_account_with_state_view(&account1_address);
-    verify_account_balance(get_account_balance(&account1_view), |x| x == 1_770_000).unwrap();
+    verify_account_balance(get_account_balance(&account1_view), |x| {
+        approx_eq(x, 1_770 * B)
+    })
+    .unwrap();
 
     let account3_view = db_state_view.as_account_with_state_view(&account3_address);
-    verify_account_balance(get_account_balance(&account3_view), |x| x == 1_220_000).unwrap();
+    verify_account_balance(get_account_balance(&account3_view), |x| {
+        approx_eq(x, 1_220 * B)
+    })
+    .unwrap();
 
     let transaction_list_with_proof = db
         .reader
@@ -476,6 +493,11 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     );
 
     aptos_db
+}
+
+fn approx_eq(a: u64, b: u64) -> bool {
+    const M: u64 = 1_000_000;
+    a + M > b && b + M > a
 }
 
 pub fn create_db_and_executor<P: AsRef<std::path::Path>>(

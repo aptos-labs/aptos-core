@@ -17,7 +17,6 @@ jobs:
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-three-region
-      FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 30 minutes
       FORGE_RUNNER_DURATION_SECS: 1800
       # Pre release has chaos applied

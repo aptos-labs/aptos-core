@@ -4,7 +4,8 @@
 use crate::common::types::{
     CliCommand, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
 };
-use aptos_types::account_address::AccountAddress;
+use crate::common::utils::prompt_yes_with_override;
+use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
@@ -14,6 +15,7 @@ use clap::Parser;
 #[derive(Parser)]
 pub enum StakeTool {
     AddStake(AddStake),
+    CreateStakingContract(CreateStakingContract),
     UnlockStake(UnlockStake),
     WithdrawStake(WithdrawStake),
     IncreaseLockup(IncreaseLockup),
@@ -27,6 +29,7 @@ impl StakeTool {
         use StakeTool::*;
         match self {
             AddStake(tool) => tool.execute_serialized().await,
+            CreateStakingContract(tool) => tool.execute_serialized().await,
             UnlockStake(tool) => tool.execute_serialized().await,
             WithdrawStake(tool) => tool.execute_serialized().await,
             IncreaseLockup(tool) => tool.execute_serialized().await,
@@ -236,6 +239,60 @@ impl CliCommand<TransactionSummary> for SetDelegatedVoter {
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_set_delegated_voter(self.voter_address))
+            .await
+            .map(|inner| inner.into())
+    }
+}
+
+#[derive(Parser)]
+pub struct CreateStakingContract {
+    /// Account Address of operator
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub operator: AccountAddress,
+
+    /// Account Address of delegated voter
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub voter: AccountAddress,
+
+    /// Amount to create the staking contract with
+    #[clap(long)]
+    pub amount: u64,
+
+    /// Percentage of accumulated rewards to pay the operator as commission
+    #[clap(long)]
+    pub commission_percentage: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for CreateStakingContract {
+    fn command_name(&self) -> &'static str {
+        "CreateStakingContract"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let pool_address = default_stake_pool_address(
+            self.txn_options.profile_options.account_address()?,
+            self.operator,
+        );
+        prompt_yes_with_override(
+            &format!(
+                "Creating a new staking contract with pool address 0x{}. Confirm?",
+                pool_address
+            ),
+            self.txn_options.prompt_options,
+        )?;
+
+        self.txn_options
+            .submit_transaction(aptos_stdlib::staking_contract_create_staking_contract(
+                self.operator,
+                self.voter,
+                self.amount,
+                self.commission_percentage,
+                vec![],
+            ))
             .await
             .map(|inner| inner.into())
     }

@@ -3,6 +3,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
+    epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
@@ -308,8 +309,6 @@ impl BlockStore {
                 )
             })?;
 
-        // If a node restarts in the middle of state synchronization, it is going to try to catch up
-        // to the stored quorum certs as the new root.
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
         state_computer
@@ -319,9 +318,10 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data = storage
-            .start()
-            .expect_recovery_data("Failed to construct recovery data after fast forward sync");
+        let recovery_data = match storage.start() {
+            LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
+            _ => panic!("Failed to construct recovery data after fast forward sync"),
+        };
 
         Ok(recovery_data)
     }

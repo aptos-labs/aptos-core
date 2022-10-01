@@ -1,19 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_core_types::{
-        gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
-        language_storage::{StructTag, TypeTag},
-    },
-    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
-    move_vm_types::{
-        loaded_data::runtime_types::Type,
-        natives::function::NativeResult,
-        values::{Struct, Value},
-    },
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::{
+    gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
+    language_storage::{StructTag, TypeTag},
 };
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
+    values::{Struct, Value},
+};
+
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, sync::Arc};
 
@@ -145,10 +144,8 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_deps::{
-        move_core_types::{account_address::AccountAddress, identifier::Identifier},
-        move_vm_types::values::VMValueCast,
-    };
+    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+    use move_vm_types::values::VMValueCast;
 
     #[test]
     fn test_type_of_internal() {

@@ -16,7 +16,7 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 421,
+            gas_used: 365,
             status: Keep(
                 Success,
             ),

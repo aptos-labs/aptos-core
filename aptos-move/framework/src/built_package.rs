@@ -10,17 +10,17 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::EntryABI;
 use clap::Parser;
-use move_deps::move_binary_format::CompiledModule;
-use move_deps::move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_deps::move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_deps::move_core_types::errmap::ErrorMapping;
-use move_deps::move_core_types::metadata::Metadata;
-use move_deps::move_package::compilation::compiled_package::CompiledPackage;
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
-use move_deps::move_package::source_package::manifest_parser::{
+use move_binary_format::CompiledModule;
+use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
+use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use move_core_types::errmap::ErrorMapping;
+use move_core_types::metadata::Metadata;
+use move_package::compilation::compiled_package::CompiledPackage;
+use move_package::compilation::package_layout::CompiledPackageLayout;
+use move_package::source_package::manifest_parser::{
     parse_move_manifest_string, parse_source_manifest,
 };
-use move_deps::move_package::BuildConfig;
+use move_package::BuildConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -85,6 +85,7 @@ impl BuiltPackage {
             test_mode: false,
             force_recompilation: false,
             fetch_deps_only: false,
+            fetch_latest_git_deps: false,
         };
         let mut package = build_config.compile_package_no_exit(&package_path, &mut Vec::new())?;
         for module in package.root_modules_map().iter_modules().iter() {

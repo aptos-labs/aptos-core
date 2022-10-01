@@ -31,16 +31,14 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use framework::{ReleaseBundle, ReleasePackage};
-use move_deps::{
-    move_core_types::{
-        account_address::AccountAddress,
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-        resolver::MoveResolver,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    resolver::MoveResolver,
+    value::{serialize_values, MoveValue},
 };
+use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -80,8 +78,8 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 });
 
 pub fn encode_aptos_mainnet_genesis_transaction(
-    accounts: &[AccountMap],
-    employees: &[EmployeeAccountMap],
+    accounts: &[AccountBalance],
+    employees: &[EmployeePool],
     validators: &[ValidatorWithCommissionRate],
     framework: &ReleaseBundle,
     chain_id: ChainId,
@@ -303,10 +301,11 @@ fn exec_function(
         )
         .unwrap_or_else(|e| {
             panic!(
-                "Error calling {}.{}: {}",
+                "Error calling {}.{}: ({:#x}) {}",
                 module_name,
                 function_name,
-                e.into_vm_status()
+                e.sub_status().unwrap_or_default(),
+                e,
             )
         });
 }
@@ -417,7 +416,7 @@ fn initialize_on_chain_governance(
     );
 }
 
-fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountMap]) {
+fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountBalance]) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
@@ -432,7 +431,7 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
 
 fn create_employee_validators(
     session: &mut SessionExt<impl MoveResolver>,
-    employees: &[EmployeeAccountMap],
+    employees: &[EmployeePool],
 ) {
     let employees_bytes = bcs::to_bytes(employees).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&[]);
@@ -761,13 +760,13 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountMap {
+pub struct AccountBalance {
     pub account_address: AccountAddress,
     pub balance: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmployeeAccountMap {
+pub struct EmployeePool {
     pub accounts: Vec<AccountAddress>,
     pub validator: ValidatorWithCommissionRate,
     pub vesting_schedule_numerators: Vec<u64>,
@@ -839,79 +838,79 @@ pub fn test_mainnet_end_to_end() {
     let admin2 = AccountAddress::from_hex_literal("0x302").unwrap();
 
     let accounts = vec![
-        AccountMap {
+        AccountBalance {
             account_address: account44,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account45,
             balance: balance * 3, // Three times the balance so it can host 2 operators.
         },
-        AccountMap {
+        AccountBalance {
             account_address: account46,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account47,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account48,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account49,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator3,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator4,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator5,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter3,
             balance: non_validator_balance,
         },
@@ -944,7 +943,7 @@ pub fn test_mainnet_end_to_end() {
     same_owner_validator_3.voter_address = voter3;
 
     let employees = vec![
-        EmployeeAccountMap {
+        EmployeePool {
             accounts: vec![account46, account47],
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_1,
@@ -955,7 +954,7 @@ pub fn test_mainnet_end_to_end() {
             vesting_schedule_denominator: 48,
             beneficiary_resetter: AccountAddress::ZERO,
         },
-        EmployeeAccountMap {
+        EmployeePool {
             accounts: vec![account48, account49],
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_2,

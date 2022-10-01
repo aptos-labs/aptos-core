@@ -7,7 +7,7 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
+    block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
 use consensus_types::{
@@ -64,6 +64,10 @@ pub struct LedgerRecoveryData {
 impl LedgerRecoveryData {
     pub fn new(storage_ledger: LedgerInfoWithSignatures) -> Self {
         LedgerRecoveryData { storage_ledger }
+    }
+
+    pub fn committed_round(&self) -> Round {
+        self.storage_ledger.commit_info().round()
     }
 
     /// Finds the root (last committed block) and returns the root block, the QC to the root block
@@ -196,6 +200,7 @@ impl RecoveryData {
             .find_root(&mut blocks, &mut quorum_certs)
             .with_context(|| {
                 // for better readability
+                blocks.sort_by_key(|block| block.round());
                 quorum_certs.sort_by_key(|qc| qc.certified_block().round());
                 format!(
                     "\nRoot: {}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
@@ -403,11 +408,11 @@ impl PersistentLivenessStorage for StorageWriteProxy {
                     initial_data.highest_2chain_timeout_certificate().as_ref().map_or("None".to_string(), |v| v.to_string()),
                 );
 
-                LivenessStorageData::RecoveryData(initial_data)
+                LivenessStorageData::FullRecoveryData(initial_data)
             }
             Err(e) => {
                 error!(error = ?e, "Failed to construct recovery data");
-                LivenessStorageData::LedgerRecoveryData(ledger_recovery_data)
+                LivenessStorageData::PartialRecoveryData(ledger_recovery_data)
             }
         }
     }

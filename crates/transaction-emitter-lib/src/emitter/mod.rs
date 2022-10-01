@@ -40,7 +40,8 @@ use crate::{
         submission_worker::SubmissionWorker,
     },
     transaction_generator::{
-        account_generator::AccountGeneratorCreator, nft_mint::NFTMintGeneratorCreator,
+        account_generator::AccountGeneratorCreator,
+        nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
         transaction_mix_generator::TxnMixGeneratorCreator, TransactionGeneratorCreator,
     },
@@ -419,8 +420,8 @@ impl TxnEmitter {
                     req.max_account_working_set,
                     req.gas_price,
                 )),
-                TransactionType::NftMint => Box::new(
-                    NFTMintGeneratorCreator::new(
+                TransactionType::NftMintAndTransfer => Box::new(
+                    NFTMintAndTransferGeneratorCreator::new(
                         self.from_rng(),
                         txn_factory.clone(),
                         root_account,
@@ -460,9 +461,10 @@ impl TxnEmitter {
             for client in &req.rest_clients {
                 let accounts = (&mut all_accounts)
                     .take(mode_params.accounts_per_worker)
-                    .collect();
+                    .collect::<Vec<_>>();
                 let stop = stop.clone();
                 let stats = Arc::clone(&stats);
+                let txn_generator = txn_generator_creator.create_transaction_generator().await;
 
                 let worker = SubmissionWorker::new(
                     accounts,
@@ -470,7 +472,7 @@ impl TxnEmitter {
                     stop,
                     mode_params.clone(),
                     stats,
-                    txn_generator_creator.create_transaction_generator(),
+                    txn_generator,
                     workers.len(),
                     check_account_sequence_only_once_for.contains(&workers.len()),
                     self.from_rng(),

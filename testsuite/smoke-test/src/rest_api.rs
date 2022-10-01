@@ -266,10 +266,7 @@ async fn test_bcs() {
         .unwrap();
     let expected_txn_hash = pending_transaction.hash.into();
     let expected_txn = client
-        .wait_for_transaction_by_hash_bcs(
-            expected_txn_hash,
-            pending_transaction.request.expiration_timestamp_secs.0,
-        )
+        .wait_for_transaction_bcs(&pending_transaction)
         .await
         .unwrap()
         .into_inner();

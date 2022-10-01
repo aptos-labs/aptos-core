@@ -34,8 +34,11 @@ aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
 aptos-protos = { path = "../../../crates/aptos-protos" }
 aptos-types = { path = "../../../types" }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
-move-deps = { path = "../../../aptos-move/move-deps" }
 storage-interface = { path = "../../../storage/storage-interface" }
+
+move-binary-format = { git = "https://github.com/move-language/move", rev = "0155b47808de249f4030e84354fde154a1500a82" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "0155b47808de249f4030e84354fde154a1500a82", features = ["address32"] }
+move-package = { git = "https://github.com/move-language/move", rev = "0155b47808de249f4030e84354fde154a1500a82" }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
@@ -57,7 +60,6 @@ executor = { path = "../../../execution/executor" }
 executor-types = { path = "../../../execution/executor-types" }
 framework = { path = "../../../aptos-move/framework" }
 mempool-notifications = { path = "../../../state-sync/inter-component/mempool-notifications" }
-move-deps = { path = "../../../aptos-move/move-deps" }
 vm-validator = { path = "../../../vm-validator" }
 
 [features]
