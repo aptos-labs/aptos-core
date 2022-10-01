@@ -1,4 +1,17 @@
 -- Your SQL goes here
+-- add indices for current ownership to speed up queries
+CREATE INDEX curr_to_oa_tt_am_ltv_index ON current_token_ownerships (
+  owner_address,
+  table_type,
+  amount,
+  last_transaction_version DESC
+);
+CREATE INDEX curr_to_oa_tt_ltv_index ON current_token_ownerships (
+  owner_address,
+  table_type,
+  last_transaction_version DESC
+);
+-- allows quick lookup for aptos name services registered address
 CREATE TABLE current_ans_lookup (
   domain VARCHAR(64) NOT NULL,
   -- if subdomain is null set to empty string
