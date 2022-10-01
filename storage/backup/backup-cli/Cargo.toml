@@ -11,7 +11,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.57"
 async-trait = "0.1.53"
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "f94869cdfa1b5d2c9892016e8fb0c59fda1eea2d" }
 bytes = "1.1.0"
 clap = { version = "3.1.8", features = ["derive"] }
 futures = "0.3.21"
