@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, enable_golden, tests::common, MoveHarness};
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::SigningKey;
 use aptos_types::state_store::table::TableHandle;
@@ -47,6 +47,7 @@ struct TokenStore {
 #[test]
 fn mint_nft_e2e() {
     let mut h = MoveHarness::new();
+    enable_golden!(h);
 
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let resource_address =

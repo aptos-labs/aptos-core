@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{assert_success, assert_vm_status, enable_golden, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
 use move_deps::move_core_types::identifier::Identifier;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
@@ -20,6 +20,7 @@ fn success(tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &str)>)>) {
 
 fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &str)>)>) {
     let mut h = MoveHarness::new();
+    enable_golden!(h);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
