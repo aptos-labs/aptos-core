@@ -70,9 +70,9 @@ impl FromStr for AccountAddressWithChecks {
         }
 
         let account_address = if has_0x {
-            AccountAddress::from_hex_literal(str)
+            AccountAddress::from_hex_literal(str.trim())
         } else {
-            AccountAddress::from_str(str)
+            AccountAddress::from_str(str.trim())
         }?;
 
         Ok(account_address.into())
