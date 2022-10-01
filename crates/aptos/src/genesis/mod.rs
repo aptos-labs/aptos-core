@@ -32,7 +32,7 @@ use aptos_logger::info;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
 use vm_genesis::{AccountBalance, EmployeePool};
@@ -163,55 +163,31 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         .collect();
     let employee_vesting_accounts: Vec<EmployeePool> = employee_vesting_accounts.try_into()?;
     let validators = get_validator_configs(&client, &layout, true).map_err(parse_error)?;
+    let mut unique_accounts = BTreeSet::new();
 
-    // Check accounts for employee accounts
-    for (i, pool) in employee_vesting_accounts.iter().enumerate() {
-        let mut total_stake_pool_amount = 0;
-        for (j, account) in pool.accounts.iter().enumerate() {
-            if !initialized_accounts.contains_key(account) {
-                return Err(CliError::UnexpectedError(format!(
-                    "Account #{} '{}' in pool #{} is is not in the initialized balances",
-                    j, account, i
-                )));
-            }
-            total_stake_pool_amount += initialized_accounts.get(account).unwrap();
-        }
+    validate_employee_accounts(
+        &employee_vesting_accounts,
+        &initialized_accounts,
+        &mut unique_accounts,
+    )?;
 
-        if total_stake_pool_amount != pool.validator.validator.stake_amount {
-            return Err(CliError::UnexpectedError(format!(
-                "Stake amount {} in pool #{} does not match combined of accounts {}",
-                pool.validator.validator.stake_amount, i, total_stake_pool_amount
-            )));
-        }
-
-        if !initialized_accounts.contains_key(&pool.validator.validator.owner_address) {
-            return Err(CliError::UnexpectedError(format!(
-                "Owner address {} in pool #{} is is not in the initialized balances",
-                pool.validator.validator.owner_address, i
-            )));
-        }
-        if !initialized_accounts.contains_key(&pool.validator.validator.operator_address) {
-            return Err(CliError::UnexpectedError(format!(
-                "Operator address {} in pool #{} is is not in the initialized balances",
-                pool.validator.validator.operator_address, i
-            )));
-        }
-        if !initialized_accounts.contains_key(&pool.validator.validator.voter_address) {
-            return Err(CliError::UnexpectedError(format!(
-                "Voter address {} in pool #{} is is not in the initialized balances",
-                pool.validator.validator.voter_address, i
-            )));
-        }
-        if !initialized_accounts.contains_key(&pool.beneficiary_resetter) {
-            return Err(CliError::UnexpectedError(format!(
-                "Beneficiary resetter {} in pool #{} is is not in the initialized balances",
-                pool.beneficiary_resetter, i
-            )));
-        }
-    }
-
-    validate_validators(&layout, &employee_validators, &initialized_accounts, true)?;
-    validate_validators(&layout, &validators, &initialized_accounts, false)?;
+    let mut seen_owners = BTreeMap::new();
+    validate_validators(
+        &layout,
+        &employee_validators,
+        &initialized_accounts,
+        &mut unique_accounts,
+        &mut seen_owners,
+        true,
+    )?;
+    validate_validators(
+        &layout,
+        &validators,
+        &initialized_accounts,
+        &mut unique_accounts,
+        &mut seen_owners,
+        false,
+    )?;
 
     let framework = client.get_framework()?;
     Ok(MainnetGenesisInfo::new(
@@ -540,6 +516,8 @@ fn validate_validators(
     layout: &Layout,
     validators: &[ValidatorConfiguration],
     initialized_accounts: &BTreeMap<AccountAddress, u64>,
+    unique_accounts: &mut BTreeSet<AccountAddress>,
+    seen_owners: &mut BTreeMap<AccountAddress, usize>,
     is_pooled_validator: bool,
 ) -> CliTypedResult<()> {
     // check accounts for validators
@@ -566,6 +544,35 @@ fn validate_validators(
         let owner_balance = initialized_accounts
             .get(&validator.owner_account_address.into())
             .unwrap();
+
+        if seen_owners.contains_key(&validator.owner_account_address.into()) {
+            return Err(CliError::UnexpectedError(format!(
+                "Owner {} in validator #{} has been seen before as an owner of validator {}",
+                validator.owner_account_address,
+                i,
+                seen_owners
+                    .get(&validator.owner_account_address.into())
+                    .unwrap()
+            )));
+        }
+        seen_owners.insert(validator.owner_account_address.into(), i);
+
+        if unique_accounts.contains(&validator.owner_account_address.into()) {
+            return Err(CliError::UnexpectedError(format!(
+                "Owner '{}' in validator #{} has already been seen elsewhere",
+                validator.owner_account_address, i
+            )));
+        }
+        unique_accounts.insert(validator.owner_account_address.into());
+
+        if unique_accounts.contains(&validator.operator_account_address.into()) {
+            return Err(CliError::UnexpectedError(format!(
+                "Operator '{}' in validator #{} has already been seen elsewhere",
+                validator.operator_account_address, i
+            )));
+        }
+        unique_accounts.insert(validator.operator_account_address.into());
+
         // Pooled validators have a combined balance
         // TODO: Make this field optional but checked
         if !is_pooled_validator && *owner_balance < validator.stake_amount {
@@ -685,6 +692,67 @@ fn validate_validators(
                     i
                 )));
             }
+        }
+    }
+    Ok(())
+}
+
+fn validate_employee_accounts(
+    employee_vesting_accounts: &[EmployeePool],
+    initialized_accounts: &BTreeMap<AccountAddress, u64>,
+    unique_accounts: &mut BTreeSet<AccountAddress>,
+) -> CliTypedResult<()> {
+    // Check accounts for employee accounts
+    for (i, pool) in employee_vesting_accounts.iter().enumerate() {
+        let mut total_stake_pool_amount = 0;
+        for (j, account) in pool.accounts.iter().enumerate() {
+            if !initialized_accounts.contains_key(account) {
+                return Err(CliError::UnexpectedError(format!(
+                    "Account #{} '{}' in pool #{} is not in the initialized balances",
+                    j, account, i
+                )));
+            }
+            if unique_accounts.contains(account) {
+                return Err(CliError::UnexpectedError(format!(
+                    "Account #{} '{}' in pool #{} has already been seen elsewhere",
+                    j, account, i
+                )));
+            }
+            unique_accounts.insert(*account);
+
+            total_stake_pool_amount += initialized_accounts.get(account).unwrap();
+        }
+
+        if total_stake_pool_amount != pool.validator.validator.stake_amount {
+            return Err(CliError::UnexpectedError(format!(
+                "Stake amount {} in pool #{} does not match combined of accounts {}",
+                pool.validator.validator.stake_amount, i, total_stake_pool_amount
+            )));
+        }
+
+        if !initialized_accounts.contains_key(&pool.validator.validator.owner_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Owner address {} in pool #{} is is not in the initialized balances",
+                pool.validator.validator.owner_address, i
+            )));
+        }
+        if !initialized_accounts.contains_key(&pool.validator.validator.operator_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Operator address {} in pool #{} is is not in the initialized balances",
+                pool.validator.validator.operator_address, i
+            )));
+        }
+        if !initialized_accounts.contains_key(&pool.validator.validator.voter_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Voter address {} in pool #{} is is not in the initialized balances",
+                pool.validator.validator.voter_address, i
+            )));
+        }
+        if !initialized_accounts.contains_key(&pool.beneficiary_resetter) {
+            return Err(CliError::UnexpectedError(format!(
+                "Beneficiary resetter {} in pool #{} is is not in the initialized balances",
+                pool.beneficiary_resetter, i
+            )));
         }
     }
     Ok(())
