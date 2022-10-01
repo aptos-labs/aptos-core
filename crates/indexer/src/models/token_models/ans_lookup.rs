@@ -80,10 +80,10 @@ impl CurrentAnsLookup {
                 let event_type = event.typ.to_string();
                 let maybe_ans_event = match event_type.as_str() {
                     "0xdbf606fea404cb26efe68d00f8f4fff8e4b9ce69f903818f8acf81473a32430a\
-                ::events::SetNameAddressEventV1" => serde_json::from_value(event.data.clone())
+                ::domains::SetNameAddressEventV1" => serde_json::from_value(event.data.clone())
                         .map(|inner| Some(ANSEvent::SetNameAddressEventV1(inner))),
                     "0xdbf606fea404cb26efe68d00f8f4fff8e4b9ce69f903818f8acf81473a32430a\
-                ::events::RegisterNameEventV1" => serde_json::from_value(event.data.clone())
+                ::domains::RegisterNameEventV1" => serde_json::from_value(event.data.clone())
                         .map(|inner| Some(ANSEvent::RegisterNameEventV1(inner))),
                     _ => Ok(None),
                 }
