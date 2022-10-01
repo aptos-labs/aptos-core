@@ -4,12 +4,12 @@
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use warp::http::header::CONTENT_TYPE;
 use warp::http::Response;
 use warp::hyper::body::Bytes;
 
-use crate::context::{JsonWebTokenService, PeerStoreTuple};
+use crate::context::{ClientTuple, JsonWebTokenService, PeerStoreTuple};
 use crate::CustomEventConfig;
 use crate::{context::Context, index, TelemetryServiceConfig};
 
@@ -31,7 +31,7 @@ pub async fn new_test_context() -> TestContext {
             dataset_id: String::from("2"),
             table_id: String::from("3"),
         },
-        victoria_metrics_base_url: "".into(),
+        victoria_metrics_endpoints: HashMap::new(),
         humio_url: "".into(),
         pfn_allowlist: HashMap::new(),
         log_env_map: HashMap::new(),
@@ -46,7 +46,7 @@ pub async fn new_test_context() -> TestContext {
         Context::new(
             server_private_key,
             peers,
-            None,
+            ClientTuple::new(None, Some(BTreeMap::new()), None),
             HashSet::new(),
             jwt_service,
             HashMap::new(),
