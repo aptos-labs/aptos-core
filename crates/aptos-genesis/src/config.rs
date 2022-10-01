@@ -476,6 +476,7 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
 
     fn try_from(map: EmployeePoolMap) -> Result<Self, Self::Error> {
         let mut vesting_schedule_numbers: Option<(Vec<u64>, u64)> = None;
+        let mut beneficiary_resetter: Option<AccountAddress> = None;
 
         let mut employee_accounts = HashSet::new();
         let mut pools = vec![];
@@ -508,6 +509,10 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
                 for numerator in pool.vesting_schedule_numerators.iter() {
                     numerators += *numerator;
                     last_numerator = *numerator;
+                }
+
+                if denominator == 0 {
+                    anyhow::bail!("Denominator can't be 0 for pool #{}", i)
                 }
 
                 if numerators > denominator {
@@ -560,6 +565,20 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
                         pool.validator.stake_amount
                     );
                 }
+            }
+
+            let pool_beneficiary_resetter = AccountAddress::from(pool.beneficiary_resetter);
+            if let Some(beneficiary_resetter) = beneficiary_resetter {
+                if beneficiary_resetter != pool_beneficiary_resetter {
+                    anyhow::bail!(
+                        "Pool #{} has the wrong beneficiary resetter.  Found {}, should have {}",
+                        i,
+                        pool.beneficiary_resetter,
+                        beneficiary_resetter
+                    );
+                }
+            } else {
+                beneficiary_resetter = Some(pool_beneficiary_resetter);
             }
 
             pools.push(EmployeePool::try_from(pool)?);
