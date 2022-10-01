@@ -6,8 +6,8 @@ import {
 } from '@chakra-ui/react';
 import { secondaryTextColor } from 'core/colors';
 import React, { useMemo } from 'react';
-import MaskedInput from 'react-text-mask';
-import { createNumberMask } from 'text-mask-addons';
+import MaskedInput from '@hariria/react-text-mask';
+import { createNumberMask } from '@hariria/text-mask-addons';
 import { keyframes } from '@emotion/react';
 import { APTOS_UNIT } from 'core/utils/coin';
 import { useTransferFlow } from 'core/hooks/useTransferFlow';

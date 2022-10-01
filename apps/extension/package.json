@@ -11,6 +11,8 @@
     "@fortawesome/fontawesome-svg-core": "^6.1.1",
     "@fortawesome/free-solid-svg-icons": "^6.1.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
+    "@hariria/react-text-mask": "5.4.5",
+    "@hariria/text-mask-addons": "^3.8.0",
     "@react-icons/all-files": "^4.1.0",
     "@scure/bip39": "^1.1.0",
     "@segment/analytics-next": "^1.43.0",
@@ -39,9 +41,7 @@
     "react-router-dom": "^6.3.0",
     "react-scripts": "5.0.1",
     "react-syntax-highlighter": "^15.5.0",
-    "react-text-mask": "^5.4.3",
     "react-transition-group": "^4.4.5",
-    "text-mask-addons": "^3.8.0",
     "tweetnacl": "^1.0.3",
     "webextension-polyfill": "^0.9.0"
   },

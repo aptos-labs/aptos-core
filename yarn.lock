@@ -1945,6 +1945,18 @@
   dependencies:
     prop-types "^15.8.1"
 
+"@hariria/react-text-mask@5.4.5":
+  version "5.4.5"
+  resolved "https://registry.yarnpkg.com/@hariria/react-text-mask/-/react-text-mask-5.4.5.tgz#6980a88c605b3e8c9d2c0e577477203df0075efa"
+  integrity sha512-tKY/sSO+KW2Bd7WKYlkJbR3Awt9Edjnfi4Bmxqe8R0KLUX7TYl8FAWjNHNu2LZltancSCHL+YtiiU4lBxoCyug==
+  dependencies:
+    prop-types "^15.5.6"
+
+"@hariria/text-mask-addons@^3.8.0":
+  version "3.8.0"
+  resolved "https://registry.yarnpkg.com/@hariria/text-mask-addons/-/text-mask-addons-3.8.0.tgz#8b87a576dac68e30bdb03ad975d2ea38b52ea359"
+  integrity sha512-fsHcV9QptrBimsJ9MUB8aDlJ17niexAmS2l4BM8xKNSwZhwVXtVC8h9tY4Bf7VDga+3VselV63pXmpI0+dGuLA==
+
 "@humanwhocodes/config-array@^0.10.4":
   version "0.10.4"
   resolved "https://registry.yarnpkg.com/@humanwhocodes/config-array/-/config-array-0.10.4.tgz#01e7366e57d2ad104feea63e72248f22015c520c"
@@ -12211,13 +12223,6 @@ react-syntax-highlighter@^15.5.0:
     prismjs "^1.27.0"
     refractor "^3.6.0"
 
-react-text-mask@^5.4.3:
-  version "5.4.3"
-  resolved "https://registry.yarnpkg.com/react-text-mask/-/react-text-mask-5.4.3.tgz#991efb4299e30c2e6c2c46d13f617169463e0d2d"
-  integrity sha512-IQ26CO6YMhc2FBRxLVnckBEDkuMvBQOiHBeAxWdZzoqMMOQvGG6vrVW1Rv6RtqOYsqVQaQd+6zYDW2tEM8VXxA==
-  dependencies:
-    prop-types "^15.5.6"
-
 react-transition-group@^4.4.5:
   version "4.4.5"
   resolved "https://registry.yarnpkg.com/react-transition-group/-/react-transition-group-4.4.5.tgz#e53d4e3f3344da8521489fbef8f2581d42becdd1"
@@ -13618,11 +13623,6 @@ test-exclude@^6.0.0:
     "@istanbuljs/schema" "^0.1.2"
     glob "^7.1.4"
     minimatch "^3.0.4"
-
-text-mask-addons@^3.8.0:
-  version "3.8.0"
-  resolved "https://registry.yarnpkg.com/text-mask-addons/-/text-mask-addons-3.8.0.tgz#17b61ef665a4f36811f2ea1f01a223b4be61ab26"
-  integrity sha512-VSZSdc/tKn4zGxgpJ+uNBzoW1t472AoAFIlbw1K7hSNXz0DfSBYDJNRxLqgxOfWw1BY2z6DQpm7g0sYZn5qLpg==
 
 text-table@^0.2.0:
   version "0.2.0"
