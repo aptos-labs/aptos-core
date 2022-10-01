@@ -42,7 +42,7 @@ pub(crate) static METRICS_INGEST_BACKEND_REQUEST_DURATION: Lazy<HistogramVec> = 
     register_histogram_vec!(
         "telemetry_web_service_metrics_ingest_backend_request_duration",
         "Number of metrics ingest backend requests by response code",
-        &["response_code"]
+        &["endpoint_name", "response_code"]
     )
     .unwrap()
 });

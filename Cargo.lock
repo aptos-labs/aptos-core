@@ -1274,6 +1274,7 @@ dependencies = [
  "clap 3.2.17",
  "debug-ignore",
  "flate2",
+ "futures",
  "gcp-bigquery-client",
  "hex",
  "httpmock",
