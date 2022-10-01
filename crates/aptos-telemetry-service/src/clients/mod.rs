@@ -8,20 +8,27 @@ pub mod victoria_metrics_api {
     use anyhow::{anyhow, Result};
 
     use reqwest::{header::CONTENT_ENCODING, Client as ReqwestClient};
+    use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+    use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
     use url::Url;
     use warp::hyper::body::Bytes;
 
+    /// Client implementation to export metrics to Victoria Metrics
     #[derive(Clone)]
     pub struct Client {
-        inner: ReqwestClient,
+        inner: ClientWithMiddleware,
         base_url: Url,
         auth_token: String,
     }
 
     impl Client {
         pub fn new(base_url: Url, auth_token: String) -> Self {
+            let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+            let inner = ClientBuilder::new(ReqwestClient::new())
+                .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+                .build();
             Self {
-                inner: ReqwestClient::new(),
+                inner,
                 base_url,
                 auth_token,
             }
