@@ -480,6 +480,19 @@ impl RngArgs {
         }
     }
 
+    pub fn from_string_seed(str: &str) -> RngArgs {
+        assert!(str.len() < 32);
+
+        let mut seed = [0u8; 32];
+        for (i, byte) in str.bytes().enumerate() {
+            seed[i] = byte;
+        }
+
+        RngArgs {
+            random_seed: Some(hex::encode(seed)),
+        }
+    }
+
     /// Returns a key generator with the seed if given
     pub fn key_generator(&self) -> CliTypedResult<KeyGen> {
         if let Some(ref seed) = self.random_seed {
