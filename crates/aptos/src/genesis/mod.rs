@@ -33,6 +33,7 @@ use aptos_logger::info;
 use aptos_types::account_address::{AccountAddress, AccountAddressWithChecks};
 use async_trait::async_trait;
 use clap::Parser;
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
@@ -146,6 +147,24 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             "Total supply seen {} doesn't match expected total supply {}",
             total_balance_supply, total_supply
         )));
+    }
+
+    // Check that the user has a reasonable amount of APT, since below the minimum gas amount is
+    // not useful 1 APT minimally
+    const MIN_USEFUL_AMOUNT: u64 = 200000000;
+    let ten_percent_of_total = total_supply / 10;
+    for account in accounts.iter() {
+        if account.balance != 0 && account.balance < MIN_USEFUL_AMOUNT {
+            return Err(CliError::UnexpectedError(format!(
+                "Account {} has an initial supply below expected amount {} < {}",
+                account.account_address, account.balance, MIN_USEFUL_AMOUNT
+            )));
+        } else if account.balance > ten_percent_of_total {
+            return Err(CliError::UnexpectedError(format!(
+                "Account {} has an more than 10% of the total balance {} > {}",
+                account.account_address, account.balance, ten_percent_of_total
+            )));
+        }
     }
 
     // Keep track of accounts for later lookup of balances
@@ -481,20 +500,24 @@ fn parse_key<T: ValidCryptoMaterial>(num_bytes: usize, str: &str) -> anyhow::Res
         working = &working[2..];
     }
 
-    if working.len() > num_chars {
-        anyhow::bail!(
-            "Key {} is too long {} must be {} hex characters with or without a 0x in front",
-            str,
-            working.len(),
-            num_chars
-        )
-    } else if working.len() < num_chars {
-        anyhow::bail!(
-            "Key {} is too short {} must be {} hex characters",
-            str,
-            working.len(),
-            num_chars
-        )
+    match working.len().cmp(&num_chars) {
+        Ordering::Less => {
+            anyhow::bail!(
+                "Key {} is too short {} must be {} hex characters",
+                str,
+                working.len(),
+                num_chars
+            )
+        }
+        Ordering::Greater => {
+            anyhow::bail!(
+                "Key {} is too long {} must be {} hex characters with or without a 0x in front",
+                str,
+                working.len(),
+                num_chars
+            )
+        }
+        Ordering::Equal => {}
     }
 
     if !working.chars().all(|c| char::is_ascii_hexdigit(&c)) {
@@ -559,23 +582,31 @@ fn validate_validators(
     is_pooled_validator: bool,
 ) -> CliTypedResult<()> {
     // check accounts for validators
+    let mut errors = vec![];
+
     for (i, validator) in validators.iter().enumerate() {
+        let name = if is_pooled_validator {
+            format!("Employee Pool #{}", i)
+        } else {
+            layout.users.get(i).unwrap().to_string()
+        };
+
         if !initialized_accounts.contains_key(&validator.owner_account_address.into()) {
-            return Err(CliError::UnexpectedError(format!(
-                "Owner {} in validator #{} is is not in the balances.yaml file",
-                validator.owner_account_address, i
+            errors.push(CliError::UnexpectedError(format!(
+                "Owner {} in validator {} is is not in the balances.yaml file",
+                validator.owner_account_address, name
             )));
         }
         if !initialized_accounts.contains_key(&validator.operator_account_address.into()) {
-            return Err(CliError::UnexpectedError(format!(
-                "Operator {} in validator #{} is is not in the balances.yaml file",
-                validator.operator_account_address, i
+            errors.push(CliError::UnexpectedError(format!(
+                "Operator {} in validator {} is is not in the balances.yaml file",
+                validator.operator_account_address, name
             )));
         }
         if !initialized_accounts.contains_key(&validator.voter_account_address.into()) {
-            return Err(CliError::UnexpectedError(format!(
-                "Voter {} in validator #{} is is not in the balances.yaml file",
-                validator.voter_account_address, i
+            errors.push(CliError::UnexpectedError(format!(
+                "Voter {} in validator {} is is not in the balances.yaml file",
+                validator.voter_account_address, name
             )));
         }
 
@@ -584,10 +615,10 @@ fn validate_validators(
             .unwrap();
 
         if seen_owners.contains_key(&validator.owner_account_address.into()) {
-            return Err(CliError::UnexpectedError(format!(
-                "Owner {} in validator #{} has been seen before as an owner of validator {}",
+            errors.push(CliError::UnexpectedError(format!(
+                "Owner {} in validator {} has been seen before as an owner of validator {}",
                 validator.owner_account_address,
-                i,
+                name,
                 seen_owners
                     .get(&validator.owner_account_address.into())
                     .unwrap()
@@ -596,17 +627,17 @@ fn validate_validators(
         seen_owners.insert(validator.owner_account_address.into(), i);
 
         if unique_accounts.contains(&validator.owner_account_address.into()) {
-            return Err(CliError::UnexpectedError(format!(
-                "Owner '{}' in validator #{} has already been seen elsewhere",
-                validator.owner_account_address, i
+            errors.push(CliError::UnexpectedError(format!(
+                "Owner '{}' in validator {} has already been seen elsewhere",
+                validator.owner_account_address, name
             )));
         }
         unique_accounts.insert(validator.owner_account_address.into());
 
         if unique_accounts.contains(&validator.operator_account_address.into()) {
-            return Err(CliError::UnexpectedError(format!(
-                "Operator '{}' in validator #{} has already been seen elsewhere",
-                validator.operator_account_address, i
+            errors.push(CliError::UnexpectedError(format!(
+                "Operator '{}' in validator {} has already been seen elsewhere",
+                validator.operator_account_address, name
             )));
         }
         unique_accounts.insert(validator.operator_account_address.into());
@@ -614,48 +645,48 @@ fn validate_validators(
         // Pooled validators have a combined balance
         // TODO: Make this field optional but checked
         if !is_pooled_validator && *owner_balance < validator.stake_amount {
-            return Err(CliError::UnexpectedError(format!(
-                "Owner {} in validator #{} has less in it's balance {} than the stake amount for the validator {}",
-                validator.owner_account_address, i, owner_balance, validator.stake_amount
+            errors.push(CliError::UnexpectedError(format!(
+                "Owner {} in validator {} has less in it's balance {} than the stake amount for the validator {}",
+                validator.owner_account_address, name, owner_balance, validator.stake_amount
             )));
         }
         if validator.stake_amount < layout.min_stake {
-            return Err(CliError::UnexpectedError(format!(
-                "Validator #{} has stake {} under the min stake {}",
-                i, validator.stake_amount, layout.min_stake
+            errors.push(CliError::UnexpectedError(format!(
+                "Validator {} has stake {} under the min stake {}",
+                name, validator.stake_amount, layout.min_stake
             )));
         }
         if validator.stake_amount > layout.max_stake {
-            return Err(CliError::UnexpectedError(format!(
-                "Validator #{} has stake {} over the max stake {}",
-                i, validator.stake_amount, layout.max_stake
+            errors.push(CliError::UnexpectedError(format!(
+                "Validator {} has stake {} over the max stake {}",
+                name, validator.stake_amount, layout.max_stake
             )));
         }
 
         // Ensure that the validator is setup correctly if it's joining in genesis
         if validator.join_during_genesis {
             if validator.validator_network_public_key.is_none() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} does not have a validator network public key, though it's joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} does not have a validator network public key, though it's joining during genesis",
+                    name
                 )));
             }
             if validator.validator_host.is_none() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} does not have a validator host, though it's joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} does not have a validator host, though it's joining during genesis",
+                    name
                 )));
             }
             if validator.consensus_public_key.is_none() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} does not have a consensus public key, though it's joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} does not have a consensus public key, though it's joining during genesis",
+                    name
                 )));
             }
             if validator.proof_of_possession.is_none() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} does not have a consensus proof of possession, though it's joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} does not have a consensus proof of possession, though it's joining during genesis",
+                    name
                 )));
             }
 
@@ -664,12 +695,12 @@ fn validate_validators(
                 validator.full_node_network_public_key.as_ref(),
             ) {
                 (None, None) => {
-                    info!("Validator #{} does not have a full node setup", i);
+                    info!("Validator {} does not have a full node setup", name);
                 }
                 (Some(_), None) | (None, Some(_)) => {
-                    return Err(CliError::UnexpectedError(format!(
-                        "Validator #{} has a full node host or public key but not both",
-                        i
+                    errors.push(CliError::UnexpectedError(format!(
+                        "Validator {} has a full node host or public key but not both",
+                        name
                     )));
                 }
                 (Some(full_node_host), Some(full_node_network_public_key)) => {
@@ -678,16 +709,16 @@ fn validate_validators(
                     let validator_network_public_key =
                         validator.validator_network_public_key.as_ref().unwrap();
                     if validator_host == full_node_host {
-                        return Err(CliError::UnexpectedError(format!(
-                            "Validator #{} has a validator and a full node host that are the same {:?}",
-                            i,
+                        errors.push(CliError::UnexpectedError(format!(
+                            "Validator {} has a validator and a full node host that are the same {:?}",
+                            name,
                             validator_host
                         )));
                     }
                     if validator_network_public_key == full_node_network_public_key {
-                        return Err(CliError::UnexpectedError(format!(
-                            "Validator #{} has a validator and a full node network public key that are the same {}",
-                            i,
+                        errors.push(CliError::UnexpectedError(format!(
+                            "Validator {} has a validator and a full node network public key that are the same {}",
+                            name,
                             validator_network_public_key
                         )));
                     }
@@ -695,44 +726,53 @@ fn validate_validators(
             }
         } else {
             if validator.validator_network_public_key.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a validator network public key, but it is *NOT* joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a validator network public key, but it is *NOT* joining during genesis",
+                    name
                 )));
             }
             if validator.validator_host.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a validator host, but it is *NOT* joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a validator host, but it is *NOT* joining during genesis",
+                    name
                 )));
             }
             if validator.consensus_public_key.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a consensus public key, but it is *NOT* joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a consensus public key, but it is *NOT* joining during genesis",
+                    name
                 )));
             }
             if validator.proof_of_possession.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a consensus proof of possession, but it is *NOT* joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a consensus proof of possession, but it is *NOT* joining during genesis",
+                    name
                 )));
             }
             if validator.full_node_network_public_key.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a full node public key, but it is *NOT* joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a full node public key, but it is *NOT* joining during genesis",
+                    name
                 )));
             }
             if validator.full_node_host.is_some() {
-                return Err(CliError::UnexpectedError(format!(
-                    "Validator #{} has a full node host, but it is *NOT* joining during genesis",
-                    i
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a full node host, but it is *NOT* joining during genesis",
+                    name
                 )));
             }
         }
     }
-    Ok(())
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        eprintln!("{:#?}", errors);
+
+        Err(CliError::UnexpectedError(
+            "Failed to validate validators".to_string(),
+        ))
+    }
 }
 
 fn validate_employee_accounts(
@@ -746,13 +786,13 @@ fn validate_employee_accounts(
         for (j, account) in pool.accounts.iter().enumerate() {
             if !initialized_accounts.contains_key(account) {
                 return Err(CliError::UnexpectedError(format!(
-                    "Account #{} '{}' in pool #{} is not in the balances.yaml file",
+                    "Account #{} '{}' in employee pool #{} is not in the balances.yaml file",
                     j, account, i
                 )));
             }
             if unique_accounts.contains(account) {
                 return Err(CliError::UnexpectedError(format!(
-                    "Account #{} '{}' in pool #{} has already been seen elsewhere",
+                    "Account #{} '{}' in employee pool #{} has already been seen elsewhere",
                     j, account, i
                 )));
             }
@@ -763,32 +803,32 @@ fn validate_employee_accounts(
 
         if total_stake_pool_amount != pool.validator.validator.stake_amount {
             return Err(CliError::UnexpectedError(format!(
-                "Stake amount {} in pool #{} does not match combined of accounts {}",
+                "Stake amount {} in employee pool #{} does not match combined of accounts {}",
                 pool.validator.validator.stake_amount, i, total_stake_pool_amount
             )));
         }
 
         if !initialized_accounts.contains_key(&pool.validator.validator.owner_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Owner address {} in pool #{} is is not in the balances.yaml file",
+                "Owner address {} in employee pool #{} is is not in the balances.yaml file",
                 pool.validator.validator.owner_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.validator.validator.operator_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Operator address {} in pool #{} is is not in the balances.yaml file",
+                "Operator address {} in employee pool #{} is is not in the balances.yaml file",
                 pool.validator.validator.operator_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.validator.validator.voter_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Voter address {} in pool #{} is is not in the balances.yaml file",
+                "Voter address {} in employee pool #{} is is not in the balances.yaml file",
                 pool.validator.validator.voter_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.beneficiary_resetter) {
             return Err(CliError::UnexpectedError(format!(
-                "Beneficiary resetter {} in pool #{} is is not in the balances.yaml file",
+                "Beneficiary resetter {} in employee pool #{} is is not in the balances.yaml file",
                 pool.beneficiary_resetter, i
             )));
         }

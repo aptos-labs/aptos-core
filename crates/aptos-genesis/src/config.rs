@@ -398,11 +398,12 @@ impl TryFrom<Vec<AccountBalance>> for AccountBalanceMap {
     fn try_from(balances: Vec<AccountBalance>) -> Result<Self, Self::Error> {
         let mut accounts = HashSet::new();
         let mut vector = vec![];
+        let mut errors = vec![];
         for balance in balances {
             let mut map = BTreeMap::new();
             map.insert(balance.account_address, balance.balance);
             if !accounts.insert(balance.account_address) {
-                return Err(anyhow::anyhow!(
+                errors.push(anyhow::anyhow!(
                     "An account was duplicated {}",
                     balance.account_address
                 ));
@@ -411,9 +412,16 @@ impl TryFrom<Vec<AccountBalance>> for AccountBalanceMap {
             vector.push(map);
         }
 
-        Ok(AccountBalanceMap {
-            account_balances: vector,
-        })
+        if !errors.is_empty() {
+            Err(anyhow::anyhow!(
+                "There are duplicated accounts: {:?}",
+                errors
+            ))
+        } else {
+            Ok(AccountBalanceMap {
+                account_balances: vector,
+            })
+        }
     }
 }
 
@@ -423,6 +431,7 @@ impl TryFrom<AccountBalanceMap> for Vec<AccountBalance> {
     fn try_from(balance_map: AccountBalanceMap) -> Result<Self, Self::Error> {
         let mut accounts = HashSet::new();
         let mut balances = vec![];
+        let mut errors = vec![];
         for (i, balance_entry) in balance_map.account_balances.iter().enumerate() {
             let (account_address, balance) = balance_entry
                 .iter()
@@ -430,7 +439,7 @@ impl TryFrom<AccountBalanceMap> for Vec<AccountBalance> {
                 .ok_or_else(|| anyhow::anyhow!("No account in entry #{}", i))?;
 
             if !accounts.insert(*account_address) {
-                return Err(anyhow::anyhow!(
+                errors.push(anyhow::anyhow!(
                     "An account was duplicated {} in the balances at entry #{}",
                     account_address,
                     i
@@ -443,7 +452,14 @@ impl TryFrom<AccountBalanceMap> for Vec<AccountBalance> {
             });
         }
 
-        Ok(balances)
+        if !errors.is_empty() {
+            Err(anyhow::anyhow!(
+                "There are duplicated accounts: {:?}",
+                errors
+            ))
+        } else {
+            Ok(balances)
+        }
     }
 }
 
@@ -480,27 +496,28 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
 
         let mut employee_accounts = HashSet::new();
         let mut pools = vec![];
+        let mut errors = vec![];
         for (i, pool) in map.inner.into_iter().enumerate() {
             // Check for duplicate employee accounts
             for (j, employee_account) in pool.accounts.iter().enumerate() {
                 if !employee_accounts.insert(*employee_account) {
-                    anyhow::bail!(
-                        "Employee account #{} {} duplicated in pool #{}",
+                    errors.push(anyhow::anyhow!(
+                        "Employee account #{} {} duplicated in employee pool #{}",
                         j,
                         employee_account,
                         i
-                    )
+                    ));
                 }
             }
 
             // Check vesting schedule adds up properly, we only have to check once, then check they are all the same
             if let Some((numerators, denominator)) = vesting_schedule_numbers.as_ref() {
                 if numerators != &pool.vesting_schedule_numerators {
-                    anyhow::bail!("Numerators are not the same on every pool in pool #{}.  Expected: {:?}, got {:?}", i, numerators, pool.vesting_schedule_numerators);
+                    errors.push(anyhow::anyhow!("Numerators are not the same on every pool in employee pool #{}.  Expected: {:?}, got {:?}", i, numerators, pool.vesting_schedule_numerators));
                 }
 
                 if denominator != &pool.vesting_schedule_denominator {
-                    anyhow::bail!("Denominator are not the same on every pool in pool #{}.  Expected: {:?}, got {:?}", i, denominator, pool.vesting_schedule_denominator);
+                    errors.push(anyhow::anyhow!("Denominator are not the same on every pool in employee pool #{}.  Expected: {:?}, got {:?}", i, denominator, pool.vesting_schedule_denominator));
                 }
             } else {
                 let mut numerators = 0;
@@ -512,18 +529,21 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
                 }
 
                 if denominator == 0 {
-                    anyhow::bail!("Denominator can't be 0 for pool #{}", i)
+                    errors.push(anyhow::anyhow!(
+                        "Denominator can't be 0 for employee pool #{}",
+                        i
+                    ));
                 }
 
                 if numerators > denominator {
-                    anyhow::bail!(
-                        "Numerators {} add up over the denominator {} for pool #{}",
+                    errors.push(anyhow::anyhow!(
+                        "Numerators {} add up over the denominator {} for employee pool #{}",
                         numerators,
                         denominator,
                         i
-                    )
+                    ));
                 } else if (denominator - numerators) % last_numerator != 0 {
-                    anyhow::bail!("Numerators don't add up to the denominator {} (with the last one {} being repeated for pool #{}", denominator, last_numerator, i)
+                    errors.push(anyhow::anyhow!("Numerators don't add up to the denominator {} (with the last one {} being repeated for employee pool #{}", denominator, last_numerator, i));
                 }
 
                 vesting_schedule_numbers = Some((
@@ -534,48 +554,48 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
 
             // I'm going to assume no one wants to pay more than 50% of their rewards away
             if pool.validator.commission_percentage > 50 {
-                anyhow::bail!(
-                    "Commission percentage is larger than 50% ({}%) for pool #{}",
+                errors.push(anyhow::anyhow!(
+                    "Commission percentage is larger than 50% ({}%) for employee pool #{}",
                     pool.validator.commission_percentage,
                     i
-                );
+                ));
             }
 
             // If joining during genesis, it needs all the setup
             if pool.validator.join_during_genesis {
                 if pool.validator.consensus_public_key.is_none() {
-                    anyhow::bail!("Pool #{} is setup to join during genesis but missing a consensus public key", i);
+                    errors.push(anyhow::anyhow!("Employee pool #{} is setup to join during genesis but missing a consensus public key", i));
                 }
                 if pool.validator.proof_of_possession.is_none() {
-                    anyhow::bail!("Pool #{} is setup to join during genesis but missing a proof of possession", i);
+                    errors.push(anyhow::anyhow!("Employee pool #{} is setup to join during genesis but missing a proof of possession", i));
                 }
                 if pool.validator.validator_host.is_none() {
-                    anyhow::bail!(
-                        "Pool #{} is setup to join during genesis but missing a validator host",
+                    errors.push(anyhow::anyhow!(
+                        "Employee pool #{} is setup to join during genesis but missing a validator host",
                         i
-                    );
+                    ));
                 }
                 if pool.validator.validator_network_public_key.is_none() {
-                    anyhow::bail!("Pool #{} is setup to join during genesis but missing a validator network public key", i);
+                    errors.push(anyhow::anyhow!("Employee pool #{} is setup to join during genesis but missing a validator network public key", i));
                 }
-                if pool.validator.stake_amount < 100000000000 {
-                    anyhow::bail!(
-                        "Pool #{} is setup to join during genesis but has a low stake amount {} < 1000 APT",
+                if pool.validator.stake_amount < 100000000000000 {
+                    errors.push(anyhow::anyhow!(
+                        "Employee pool #{} is setup to join during genesis but has a low stake amount {} < 1000000 APT",
                         i,
                         pool.validator.stake_amount
-                    );
+                    ));
                 }
             }
 
             let pool_beneficiary_resetter = AccountAddress::from(pool.beneficiary_resetter);
             if let Some(beneficiary_resetter) = beneficiary_resetter {
                 if beneficiary_resetter != pool_beneficiary_resetter {
-                    anyhow::bail!(
-                        "Pool #{} has the wrong beneficiary resetter.  Found {}, should have {}",
+                    errors.push(anyhow::anyhow!(
+                        "Employee pool #{} has the wrong beneficiary resetter.  Found {}, should have {}",
                         i,
                         pool.beneficiary_resetter,
                         beneficiary_resetter
-                    );
+                    ));
                 }
             } else {
                 beneficiary_resetter = Some(pool_beneficiary_resetter);
@@ -584,7 +604,14 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
             pools.push(EmployeePool::try_from(pool)?);
         }
 
-        Ok(pools)
+        if errors.is_empty() {
+            Ok(pools)
+        } else {
+            Err(anyhow::anyhow!(
+                "Failed with the following errors: {:?}",
+                errors
+            ))
+        }
     }
 }
 
