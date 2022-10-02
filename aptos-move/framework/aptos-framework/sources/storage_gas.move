@@ -1,3 +1,151 @@
+/// Gas parameters for global storage.
+///
+/// # General overview sections
+///
+/// [Definitions](#definitions)
+///
+/// * [Utilization dimensions](#utilization-dimensions)
+/// * [Utilization ratios](#utilization-ratios)
+/// * [Gas curve lookup](#gas-curve-lookup)
+/// * [Item-wise operations](#item-wise-operations)
+/// * [Byte-wise operations](#byte-wise-operations)
+///
+/// [Function dependencies](#function-dependencies)
+///
+/// * [Initialization](#initialization)
+/// * [Reconfiguration](#reconfiguration)
+/// * [Setting configurations](#setting-configurations)
+///
+/// # Definitions
+///
+/// ## Utilization dimensions
+///
+/// Global storage gas fluctuates each epoch based on total utilization,
+/// which is defined across two dimensions:
+///
+/// 1. The number of "items" in global storage.
+/// 2. The number of bytes in global storage.
+///
+/// "Items" include:
+///
+/// 1. Resources having the `key` attribute, which have been moved into
+///    global storage via a `move_to()` operation.
+/// 2.  Table entries.
+///
+/// ## Utilization ratios
+///
+/// `initialize()` sets an arbitrary "target" utilization for both
+/// item-wise and byte-wise storage, then each epoch, gas parameters are
+/// reconfigured based on the "utilization ratio" for each of the two
+/// utilization dimensions. The utilization ratio for a given dimension,
+/// either item-wise or byte-wise, is taken as the quotient of actual
+/// utilization and target utilization. For example, given a 500 GB
+/// target and 250 GB actual utilization, the byte-wise utilization
+/// ratio is 50%.
+///
+/// See `base_8192_exponential_curve()` for mathematical definitions.
+///
+/// ## Gas curve lookup
+///
+/// The utilization ratio in a given epoch is used as a lookup value in
+/// a Eulerian approximation to an exponential curve, known as a
+/// `GasCurve`, which is defined in `base_8192_exponential_curve()`,
+/// based on a minimum gas charge and a maximum gas charge.
+///
+/// The minimum gas charge and maximum gas charge at the endpoints of
+/// the curve are set in `initialize()`, and correspond to the following
+/// operations defined in `StorageGas`:
+///
+/// 1. Per-item read
+/// 2. Per-item create
+/// 3. Per-item write
+/// 4. Per-byte read
+/// 5. Per-byte create
+/// 6. Per-byte write
+///
+/// For example, if the byte-wise utilization ratio is 50%, then
+/// per-byte reads will charge the minimum per-byte gas cost, plus
+/// 1.09% of the difference between the maximum and the minimum cost.
+/// See `base_8192_exponential_curve()` for a supporting calculation.
+///
+/// ## Item-wise operations
+///
+/// 1. Per-item read gas is assessed whenever an item is read from
+///    global storage via `borrow_global<T>()` or via a table entry read
+///    operation.
+/// 2. Per-item create gas is assessed whenever an item is created in
+///    global storage via `move_to<T>()` or via a table entry creation
+///    operation.
+/// 3. Per-item write gas is assessed whenever an item is overwritten in
+///    global storage via `borrow_global_mut<T>` or via a table entry
+///    mutation operation.
+///
+/// ## Byte-wise operations
+///
+/// Byte-wise operations are assessed in a manner similar to per-item
+/// operations, but account for the number of bytes affected by the
+/// given operation. Notably, this number denotes the total number of
+/// bytes in an *entire item*.
+///
+/// For example, if an operation mutates a `u8` field in a resource that
+/// has 5 other `u128` fields, the per-byte gas write cost will account
+/// for $(5 * 128) / 8 + 1 = 81$ bytes. Vectors are similarly treated
+/// as fields.
+///
+/// # Function dependencies
+///
+/// The below dependency chart uses `mermaid.js` syntax, which can be
+/// automatically rendered into a diagram (depending on the browser)
+/// when viewing the documentation file generated from source code. If
+/// a browser renders the diagrams with coloring that makes it difficult
+/// to read, try a different browser.
+///
+/// ## Initialization
+///
+/// ```mermaid
+///
+/// flowchart LR
+///
+/// initialize --> base_8192_exponential_curve
+/// base_8192_exponential_curve --> new_gas_curve
+/// base_8192_exponential_curve --> new_point
+/// new_gas_curve --> validate_points
+///
+/// ```
+///
+/// ## Reconfiguration
+///
+/// ```mermaid
+///
+/// flowchart LR
+///
+/// calculate_gas --> Interpolate %% capitalized
+/// calculate_read_gas --> calculate_gas
+/// calculate_create_gas --> calculate_gas
+/// calculate_write_gas --> calculate_gas
+/// on_reconfig --> calculate_read_gas
+/// on_reconfig --> calculate_create_gas
+/// on_reconfig --> calculate_write_gas
+/// reconfiguration::reconfigure --> on_reconfig
+///
+/// ```
+///
+/// Here, the function `interpolate()` is spelled `Interpolate` because
+/// `interpolate` is a reserved word in `mermaid.js`.
+///
+/// ## Setting configurations
+///
+/// ```mermaid
+///
+/// flowchart LR
+///
+/// gas_schedule::set_storage_gas_config --> set_config
+///
+/// ```
+///
+/// # Complete docgen index
+///
+/// The below index is automatically generated from source code:
 module aptos_framework::storage_gas {
 
     use aptos_framework::system_addresses;
@@ -21,30 +169,55 @@ module aptos_framework::storage_gas {
 
     const MAX_U64: u64 = 18446744073709551615;
 
-    /// This updates at reconfig and guarantees not to change elsewhere, safe
-    /// for gas calculation.
+    /// Storage parameters, reconfigured each epoch.
     ///
-    /// Specifically, it is updated by executing a reconfig transaction based
-    /// on the usage at the begining of the current epoch. The gas schedule
-    /// derived from these parameter will be for gas calculation of the entire
-    /// next epoch.
-    /// -- The data is one epoch older than ideal, but VM doesn't need to worry
-    /// about reloading gas parameters after the first txn of an epoch.
+    /// Parameters are updated during reconfiguration via
+    /// `on_reconfig()`, based on storage utilization at the beginning
+    /// of the epoch in which the reconfiguration transaction is
+    /// executed. The gas schedule derived from these parameters will
+    /// then be used to calculate gas for the entirety of the
+    /// following epoch, such that the data is one epoch older than
+    /// ideal. Notably, however, per this approach, the virtual machine
+    /// does not need to reload gas parameters after the
+    /// first transaction of an epoch.
     struct StorageGas has key {
+        /// Cost to read an item from global storage.
         per_item_read: u64,
+        /// Cost to create an item in global storage.
         per_item_create: u64,
+        /// Cost to overwrite an item in global storage.
         per_item_write: u64,
+        /// Cost to read a byte from global storage.
         per_byte_read: u64,
+        /// Cost to create a byte in global storage.
         per_byte_create: u64,
+        /// Cost to overwrite a byte in global storage.
         per_byte_write: u64,
     }
 
-    // x and y are basis points.
+    /// A point in a Eulerian curve approximation, with each coordinate
+    /// given in basis points:
+    ///
+    /// | Field value | Percentage |
+    /// |-------------|------------|
+    /// | `1`         | 00.01 %    |
+    /// | `10`        | 00.10 %    |
+    /// | `100`       | 01.00 %    |
+    /// | `1000`      | 10.00 %    |
     struct Point has copy, drop, store {
+        /// x-coordinate basis points, corresponding to utilization
+        /// ratio in `base_8192_exponential_curve()`.
         x: u64,
+        /// y-coordinate basis points, corresponding to utilization
+        /// multiplier in `base_8192_exponential_curve()`.
         y: u64
     }
 
+    /// A gas configuration for either per-item or per-byte costs.
+    ///
+    /// Contains a target usage amount, as well as a Eulerian
+    /// approximation of an exponential curve for reads, creations, and
+    /// overwrites. See `StorageGasConfig`.
     struct UsageGasConfig has copy, drop, store {
         target_usage: u64,
         read_curve: GasCurve,
@@ -52,34 +225,78 @@ module aptos_framework::storage_gas {
         write_curve: GasCurve,
     }
 
-    /// The curve assumes there are two points (0, 0) and (10000, 10000) on both ends. Moreover, points must also
-    /// satisfy the following rules:
-    /// 1. the x values must be strictly increasing and between (0, 10000);
-    /// 2. the y values must be non-decreasing and between (0, 10000);
-    /// So the curve will be identified as point (0, 0) and (10000, 10000) interpolated with the points. The y value
-    /// between two points will be calculated by neighboring points as if there is a linear line connecting these two
-    /// points.
+    /// Eulerian approximation of an exponential curve.
+    ///
+    /// Assumes the following endpoints:
+    ///
+    /// * $(x_0, y_0) = (0, 0)$
+    /// * $(x_f, y_f) = (10000, 10000)$
+    ///
+    /// Intermediate points must satisfy:
+    ///
+    /// 1. $x_i > x_{i - 1}$ ( $x$ is strictly increasing).
+    /// 2. $0 \leq x_i \leq 10000$ ( $x$ is between 0 and 10000).
+    /// 3. $y_i \geq y_{i - 1}$ ( $y$ is non-decreasing).
+    /// 4. $0 \leq y_i \leq 10000$ ( $y$ is between 0 and 10000).
+    ///
+    /// Lookup between two successive points is calculated via linear
+    /// interpolation, e.g., as if there were a straight line between
+    /// them.
+    ///
+    /// See `base_8192_exponential_curve()`.
     struct GasCurve has copy, drop, store {
         min_gas: u64,
         max_gas: u64,
         points: vector<Point>,
     }
 
-    /// P(x) = min_price + (base ^ (utilization / target_usage) - 1) / (base - 1) * (max_price - min_price)
-    // Provide a default exponential curve with the base to be 8192, which means:
-    // When DB is at 50% target usage,the price increases roughly 1.09% of (max_price - min_price).
-    // Detailed data points:
-    // 10% -> 0.02%
-    // 20% -> 0.06%
-    // 30% -> 0.17%
-    // 40% -> 0.44%
-    // 50% -> 1.09%
-    // 60% -> 2.71%
-    // 70% -> 6.69%
-    // 80% -> 16.48%
-    // 90% -> 40.61%
-    // 95% -> 63.72%
-    // 99% -> 91.38%
+    /// Default exponential curve having base 8192.
+    ///
+    /// # Function definition
+    ///
+    /// Gas price as a function of utilization ratio is defined as:
+    ///
+    /// $$g(u_r) = g_{min} + \frac{(b^{u_r} - 1)}{b - 1} \Delta_g$$
+    ///
+    /// $$g(u_r) = g_{min} + u_m \Delta_g$$
+    ///
+    /// | Variable                            | Description            |
+    /// |-------------------------------------|------------------------|
+    /// | $g_{min}$                           | `min_gas`              |
+    /// | $g_{max}$                           | `max_gas`              |
+    /// | $\Delta_{g} = g_{max} - g_{min}$    | Gas delta              |
+    /// | $u$                                 | Utilization            |
+    /// | $u_t$                               | Target utilization     |
+    /// | $u_r = u / u_t$                     | Utilization ratio      |
+    /// | $u_m = \frac{(b^{u_r} - 1)}{b - 1}$ | Utilization multiplier |
+    /// | $b = 8192$                          | Exponent base          |
+    ///
+    /// # Example
+    ///
+    /// Hence for a utilization ratio of 50% ( $u_r = 0.5$ ):
+    ///
+    /// $$g(0.5) = g_{min} + \frac{8192^{0.5} - 1}{8192 - 1} \Delta_g$$
+    ///
+    /// $$g(0.5) \approx g_{min} + 0.0109 \Delta_g$$
+    ///
+    /// Which means that the price above `min_gas` is approximately
+    /// 1.09% of the difference between `max_gas` and `min_gas`.
+    ///
+    /// # Utilization multipliers
+    ///
+    /// | $u_r$ | $u_m$ (approximate) |
+    /// |-------|---------------------|
+    /// | 10%   | 0.02%               |
+    /// | 20%   | 0.06%               |
+    /// | 30%   | 0.17%               |
+    /// | 40%   | 0.44%               |
+    /// | 50%   | 1.09%               |
+    /// | 60%   | 2.71%               |
+    /// | 70%   | 6.69%               |
+    /// | 80%   | 16.48%              |
+    /// | 90%   | 40.61%              |
+    /// | 95%   | 63.72%              |
+    /// | 99%   | 91.38%              |
     public fun base_8192_exponential_curve(min_gas: u64, max_gas: u64): GasCurve {
         new_gas_curve(min_gas, max_gas,
             vector[
@@ -98,8 +315,11 @@ module aptos_framework::storage_gas {
         )
     }
 
+    /// Gas configurations for per-item and per-byte prices.
     struct StorageGasConfig has copy, drop, key {
+        /// Per-item gas configuration.
         item_config: UsageGasConfig,
+        /// Per-byte gas configuration.
         byte_config: UsageGasConfig,
     }
 
@@ -145,6 +365,27 @@ module aptos_framework::storage_gas {
         *borrow_global_mut<StorageGasConfig>(@aptos_framework) = config;
     }
 
+    /// Initialize per-item and per-byte gas prices.
+    ///
+    /// Target utilization is set to 1 billion items and 500 GB.
+    ///
+    /// `GasCurve` endpoints are initialized as follows:
+    ///
+    /// | Data style | Operation | Minimum gas | Maximum gas |
+    /// |------------|-----------|-------------|-------------|
+    /// | Per item   | Read      | 80000       | 8000000     |
+    /// | Per item   | Create    | 2000000     | 200000000   |
+    /// | Per item   | Write     | 400000      | 40000000    |
+    /// | Per byte   | Read      | 40          | 4000        |
+    /// | Per byte   | Create    | 1000        | 100000      |
+    /// | Per byte   | Write     | 200         | 20000       |
+    ///
+    /// `StorageGas` values are additionally initialized, but per
+    /// `on_reconfig()`, they will be reconfigured for each subsequent
+    /// epoch after initialization.
+    ///
+    /// See `base_8192_exponential_curve()` fore more information on
+    /// target utilization.
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
