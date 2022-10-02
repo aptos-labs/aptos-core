@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::OTHER_TIMERS_SECONDS;
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory,
@@ -10,6 +9,7 @@ use crate::{
     metrics::{
         restore::{TRANSACTION_REPLAY_VERSION, TRANSACTION_SAVE_VERSION},
         verify::VERIFY_TRANSACTION_VERSION,
+        OTHER_TIMERS_SECONDS,
     },
     storage::{BackupStorage, FileHandle},
     utils::{
@@ -22,15 +22,17 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
-use aptos_types::account_config::CORE_CODE_ADDRESS;
-use aptos_types::stake_pool::DistributeRewardsEvent;
-use aptos_types::transaction::TransactionPayload;
-use aptos_types::write_set::WriteSet;
 use aptos_types::{
+    account_config::CORE_CODE_ADDRESS,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
-    transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
+    stake_pool::DistributeRewardsEvent,
+    transaction::{
+        ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionPayload, Version,
+    },
+    write_set::WriteSet,
 };
 use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
@@ -45,6 +47,7 @@ use futures::{
     StreamExt,
 };
 use itertools::zip_eq;
+use move_core_types::transaction_argument::TransactionArgument;
 use std::{
     cmp::{max, min},
     pin::Pin,
@@ -55,6 +58,7 @@ use storage_interface::DbReaderWriter;
 use tokio::io::BufReader;
 
 const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 10000 };
+static MINTER_SCRIPT: &[u8] = include_bytes!("minter.mv");
 
 #[derive(Parser)]
 pub struct TransactionRestoreOpt {
@@ -280,20 +284,35 @@ impl TransactionRestoreBatchController {
                             Transaction::UserTransaction(signed_txn) => {
                                 let burnt = signed_txn.gas_unit_price() * txn_info.gas_used();
 
-                                // Additionally, we might get some mints from entry functions.
-                                if let TransactionPayload::EntryFunction(func) =
-                                    signed_txn.payload()
-                                {
-                                    let core_module =
-                                        func.module().address().eq(&CORE_CODE_ADDRESS);
-                                    let coin_module =
-                                        func.module().name().as_str().eq("aptos_coin");
-                                    let mint_func = func.function().as_str().eq("mint");
-                                    if core_module && coin_module && mint_func {
-                                        let amount: u64 = bcs::from_bytes(&func.args()[1]).expect(
-                                            "unable to deserialize the amount of minted coins",
-                                        );
-                                        minted += amount
+                                if *txn_info.status() == ExecutionStatus::Success {
+                                    // Additionally, we might get some mints from entry functions.
+                                    if let TransactionPayload::EntryFunction(func) =
+                                        signed_txn.payload()
+                                    {
+                                        let core_module =
+                                            func.module().address().eq(&CORE_CODE_ADDRESS);
+                                        let coin_module =
+                                            func.module().name().as_str().eq("aptos_coin");
+                                        let mint_func = func.function().as_str().eq("mint");
+                                        if core_module && coin_module && mint_func {
+                                            let amount: u64 = bcs::from_bytes(&func.args()[1])
+                                                .expect(
+                                                "unable to deserialize the amount of minted coins",
+                                            );
+                                            minted += amount
+                                        }
+                                    }
+
+                                    if let TransactionPayload::Script(script) = signed_txn.payload()
+                                    {
+                                        if script.code() == MINTER_SCRIPT {
+                                            match &script.args()[1] {
+                                                TransactionArgument::U64(amount) => {
+                                                    minted += amount + 100000; // GAS BUFFER
+                                                }
+                                                _ => unreachable!(),
+                                            }
+                                        }
                                     }
                                 }
                                 (burnt, minted)
