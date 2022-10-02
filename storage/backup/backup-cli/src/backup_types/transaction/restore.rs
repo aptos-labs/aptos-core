@@ -22,6 +22,9 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
+use aptos_types::account_config::CORE_CODE_ADDRESS;
+use aptos_types::stake_pool::DistributeRewardsEvent;
+use aptos_types::transaction::TransactionPayload;
 use aptos_types::write_set::WriteSet;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -219,24 +222,95 @@ impl TransactionRestoreBatchController {
             return Ok(());
         }
 
-        let mut loaded_chunk_stream = self.loaded_chunk_stream();
-        let first_version = self
-            .confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
-            .await?;
+        let loaded_chunk_stream = self.loaded_chunk_stream();
+        // let first_version = self
+        //     .confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
+        //     .await?;
 
-        if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
-            AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
-            let txns_to_execute_stream = self
-                .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
-                .await?;
+        Self::verify_total_supply(loaded_chunk_stream).await?;
+        // if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
+        //     AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
+        //     let txns_to_execute_stream = self
+        //         .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
+        //         .await?;
 
-            if let Some(txns_to_execute_stream) = txns_to_execute_stream {
-                self.replay_transactions(restore_handler, txns_to_execute_stream)
-                    .await?;
-            }
-        } else {
-            Self::go_through_verified_chunks(loaded_chunk_stream, first_version).await?;
-        }
+        //     if let Some(txns_to_execute_stream) = txns_to_execute_stream {
+        //         self.replay_transactions(restore_handler, txns_to_execute_stream)
+        //             .await?;
+        //     }
+        // } else {
+        //     Self::go_through_verified_chunks(loaded_chunk_stream, first_version).await?;
+        // }
+        Ok(())
+    }
+
+    async fn verify_total_supply(
+        loaded_chunk_stream: impl Stream<Item = Result<LoadedChunk>>,
+    ) -> anyhow::Result<()> {
+        // Need this for last batch != 1000000
+        // let mut a: usize = 0;
+
+        loaded_chunk_stream
+            .for_each(|res| {
+                let chunk = res.unwrap();
+                let num_txns = chunk.txns.len();
+
+                let (total_burnt, total_minted) = chunk
+                    .txns
+                    .iter()
+                    .zip(chunk.txn_infos.iter().zip(chunk.event_vecs.iter()))
+                    .enumerate()
+                    .map(|(index, (txn, (txn_info, events)))| {
+                        // if a + index > 281199 {
+                        //     return (0, 0);
+                        // }
+
+                        // First, find wrapped mints - the only place they can come from is
+                        // reward redistribution.
+                        let mut minted: u64 = 0;
+                        for event in events {
+                            if let Ok(rewards_event) = DistributeRewardsEvent::try_from(event) {
+                                minted += rewards_event.rewards_amount;
+                            }
+                        }
+
+                        // Now calculate how much fees was burnt and also check if the payload
+                        // is a minting script.
+                        match txn {
+                            Transaction::UserTransaction(signed_txn) => {
+                                let burnt = signed_txn.gas_unit_price() * txn_info.gas_used();
+
+                                // Additionally, we might get some mints from entry functions.
+                                if let TransactionPayload::EntryFunction(func) =
+                                    signed_txn.payload()
+                                {
+                                    let core_module =
+                                        func.module().address().eq(&CORE_CODE_ADDRESS);
+                                    let coin_module =
+                                        func.module().name().as_str().eq("aptos_coin");
+                                    let mint_func = func.function().as_str().eq("mint");
+                                    if core_module && coin_module && mint_func {
+                                        let amount: u64 = bcs::from_bytes(&func.args()[1]).expect(
+                                            "unable to deserialize the amount of minted coins",
+                                        );
+                                        minted += amount
+                                    }
+                                }
+                                (burnt, minted)
+                            }
+                            _ => (0, minted),
+                        }
+                    })
+                    .fold((0_u128, 0_u128), |(acc_b, acc_m), (b, m)| {
+                        (acc_b + b as u128, acc_m + m as u128)
+                    });
+
+                // a += num_txns;
+
+                println!("{} {}", total_burnt, total_minted);
+                future::ready(())
+            })
+            .await;
         Ok(())
     }
 

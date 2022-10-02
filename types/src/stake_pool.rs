@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account_address::AccountAddress, event::EventHandle};
+use anyhow::Result;
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -90,6 +92,17 @@ pub struct JoinValidatorSetEvent {
 pub struct DistributeRewardsEvent {
     pub pool_address: AccountAddress,
     pub rewards_amount: u64,
+}
+
+impl DistributeRewardsEvent {
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
+        bcs::from_bytes(bytes).map_err(Into::into)
+    }
+}
+
+impl MoveStructType for DistributeRewardsEvent {
+    const MODULE_NAME: &'static IdentStr = ident_str!("stake");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("DistributeRewardsEvent");
 }
 
 #[derive(Debug, Serialize, Deserialize)]

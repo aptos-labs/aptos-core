@@ -46,6 +46,8 @@ executor-types = { path = "../../../execution/executor-types" }
 scratchpad = { path = "../../scratchpad" }
 storage-interface = { path = "../../storage-interface" }
 
+move-core-types = { git = "https://github.com/move-language/move", rev = "94552a7fd7381b84376f6d7008d1f3110b5eccc5" }
+
 [dev-dependencies]
 proptest = "1.0.0"
 warp = "0.3.2"

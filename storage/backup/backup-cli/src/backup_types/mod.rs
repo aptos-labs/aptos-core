@@ -3,6 +3,7 @@
 
 pub mod epoch_ending;
 pub mod state_snapshot;
+pub mod total_supply;
 pub mod transaction;
 
 #[cfg(test)]

@@ -4,6 +4,7 @@
 use crate::{
     account_config::{DepositEvent, NewBlockEvent, NewEpochEvent, WithdrawEvent},
     event::EventKey,
+    stake_pool::DistributeRewardsEvent,
     transaction::Version,
 };
 use anyhow::{Error, Result};
@@ -134,6 +135,17 @@ impl TryFrom<&ContractEvent> for DepositEvent {
     fn try_from(event: &ContractEvent) -> Result<Self> {
         if event.type_tag != TypeTag::Struct(DepositEvent::struct_tag()) {
             anyhow::bail!("Expected Received Payment")
+        }
+        Self::try_from_bytes(&event.event_data)
+    }
+}
+
+impl TryFrom<&ContractEvent> for DistributeRewardsEvent {
+    type Error = Error;
+
+    fn try_from(event: &ContractEvent) -> Result<Self> {
+        if event.type_tag != TypeTag::Struct(DistributeRewardsEvent::struct_tag()) {
+            anyhow::bail!("Expected Distributed Rewards")
         }
         Self::try_from_bytes(&event.event_data)
     }
