@@ -4,7 +4,7 @@
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource},
+    account_config::CoinStoreResource,
     transaction::{Script, TransactionArgument},
 };
 use language_e2e_tests::account::TransactionBuilder;
@@ -57,15 +57,10 @@ fn test_two_to_two_transfer() {
         ],
     );
 
-    let seq_num = h
-        .read_resource::<AccountResource>(alice.address(), AccountResource::struct_tag())
-        .unwrap()
-        .sequence_number();
-
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
         .script(script)
-        .sequence_number(seq_num)
+        .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .sign_multi_agent();
