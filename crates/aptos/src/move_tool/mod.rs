@@ -955,7 +955,9 @@ impl FromStr for ArgWithType {
     type Err = CliError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<_> = s.split(':').collect();
+        // Splits on the first colon, returning at most `2` elements
+        // This is required to support args that contain a colon
+        let parts: Vec<_> = s.splitn(2, ':').collect();
         if parts.len() != 2 {
             return Err(CliError::CommandArgumentError(
                 "Arguments must be pairs of <type>:<arg> e.g. bool:true".to_string(),
