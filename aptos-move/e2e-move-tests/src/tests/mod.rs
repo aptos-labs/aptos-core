@@ -12,5 +12,6 @@ mod lazy_natives;
 mod max_loop_depth;
 mod mint_nft;
 mod rotate_auth_key;
+mod scripts;
 mod stake;
 mod string_args;

@@ -85,6 +85,12 @@ fn test_minter() {
 }
 
 #[test]
+fn test_two_by_two_transfer() {
+    let named_address = BTreeMap::new();
+    run_tests_for_pkg("scripts/two_by_two_transfer", named_address);
+}
+
+#[test]
 fn test_shared_account() {
     let named_address = BTreeMap::from([(
         String::from("shared_account"),
