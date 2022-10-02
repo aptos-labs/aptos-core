@@ -795,6 +795,11 @@ pub struct RunScript {
     /// Example: `address:0x1 bool:true u8:0`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u64 u128 bool address vector signer`
+    #[clap(long, multiple_values = true)]
+    pub(crate) type_args: Vec<MoveType>,
 }
 
 #[async_trait]
@@ -813,12 +818,19 @@ impl CliCommand<TransactionSummary> for RunScript {
             args.push(arg.try_into()?);
         }
 
+        let mut type_args: Vec<TypeTag> = Vec::new();
+
+        // These TypeArgs are used for generics
+        for type_arg in self.type_args.into_iter() {
+            let type_tag = TypeTag::try_from(type_arg)
+                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
+            type_args.push(type_tag)
+        }
+
         let txn = self
             .txn_options
             .submit_transaction(TransactionPayload::Script(Script::new(
-                bytecode,
-                vec![],
-                args,
+                bytecode, type_args, args,
             )))
             .await?;
         Ok(TransactionSummary::from(&txn))
