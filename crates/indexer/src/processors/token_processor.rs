@@ -244,7 +244,11 @@ fn insert_collection_datas(
             diesel::insert_into(schema::collection_datas::table)
                 .values(&collection_datas_to_insert[start_ind..end_ind])
                 .on_conflict((collection_data_id_hash, transaction_version))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    table_handle.eq(excluded(table_handle)),
+                )),
             None,
         )?;
     }
@@ -352,6 +356,7 @@ fn insert_current_collection_datas(
                     description_mutable.eq(excluded(description_mutable)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
+                    table_handle.eq(excluded(table_handle)),
                 )),
             Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -432,6 +437,8 @@ impl TransactionProcessor for TokenTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
+        let mut conn = self.get_conn();
+
         let mut all_tokens = vec![];
         let mut all_token_ownerships = vec![];
         let mut all_token_datas = vec![];
@@ -462,7 +469,7 @@ impl TransactionProcessor for TokenTransactionProcessor {
                 current_token_datas,
                 current_collection_datas,
                 current_token_claims,
-            ) = Token::from_transaction(&txn);
+            ) = Token::from_transaction(&txn, &mut conn);
             all_tokens.append(&mut tokens);
             all_token_ownerships.append(&mut token_ownerships);
             all_token_datas.append(&mut token_datas);
@@ -520,7 +527,6 @@ impl TransactionProcessor for TokenTransactionProcessor {
                 ))
         });
 
-        let mut conn = self.get_conn();
         let tx_result = insert_to_db(
             &mut conn,
             self.name(),
