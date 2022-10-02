@@ -148,7 +148,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     }
 
     let starting_version_from_db = tailer
-        .get_start_version(&processor_name)
+        .get_start_version(&processor_name, config.is_backfill)
         .unwrap_or_else(|| {
             info!(
                 processor_name = processor_name,

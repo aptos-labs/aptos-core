@@ -358,6 +358,11 @@ impl NodeConfig {
         self.indexer.processor_tasks =
             default_if_zero_u8(self.indexer.processor_tasks, DEFAULT_PROCESSOR_TASKS);
         self.indexer.emit_every = self.indexer.emit_every.or(Some(0));
+        self.indexer.is_backfill = env_or_default(
+            "IS_BACKFILL",
+            self.indexer.is_backfill.or(Some(false)),
+            None,
+        );
 
         Ok(self)
     }

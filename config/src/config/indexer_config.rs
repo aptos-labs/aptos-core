@@ -60,6 +60,10 @@ pub struct IndexerConfig {
     /// Set to 0 to disable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub emit_every: Option<u64>,
+
+    /// If is_backfill, then we will start looking at gaps from 0 (instead of the default MAX - 1.5M versions)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_backfill: Option<bool>,
 }
 
 pub fn env_or_default<T: std::str::FromStr>(

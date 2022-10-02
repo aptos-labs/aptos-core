@@ -165,12 +165,20 @@ impl Tailer {
 
     /// Get starting version from database. Starting version is defined as the first version that's either
     /// not successful or missing from the DB.
-    pub fn get_start_version(&self, processor_name: &String) -> Option<i64> {
+    pub fn get_start_version(
+        &self,
+        processor_name: &String,
+        is_backfill: Option<bool>,
+    ) -> Option<i64> {
         let mut conn = self
             .connection_pool
             .get()
             .expect("DB connection should be available to get starting version");
 
+        let mut lookback_versions: i64 = 1500000;
+        if is_backfill.unwrap_or(false) {
+            lookback_versions = i64::MAX;
+        }
         // This query gets the first version that isn't equal to the next version (versions would be sorted of course).
         // There's also special handling if the gap happens in the beginning.
         let sql = "
@@ -240,7 +248,7 @@ impl Tailer {
         let mut res: Vec<Option<Gap>> = sql_query(sql)
             .bind::<Text, _>(processor_name)
             // This is the number used to determine how far we look back for gaps. Increasing it may result in slower startup
-            .bind::<BigInt, _>(1500000)
+            .bind::<BigInt, _>(lookback_versions)
             .get_results(&mut conn)
             .unwrap();
         res.pop().unwrap().map(|g| g.version)
