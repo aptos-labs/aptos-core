@@ -77,8 +77,6 @@ squatting and more quickly return 'lost' names to those who will use them.
 The maximum number of years that a domain can be registered for (excluding renewals) is 10. Names can however be renewed
 indefinitely.
 
-The fee is calculated as follows:
-// TODO: THIS NAMING FEE EXPLANATION!
 
 ### Governance
 

@@ -67,13 +67,6 @@ module aptos_names::config {
         set_domain_price_for_length(framework, (30 * octas()), 4);
         set_domain_price_for_length(framework, (15 * octas()), 5);
         set_domain_price_for_length(framework, (5 * octas()), 6);
-
-        // These are for testnet only
-        // set_domain_price_for_length(framework, (4 * octas()), 2);
-        // set_domain_price_for_length(framework, (3 * octas()), 3);
-        // set_domain_price_for_length(framework, (2 * octas()), 4);
-        // set_domain_price_for_length(framework, (1 * octas()), 5);
-        // set_domain_price_for_length(framework, (1 * octas() / 2), 6);
     }
 
 
