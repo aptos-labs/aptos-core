@@ -222,7 +222,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "up{job=\"federate\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"} == 0 or up{job=\"aptos-procs\", role=\"validator\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"} == 0",
+          "expr": "up{job=\"federate\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"} == 0 or up{chain_name=~\"$chain_name\", namespace=~\"$namespace\"} == 0",
           "instant": true,
           "format": "table"
         }
