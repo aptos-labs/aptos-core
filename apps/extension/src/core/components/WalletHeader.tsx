@@ -116,7 +116,6 @@ export default function WalletHeader({
               <IconButton
                 size="lg"
                 aria-label="back"
-                colorScheme="teal"
                 icon={<ArrowBackIcon fontSize={26} />}
                 variant="filled"
                 onClick={backOnClick}

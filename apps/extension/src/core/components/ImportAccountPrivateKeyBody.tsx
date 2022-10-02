@@ -59,7 +59,13 @@ export default function ImportAccountPrivateKeyBody({
       {
         hasSubmit ? (
           <Box p={4} width="100%" borderTop="1px" borderColor={buttonBorderColor[colorMode]}>
-            <Button colorScheme="teal" width="100%" type="submit" disabled={privateKey.length === 0}>
+            <Button
+              colorScheme="salmon"
+              height="48px"
+              width="100%"
+              type="submit"
+              disabled={privateKey.length === 0}
+            >
               Submit
             </Button>
           </Box>

@@ -18,7 +18,7 @@ import { aptosCoinStoreStructTag } from 'core/constants';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useAccountCoinResources } from 'core/queries/account';
 import { formatCoin } from 'core/utils/coin';
-import { PetraLogo } from './PetraLogo';
+import { AptosLogo } from './AptosLogo';
 
 const CoinType = {
   APTOS_TOKEN: aptosCoinStoreStructTag,
@@ -60,7 +60,7 @@ function AssetListItem({
   const logo = useMemo(() => {
     switch (type) {
       case CoinType.APTOS_TOKEN:
-        return <PetraLogo />;
+        return <AptosLogo />;
       default:
         return <AvatarImage size={32} address={type} />;
     }
