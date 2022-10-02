@@ -478,6 +478,7 @@ impl EpochManager {
         let signer = ValidatorSigner::new(self.author, private_key);
 
         let mut quorum_store_msg_rx_vec = Vec::new();
+        self.quorum_store_msg_tx_vec.clear();
         for _ in 0..self.num_network_listener_workers {
             let (quorum_store_msg_tx, quorum_store_msg_rx) =
                 aptos_channel::new::<AccountAddress, VerifiedEvent>(
