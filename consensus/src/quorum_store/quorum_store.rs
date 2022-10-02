@@ -158,8 +158,7 @@ impl QuorumStore {
                 proof_builder_tx.clone(),
                 config.max_batch_bytes,
             );
-            // spawn_monitored("Quorum:NetworkListener", net.start());
-            tokio::spawn(net.start());
+            spawn_monitored("Quorum:NetworkListener", net.start());
         }
         spawn_monitored(
             "Quorum:BatchStore",

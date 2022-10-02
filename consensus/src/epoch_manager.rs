@@ -453,10 +453,12 @@ impl EpochManager {
             self.config.mempool_txn_pull_timeout_ms,
         );
         // TODO: do we need to destroy the async thread with explicit shutdown?
-        spawn_named!(
+        if let Err(e) = spawn_named!(
             "Quorum Store",
             quorum_store.start(consensus_to_quorum_store_rx)
-        );
+        ) {
+            debug!("QS: spawn_named quorum store error {:?}", e);
+        }
     }
 
     fn spawn_quorum_store(
@@ -531,10 +533,12 @@ impl EpochManager {
                 }
             });
         }
-        spawn_named!(
+        if let Err(e) = spawn_named!(
             "QuorumStore",
             metrics_monitor.instrument(quorum_store.start())
-        );
+        ) {
+            debug!("QS: spawn_named QuorumStore error {:?}", e);
+        }
         batch_reader
     }
 
@@ -782,24 +786,24 @@ impl EpochManager {
             // TODO: think about these numbers
             let config = QuorumStoreConfig {
                 channel_size: 1000,
-                proof_timeout_ms: 1000,
-                batch_request_num_peers: 3,
+                proof_timeout_ms: 5000,
+                batch_request_num_peers: 2,
                 end_batch_ms: 500,
                 max_batch_bytes: 1000000,
-                batch_request_timeout_ms: 1000,
+                batch_request_timeout_ms: 2000,
                 max_batch_expiry_round_gap: 20,
                 batch_expiry_grace_rounds: 5,
                 memory_quota: 100000000,
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
-                num_nodes_per_worker_handles: 5,
+                num_nodes_per_worker_handles: 10,
             };
 
             // update the number of network_listener workers when start a new round_manager
             self.num_network_listener_workers = usize::max(
                 1,
-                (epoch_state.verifier.len() / config.num_nodes_per_worker_handles),
+                epoch_state.verifier.len() / config.num_nodes_per_worker_handles,
             );
 
             let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
