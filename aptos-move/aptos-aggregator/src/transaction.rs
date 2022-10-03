@@ -4,10 +4,9 @@
 use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use anyhow::bail;
 use aptos_state_view::StateView;
-use aptos_types::write_set::TransactionWrite;
 use aptos_types::{
     transaction::{ChangeSet, TransactionOutput},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut},
 };
 use std::collections::btree_map;
 
