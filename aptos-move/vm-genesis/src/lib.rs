@@ -6,6 +6,7 @@
 mod genesis_context;
 
 use crate::genesis_context::GenesisStateView;
+use aptos_crypto::multi_ed25519::MultiEd25519PublicKey;
 use aptos_crypto::{
     bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -714,6 +715,7 @@ Below values are for testing only!
 addresses: 0x0ee16f0e4b47d5972f63a642385d52d301e53716b4e1fbd637b9a91a7f1979ba, 0xe5a6fcac1fc4eeec1859d9e395d6c6bc49fa7dd29ca8681e581b0950dcec23df
 public_keys: 0xc5547463e44c3ad8ad52018f0aaf237d39e396b22815cf712493dd61cffabebf, 0xeea1decaa37eb5cdcf99262c6518053126e34283f42ad74f7b91b75fa625c6f8
 private_keys: 0x44c7eabad483e04ce6703a4518d0a74a1356b9c50a3f5cfd4a4c9285591caca6, 0x0afd9ed1d3c00ef22b78a7234f436132317d7fcc69824a16f0c651658929e7f8
+multisig_pub_key: 0xc5547463e44c3ad8ad52018f0aaf237d39e396b22815cf712493dd61cffabebfeea1decaa37eb5cdcf99262c6518053126e34283f42ad74f7b91b75fa625c6f801
 multisig_auth_key: 0x4407b9a063ac530f8b621f7d80b527a79c626791b14b51c1118763ce941b99ce
 threshold: 1/2.
 */
@@ -725,12 +727,17 @@ pub fn get_test_ans_funds_address() -> AccountAddress {
 }
 
 pub fn get_test_ans_admin_multisig_auth_key() -> AuthenticationKey {
-    AuthenticationKey::ed25519(
-        &Ed25519PublicKey::from_encoded_string(
-            "0x4407b9a063ac530f8b621f7d80b527a79c626791b14b51c1118763ce941b99ce",
-        )
-        .unwrap(),
+    let pub_key = MultiEd25519PublicKey::from_encoded_string(
+        "0xc5547463e44c3ad8ad52018f0aaf237d39e396b22815cf712493dd61cffabebfeea1decaa37eb5cdcf99262c6518053126e34283f42ad74f7b91b75fa625c6f801",
     )
+        .unwrap();
+    let auth_key = AuthenticationKey::multi_ed25519(&pub_key);
+    // Ensure the auth key matches the expected on in the comment above
+    assert_eq!(
+        auth_key.to_string(),
+        "4407b9a063ac530f8b621f7d80b527a79c626791b14b51c1118763ce941b99ce".to_string()
+    );
+    auth_key
 }
 
 pub fn generate_test_genesis(
