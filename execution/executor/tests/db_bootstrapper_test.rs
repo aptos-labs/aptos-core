@@ -202,11 +202,11 @@ fn test_new_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
-    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
+    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 200_000_000);
+    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 200_000_000);
     execute_and_commit(block(vec![txn1, txn2, txn3, txn4]), &db, &signer);
-    assert_eq!(get_balance(&account1, &db), 2_000_000);
-    assert_eq!(get_balance(&account2, &db), 2_000_000);
+    assert_eq!(get_balance(&account1, &db), 200_000_000);
+    assert_eq!(get_balance(&account2, &db), 200_000_000);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
@@ -238,7 +238,7 @@ fn test_new_genesis() {
                     )),
                     WriteOp::Modification(
                         bcs::to_bytes(&CoinStoreResource::new(
-                            1_000_000,
+                            100_000_000,
                             false,
                             EventHandle::random(0),
                             EventHandle::random(0),
@@ -281,14 +281,15 @@ fn test_new_genesis() {
     assert_eq!(trusted_state.version(), 6);
 
     // Effect of bootstrapping reflected.
-    assert_eq!(get_balance(&account1, &db), 1_000_000);
+    assert_eq!(get_balance(&account1, &db), 100_000_000);
     // State before new genesis accessible.
-    assert_eq!(get_balance(&account2, &db), 2_000_000);
+    assert_eq!(get_balance(&account2, &db), 200_000_000);
 
+    println!("FINAL TRANSFER");
     // Transfer some money.
-    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
+    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 50_000_000);
     execute_and_commit(block(vec![txn]), &db, &signer);
 
     // And verify.
-    assert_eq!(get_balance(&account2, &db), 2_500_000);
+    assert_eq!(get_balance(&account2, &db), 250_000_000);
 }
