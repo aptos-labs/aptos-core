@@ -6,11 +6,10 @@
 mod genesis_context;
 
 use crate::genesis_context::GenesisStateView;
-use aptos_crypto::multi_ed25519::MultiEd25519PublicKey;
 use aptos_crypto::{
     bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    HashValue, PrivateKey, Uniform, ValidCryptoMaterialStringExt,
+    HashValue, PrivateKey, Uniform,
 };
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
@@ -760,21 +759,11 @@ pub fn get_test_ans_funds_address() -> AccountAddress {
         .unwrap()
 }
 
-pub fn get_test_ans_admin_multisig_auth_key() -> AuthenticationKey {
-    AuthenticationKey::ed25519(
-        &Ed25519PublicKey::from_encoded_string(
-            "0x4407b9a063ac530f8b621f7d80b527a79c626791b14b51c1118763ce941b99ce",
-        )
-            .unwrap(),
+pub fn get_test_ans_admin_address() -> AccountAddress {
+    AccountAddress::from_hex_literal(
+        "0x0ee16f0e4b47d5972f63a642385d52d301e53716b4e1fbd637b9a91a7f1979ba",
     )
-        .unwrap();
-    let auth_key = AuthenticationKey::multi_ed25519(&pub_key);
-    // Ensure the auth key matches the expected on in the comment above
-    assert_eq!(
-        auth_key.to_string(),
-        "4407b9a063ac530f8b621f7d80b527a79c626791b14b51c1118763ce941b99ce".to_string()
-    );
-    auth_key
+        .unwrap()
 }
 
 pub fn generate_test_genesis(
@@ -808,7 +797,7 @@ pub fn generate_test_genesis(
             employee_vesting_period_duration: 5 * 60, // 5 minutes
             // ANS specific configuration
             ans_funds_address: get_test_ans_funds_address(),
-            ans_admin_address: get_test_ans_admin_multisig_auth_key(),
+            ans_admin_address: get_test_ans_admin_address(),
         },
     );
     (genesis, test_validators)
