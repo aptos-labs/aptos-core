@@ -2,7 +2,7 @@
 /// `EventHandle`s with unique GUIDs. It contains a counter for the number
 /// of `EventHandle`s it generates. An `EventHandle` is used to count the number of
 /// events emitted to a handle and emit events to the event store.
-module aptos_std::event {
+module aptos_framework::event {
     use std::bcs;
 
     use aptos_framework::guid::GUID;

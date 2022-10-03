@@ -129,8 +129,10 @@ module aptos_framework::account {
     public(friend) fun create_account(new_address: address): signer {
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT_ALREADY_EXISTS));
+
+        // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
         assert!(
-            new_address != @vm_reserved && new_address != @aptos_framework,
+            new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token,
             error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
         );
 
