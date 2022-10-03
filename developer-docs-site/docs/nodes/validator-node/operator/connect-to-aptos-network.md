@@ -108,7 +108,7 @@ Before joining the network, you need to make sure the validator node is bootstra
     }
 
     ```
-5. Apply Terraform: `terraform apply`.
+5. Pull latest of the terraform module `terraform get -update`, and then apply Terraform: `terraform apply`.
 6. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team.
 7. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **owner** wallet address. Do not change anything else. Keep the keys as they are.
 8. Recreate the secrets. Make sure the secret name matches your `era` number, e.g. if you have `era = 3`, then you should replace the secret name to be:
