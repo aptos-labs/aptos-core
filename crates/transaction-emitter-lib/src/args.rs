@@ -16,23 +16,46 @@ use url::Url;
 const DEFAULT_API_PORT: u16 = 8080;
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
-pub struct MintArgs {
+pub struct CoinSourceArgs {
     /// Ed25519PrivateKey for minting coins
     #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string))]
     pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
 
-    #[clap(long, default_value = "mint.key", conflicts_with = "mint-key")]
-    pub mint_file: String,
+    #[clap(long, conflicts_with = "mint-key")]
+    pub mint_file: Option<String>,
+
+    /// Ed25519PrivateKey for minting coins
+    #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string), conflicts_with_all = &["mint-key", "mint-file"])]
+    pub coin_source_key: Option<ConfigKey<Ed25519PrivateKey>>,
+
+    #[clap(long, conflicts_with_all = &["mint-key", "mint-file", "coin-source-key"])]
+    pub coin_source_file: Option<String>,
 }
 
-impl MintArgs {
-    pub fn get_mint_key(&self) -> Result<Ed25519PrivateKey> {
-        let key = match &self.mint_key {
-            Some(ref key) => key.private_key(),
-            None => EncodingType::BCS
-                .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(&self.mint_file))?,
-        };
-        Ok(key)
+impl CoinSourceArgs {
+    pub fn get_private_key(&self) -> Result<(Ed25519PrivateKey, bool)> {
+        Ok(
+            match (
+                &self.mint_key,
+                &self.mint_file,
+                &self.coin_source_key,
+                &self.coin_source_file,
+            ) {
+                (Some(ref key), None, None, None) => (key.private_key(), true),
+                (None, Some(path), None, None) => (
+                    EncodingType::BCS
+                        .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
+                    true,
+                ),
+                (None, None, Some(ref key), None) => (key.private_key(), false),
+                (None, None, None, Some(path)) => (
+                    EncodingType::BCS
+                        .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
+                    false,
+                ),
+                _ => unreachable!(),
+            },
+        )
     }
 }
 
@@ -51,7 +74,7 @@ pub struct ClusterArgs {
     pub chain_id: ChainId,
 
     #[clap(flatten)]
-    pub mint_args: MintArgs,
+    pub coin_source_args: CoinSourceArgs,
 }
 
 #[derive(Debug, Clone, Copy, ArgEnum, Deserialize, Parser, Serialize)]
@@ -106,6 +129,12 @@ pub struct EmitArgs {
 
     #[clap(long, min_values = 0)]
     pub transaction_type_weights: Vec<usize>,
+
+    #[clap(long)]
+    pub expected_max_txns: Option<u64>,
+
+    #[clap(long)]
+    pub expected_gas_per_txn: Option<u64>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {
