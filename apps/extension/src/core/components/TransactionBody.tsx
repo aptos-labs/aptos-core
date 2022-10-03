@@ -18,7 +18,7 @@ import {
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { FaRegCheckCircle } from '@react-icons/all-files/fa/FaRegCheckCircle';
 import { FaRegTimesCircle } from '@react-icons/all-files/fa/FaRegTimesCircle';
-import { HexString, MaybeHexString } from 'aptos';
+import { MaybeHexString } from 'aptos';
 import { useParams } from 'react-router-dom';
 import ChakraLink from 'core/components/ChakraLink';
 import { useActiveAccount } from 'core/hooks/useAccounts';
@@ -62,12 +62,10 @@ function TransactionBody() {
     })
     : undefined;
 
-  const userAddress = activeAccountAddress
-    && HexString.ensure(activeAccountAddress).toShortString();
   const explorerAddress = getExplorerAddress(`txn/${version}`);
 
   function clickableAddress(address: MaybeHexString) {
-    return address === userAddress
+    return address === activeAccountAddress
       ? <Text>You</Text>
       : (
         <Badge fontSize="sm" textTransform="none">

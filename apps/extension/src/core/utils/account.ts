@@ -110,7 +110,8 @@ export async function getBackgroundNetwork() {
   return networks[activeNetworkName ?? defaultNetworkName];
 }
 
-export function trimAddressLeadingZeros(address: string) {
-  const noPrefix = address.replace(/^0x+/, '');
-  return `0x${noPrefix.replace(/^0+/, '')}`;
+export function normalizeAddress(address: string) {
+  const noPrefix = new HexString(address).noPrefix();
+  const paddedNoPrefix = noPrefix.padStart(64, '0');
+  return `0x${paddedNoPrefix}`;
 }

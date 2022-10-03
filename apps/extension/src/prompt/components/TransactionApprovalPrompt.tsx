@@ -30,7 +30,6 @@ import { bigIntMin } from 'core/utils/bigint';
 import { formatAmount, formatCoin } from 'core/utils/coin';
 import { maxGasFeeFromEstimated } from 'shared/transactions';
 import { CoinBalanceChangesByCoinType, Transaction } from 'shared/types';
-import { trimAddressLeadingZeros } from 'core/utils/account';
 import { usePermissionRequestContext } from '../hooks';
 import { LoadableContent } from './LoadableContent';
 import { PermissionPromptLayout } from './PermissionPromptLayout';
@@ -167,12 +166,11 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
     ? formatCoin(simulation.data.gasFee * simulation.data.gasUnitPrice, { decimals: 8 })
     : undefined;
 
-  const address = trimAddressLeadingZeros(activeAccountAddress);
   const hasCoinBalanceChanges = simulation.data !== undefined
-    && simulation.data.coinBalanceChanges[address]
-    && Object.keys(simulation.data.coinBalanceChanges[address]).length > 0;
+    && simulation.data.coinBalanceChanges[activeAccountAddress]
+    && Object.keys(simulation.data.coinBalanceChanges[activeAccountAddress]).length > 0;
   const ownCoinBalanceChanges = hasCoinBalanceChanges
-    ? simulation.data.coinBalanceChanges[address]
+    ? simulation.data.coinBalanceChanges[activeAccountAddress]
     : undefined;
 
   return (

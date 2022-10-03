@@ -6,6 +6,7 @@ import { useRef } from 'react';
 import { aptosCoinStructTag } from 'core/constants';
 import useCachedRestApi from 'core/hooks/useCachedRestApi';
 import { getCoinStoresByCoinType } from 'core/utils/resource';
+import { normalizeAddress } from 'core/utils/account';
 import { parseMoveAbortDetails } from 'shared/move';
 import {
   CoinInfoData,
@@ -62,11 +63,12 @@ function getNewResourcesStateByAccount(txn: Types.UserTransaction) {
   for (const change of txn.changes) {
     if (change.type === 'write_resource') {
       const { address, data } = change as Types.WriteResource;
+      const normalizedAddress = normalizeAddress(address);
       const newResourceState = data as Resource;
-      if (address in newResourcesStateByOwner) {
-        newResourcesStateByOwner[address].push(newResourceState);
+      if (normalizedAddress in newResourcesStateByOwner) {
+        newResourcesStateByOwner[normalizedAddress].push(newResourceState);
       } else {
-        newResourcesStateByOwner[address] = [newResourceState];
+        newResourcesStateByOwner[normalizedAddress] = [newResourceState];
       }
     }
   }
@@ -154,6 +156,7 @@ export default function useParseTransaction() {
     const gasUnitPrice = Number(txn.gas_unit_price);
     const version = Number(txn.version);
     const { payload } = txn;
+    const sender = normalizeAddress(txn.sender);
     const error = !txn.success ? parseMoveAbortDetails(txn.vm_status) : undefined;
 
     const baseProps = {
@@ -173,7 +176,7 @@ export default function useParseTransaction() {
     if (isEntryFunctionPayload(payload)) {
       if (payload.function === coinTransferFunction
         || payload.function === accountTransferFunction) {
-        const recipient = payload.arguments[0];
+        const recipient = normalizeAddress(payload.arguments[0]);
         const amount = BigInt(payload.arguments[1]);
         const coinType = payload.type_arguments[0] ?? aptosCoinStructTag;
         const coinInfo = await getCoinInfo(coinType);
@@ -183,14 +186,14 @@ export default function useParseTransaction() {
           coinInfo,
           coinType,
           recipient,
-          sender: txn.sender,
+          sender,
           type: 'transfer',
           ...baseProps,
         };
       }
 
       if (payload.function === coinMintFunction) {
-        const recipient = payload.arguments[0];
+        const recipient = normalizeAddress(payload.arguments[0]);
         const amount = BigInt(payload.arguments[1]);
         const coinInfo = await getCoinInfo(aptosCoinStructTag);
         return {
@@ -204,7 +207,7 @@ export default function useParseTransaction() {
     }
 
     return {
-      sender: txn.sender,
+      sender,
       type: 'generic',
       ...baseProps,
     };
