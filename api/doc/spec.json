@@ -8157,7 +8157,7 @@
           "Transactions"
         ],
         "summary": "Get account transactions",
-        "description": "Retrieves transactions from an account.  If the start version is too far in the past\na 410 will be returned.\n\nIf no start version is given, it will start at 0",
+        "description": "Retrieves transactions from an account. If the start sequence number is too far in the past\na 410 will be returned.\n\nIf no start sequence number is given, it will start at 0",
         "parameters": [
           {
             "name": "address",
@@ -8176,7 +8176,7 @@
               "$ref": "#/components/schemas/U64"
             },
             "in": "query",
-            "description": "Ledger version to start list of transactions\n\nIf not provided, defaults to showing the latest transactions",
+            "description": "The sequence number of the start transaction of the page.\n\nIf not provided, defaults to 0",
             "required": false,
             "deprecated": false,
             "explode": true

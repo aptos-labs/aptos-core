@@ -229,10 +229,10 @@ impl TransactionsApi {
 
     /// Get account transactions
     ///
-    /// Retrieves transactions from an account.  If the start version is too far in the past
+    /// Retrieves transactions from an account. If the start sequence number is too far in the past
     /// a 410 will be returned.
     ///
-    /// If no start version is given, it will start at 0
+    /// If no start sequence number is given, it will start at 0
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
@@ -244,9 +244,9 @@ impl TransactionsApi {
         accept_type: AcceptType,
         /// Address of account with or without a `0x` prefix
         address: Path<Address>,
-        /// Ledger version to start list of transactions
+        /// The sequence number of the start transaction of the page.
         ///
-        /// If not provided, defaults to showing the latest transactions
+        /// If not provided, defaults to 0
         start: Query<Option<U64>>,
         /// Max number of transactions to retrieve.
         ///
