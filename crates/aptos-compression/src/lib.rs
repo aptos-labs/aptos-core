@@ -65,6 +65,17 @@ pub fn compress(
         }
     };
 
+    // Ensure that the compressed data size is not greater than the max bytes limit. This can
+    // happen in case of uncompressible data, where the compression size will be more than the
+    // uncompressed size.
+    if compressed_data.len() > max_bytes {
+        return Err(CompressionError(format!(
+            "Compressed size greater than max. size: {}, max: {}",
+            compressed_data.len(),
+            max_bytes
+        )));
+    }
+
     // Stop the timer and update the metrics
     let compression_duration = timer.stop_and_record();
     increment_compression_byte_count(RAW_BYTES, client.clone(), raw_data.len() as u64);
