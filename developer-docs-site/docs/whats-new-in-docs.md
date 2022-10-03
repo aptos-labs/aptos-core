@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 03 October 2022
+
+- [How Base Gas Works](/docs/concepts/base-gas.md) describes the types of gas involved in Aptos transactions and offers optimizations for your use.
+
 ## 26 September 2022
 
 - [Installing Aptos CLI](/docs/cli-tools/aptos-cli-tool/install-aptos-cli.md) provides detailed guidance for all major operating systems: Linux, macOS, and Windows.

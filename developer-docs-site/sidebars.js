@@ -45,6 +45,7 @@ const sidebars = {
         "concepts/basics-accounts",
         "concepts/basics-events",
         "concepts/basics-gas-txn-fee",
+        "concepts/base-gas",
         {
           type: "category",
           label: "Coin and Token",
