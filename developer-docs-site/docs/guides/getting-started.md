@@ -32,15 +32,11 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     ./scripts/dev_setup.sh
     ```
 
-TODO: ID which OSes this script works on. macOS and Linux only? And ask if we can remove the selection verbiage in the output of “Based on your selection, these tools will be included”
-
 4. Update your current shell environment to run `cargo build` and other Aptos-related commands:
 
     ```
     source ~/.cargo/env
     ```
-
-TODO: Find out why this isn’t done by the script, which suggests running `cargo build` immediately.
 
 5. Optionally, check out a release branch to install an Aptos node:
 
@@ -63,8 +59,6 @@ TODO: Find out why this isn’t done by the script, which suggests running `carg
     </TabItem>
     </Tabs>
 
-TODO: Will this still be true after mainnet? Should we add that branch? Find out where we can link off for more information on branches and determine if this should be done BEFORE building Aptos, as the end of the the setup script encourages you to do so next.
-
 ## Install the CLI
 
 Install the Aptos CLI following the [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md) guide. 
@@ -85,8 +79,6 @@ Make sure you have the below tools installed on your computer if running macOS. 
 - **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
 
 Now your basic Aptos development environment is ready.
-
-TODO: Find out if similar extras are needed for Linux or Windows. See my TODO for supported OSes above.
 
 ## Aptos developer resources
 
