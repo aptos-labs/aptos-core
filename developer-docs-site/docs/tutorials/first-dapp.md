@@ -320,7 +320,7 @@ function App() {
   // ...
 
   // Check for the module; show publish instructions if not present.
-  const [modules, setModules] = React.useState<Types.MoveModule[]>([]);
+  const [modules, setModules] = React.useState<Types.MoveModuleBytecode[]>([]);
   React.useEffect(() => {
     if (!address) return;
     client.getAccountModules(address).then(setModules);
