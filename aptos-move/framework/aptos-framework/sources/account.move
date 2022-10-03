@@ -71,6 +71,7 @@ module aptos_framework::account {
 
     struct SignerCapabilityOfferProofChallenge has drop {
         sequence_number: u64,
+        source_address: address,
         recipient_address: address,
     }
 
@@ -325,6 +326,7 @@ module aptos_framework::account {
         // proof that this account intends to delegate its signer capability to another account
         let proof_challenge = SignerCapabilityOfferProofChallenge {
             sequence_number: account_resource.sequence_number,
+            source_address: addr,
             recipient_address,
         };
 
