@@ -108,20 +108,20 @@ A transaction may end in one of the following states:
 * Committed on the blockchain and executed. This is considered as a successful transaction.
 * Committed on the blockchain and aborted. The abort code indicates why the transaction failed to execute.
 * Discarded during transaction submission due to a validation check such as insufficient gas, invalid transaction format, or incorrect key.
-* Discarded after transaction submission but before attempted execution. This could be due to timeouts or insufficient gas due to other transactions affecting the account.
+* Discarded after transaction submission but before attempted execution. This could be caused by timeouts or insufficient gas due to other transactions affecting the account.
 
 The sender’s account will be charged gas for any committed transactions.
 
 During transaction submission, the submitter is notified of successful submission or a reason for failing validations otherwise.
 
-A transaction that is successfully submitted but ultimately discarded may have no visible state in any accessible Aptos node or within the Aptos network. A user can attempt to resubmit the same transaction to re-validate the transaction. If the submitting node believes that this transaction is still valid, this will return an error stating that there exists an identical transaction already submitted.
+A transaction that is successfully submitted but ultimately discarded may have no visible state in any accessible Aptos node or within the Aptos network. A user can attempt to resubmit the same transaction to re-validate the transaction. If the submitting node believes that this transaction is still valid, it will return an error stating that an identical transaction has been submitted.
 
 The submitter can try to increase the gas cost by a trivial amount to help make progress and adjust for whatever may have been causing the discarding of the transaction further downstream.
 
 On the Aptos devnet, the time between submission and confirmation is within seconds.
 
 :::tip Read more
-See [here for a comprehensive description of the transaction lifecycle](/guides/basics-life-of-txn).
+See [Life of a Transaction](/guides/basics-life-of-txn) for a comprehensive description of the Aptos transaction lifecycle.
 :::
 
 ### Constructing a transaction
@@ -135,24 +135,24 @@ Aptos supports two methods for constructing transactions:
 
 JSON-encoded transactions can be generated via the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), following these steps:
 
-- First construct an appropriate JSON payload for the `/transactions/encode_submission` endpoint as demonstrated in the [Python SDK](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L128).
-- The output of the above contains an object containing a `message` and this must be signed with the sender’s private key locally.
-- Finally, the original JSON payload is extended with the signature information and posted to the `/transactions` [endpoint](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L142). This will return back a transaction submission result that, if successful, contains a transaction hash in the `hash` [field](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L145).
+1. First construct an appropriate JSON payload for the `/transactions/encode_submission` endpoint as demonstrated in the [Python SDK](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L128).
+1. The output of the above contains an object containing a `message` that must be signed with the sender’s private key locally.
+1. Extend the original JSON payload with the signature information and post it to the `/transactions` [endpoint](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L142). This will return a transaction submission result that, if successful, contains a transaction hash in the `hash` [field](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L145).
 
 JSON-encoded transactions allow for rapid development and support seamless ABI conversions of transaction arguments to native types. However, most system integrators prefer to generate transactions within their own tech stack. Both the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L259) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L100) support generating BCS transactions.
 
 #### BCS-encoded transactions
 
-BCS encoded transactions can be submitted to the `/transactions` endpoint but must specify `Content-Type: application/x.aptos.signed_transaction+bcs` in the HTTP headers. This will return back a transaction submission result that, if successful, contains a transaction hash in the `hash` [field](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L138).
+BCS-encoded transactions can be submitted to the `/transactions` endpoint but must specify `Content-Type: application/x.aptos.signed_transaction+bcs` in the HTTP headers. This will return a transaction submission result that, if successful, contains a transaction hash in the `hash` [field](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L138).
 
-### Types of Transactions
+### Types of transactions
 
 Within a given transaction, the target of execution can be one of two types: 
 
-- An entry point (formerly known as script function), and/or
-- A script (payload). 
+- An entry point (formerly known as script function)
+- A script (payload)
 
-Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `aptos_account::create_account`. 
+Currently the SDKs [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) support the generation of transactions that target entry points only. This guide points out many of those entry points, such as `coin::transfer` and `aptos_account::create_account`. 
 
 All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. 
 
@@ -164,9 +164,9 @@ Currently there are no tutorials in this guide on script payloads, but the [Move
 
 See the following documentation for generating valid transactions:
 
-- [JSON encoded transactions](http://aptos.dev/tutorials/your-first-transaction) via Typescript, Python, and Rust.
-- [Python example of BCS encoded coin transfers](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L240).
-- [Typescript example of BCS encoded coin transfers](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.test.ts#L122).
+- [JSON-encoded transactions](http://aptos.dev/tutorials/your-first-transaction) via Typescript, Python, and Rust.
+- [Python example of BCS-encoded coin transfers](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L240).
+- [Typescript example of BCS-encoded coin transfers](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.test.ts#L122).
 - [CLI-based transaction publishing](http://aptos.dev/cli-tools/aptos-cli-tool/use-aptos-cli#publishing-a-move-package-with-a-named-address).
 - [Publish your first Move module](https://aptos.dev/tutorials/first-move-module) via Typescript, Python, and Rust.
 
@@ -174,9 +174,9 @@ See the following documentation for generating valid transactions:
 
 ### Status of a transaction
 
-Transaction status can be obtained by querying the API [`/transactions/by_hash/{hash}`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_hash) with the hash returned during the submission of the transaction.
+Obtain transaction status by querying the API [`/transactions/by_hash/{hash}`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_hash) with the hash returned during the submission of the transaction.
 
-A reasonable strategy for submitting transactions is to limit their lifetime to 30 to 60 seconds, and polling that API at regular intervals until success or a several seconds after that time has elapsed. If there is no commitment on-chain, the transaction was likely discarded.
+A reasonable strategy for submitting transactions is to limit their lifetime to 30 to 60 seconds, and polling that API at regular intervals until success or several seconds after that time has elapsed. If there is no commitment on-chain, the transaction was likely discarded.
 
 ### Testing transactions or transaction pre-execution
 
