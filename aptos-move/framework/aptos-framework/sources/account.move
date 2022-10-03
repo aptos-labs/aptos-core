@@ -74,6 +74,12 @@ module aptos_framework::account {
         recipient_address: address,
     }
 
+    struct SignerCapabilityOfferProofChallenge_V2 has drop {
+        sequence_number: u64,
+        source_address: address,
+        recipient_address: address,
+    }
+
     const MAX_U64: u128 = 18446744073709551615;
     const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -307,7 +313,7 @@ module aptos_framework::account {
 
     /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its signer capability to only one other address at one time.
-    /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
+    /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge_V2` signed by the account owner's key
     /// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
     /// `account_public_key_bytes` is the public key of the account owner
     /// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing
@@ -326,12 +332,13 @@ module aptos_framework::account {
 
         let account_resource = borrow_global_mut<Account>(addr);
         // proof that this account intends to delegate its signer capability to another account
-        let proof_challenge = SignerCapabilityOfferProofChallenge {
+        let proof_challenge = SignerCapabilityOfferProofChallenge_V2 {
             sequence_number: account_resource.sequence_number,
+            source_address: addr,
             recipient_address,
         };
 
-        // verify that the `SignerCapabilityOfferProofChallenge` is correct and signed by the account owner's private key
+        // verify that the `SignerCapabilityOfferProofChallenge_V2` is correct and signed by the account owner's private key
         if (account_scheme == ED25519_SCHEME) {
             let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
             let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
