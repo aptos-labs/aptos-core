@@ -1,18 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::emitter::{account_minter::create_and_fund_account_request, RETRY_POLICY};
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
+use aptos_infallible::Mutex;
+use aptos_logger::{info, warn};
 use aptos_rest_client::Client as RestClient;
+use aptos_sdk::types::account_address::AccountAddress;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib::aptos_token_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use std::collections::HashMap;
-
-use crate::emitter::{account_minter::create_and_fund_account_request, RETRY_POLICY};
-use aptos_infallible::Mutex;
-use aptos_logger::{info, warn};
-use aptos_sdk::types::account_address::AccountAddress;
 use async_trait::async_trait;
 use rand::rngs::StdRng;
 use rand::thread_rng;
@@ -26,7 +24,7 @@ pub struct NFTMintAndTransfer {
     faucet_account: LocalAccount,
     collection_name: Vec<u8>,
     token_name: Vec<u8>,
-    account_funded: HashMap<AccountAddress, bool>,
+    rest_client: RestClient,
 }
 
 impl NFTMintAndTransfer {
@@ -39,6 +37,14 @@ impl NFTMintAndTransfer {
     ) -> Self {
         let creator_address = creator_account.lock().address();
         let faucet_account = LocalAccount::generate(&mut thread_rng());
+        let create_account_txn = create_and_fund_account_request(
+            &mut creator_account.lock(),
+            100_000_000_000,
+            faucet_account.public_key(),
+            &txn_factory,
+        );
+        submit_retry_and_wait(rest_client, &create_account_txn).await;
+
         let fund_faucet_account_txn = create_nft_transfer_request(
             &mut creator_account.lock(),
             &faucet_account,
@@ -56,58 +62,56 @@ impl NFTMintAndTransfer {
             creator_address,
             collection_name,
             token_name,
-            account_funded: Default::default(),
+            rest_client: rest_client.clone(),
         }
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for NFTMintAndTransfer {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
     ) -> Vec<SignedTransaction> {
+        let mut fund_requests = Vec::with_capacity(accounts.len());
         let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
         for account in accounts {
-            let account_funded = self
-                .account_funded
-                .get(&account.address())
-                .cloned()
-                .unwrap_or(false);
+            fund_requests.push(create_nft_transfer_request(
+                &mut self.faucet_account,
+                account,
+                self.creator_address,
+                &self.collection_name,
+                &self.token_name,
+                &self.txn_factory,
+                INITIAL_NFT_BALANCE,
+            ));
             for i in 0..transactions_per_account {
-                requests.push(if account_funded {
-                    create_nft_transfer_request(
-                        account,
-                        &self.faucet_account,
-                        self.creator_address,
-                        &self.collection_name,
-                        &self.token_name,
-                        &self.txn_factory,
-                        if i != transactions_per_account - 1 {
-                            1
-                        } else {
-                            INITIAL_NFT_BALANCE + 1 - transactions_per_account as u64
-                        },
-                    )
-                } else {
-                    create_nft_transfer_request(
-                        &mut self.faucet_account,
-                        account,
-                        self.creator_address,
-                        &self.collection_name,
-                        &self.token_name,
-                        &self.txn_factory,
-                        if i != transactions_per_account - 1 {
-                            1
-                        } else {
-                            INITIAL_NFT_BALANCE + 1 - transactions_per_account as u64
-                        },
-                    )
-                });
+                requests.push(create_nft_transfer_request(
+                    account,
+                    &self.faucet_account,
+                    self.creator_address,
+                    &self.collection_name,
+                    &self.token_name,
+                    &self.txn_factory,
+                    if i != transactions_per_account - 1 {
+                        1
+                    } else {
+                        INITIAL_NFT_BALANCE + 1 - transactions_per_account as u64
+                    },
+                ));
             }
-            self.account_funded
-                .insert(account.address(), !account_funded);
         }
+        // Fund the accounts before issuing transfer txns.
+        crate::emitter::account_minter::execute_and_wait_transactions(
+            &self.rest_client,
+            &mut self.faucet_account,
+            fund_requests,
+            &std::sync::atomic::AtomicUsize::new(0),
+        )
+        .await
+        .unwrap();
+
         requests
     }
 }
@@ -118,6 +122,7 @@ async fn submit_retry_and_wait(rest_client: &RestClient, txn: &SignedTransaction
         .await;
     if let Err(e) = submit_result {
         warn!("Failed submitting transaction {:?} with {:?}", txn, e);
+        panic!();
     }
     // if submission timeouts, it might still get committed:
     RETRY_POLICY
@@ -164,14 +169,14 @@ pub async fn initialize_nft_collection(
     // Create and mint the owner account first
     let create_account_txn = create_and_fund_account_request(
         root_account,
-        10_000_000,
+        100_000_000_000_000,
         creator_account.public_key(),
         txn_factory,
     );
 
     submit_retry_and_wait(rest_client, &create_account_txn).await;
 
-    info!("create_account_txn complete");
+    info!("create_account_txn {} complete", creator_account.address());
 
     let collection_txn =
         create_nft_collection_request(creator_account, collection_name, txn_factory);
@@ -215,7 +220,7 @@ pub fn create_nft_token_request(
             collection_name.to_vec(),
             token_name.to_vec(),
             "collection description".to_owned().into_bytes(),
-            100_000_000_000,
+            1_000_000_000_000,
             u64::MAX,
             "uri".to_owned().into_bytes(),
             creation_account.address(),

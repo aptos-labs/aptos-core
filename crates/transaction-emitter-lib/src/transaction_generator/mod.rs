@@ -9,8 +9,9 @@ pub mod nft_mint_and_transfer;
 pub mod p2p_transaction_generator;
 pub mod transaction_mix_generator;
 
+#[async_trait]
 pub trait TransactionGenerator: Sync + Send {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,

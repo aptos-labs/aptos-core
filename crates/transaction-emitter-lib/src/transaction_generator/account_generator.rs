@@ -61,7 +61,7 @@ impl AccountGenerator {
 
 #[async_trait]
 impl TransactionGenerator for AccountGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,

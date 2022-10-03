@@ -97,7 +97,7 @@ impl SubmissionWorker {
             // always add expected cycle duration, to not drift from expected pace.
             wait_until += wait_duration;
 
-            let requests = self.gen_requests();
+            let requests = self.gen_requests().await;
 
             let txn_expiration_time = requests
                 .iter()
@@ -260,7 +260,7 @@ impl SubmissionWorker {
         }
     }
 
-    fn gen_requests(&mut self) -> Vec<SignedTransaction> {
+    async fn gen_requests(&mut self) -> Vec<SignedTransaction> {
         let batch_size = max(
             1,
             min(
@@ -274,6 +274,7 @@ impl SubmissionWorker {
             .choose_multiple(&mut self.rng, batch_size);
         self.txn_generator
             .generate_transactions(accounts, self.params.transactions_per_account)
+            .await
     }
 }
 

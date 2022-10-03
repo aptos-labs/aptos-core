@@ -571,7 +571,7 @@ impl TxnEmitter {
 }
 
 /// Waits for a single account to catch up to the expected sequence number
-async fn wait_for_single_account_sequence(
+pub async fn wait_for_single_account_sequence(
     client: &RestClient,
     account: &LocalAccount,
     wait_timeout: Duration,

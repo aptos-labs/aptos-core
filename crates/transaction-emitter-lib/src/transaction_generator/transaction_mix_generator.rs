@@ -25,8 +25,9 @@ impl TxnMixGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for TxnMixGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
@@ -34,7 +35,9 @@ impl TransactionGenerator for TxnMixGenerator {
         let mut picked = self.rng.gen_range(0, self.total_weight);
         for (gen, weight) in &mut self.txn_mix {
             if picked < *weight {
-                return gen.generate_transactions(accounts, transactions_per_account);
+                return gen
+                    .generate_transactions(accounts, transactions_per_account)
+                    .await;
             }
             picked -= *weight;
         }
