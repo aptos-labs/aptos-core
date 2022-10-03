@@ -89,9 +89,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.code.request_publish.base, "code.request_publish.base", 500],
     [.code.request_publish.per_byte, "code.request_publish.per_byte", 2],
 
-    [.event.write_to_event_store.base, "event.write_to_event_store.base", 600],
+    [.event.write_to_event_store.base, "event.write_to_event_store.base", 500_000],
     // TODO(Gas): the on-chain name is wrong...
-    [.event.write_to_event_store.per_abstract_value_unit, "event.write_to_event_store.per_abstract_memory_unit", 4],
+    [.event.write_to_event_store.per_abstract_value_unit, "event.write_to_event_store.per_abstract_memory_unit", 5_000],
 
     [.state_storage.get_usage.base_cost, "state_storage.get_usage.base", 500],
 
