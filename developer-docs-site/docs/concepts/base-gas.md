@@ -16,6 +16,8 @@ The more function calls, branching conditional statements, etc. that a transacti
 Likewise, the more reads from and writes into global storage that a transaction requires, the more storage gas it will cost.
 Finally, the more bytes in a transaction payload, the more it will cost.
 
+As explained in the [optimization principles](#optimization-principles) section, storage gas has by far the largest affect on base gas.
+
 ## Instruction gas
 
 Instruction gas parameters are defined at [`instr.rs`] and include the following instruction types:
@@ -269,9 +271,11 @@ In the absence of a legitimate economic incentive to deallocate from global stor
 
 As of the time of this writing, by far the most expensive instruction gas operation defined in [`instr.rs`] is a function call, which requires 1500 gas units (.15 octals), some 53 times less gas than a single per-item read in global storage.
 Loading a constant costs 650 gas units (.065 octals), borrow operations cost 500 units (0.05 octals), reading or writing to a reference costs 200 gas units (0.02 octals), and loading a `u128` on the stack costs 80 gas units (0.008 octals).
-Hence pass-by-value is less expensive than pass-by-reference for a primitive type like `u64`, but more expensive for larger data structures like `vector<u128>`.
+Hence pass-by-value is less expensive than pass-by-reference for a primitive type like `u64`, but more expensive for a larger data structure like a 40-byte `struct`.
 
-Still though, instruction gas is completely dwarfed by storage costs, and while there is technically an incentive to reduce the number of function calls in a program, for example, engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions.
+Notably, instruction gas is completely dwarfed by storage costs, and while there is technically an incentive to reduce the number of function calls in a program, for example, engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions (in nearly all cases).
+
+In extreme cases it is possible for instruction gas to outweigh storage gas, for example if a loopwise mathematical function takes 10,000 iterations to converge, but again this is an extreme case and for most applications storage gas has a larger impact on base gas than does instruction gas.
 
 ### Payload gas
 
@@ -281,11 +285,11 @@ Hence in practice, payload gas is unlikely to be a concern.
 <!--- Alphabetized reference links -->
 
 [#4540]:                           https://github.com/aptos-labs/aptos-core/pull/4540/files
-[`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/69d076700dbdbe5c49eb617937bd4999832397bd/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
-[`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/69d076700dbdbe5c49eb617937bd4999832397bd/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_initialize
+[`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
+[`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_initialize
 [`instr.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/instr.rs
-[`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/69d076700dbdbe5c49eb617937bd4999832397bd/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_on_reconfig
-[`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/69d076700dbdbe5c49eb617937bd4999832397bd/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md
+[`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_on_reconfig
+[`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md
 [`storage_gas.move`]:              https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/storage_gas.move
-[`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/69d076700dbdbe5c49eb617937bd4999832397bd/aptos-move/framework/aptos-framework/build/AptosFramework/docs/storage_gas.md#0x1_storage_gas_StorageGas
+[`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_StorageGas
 [`transaction.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction.rs
