@@ -106,6 +106,12 @@ pub enum EntryFunctionCall {
         new_owner: AccountAddress,
     },
 
+    /// This is only callable during genesis or framework upgrades
+    DomainsInitialize {
+        funds_address: AccountAddress,
+        admin_multisig_address: AccountAddress,
+    },
+
     /// A wrapper around `register_name` as an entry function.
     /// Option<String> is not currently serializable, so we have these convenience methods
     DomainsRegisterDomain {
@@ -183,6 +189,10 @@ impl EntryFunctionCall {
                 domain_name,
                 new_owner,
             } => domains_force_set_subdomain_address(subdomain_name, domain_name, new_owner),
+            DomainsInitialize {
+                funds_address,
+                admin_multisig_address,
+            } => domains_initialize(funds_address, admin_multisig_address),
             DomainsRegisterDomain {
                 domain_name,
                 num_years,
@@ -478,6 +488,28 @@ pub fn domains_force_set_subdomain_address(
     ))
 }
 
+/// This is only callable during genesis or framework upgrades
+pub fn domains_initialize(
+    funds_address: AccountAddress,
+    admin_multisig_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 4,
+            ]),
+            ident_str!("domains").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&funds_address).unwrap(),
+            bcs::to_bytes(&admin_multisig_address).unwrap(),
+        ],
+    ))
+}
+
 /// A wrapper around `register_name` as an entry function.
 /// Option<String> is not currently serializable, so we have these convenience methods
 pub fn domains_register_domain(domain_name: Vec<u8>, num_years: u8) -> TransactionPayload {
@@ -738,6 +770,17 @@ mod decoder {
         }
     }
 
+    pub fn domains_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DomainsInitialize {
+                funds_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                admin_multisig_address: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn domains_register_domain(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DomainsRegisterDomain {
@@ -854,6 +897,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "domains_force_set_subdomain_address".to_string(),
             Box::new(decoder::domains_force_set_subdomain_address),
+        );
+        map.insert(
+            "domains_initialize".to_string(),
+            Box::new(decoder::domains_initialize),
         );
         map.insert(
             "domains_register_domain".to_string(),

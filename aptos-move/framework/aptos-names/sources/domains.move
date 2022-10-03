@@ -97,7 +97,7 @@ module aptos_names::domains {
     }
 
     /// This is only callable during genesis or framework upgrades
-    public fun initialize(framework: &signer, funds_address: address, admin_multisig_address: address) {
+    public entry fun initialize(framework: &signer, funds_address: address, admin_multisig_address: address) {
         use aptos_framework::aptos_account;
 
         assert!(signer::address_of(framework) == @0x4, error::permission_denied(ENOT_AUTHORIZED));
