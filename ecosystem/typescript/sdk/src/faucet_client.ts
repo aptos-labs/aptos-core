@@ -21,7 +21,7 @@ export class FaucetClient extends AptosClient {
    * @param config An optional config for inner axios instance
    * Detailed config description: {@link https://github.com/axios/axios#request-config}
    */
-  constructor(nodeUrl: string, faucetUrl: string, config?: OpenAPIConfig) {
+  constructor(nodeUrl: string, faucetUrl: string, config?: Partial<OpenAPIConfig>) {
     super(nodeUrl, config);
 
     if (!faucetUrl) {
