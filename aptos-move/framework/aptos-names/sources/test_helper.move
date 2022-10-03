@@ -52,7 +52,7 @@ module aptos_names::test_helper {
         account::create_account_for_test(@aptos_names);
         let new_accounts = setup_and_fund_accounts(aptos, foundation, vector[user, rando]);
         timestamp::set_time_has_started_for_testing(aptos);
-        domains::init_module_for_test(myself);
+        domains::init_module_for_test(myself, @aptos_names, @aptos_names);
         config::set_foundation_fund_address_test_only(signer::address_of(foundation));
         new_accounts
     }

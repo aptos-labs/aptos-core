@@ -42,15 +42,14 @@ module aptos_names::config {
         config: PropertyMap,
     }
 
-    public(friend) fun initialize_v1(framework: &signer) acquires ConfigurationV1 {
+    public(friend) fun initialize_v1(framework: &signer, admin_multisig_addres: address, foundation_fund_address: address) acquires ConfigurationV1 {
         move_to(framework, ConfigurationV1 {
             config: property_map::empty(),
         });
 
-        // TODO: SET THIS TO SOMETHING REAL
         // We set it directly here to allow boostrapping the other values
-        set_v1(@aptos_names, config_key_admin_multisig_address(), &@aptos_names);
-        set_v1(@aptos_names, config_key_foundation_fund_address(), &@aptos_names);
+        set_v1(@aptos_names, config_key_admin_multisig_address(), &admin_multisig_addres);
+        set_v1(@aptos_names, config_key_foundation_fund_address(), &foundation_fund_address);
 
         set_is_enabled(framework, true);
 
@@ -310,7 +309,7 @@ module aptos_names::config {
     public fun initialize_for_test(aptos_names: &signer, aptos: &signer) acquires ConfigurationV1 {
         timestamp::set_time_has_started_for_testing(aptos);
         initialize_aptoscoin_for(aptos);
-        initialize_v1(aptos_names);
+        initialize_v1(aptos_names, @aptos_names, @aptos_names);
         set_admin_multisig_address_test_only(signer::address_of(aptos_names));
     }
 
@@ -318,7 +317,7 @@ module aptos_names::config {
     fun test_default_token_configs_are_set(myself: signer) acquires ConfigurationV1 {
         account::create_account_for_test(signer::address_of(&myself));
 
-        initialize_v1(&myself);
+        initialize_v1(&myself, @aptos_names, @aptos_names);
         set_v1(@aptos_names, config_key_admin_multisig_address(), &@aptos_names);
 
         set_tokendata_description(&myself, string::utf8(b"test description"));
@@ -332,7 +331,7 @@ module aptos_names::config {
     fun test_default_tokens_configs_are_set(myself: signer) acquires ConfigurationV1 {
         account::create_account_for_test(signer::address_of(&myself));
 
-        initialize_v1(&myself);
+        initialize_v1(&myself, @aptos_names, @aptos_names);
         set_v1(@aptos_names, config_key_admin_multisig_address(), &@aptos_names);
 
         set_tokendata_description(&myself, string::utf8(b"test description"));

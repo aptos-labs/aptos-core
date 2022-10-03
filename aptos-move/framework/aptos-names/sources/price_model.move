@@ -43,7 +43,7 @@ module aptos_names::price_model {
 
         config::initialize_aptoscoin_for(framework);
         coin::register<AptosCoin>(myself);
-        config::initialize_v1(myself);
+        config::initialize_v1(myself, @aptos_names, @aptos_names);
 
         config::set_domain_price_for_length(myself, (100 * config::octas()), 2);
         config::set_domain_price_for_length(myself, (60 * config::octas()), 3);

@@ -96,8 +96,10 @@ module aptos_names::domains {
         expiration_time_secs: u64,
     }
 
-    fun init_module(framework: &signer) {
-        config::initialize_v1(framework);
+    /// This is only callable during genesis or framework upgrades
+    public fun initialize(framework: &signer, funds_address: address, admin_multisig_address: address) {
+        assert!(signer::address_of(framework) == @0x4, ENOT_AUTHORIZED);
+        config::initialize_v1(framework, admin_multisig_address, funds_address);
 
         move_to(
             framework,
@@ -435,8 +437,8 @@ module aptos_names::domains {
     }
 
     #[test_only]
-    public fun init_module_for_test(framework: &signer) {
-        init_module(framework);
+    public fun init_module_for_test(framework: &signer, funds_address: address, admin_multisig_address: address) {
+        initialize(framework, funds_address, admin_multisig_address)
     }
 
     #[test_only]
