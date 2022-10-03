@@ -189,7 +189,11 @@ module aptos_framework::genesis {
         }
     }
 
-    fun create_employee_validators(employees: vector<EmployeeAccountMap>) {
+    fun create_employee_validators(
+        employee_vesting_start: u64,
+        employee_vesting_period_duration: u64,
+        employees: vector<EmployeeAccountMap>,
+    ) {
         let i = 0;
         let num_employee_groups = vector::length(&employees);
         let unique_accounts = vector::empty();
@@ -231,8 +235,8 @@ module aptos_framework::genesis {
 
             let vesting_schedule = vesting::create_vesting_schedule(
                 schedule,
-                1663456089, // Update before mainnet or pass in by config
-                30 * 24 * 60 * 60, // 30 days
+                employee_vesting_start,
+                employee_vesting_period_duration,
             );
 
             let admin = employee_group.validator.validator_config.owner_address;
