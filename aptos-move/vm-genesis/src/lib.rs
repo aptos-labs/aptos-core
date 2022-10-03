@@ -6,11 +6,10 @@
 mod genesis_context;
 
 use crate::genesis_context::GenesisStateView;
-use aptos_crypto::multi_ed25519::MultiEd25519PublicKey;
 use aptos_crypto::{
     bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    HashValue, PrivateKey, Uniform, ValidCryptoMaterialStringExt,
+    HashValue, PrivateKey, Uniform,
 };
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
@@ -69,9 +68,6 @@ pub struct GenesisConfiguration {
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voting_power_increase_limit: u64,
-    // Aptos Names configuration
-    pub ans_funds_address: AccountAddress,
-    pub ans_admin_multisig_auth_key: AuthenticationKey,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -115,7 +111,6 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     create_accounts(&mut session, accounts);
     create_employee_validators(&mut session, employees);
     create_and_initialize_validators_with_commission(&mut session, validators);
-    initialize_aptos_names(&mut session, genesis_config);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -211,7 +206,6 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
-    initialize_aptos_names(&mut session, genesis_config);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -289,7 +283,6 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 
 fn exec_function(
     session: &mut SessionExt<impl MoveResolver>,
-    module_address: AccountAddress,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -297,7 +290,10 @@ fn exec_function(
 ) {
     session
         .execute_function_bypass_visibility(
-            &ModuleId::new(module_address, Identifier::new(module_name).unwrap()),
+            &ModuleId::new(
+                account_config::CORE_CODE_ADDRESS,
+                Identifier::new(module_name).unwrap(),
+            ),
             &Identifier::new(function_name).unwrap(),
             ty_args,
             args,
@@ -344,7 +340,6 @@ fn initialize(
     let epoch_interval_usecs = genesis_config.epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "initialize",
         vec![],
@@ -368,7 +363,6 @@ fn initialize(
 fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
         vec![],
@@ -379,7 +373,6 @@ fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
 fn set_genesis_end(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "set_genesis_end",
         vec![],
@@ -394,7 +387,6 @@ fn initialize_core_resources_and_aptos_coin(
     let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "initialize_core_resources_and_aptos_coin",
         vec![],
@@ -412,7 +404,6 @@ fn initialize_on_chain_governance(
 ) {
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GOVERNANCE_MODULE_NAME,
         "initialize",
         vec![],
@@ -425,32 +416,12 @@ fn initialize_on_chain_governance(
     );
 }
 
-/// Create and initialize Aptos Names configuration.
-fn initialize_aptos_names(
-    session: &mut SessionExt<impl MoveResolver>,
-    genesis_config: &GenesisConfiguration,
-) {
-    exec_function(
-        session,
-        AccountAddress::from_hex_literal("0x4").unwrap(),
-        "domains",
-        "initialize",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(AccountAddress::from_hex_literal("0x4").unwrap()),
-            MoveValue::Address(genesis_config.ans_funds_address),
-            MoveValue::Address(genesis_config.ans_admin_multisig_auth_key.derived_address()),
-        ]),
-    );
-}
-
 fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountBalance]) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "create_accounts",
         vec![],
@@ -468,7 +439,6 @@ fn create_employee_validators(
 
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "create_employee_validators",
         vec![],
@@ -488,7 +458,6 @@ fn create_and_initialize_validators(
     serialized_values.push(validators_bytes);
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "create_initialize_validators",
         vec![],
@@ -508,7 +477,6 @@ fn create_and_initialize_validators_with_commission(
     serialized_values.push(validators_bytes);
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "create_initialize_validators_with_commission",
         vec![],
@@ -519,7 +487,6 @@ fn create_and_initialize_validators_with_commission(
 fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         VERSION_MODULE_NAME,
         "initialize_for_test",
         vec![],
@@ -555,7 +522,6 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
     // Call the initialize function with the metadata.
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         CODE_MODULE_NAME,
         "initialize",
         vec![],
@@ -573,7 +539,6 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
 fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         "block",
         "emit_genesis_block_event",
         vec![],
@@ -583,7 +548,6 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveResolver>) {
     );
     exec_function(
         session,
-        CORE_CODE_ADDRESS,
         "reconfiguration",
         "emit_genesis_reconfiguration_event",
         vec![],
@@ -725,36 +689,6 @@ impl TestValidator {
     }
 }
 
-/*
-Below values are for testing only!
-addresses: 0x0ee16f0e4b47d5972f63a642385d52d301e53716b4e1fbd637b9a91a7f1979ba, 0xe5a6fcac1fc4eeec1859d9e395d6c6bc49fa7dd29ca8681e581b0950dcec23df
-public_keys: 0xc5547463e44c3ad8ad52018f0aaf237d39e396b22815cf712493dd61cffabebf, 0xeea1decaa37eb5cdcf99262c6518053126e34283f42ad74f7b91b75fa625c6f8
-private_keys: 0x44c7eabad483e04ce6703a4518d0a74a1356b9c50a3f5cfd4a4c9285591caca6, 0x0afd9ed1d3c00ef22b78a7234f436132317d7fcc69824a16f0c651658929e7f8
-multisig_pub_key: 0xc5547463e44c3ad8ad52018f0aaf237d39e396b22815cf712493dd61cffabebfeea1decaa37eb5cdcf99262c6518053126e34283f42ad74f7b91b75fa625c6f801
-multisig_auth_key: 0x4407b9a063ac530f8b621f7d80b527a79c626791b14b51c1118763ce941b99ce
-threshold: 1/2.
-*/
-pub fn get_test_ans_funds_address() -> AccountAddress {
-    AccountAddress::from_hex_literal(
-        "0x0ee16f0e4b47d5972f63a642385d52d301e53716b4e1fbd637b9a91a7f1979ba",
-    )
-    .unwrap()
-}
-
-pub fn get_test_ans_admin_multisig_auth_key() -> AuthenticationKey {
-    let pub_key = MultiEd25519PublicKey::from_encoded_string(
-        "0xc5547463e44c3ad8ad52018f0aaf237d39e396b22815cf712493dd61cffabebfeea1decaa37eb5cdcf99262c6518053126e34283f42ad74f7b91b75fa625c6f801",
-    )
-        .unwrap();
-    let auth_key = AuthenticationKey::multi_ed25519(&pub_key);
-    // Ensure the auth key matches the expected on in the comment above
-    assert_eq!(
-        auth_key.to_string(),
-        "4407b9a063ac530f8b621f7d80b527a79c626791b14b51c1118763ce941b99ce".to_string()
-    );
-    auth_key
-}
-
 pub fn generate_test_genesis(
     framework: &ReleaseBundle,
     count: Option<usize>,
@@ -782,9 +716,6 @@ pub fn generate_test_genesis(
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
-            // ANS specific configuration
-            ans_funds_address: get_test_ans_funds_address(),
-            ans_admin_multisig_auth_key: get_test_ans_admin_multisig_auth_key(),
         },
     );
     (genesis, test_validators)
@@ -825,15 +756,6 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         rewards_apy_percentage: 10,
         voting_duration_secs: 7 * 24 * 3600, // 7 days
         voting_power_increase_limit: 30,
-        // TODO: update once decided
-        ans_funds_address: AccountAddress::from_hex_literal(
-            "0x3e89c7ef29468198fe58b3ced66d8c7dcb79b5f9fa27313464886334c35730e9",
-        )
-        .expect("Funds Address is valid"),
-        ans_admin_multisig_auth_key: AuthenticationKey::from_encoded_string(
-            "0xfaadc5d7aea4cf2521308620fb96ec6f32e29664926d33ce381f9911529d4cc8",
-        )
-        .expect("AuthenticationKey is valid"),
     }
 }
 
