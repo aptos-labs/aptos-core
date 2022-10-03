@@ -67,6 +67,10 @@ pub struct Layout {
     pub employee_vesting_start: Option<u64>,
     /// Duration of each vesting period (in seconds).
     pub employee_vesting_period_duration: Option<u64>,
+    /// Address to send ANS registry fees to
+    pub ans_funds_address: Option<AccountAddress>,
+    /// Address of account controlling ANS registry
+    pub ans_admin_address: Option<AccountAddress>,
 }
 
 impl Layout {
@@ -104,6 +108,8 @@ impl Default for Layout {
             total_supply: None,
             employee_vesting_start: Some(1663456089),
             employee_vesting_period_duration: Some(5 * 60), // 5 minutes
+            ans_funds_address: None,
+            ans_admin_address: None,
         }
     }
 }
@@ -146,6 +152,12 @@ pub struct ValidatorConfiguration {
     /// If set to false, the validator will be fully initialized but won't be added to the
     /// validator set.
     pub join_during_genesis: bool,
+    /// Address to send ANS registry fees to
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ans_funds_address: Option<AccountAddress>,
+    /// AuthKey of account controlling ANS registry
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ans_admin_address: Option<AccountAddress>,
 }
 
 impl TryFrom<ValidatorConfiguration> for ValidatorWithCommissionRate {

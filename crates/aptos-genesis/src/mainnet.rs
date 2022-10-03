@@ -2,12 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
+use anyhow::Context;
 use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_temppath::TempPath;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use aptos_types::{
+    account_address::AccountAddress,
+    chain_id::ChainId,
+    transaction::{authenticator::AuthenticationKey, Transaction},
+    waypoint::Waypoint,
+};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use framework::ReleaseBundle;
@@ -54,6 +60,10 @@ pub struct MainnetGenesisInfo {
     employee_vesting_start: u64,
     /// Duration of each vesting period (in seconds).
     employee_vesting_period_duration: u64,
+    /// Address to send ANS registry fees to
+    pub ans_funds_address: AccountAddress,
+    /// Address of account controlling ANS registry
+    pub ans_admin_address: AccountAddress,
 }
 
 impl MainnetGenesisInfo {
@@ -72,13 +82,23 @@ impl MainnetGenesisInfo {
             .employee_vesting_period_duration
             .expect("Employee vesting period duration (in secs) needs to be provided");
 
+        let ans_funds_address = genesis_config
+            .ans_funds_address
+            .context("Expected ANS funds address")?;
+        let ans_admin_multisig_auth_key = genesis_config
+            .ans_admin_multisig_auth_key
+            .context("Expected ANS Admin Multisig AuthKey")?;
         Ok(MainnetGenesisInfo {
             chain_id,
             accounts,
             employee_vesting_accounts,
             validators: validators
                 .into_iter()
-                .map(|v| ValidatorWithCommissionRate::try_from(v).unwrap())
+                .map(|mut v| {
+                    v.ans_funds_address = Some(ans_funds_address);
+                    v.ans_admin_multisig_auth_key = Some(ans_admin_multisig_auth_key);
+                    ValidatorWithCommissionRate::try_from(v).unwrap()
+                })
                 .collect(),
             framework,
             genesis: None,
@@ -93,6 +113,8 @@ impl MainnetGenesisInfo {
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
             employee_vesting_start,
             employee_vesting_period_duration,
+            ans_funds_address,
+            ans_admin_address,
         })
     }
 
@@ -126,6 +148,8 @@ impl MainnetGenesisInfo {
                 voting_power_increase_limit: self.voting_power_increase_limit,
                 employee_vesting_start: self.employee_vesting_start,
                 employee_vesting_period_duration: self.employee_vesting_period_duration,
+                ans_funds_address: self.ans_funds_address,
+                ans_admin_address: self.ans_admin_address,
             },
         )
     }
