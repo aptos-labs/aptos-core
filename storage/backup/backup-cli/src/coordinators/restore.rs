@@ -109,82 +109,19 @@ impl RestoreCoordinator {
             self.global_opt.concurrent_downloads,
         )
         .await?;
+        let transaction_backups = metadata_view.select_transaction_backups(0, Version::MAX)?;
 
-        let next_txn_version = self
-            .global_opt
-            .run_mode
-            .get_next_expected_transaction_version()?;
-        if next_txn_version != 0 {
-            // DB is already in workable state
-            info!(
-                next_txn_version = next_txn_version,
-                "DB is ready to accept transactions, start the node to catch up with the chain. \
-                If the node is unable to catch up because the DB is too old, delete the data folder \
-                and bootstrap again.",
-            );
-            return Ok(());
-        }
+        let txn_manifests = transaction_backups
+            .into_iter()
+            .map(|m| m.manifest)
+            .collect::<Vec<_>>();
 
-        let state_snapshot_backup =
-            if let Some(version) = self.global_opt.run_mode.get_in_progress_state_snapshot()? {
-                info!(
-                    version = version,
-                    "Found in progress state snapshot restore",
-                );
-                metadata_view.expect_state_snapshot(version)?
-            } else {
-                let max_txn_ver = metadata_view
-                    .max_transaction_version()?
-                    .ok_or_else(|| anyhow!("No transaction backup found."))?;
-                metadata_view
-                    .select_state_snapshot(std::cmp::min(self.target_version(), max_txn_ver))?
-                    .ok_or_else(|| anyhow!("No usable state snapshot."))?
-            };
-        let version = state_snapshot_backup.version;
-        let epoch_ending_backups = metadata_view.select_epoch_ending_backups(version)?;
-        let transaction_backup = metadata_view
-            .select_transaction_backups(version, version)?
-            .pop()
-            .unwrap();
-        COORDINATOR_TARGET_VERSION.set(version as i64);
-        info!(version = version, "Restore target decided.");
-
-        let epoch_history = if !self.skip_epoch_endings {
-            Some(Arc::new(
-                EpochHistoryRestoreController::new(
-                    epoch_ending_backups
-                        .into_iter()
-                        .map(|backup| backup.manifest)
-                        .collect(),
-                    self.global_opt.clone(),
-                    self.storage.clone(),
-                )
-                .run()
-                .await?,
-            ))
-        } else {
-            None
-        };
-
-        StateSnapshotRestoreController::new(
-            StateSnapshotRestoreOpt {
-                manifest_handle: state_snapshot_backup.manifest,
-                version,
-            },
-            self.global_opt.clone(),
-            Arc::clone(&self.storage),
-            epoch_history.clone(),
-        )
-        .run()
-        .await?;
-
-        let txn_manifests = vec![transaction_backup.manifest];
         TransactionRestoreBatchController::new(
             self.global_opt,
             self.storage,
             txn_manifests,
-            Some(version + 1),
-            epoch_history,
+            None,
+            None,
         )
         .run()
         .await?;

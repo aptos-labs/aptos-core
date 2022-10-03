@@ -23,16 +23,17 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS,
+    account_config::{DepositEvent, CORE_CODE_ADDRESS},
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
     stake_pool::DistributeRewardsEvent,
+    state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
         ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionPayload, Version,
     },
-    write_set::WriteSet,
+    write_set::{WriteOp, WriteSet},
 };
 use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
@@ -47,9 +48,10 @@ use futures::{
     StreamExt,
 };
 use itertools::zip_eq;
-use move_core_types::transaction_argument::TransactionArgument;
+use move_core_types::{account_address::AccountAddress, transaction_argument::TransactionArgument};
 use std::{
     cmp::{max, min},
+    io::Write,
     pin::Pin,
     sync::Arc,
     time::Instant,
@@ -91,6 +93,7 @@ struct LoadedChunk {
     pub event_vecs: Vec<Vec<ContractEvent>>,
     pub range_proof: TransactionAccumulatorRangeProof,
     pub ledger_info: LedgerInfoWithSignatures,
+    pub write_sets: Vec<WriteSet>,
 }
 
 impl LoadedChunk {
@@ -103,13 +106,15 @@ impl LoadedChunk {
         let mut txns = Vec::new();
         let mut txn_infos = Vec::new();
         let mut event_vecs = Vec::new();
+        let mut write_sets = Vec::new();
 
         while let Some(record_bytes) = file.read_record_bytes().await? {
-            let (txn, txn_info, events, _write_set): (_, _, _, WriteSet) =
+            let (txn, txn_info, events, write_set): (_, _, _, WriteSet) =
                 bcs::from_bytes(&record_bytes)?;
             txns.push(txn);
             txn_infos.push(txn_info);
             event_vecs.push(events);
+            write_sets.push(write_set);
         }
 
         ensure!(
@@ -152,6 +157,7 @@ impl LoadedChunk {
             event_vecs,
             range_proof,
             ledger_info,
+            write_sets,
         })
     }
 }
@@ -254,6 +260,23 @@ impl TransactionRestoreBatchController {
         // Need this for last batch != 1000000
         // let mut a: usize = 0;
 
+        let supply_handle: TableHandle = TableHandle(
+            AccountAddress::from_hex_literal(
+                "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+            )
+            .unwrap(),
+        );
+        let supply_key: Vec<u8> = vec![
+            6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189,
+            245, 246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
+        ];
+        let state_key = StateKey::TableItem {
+            handle: supply_handle,
+            key: supply_key,
+        };
+        let another_minter_script = hex::decode("a11ceb0b050000000601000603060f05150b07203908592006790a00000001000202030301000104000200000500020003060c050301050001060c0d6170746f735f6163636f756e740a6170746f735f636f696e067369676e65720a616464726573735f6f66046d696e74087472616e7366657200000000000000000000000000000000000000000000000000000000000000010308a0860100000000000000010e0a0011000c030a000b030a0207001611010b000b010b02110202").unwrap();
+        let mut prev_total_supply: u128 = 0;
+
         loaded_chunk_stream
             .for_each(|res| {
                 let chunk = res.unwrap();
@@ -262,9 +285,11 @@ impl TransactionRestoreBatchController {
                 let (total_burnt, total_minted) = chunk
                     .txns
                     .iter()
-                    .zip(chunk.txn_infos.iter().zip(chunk.event_vecs.iter()))
                     .enumerate()
-                    .map(|(index, (txn, (txn_info, events)))| {
+                    .map(|(index, txn)| {
+                        let txn_info = &chunk.txn_infos[index];
+                        let events = &chunk.event_vecs[index];
+                        let write_set = &chunk.write_sets[index];
                         // if a + index > 281199 {
                         //     return (0, 0);
                         // }
@@ -272,15 +297,20 @@ impl TransactionRestoreBatchController {
                         // First, find wrapped mints - the only place they can come from is
                         // reward redistribution.
                         let mut minted: u64 = 0;
+                        let mut num_deposit_events = 0;
                         for event in events {
                             if let Ok(rewards_event) = DistributeRewardsEvent::try_from(event) {
                                 minted += rewards_event.rewards_amount;
+                                continue;
+                            }
+                            if let Ok(_) = DepositEvent::try_from(event) {
+                                num_deposit_events += 1;
                             }
                         }
 
                         // Now calculate how much fees was burnt and also check if the payload
                         // is a minting script.
-                        match txn {
+                        let (burn, mint) = match txn {
                             Transaction::UserTransaction(signed_txn) => {
                                 let burnt = signed_txn.gas_unit_price() * txn_info.gas_used();
 
@@ -305,7 +335,10 @@ impl TransactionRestoreBatchController {
 
                                     if let TransactionPayload::Script(script) = signed_txn.payload()
                                     {
-                                        if script.code() == MINTER_SCRIPT {
+                                        if (script.code() == MINTER_SCRIPT
+                                            || script.code() == &another_minter_script)
+                                            && num_deposit_events == 2
+                                        {
                                             match &script.args()[1] {
                                                 TransactionArgument::U64(amount) => {
                                                     minted += amount + 100000; // GAS BUFFER
@@ -315,10 +348,35 @@ impl TransactionRestoreBatchController {
                                         }
                                     }
                                 }
-                                (burnt, minted)
+                                (burnt as u128, minted as u128)
                             }
-                            _ => (0, minted),
+                            Transaction::GenesisTransaction(_) => (0, 18448344073709551615),
+                            _ => (0, minted as u128),
+                        };
+                        if burn == 0 && mint == 0 {
+                            return (burn, mint);
                         }
+                        let current_total_supply: u128 =
+                            match write_set.clone().into_mut().get(&state_key).unwrap() {
+                                WriteOp::Creation(value) => bcs::from_bytes(value).unwrap(),
+                                WriteOp::Modification(value) => bcs::from_bytes(value).unwrap(),
+                                _ => unreachable!(),
+                            };
+                        let valid =
+                            prev_total_supply + mint as u128 - burn as u128 == current_total_supply;
+                        if !valid {
+                            println!("Version: {}", chunk.manifest.first_version + index as u64);
+                            println!("Transaction: {:?}", txn);
+                            println!("burn {} mint {}", burn, mint);
+                            println!(
+                                "Expected {}, aggregator {}",
+                                prev_total_supply + mint as u128 - burn as u128,
+                                current_total_supply
+                            );
+                            panic!();
+                        }
+                        prev_total_supply = current_total_supply;
+                        (burn, mint)
                     })
                     .fold((0_u128, 0_u128), |(acc_b, acc_m), (b, m)| {
                         (acc_b + b as u128, acc_m + m as u128)
@@ -326,7 +384,13 @@ impl TransactionRestoreBatchController {
 
                 // a += num_txns;
 
-                println!("{} {}", total_burnt, total_minted);
+                println!(
+                    "total burnt {} mint {} for chunk {}-{}",
+                    total_burnt,
+                    total_minted,
+                    chunk.manifest.first_version,
+                    chunk.manifest.last_version
+                );
                 future::ready(())
             })
             .await;
@@ -454,6 +518,7 @@ impl TransactionRestoreBatchController {
                         mut event_vecs,
                         range_proof: _,
                         ledger_info: _,
+                        write_sets: _,
                     } = chunk;
 
                     if target_version < last_version {

@@ -1924,6 +1924,7 @@ dependencies = [
  "executor-test-helpers",
  "executor-types",
  "futures",
+ "hex",
  "itertools",
  "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=94552a7fd7381b84376f6d7008d1f3110b5eccc5)",
  "num_cpus",
