@@ -197,7 +197,6 @@ In short:
 | `per_byte_create` | Cost to create a byte in global storage     |
 | `per_byte_write`  | Cost to overwrite a byte in global storage  |
 
-
 Here, an "item" is either a resource having the `key` attribute, or an entry in a table, and notably, per-byte costs are assessed on the *entire* size of an item.
 As stated in [`storage_gas.md`], for example, if an operation mutates a `u8` field in a resource that has 5 other `u128` fields, the per-byte gas write cost will account for $(5 * 128) / 8 + 1 = 81$ bytes.
 
@@ -226,6 +225,58 @@ Payload gas is defined in [`transaction.rs`], which incorporates storage gas wit
 | `max_price_per_gas_unit`        | Maximum gas price allowed on a transaction                                             |
 | `max_transaction_size_in_bytes` | Maximum transaction payload size in bytes                                              |
 | `gas_unit_scaling_factor`       | Amount of gas units in one octal                                                       |
+
+## Optimization principles
+
+### Storage gas
+
+As of the time of this writing, [`initialize()`] sets the following minimum and maximum storage gas amounts:
+
+| Data style | Operation | Minimum gas | Maximum gas |
+|------------|-----------|-------------|-------------|
+| Per item   | Read      | 80000       | 8000000     |
+| Per item   | Create    | 2000000     | 200000000   |
+| Per item   | Write     | 400000      | 40000000    |
+| Per byte   | Read      | 40          | 4000        |
+| Per byte   | Create    | 1000        | 100000      |
+| Per byte   | Write     | 200         | 20000       |
+
+Here, maximum amounts are 100 times the minimum amounts, which means that for a utilization ratio of 40% or less, total gas costs will be on the order of 1 to 1.5 times the minimum amount (see [`base_8192_exponential_curve()`] for supporting calculations).
+
+Also as of the time of this writing, the `gas_unit_scaling_factor` specified in [`transaction.rs`] is 10,000, which means that in terms of octals, initial mainnet gas costs can be estimated as follows:
+
+| Operation       | Octals |
+|-----------------|--------|
+| Per-item read   | 8      |
+| Per-item create | 200    |
+| Per-item write  | 40     |
+| Per-byte read   | 0.004  |
+| Per-byte create | 0.1    |
+| Per-byte write  | 0.02   |
+
+Here, the most expensive per-item operation by far is creating a new item (via either `move_to<T>()` or adding to a table), which costs 5 times as much as overwriting an old item, and 25 times as much as reading an old item.
+The same ratios apply among per-byte costs, with the effect that per-item costs are 2000 times higher than per-byte costs.
+
+In the absence of a legitimate economic incentive to deallocate from global storage (via either `move_from<T>()` or by removing from a table), this means that the most effective strategy for minimizing gas costs involves:
+
+1. Minimizing per-item creations,
+2. Tracking unused items and overwriting them, rather than creating new items, when possible,
+3. Containing per-item writes to as few items as possible,
+4. Reading, rather than writing, whenever possible, and
+5. Minimizing the number of bytes in any given operation, noting that per-item costs far outweigh optimizations at the per-byte level.
+
+### Instruction gas
+
+As of the time of this writing, by far the most expensive instruction gas operation defined in [`instr.rs`] is a function call, which requires 1500 gas units (.15 octals), some 53 times less gas than a single per-item read in global storage.
+Loading a constant costs 650 gas units (.065 octals), borrow operations cost 500 units (0.05 octals), reading or writing to a reference costs 200 gas units (0.02 octals), and loading a `u128` on the stack costs 80 gas units (0.008 octals).
+Hence pass-by-value is less expensive than pass-by-reference for a primitive type like `u64`, but more expensive for larger data structures like `vector<u128>`.
+
+Still though, instruction gas is completely dwarfed by storage costs, and while there is technically an incentive to reduce the number of function calls in a program, for example, engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions.
+
+### Payload gas
+
+As of the time of this writing, [`transaction.rs`] defines the minimum amount of gas per transaction as 1,500,000 units (150 octals), an amount that increases by 2,000 units (0.2 octals) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
+Hence in practice, payload gas is unlikely to be a concern.
 
 <!--- Alphabetized reference links -->
 
