@@ -106,10 +106,19 @@ pub static CREATED_EMPTY_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// Count of the created proof-of-store (PoS) since last restart.
-pub static POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+pub static LOCAL_POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "quorum_store_PoS_count",
-        "Count of the created PoS since last restart."
+        "quorum_store_local_PoS_count",
+        "Count of the locally created PoS since last restart."
+    )
+    .unwrap()
+});
+
+/// Count of the created proof-of-store (PoS) since last restart.
+pub static REMOTE_POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_remote_PoS_count",
+        "Count of the received PoS since last restart."
     )
     .unwrap()
 });

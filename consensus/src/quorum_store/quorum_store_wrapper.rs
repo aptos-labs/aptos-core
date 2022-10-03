@@ -215,8 +215,6 @@ impl QuorumStoreWrapper {
     }
 
     pub(crate) async fn insert_proof(&mut self, mut new_proof: ProofOfStore) {
-        counters::POS_COUNT.inc();
-
         let maybe_proof = self.proofs_for_consensus.remove(new_proof.digest());
         if let Some(proof) = maybe_proof {
             if proof.expiration() > new_proof.expiration() {
@@ -241,6 +239,7 @@ impl QuorumStoreWrapper {
                 );
                 // Handle batch_id
 
+                counters::LOCAL_POS_COUNT.inc();
                 self.insert_proof(proof.clone()).await;
                 self.broadcast_completed_proof(proof, network_sender).await;
             }
@@ -397,6 +396,8 @@ impl QuorumStoreWrapper {
                 Some(msg) = network_msg_rx.next() => {
                    if let VerifiedEvent::ProofOfStoreBroadcast(proof) = msg{
                         debug!("QS: got proof from peer");
+                        
+                        counters::REMOTE_POS_COUNT.inc();
                         self.insert_proof(*proof).await;
                     }
                 },

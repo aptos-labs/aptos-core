@@ -173,7 +173,7 @@ impl BufferManager {
                 .await
                 .expect("Failed to send retry request");
         }) {
-            debug!("QS: spawn_named error {:?}", e);
+            debug!("QS: spawn_named retry request error {:?}", e);
         }
     }
 
