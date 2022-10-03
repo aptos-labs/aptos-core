@@ -289,6 +289,7 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 
 fn exec_function(
     session: &mut SessionExt<impl MoveResolver>,
+    module_address: AccountAddress,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -296,7 +297,7 @@ fn exec_function(
 ) {
     session
         .execute_function_bypass_visibility(
-            &ModuleId::new(CORE_CODE_ADDRESS, Identifier::new(module_name).unwrap()),
+            &ModuleId::new(module_address, Identifier::new(module_name).unwrap()),
             &Identifier::new(function_name).unwrap(),
             ty_args,
             args,
@@ -343,6 +344,7 @@ fn initialize(
     let epoch_interval_usecs = genesis_config.epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "initialize",
         vec![],
@@ -366,6 +368,7 @@ fn initialize(
 fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
         vec![],
@@ -376,6 +379,7 @@ fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
 fn set_genesis_end(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "set_genesis_end",
         vec![],
@@ -390,6 +394,7 @@ fn initialize_core_resources_and_aptos_coin(
     let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "initialize_core_resources_and_aptos_coin",
         vec![],
@@ -407,6 +412,7 @@ fn initialize_on_chain_governance(
 ) {
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GOVERNANCE_MODULE_NAME,
         "initialize",
         vec![],
@@ -426,6 +432,7 @@ fn initialize_aptos_names(
 ) {
     exec_function(
         session,
+        AccountAddress::from_hex_literal("0x4").unwrap(),
         APTOS_NAMES_MODULE_NAME,
         "initialize",
         vec![],
@@ -443,6 +450,7 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
     serialized_values.push(accounts_bytes);
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "create_accounts",
         vec![],
@@ -460,6 +468,7 @@ fn create_employee_validators(
 
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "create_employee_validators",
         vec![],
@@ -479,6 +488,7 @@ fn create_and_initialize_validators(
     serialized_values.push(validators_bytes);
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "create_initialize_validators",
         vec![],
@@ -498,6 +508,7 @@ fn create_and_initialize_validators_with_commission(
     serialized_values.push(validators_bytes);
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         GENESIS_MODULE_NAME,
         "create_initialize_validators_with_commission",
         vec![],
@@ -508,6 +519,7 @@ fn create_and_initialize_validators_with_commission(
 fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         VERSION_MODULE_NAME,
         "initialize_for_test",
         vec![],
@@ -543,6 +555,7 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
     // Call the initialize function with the metadata.
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         CODE_MODULE_NAME,
         "initialize",
         vec![],
@@ -560,6 +573,7 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
 fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         "block",
         "emit_genesis_block_event",
         vec![],
@@ -569,6 +583,7 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveResolver>) {
     );
     exec_function(
         session,
+        CORE_CODE_ADDRESS,
         "reconfiguration",
         "emit_genesis_reconfiguration_event",
         vec![],
