@@ -181,7 +181,7 @@ Instruction gas parameters are defined at [`instr.rs`] and include the following
 
 ## Storage gas
 
-Storage gas is defined in [`storage_gas.move`], which is accompanied by a comprehensive and internally-linked docgen file at [`storage_gas.md`].
+Storage gas is defined in [`storage_gas.move`], which is accompanied by a comprehensive and internally-linked DocGen file at [`storage_gas.md`].
 
 
 In short:
@@ -199,18 +199,18 @@ In short:
 | `per_byte_create` | Cost to create a byte in global storage     |
 | `per_byte_write`  | Cost to overwrite a byte in global storage  |
 
-Here, an "item" is either a resource having the `key` attribute, or an entry in a table, and notably, per-byte costs are assessed on the *entire* size of an item.
-As stated in [`storage_gas.md`], for example, if an operation mutates a `u8` field in a resource that has 5 other `u128` fields, the per-byte gas write cost will account for $(5 * 128) / 8 + 1 = 81$ bytes.
+Here, an *item* is either a resource having the `key` attribute, or an entry in a table, and notably, per-byte costs are assessed on the *entire* size of an item.
+As stated in [`storage_gas.md`], for example, if an operation mutates a `u8` field in a resource that has five other `u128` fields, the per-byte gas write cost will account for $(5 * 128) / 8 + 1 = 81$ bytes.
 
 ### Vectors
 
-Byte-wise fees are similarly assessed on vectors, which consume $\sum_{i = 0}^{n - 1} e_i + b(n)$ bytes, where
+Byte-wise fees are similarly assessed on vectors, which consume $\sum_{i = 0}^{n - 1} e_i + b(n)$ bytes, where:
 
-* $n$ is the number of elements in the vector,
-* $e_i$ is the size of element $i$,
-* and $b(n)$ is a "base size" which is a function of $n$.
+* $n$ is the number of elements in the vector
+* $e_i$ is the size of element $i$
+* $b(n)$ is a "base size" which is a function of $n$
 
-See [#4540] for more information on vector base size, which is typically just 1 byte in practice, such that a vector of 100 `u8` elements accounts for $100 + 1 = 101$ bytes.
+See [#4540] for more information on vector base size, which is typically just one byte in practice, such that a vector of 100 `u8` elements accounts for $100 + 1 = 101$ bytes.
 Hence per the item-wise read methodology described above, reading the last element of such a vector is treated as a 101-byte read.
 
 ## Payload gas
@@ -245,7 +245,7 @@ As of the time of this writing, [`initialize()`] sets the following minimum and 
 
 Here, maximum amounts are 100 times the minimum amounts, which means that for a utilization ratio of 40% or less, total gas costs will be on the order of 1 to 1.5 times the minimum amount (see [`base_8192_exponential_curve()`] for supporting calculations).
 
-Also as of the time of this writing, the `gas_unit_scaling_factor` specified in [`transaction.rs`] is 10,000, which means that in terms of octals, initial mainnet gas costs can be estimated as follows:
+Also as of the time of this writing, the `gas_unit_scaling_factor` specified in [`transaction.rs`] is 10,000; this means that in terms of octals, initial mainnet gas costs can be estimated as follows:
 
 | Operation       | Octals |
 |-----------------|--------|
@@ -256,16 +256,16 @@ Also as of the time of this writing, the `gas_unit_scaling_factor` specified in 
 | Per-byte create | 0.1    |
 | Per-byte write  | 0.02   |
 
-Here, the most expensive per-item operation by far is creating a new item (via either `move_to<T>()` or adding to a table), which costs 5 times as much as overwriting an old item, and 25 times as much as reading an old item.
+Here, the most expensive per-item operation by far is creating a new item (via either `move_to<T>()` or adding to a table), which costs five times as much as overwriting an old item and 25 times as much as reading an old item.
 The same ratios apply among per-byte costs, with the effect that per-item costs are 2000 times higher than per-byte costs.
 
 In the absence of a legitimate economic incentive to deallocate from global storage (via either `move_from<T>()` or by removing from a table), this means that the most effective strategy for minimizing gas costs involves:
 
-1. Minimizing per-item creations,
-2. Tracking unused items and overwriting them, rather than creating new items, when possible,
-3. Containing per-item writes to as few items as possible,
-4. Reading, rather than writing, whenever possible, and
-5. Minimizing the number of bytes in any given operation, noting that per-item costs far outweigh optimizations at the per-byte level.
+1. Minimizing per-item creations
+2. Tracking unused items and overwriting them, rather than creating new items, when possible
+3. Containing per-item writes to as few items as possible
+4. Reading, rather than writing, whenever possible
+5. Minimizing the number of bytes in any given operation, noting that per-item costs far outweigh optimizations at the per-byte level
 
 ### Instruction gas
 
@@ -273,9 +273,9 @@ As of the time of this writing, by far the most expensive instruction gas operat
 Loading a constant costs 650 gas units (.065 octals), borrow operations cost 500 units (0.05 octals), reading or writing to a reference costs 200 gas units (0.02 octals), and loading a `u128` on the stack costs 80 gas units (0.008 octals).
 Hence pass-by-value is less expensive than pass-by-reference for a primitive type like `u64`, but more expensive for a larger data structure like a 40-byte `struct`.
 
-Notably, instruction gas is completely dwarfed by storage costs, and while there is technically an incentive to reduce the number of function calls in a program, for example, engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions (in nearly all cases).
+Notably, instruction gas is completely dwarfed by storage costs; there is technically an incentive to reduce the number of function calls in a program, for example, engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions (in nearly all cases).
 
-In extreme cases it is possible for instruction gas to outweigh storage gas, for example if a loopwise mathematical function takes 10,000 iterations to converge, but again this is an extreme case and for most applications storage gas has a larger impact on base gas than does instruction gas.
+In extreme cases it is possible for instruction gas to outweigh storage gas, for example if a loopwise mathematical function takes 10,000 iterations to converge; but again this is an extreme case and for most applications storage gas has a larger impact on base gas than does instruction gas.
 
 ### Payload gas
 
