@@ -94,11 +94,7 @@ impl MainnetGenesisInfo {
             employee_vesting_accounts,
             validators: validators
                 .into_iter()
-                .map(|mut v| {
-                    v.ans_funds_address = Some(ans_funds_address);
-                    v.ans_admin_multisig_auth_key = Some(ans_admin_multisig_auth_key);
-                    ValidatorWithCommissionRate::try_from(v).unwrap()
-                })
+                .map(|v| ValidatorWithCommissionRate::try_from(v).unwrap())
                 .collect(),
             framework,
             genesis: None,
