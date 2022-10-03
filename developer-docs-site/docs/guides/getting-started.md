@@ -26,7 +26,7 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     cd aptos-core
     ```
 
-3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment by installing all dependencies needed to build, test and inspect Aptos Core. Note, you may be prompted for your password:
+3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment by installing most of the dependencies needed to build, test and inspect Aptos Core. Note, you may be prompted for your password:
 
     ```
     ./scripts/dev_setup.sh
