@@ -124,6 +124,8 @@ impl GenesisInfo {
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
                 voting_power_increase_limit: self.voting_power_increase_limit,
+                employee_vesting_start: 1663456089,
+                employee_vesting_period_duration: 5 * 60, // 5 minutes
             },
         )
     }

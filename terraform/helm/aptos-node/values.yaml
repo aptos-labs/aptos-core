@@ -31,18 +31,23 @@ haproxy:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 1.5
-      memory: 2Gi
+      cpu: 4
+      memory: 8Gi
     requests:
-      cpu: 1.5
-      memory: 2Gi
+      cpu: 4
+      memory: 8Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
   limits:
     validator:
-      # -- Limit the number of connections per IP address per minute
+      # -- Limit the number of connections per IP address per sec
       connectionsPerIPPerMin: 2
+      # Sustained 100mb/s for 10 sec.
+      maxBytesOutRate10sec: 134217728
+      rateLimitSession: 256
+      tcpBufSize: 524288
+
   config:
     # -- Whether to send Proxy Protocol v2
     send_proxy_protocol: &send_proxy_protocol false
