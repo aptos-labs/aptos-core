@@ -49,7 +49,6 @@ const GENESIS_SEED: [u8; 32] = [42; 32];
 
 const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
-const APTOS_NAMES_MODULE_NAME: &str = "aptos_names";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
 
@@ -116,6 +115,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     create_accounts(&mut session, accounts);
     create_employee_validators(&mut session, employees);
     create_and_initialize_validators_with_commission(&mut session, validators);
+    initialize_aptos_names(&mut session, genesis_config);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -211,6 +211,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
+    initialize_aptos_names(&mut session, genesis_config);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -227,7 +228,6 @@ pub fn encode_genesis_change_set(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    initialize_aptos_names(&mut session, genesis_config);
     let session2_out = session.finish().unwrap();
 
     session1_out.squash(session2_out).unwrap();
@@ -433,7 +433,7 @@ fn initialize_aptos_names(
     exec_function(
         session,
         AccountAddress::from_hex_literal("0x4").unwrap(),
-        APTOS_NAMES_MODULE_NAME,
+        "domains",
         "initialize",
         vec![],
         serialize_values(&vec![

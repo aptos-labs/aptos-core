@@ -42,18 +42,17 @@ module aptos_names::config {
         config: PropertyMap,
     }
 
-    public(friend) fun initialize_v1(framework: &signer, admin_multisig_addres: address, foundation_fund_address: address) acquires ConfigurationV1 {
+    public(friend) fun initialize_v1(framework: &signer, admin_multisig_address: address, foundation_fund_address: address) acquires ConfigurationV1 {
         move_to(framework, ConfigurationV1 {
             config: property_map::empty(),
         });
 
-        // We set it directly here to allow boostrapping the other values
-        set_v1(@aptos_names, config_key_admin_multisig_address(), &admin_multisig_addres);
-        set_v1(@aptos_names, config_key_foundation_fund_address(), &foundation_fund_address);
+        // Temporarily set this to framework to allow othet methods below to be set with framework signer
+        set_v1(@aptos_names, config_key_admin_multisig_address(), &signer::address_of(framework));
 
         set_is_enabled(framework, true);
 
-        set_max_number_of_years_registered(framework, 10u8);
+        set_max_number_of_years_registered(framework, 2u8);
         set_max_domain_length(framework, 63);
 
         // TODO: SET THIS TO SOMETHING REAL
@@ -66,6 +65,10 @@ module aptos_names::config {
         set_domain_price_for_length(framework, (30 * octas()), 4);
         set_domain_price_for_length(framework, (15 * octas()), 5);
         set_domain_price_for_length(framework, (5 * octas()), 6);
+
+        // We set it directly here to allow boostrapping the other values
+        set_v1(@aptos_names, config_key_foundation_fund_address(), &foundation_fund_address);
+        set_v1(@aptos_names, config_key_admin_multisig_address(), &admin_multisig_address);
     }
 
 
@@ -359,7 +362,7 @@ module aptos_names::config {
         set_max_domain_length(myself, 25);
         assert!(max_domain_length() == 25, 3);
 
-        assert!(max_number_of_years_registered() == 10, 4);
+        assert!(max_number_of_years_registered() == 2, 4);
         set_max_number_of_years_registered(myself, 5);
         assert!(max_number_of_years_registered() == 5, 4);
 

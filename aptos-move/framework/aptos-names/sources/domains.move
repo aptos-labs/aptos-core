@@ -98,7 +98,18 @@ module aptos_names::domains {
 
     /// This is only callable during genesis or framework upgrades
     public fun initialize(framework: &signer, funds_address: address, admin_multisig_address: address) {
+        use aptos_framework::aptos_account;
+
         assert!(signer::address_of(framework) == @0x4, error::permission_denied(ENOT_AUTHORIZED));
+
+        if (!account::exists_at(funds_address)) {
+            aptos_account::create_account(funds_address);
+        };
+
+        if (!account::exists_at(admin_multisig_address)) {
+            aptos_account::create_account(admin_multisig_address);
+        };
+
         config::initialize_v1(framework, admin_multisig_address, funds_address);
 
         move_to(
