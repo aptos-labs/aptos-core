@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{serde_helper::vec_bytes, transaction::transaction_argument::TransactionArgument};
-use move_deps::move_core_types::{
+use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub use move_deps::move_core_types::abi::{
+pub use move_core_types::abi::{
     ArgumentABI, ScriptFunctionABI as EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
 

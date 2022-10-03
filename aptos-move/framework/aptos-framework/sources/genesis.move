@@ -95,12 +95,10 @@ module aptos_framework::genesis {
 
         // put reserved framework reserved accounts under aptos governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
-        let i = 0;
         while (!vector::is_empty(&framework_reserved_addresses)) {
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
             let (aptos_account, framework_signer_cap) = account::create_framework_reserved_account(address);
             aptos_governance::store_signer_cap(&aptos_account, address, framework_signer_cap);
-            i = i + 1;
         };
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
@@ -191,7 +189,11 @@ module aptos_framework::genesis {
         }
     }
 
-    fun create_employee_validators(employees: vector<EmployeeAccountMap>) {
+    fun create_employee_validators(
+        employee_vesting_start: u64,
+        employee_vesting_period_duration: u64,
+        employees: vector<EmployeeAccountMap>,
+    ) {
         let i = 0;
         let num_employee_groups = vector::length(&employees);
         let unique_accounts = vector::empty();
@@ -233,8 +235,8 @@ module aptos_framework::genesis {
 
             let vesting_schedule = vesting::create_vesting_schedule(
                 schedule,
-                1663456089, // Update before mainnet or pass in by config
-                30 * 24 * 60 * 60, // 30 days
+                employee_vesting_start,
+                employee_vesting_period_duration,
             );
 
             let admin = employee_group.validator.validator_config.owner_address;

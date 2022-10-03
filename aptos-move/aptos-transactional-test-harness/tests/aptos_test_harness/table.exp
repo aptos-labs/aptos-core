@@ -11,7 +11,7 @@ Events:
 return values: 0
 
 task 2 'run'. lines 9-9:
-Error: Transaction discarded. VMStatus: status MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS of type Validation
+Error: Failed to execute transaction. ExecutionStatus: status OUT_OF_GAS of type Execution
 
 task 3 'view'. lines 11-11:
 key 0x3::token::Collections {

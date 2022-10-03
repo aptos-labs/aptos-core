@@ -119,7 +119,7 @@ impl<Fut: Future> Extend<Fut> for FuturesUnorderedX<Fut> {
 mod tests {
     use super::FuturesUnorderedX;
     use futures::StreamExt;
-    use proptest::{collection::vec, prelude::*};
+    use proptest::prelude::*;
     use std::{
         cmp::min,
         sync::{
@@ -132,45 +132,55 @@ mod tests {
     proptest! {
         #[test]
         fn test_run(
-            sleeps_ms in vec(0u64..10, 10..100),
+            num_tasks in 0usize..100,
             max_in_progress in 1usize..100,
         ) {
+            const MAX_WAIT_MS: usize = 1000;
+
             let rt = Runtime::new().unwrap();
             rt.block_on(async {
-                let num_sleeps = sleeps_ms.len();
                 let mut futures = FuturesUnorderedX::new(max_in_progress);
                 assert!(futures.is_empty());
 
                 let n_running = Arc::new(AtomicUsize::new(0));
                 let seen_max_concurrency = Arc::new(AtomicBool::new(false));
-                for (n, sleep_ms) in sleeps_ms.into_iter().enumerate() {
-                    let _n_running = n_running.clone();
-                    let _seen_max_concurrency = seen_max_concurrency.clone();
+
+                for n in 0..num_tasks {
+                    let n_running = n_running.clone();
+                    let seen_max_concurrency = seen_max_concurrency.clone();
 
                     futures.push(async move {
-                        _n_running.fetch_add(1, Ordering::Relaxed);
+                        n_running.fetch_add(1, Ordering::Relaxed);
 
-                        // yield
-                        tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
-
-                        let r = _n_running.fetch_sub(1, Ordering::SeqCst);
-                        assert!(r > 0 && r <= min(max_in_progress, num_sleeps));
-                        if r == max_in_progress {
-                            _seen_max_concurrency.store(true, Ordering::SeqCst);
+                        for _ in 0..MAX_WAIT_MS {
+                            // yield
+                            tokio::time::sleep(Duration::from_millis(1)).await;
+                            if num_tasks < max_in_progress {
+                                break
+                            }
+                            if seen_max_concurrency.load(Ordering::Relaxed) {
+                                break
+                            }
+                            if n_running.load(Ordering::Relaxed) == max_in_progress {
+                                seen_max_concurrency.store(true, Ordering::Relaxed);
+                                break
+                            }
                         }
 
+                        let r = n_running.fetch_sub(1, Ordering::SeqCst);
+                        assert!(r > 0 && r <= min(max_in_progress, num_tasks));
                         n
                     })
                 }
 
-                assert!(num_sleeps > 0 || futures.is_empty());
+                assert!(num_tasks > 0 || futures.is_empty());
                 let mut outputs = futures.collect::<Vec<_>>().await;
-                if max_in_progress <= num_sleeps {
+                if max_in_progress <= num_tasks {
                     assert!(seen_max_concurrency.load(Ordering::Relaxed));
                 }
 
                 outputs.sort_unstable();
-                assert_eq!(outputs, (0..num_sleeps).collect::<Vec<_>>());
+                assert_eq!(outputs, (0..num_tasks).collect::<Vec<_>>());
             });
         }
     }

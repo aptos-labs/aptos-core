@@ -17,6 +17,8 @@ metadata:
     {{- if .Values.ingress.acm_certificate }}
     alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.acm_certificate }}
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    # ensure ALB ingress controller is version > 1.4.4
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
     {{- end }}
     {{- if .Values.ingress.wafAclArn }}
     alb.ingress.kubernetes.io/wafv2-acl-arn: {{ .Values.ingress.wafAclArn }}

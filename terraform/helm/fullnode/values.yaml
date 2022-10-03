@@ -2,6 +2,7 @@ chain:
   era: 1
   name: devnet
   genesisConfigmap:
+  genesisSecret:
 
 aptos_chains:
   devnet:

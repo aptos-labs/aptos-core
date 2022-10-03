@@ -8369,7 +8369,7 @@ components:
       type: object
       description: |-
         The struct holding all data returned to the client by the
-        index endpoint (i.e., GET "/").
+        index endpoint (i.e., GET "/").  Only for responding in JSON
       required:
       - chain_id
       - epoch
@@ -8398,6 +8398,8 @@ components:
           $ref: '#/components/schemas/U64'
         block_height:
           $ref: '#/components/schemas/U64'
+        git_hash:
+          type: string
     ModuleBundlePayload:
       type: object
       required:
@@ -9358,4 +9360,3 @@ components:
           $ref: '#/components/schemas/DecodedTableData'
 externalDocs:
   url: https://github.com/aptos-labs/aptos-core
-

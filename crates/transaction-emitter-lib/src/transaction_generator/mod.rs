@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use async_trait::async_trait;
 
 pub mod account_generator;
-pub mod nft_mint;
+pub mod nft_mint_and_transfer;
 pub mod p2p_transaction_generator;
 pub mod transaction_mix_generator;
 
@@ -16,6 +17,7 @@ pub trait TransactionGenerator: Sync + Send {
     ) -> Vec<SignedTransaction>;
 }
 
+#[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator>;
+    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator>;
 }

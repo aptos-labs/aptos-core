@@ -354,28 +354,3 @@ Click the `View in Cloud Monitoring` link at the top to view the built-in GKE [d
 
 
 Google Cloud [Monitoring](https://cloud.google.com/monitoring) has many other features to easily monitor the cluster and pods.  You can configure [uptime checks](https://cloud.google.com/monitoring/uptime-checks/introduction) for the services and configure [alerts](https://cloud.google.com/monitoring/alerts/using-alerting-ui) for when the metrics reach a certain [threshold](https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/sli-metrics/overview).  
-
-
-## Troubleshooting
-
-Common troubleshooting solutions.
-
-### Terraform "Connection Refused" Error Message
-
-When running terraform, the command errors out with a connection refused error message.
-
-  ```
-  Error: Get "http://localhost/api/v1/namespaces/aptos": dial tcp 127.0.0.1:80: connect: connection refused
-  ```
-
-This likely means that the state of the install is out of sync with the saved terraform state file located in the storage bucket.  (configured during `terraform init` statement).  This could happen if the cluster or other components were deleted outside of terraform.  Or if terraform had an error and did not finish.  Use the following commands to check the state.  Delete the state that is related to the error message.  You will likely need to run terraform destroy, clean up the environment, and run the terraform script again.  
-
-  ```
-  terraform state list
-
-  terraform state rm <state>
-  ```
-
-### Fullnode "NoAvailablePeers" Error message
-
-If your node cannot state sync, and the logs are showing "NoAvailablePeers", it's likely due to network congestion. You can try add some extra upstream peers for your fullnode to state sync from. See the guide [Add upstream seed peers](#add-upstream-seed-peers).

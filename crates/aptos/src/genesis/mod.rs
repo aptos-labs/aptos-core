@@ -18,20 +18,26 @@ use crate::{
     },
     CliCommand, CliResult,
 };
-use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
+use aptos_crypto::{bls12381, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_genesis::builder::GenesisConfiguration;
-use aptos_genesis::config::{StringOperatorConfiguration, StringOwnerConfiguration};
+use aptos_genesis::config::{
+    AccountBalanceMap, EmployeePoolMap, StringOperatorConfiguration, StringOwnerConfiguration,
+};
 use aptos_genesis::{
     config::{Layout, ValidatorConfiguration},
     mainnet::MainnetGenesisInfo,
     GenesisInfo,
 };
-use aptos_types::account_address::AccountAddress;
+use aptos_logger::info;
+use aptos_types::account_address::{AccountAddress, AccountAddressWithChecks};
 use async_trait::async_trait;
 use clap::Parser;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
-use vm_genesis::{AccountMap, EmployeeAccountMap};
+use vm_genesis::{AccountBalance, EmployeePool};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
@@ -70,8 +76,10 @@ pub struct GenerateGenesis {
     #[clap(long, parse(from_os_str))]
     output_dir: Option<PathBuf>,
     /// Whether this is mainnet genesis.
+    ///
+    /// Default is false
     #[clap(long)]
-    mainnet: Option<bool>,
+    mainnet: bool,
 
     #[clap(flatten)]
     prompt_options: PromptOptions,
@@ -93,7 +101,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
         check_if_file_exists(waypoint_file.as_path(), self.prompt_options)?;
 
         // Generate genesis and waypoint files
-        let (genesis_bytes, waypoint) = if self.mainnet.unwrap_or_default() {
+        let (genesis_bytes, waypoint) = if self.mainnet {
             let mut mainnet_genesis = fetch_mainnet_genesis_info(self.git_options)?;
             let genesis_bytes = bcs::to_bytes(mainnet_genesis.clone().get_genesis())
                 .map_err(|e| CliError::BCS(GENESIS_FILE, e))?;
@@ -119,10 +127,88 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
     let client = git_options.get_client()?;
     let layout: Layout = client.get(Path::new(LAYOUT_FILE))?;
 
-    let accounts: Vec<AccountMap> = client.get(Path::new(BALANCES_FILE))?;
-    let employee_vesting_accounts: Vec<EmployeeAccountMap> =
+    if layout.root_key.is_some() {
+        return Err(CliError::UnexpectedError(
+            "Root key must not be set for mainnet.".to_string(),
+        ));
+    }
+
+    let total_supply = layout.total_supply.ok_or_else(|| {
+        CliError::UnexpectedError("Layout file does not have `total_supply`".to_string())
+    })?;
+
+    let account_balance_map: AccountBalanceMap = client.get(Path::new(BALANCES_FILE))?;
+    let accounts: Vec<AccountBalance> = account_balance_map.try_into()?;
+
+    // Check that the supply matches the total
+    let total_balance_supply: u64 = accounts.iter().map(|inner| inner.balance).sum();
+    if total_supply != total_balance_supply {
+        return Err(CliError::UnexpectedError(format!(
+            "Total supply seen {} doesn't match expected total supply {}",
+            total_balance_supply, total_supply
+        )));
+    }
+
+    // Check that the user has a reasonable amount of APT, since below the minimum gas amount is
+    // not useful 1 APT minimally
+    const MIN_USEFUL_AMOUNT: u64 = 200000000;
+    let ten_percent_of_total = total_supply / 10;
+    for account in accounts.iter() {
+        if account.balance != 0 && account.balance < MIN_USEFUL_AMOUNT {
+            return Err(CliError::UnexpectedError(format!(
+                "Account {} has an initial supply below expected amount {} < {}",
+                account.account_address, account.balance, MIN_USEFUL_AMOUNT
+            )));
+        } else if account.balance > ten_percent_of_total {
+            return Err(CliError::UnexpectedError(format!(
+                "Account {} has an more than 10% of the total balance {} > {}",
+                account.account_address, account.balance, ten_percent_of_total
+            )));
+        }
+    }
+
+    // Keep track of accounts for later lookup of balances
+    let initialized_accounts: BTreeMap<AccountAddress, u64> = accounts
+        .iter()
+        .map(|inner| (inner.account_address, inner.balance))
+        .collect();
+
+    let employee_vesting_accounts: EmployeePoolMap =
         client.get(Path::new(EMPLOYEE_VESTING_ACCOUNTS_FILE))?;
+
+    let employee_validators: Vec<_> = employee_vesting_accounts
+        .inner
+        .iter()
+        .map(|inner| inner.validator.clone())
+        .collect();
+    let employee_vesting_accounts: Vec<EmployeePool> = employee_vesting_accounts.try_into()?;
     let validators = get_validator_configs(&client, &layout, true).map_err(parse_error)?;
+    let mut unique_accounts = BTreeSet::new();
+
+    validate_employee_accounts(
+        &employee_vesting_accounts,
+        &initialized_accounts,
+        &mut unique_accounts,
+    )?;
+
+    let mut seen_owners = BTreeMap::new();
+    validate_validators(
+        &layout,
+        &employee_validators,
+        &initialized_accounts,
+        &mut unique_accounts,
+        &mut seen_owners,
+        true,
+    )?;
+    validate_validators(
+        &layout,
+        &validators,
+        &initialized_accounts,
+        &mut unique_accounts,
+        &mut seen_owners,
+        false,
+    )?;
+
     let framework = client.get_framework()?;
     Ok(MainnetGenesisInfo::new(
         layout.chain_id,
@@ -142,6 +228,8 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             rewards_apy_percentage: layout.rewards_apy_percentage,
             voting_duration_secs: layout.voting_duration_secs,
             voting_power_increase_limit: layout.voting_power_increase_limit,
+            employee_vesting_start: layout.employee_vesting_start,
+            employee_vesting_period_duration: layout.employee_vesting_period_duration,
         },
     )?)
 }
@@ -177,6 +265,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             rewards_apy_percentage: layout.rewards_apy_percentage,
             voting_duration_secs: layout.voting_duration_secs,
             voting_power_increase_limit: layout.voting_power_increase_limit,
+            employee_vesting_start: layout.employee_vesting_start,
+            employee_vesting_period_duration: layout.employee_vesting_period_duration,
         },
     )?)
 }
@@ -231,43 +321,46 @@ fn get_config(
     let owner_config = client.get::<StringOwnerConfiguration>(owner_file)?;
 
     // Check and convert fields in owner file
-    let owner_account_address = parse_required_option(
+    let owner_account_address: AccountAddress = parse_required_option(
         &owner_config.owner_account_address,
         owner_file,
         "owner_account_address",
-        AccountAddress::from_str,
-    )?;
+        AccountAddressWithChecks::from_str,
+    )?
+    .into();
     let owner_account_public_key = parse_required_option(
         &owner_config.owner_account_public_key,
         owner_file,
         "owner_account_public_key",
-        Ed25519PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
 
-    let operator_account_address = parse_required_option(
+    let operator_account_address: AccountAddress = parse_required_option(
         &owner_config.operator_account_address,
         owner_file,
         "operator_account_address",
-        AccountAddress::from_str,
-    )?;
+        AccountAddressWithChecks::from_str,
+    )?
+    .into();
     let operator_account_public_key = parse_required_option(
         &owner_config.operator_account_public_key,
         owner_file,
         "operator_account_public_key",
-        Ed25519PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
 
-    let voter_account_address = parse_required_option(
+    let voter_account_address: AccountAddress = parse_required_option(
         &owner_config.voter_account_address,
         owner_file,
         "voter_account_address",
-        AccountAddress::from_str,
-    )?;
+        AccountAddressWithChecks::from_str,
+    )?
+    .into();
     let voter_account_public_key = parse_required_option(
         &owner_config.voter_account_public_key,
         owner_file,
         "voter_account_public_key",
-        Ed25519PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
 
     let stake_amount = parse_required_option(
@@ -298,11 +391,11 @@ fn get_config(
     // We don't require the operator file if the validator is not joining during genesis.
     if is_mainnet && !join_during_genesis {
         return Ok(ValidatorConfiguration {
-            owner_account_address,
+            owner_account_address: owner_account_address.into(),
             owner_account_public_key,
-            operator_account_address,
+            operator_account_address: operator_account_address.into(),
             operator_account_public_key,
-            voter_account_address,
+            voter_account_address: voter_account_address.into(),
             voter_account_public_key,
             consensus_public_key: None,
             proof_of_possession: None,
@@ -321,41 +414,42 @@ fn get_config(
     let operator_config = client.get::<StringOperatorConfiguration>(operator_file)?;
 
     // Check and convert fields in operator file
-    let operator_account_address_from_file = parse_required_option(
+    let operator_account_address_from_file: AccountAddress = parse_required_option(
         &operator_config.operator_account_address,
         operator_file,
         "operator_account_address",
-        AccountAddress::from_str,
-    )?;
+        AccountAddressWithChecks::from_str,
+    )?
+    .into();
     let operator_account_public_key_from_file = parse_required_option(
         &operator_config.operator_account_public_key,
         operator_file,
         "operator_account_public_key",
-        Ed25519PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
     let consensus_public_key = parse_required_option(
         &operator_config.consensus_public_key,
         operator_file,
         "consensus_public_key",
-        bls12381::PublicKey::from_encoded_string,
+        |str| parse_key(bls12381::PublicKey::LENGTH, str),
     )?;
     let consensus_proof_of_possession = parse_required_option(
         &operator_config.consensus_proof_of_possession,
         operator_file,
         "consensus_proof_of_possession",
-        bls12381::ProofOfPossession::from_encoded_string,
+        |str| parse_key(bls12381::ProofOfPossession::LENGTH, str),
     )?;
     let validator_network_public_key = parse_required_option(
         &operator_config.validator_network_public_key,
         operator_file,
         "validator_network_public_key",
-        x25519::PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
     let full_node_network_public_key = parse_optional_option(
         &operator_config.full_node_network_public_key,
         operator_file,
         "full_node_network_public_key",
-        x25519::PublicKey::from_encoded_string,
+        |str| parse_key(ED25519_PUBLIC_KEY_LENGTH, str),
     )?;
 
     // Verify owner & operator agree on operator
@@ -382,11 +476,11 @@ fn get_config(
 
     // Build Validator configuration
     Ok(ValidatorConfiguration {
-        owner_account_address,
+        owner_account_address: owner_account_address.into(),
         owner_account_public_key,
-        operator_account_address,
+        operator_account_address: operator_account_address.into(),
         operator_account_public_key,
-        voter_account_address,
+        voter_account_address: voter_account_address.into(),
         voter_account_public_key,
         consensus_public_key: Some(consensus_public_key),
         proof_of_possession: Some(consensus_proof_of_possession),
@@ -398,6 +492,43 @@ fn get_config(
         commission_percentage,
         join_during_genesis,
     })
+}
+
+// TODO: Move into the Crypto libraries
+fn parse_key<T: ValidCryptoMaterial>(num_bytes: usize, str: &str) -> anyhow::Result<T> {
+    let num_chars: usize = num_bytes * 2;
+    let mut working = str.trim();
+
+    // Checks if it has a 0x at the beginning, which is okay
+    if working.starts_with("0x") {
+        working = &working[2..];
+    }
+
+    match working.len().cmp(&num_chars) {
+        Ordering::Less => {
+            anyhow::bail!(
+                "Key {} is too short {} must be {} hex characters",
+                str,
+                working.len(),
+                num_chars
+            )
+        }
+        Ordering::Greater => {
+            anyhow::bail!(
+                "Key {} is too long {} must be {} hex characters with or without a 0x in front",
+                str,
+                working.len(),
+                num_chars
+            )
+        }
+        Ordering::Equal => {}
+    }
+
+    if !working.chars().all(|c| char::is_ascii_hexdigit(&c)) {
+        anyhow::bail!("Key {} contains a non-hex character", str)
+    }
+
+    Ok(T::from_encoded_string(str.trim())?)
 }
 
 fn parse_required_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
@@ -444,4 +575,267 @@ fn parse_optional_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
     } else {
         Ok(None)
     }
+}
+
+fn validate_validators(
+    layout: &Layout,
+    validators: &[ValidatorConfiguration],
+    initialized_accounts: &BTreeMap<AccountAddress, u64>,
+    unique_accounts: &mut BTreeSet<AccountAddress>,
+    seen_owners: &mut BTreeMap<AccountAddress, usize>,
+    is_pooled_validator: bool,
+) -> CliTypedResult<()> {
+    // check accounts for validators
+    let mut errors = vec![];
+
+    for (i, validator) in validators.iter().enumerate() {
+        let name = if is_pooled_validator {
+            format!("Employee Pool #{}", i)
+        } else {
+            layout.users.get(i).unwrap().to_string()
+        };
+
+        if !initialized_accounts.contains_key(&validator.owner_account_address.into()) {
+            errors.push(CliError::UnexpectedError(format!(
+                "Owner {} in validator {} is is not in the balances.yaml file",
+                validator.owner_account_address, name
+            )));
+        }
+        if !initialized_accounts.contains_key(&validator.operator_account_address.into()) {
+            errors.push(CliError::UnexpectedError(format!(
+                "Operator {} in validator {} is is not in the balances.yaml file",
+                validator.operator_account_address, name
+            )));
+        }
+        if !initialized_accounts.contains_key(&validator.voter_account_address.into()) {
+            errors.push(CliError::UnexpectedError(format!(
+                "Voter {} in validator {} is is not in the balances.yaml file",
+                validator.voter_account_address, name
+            )));
+        }
+
+        let owner_balance = initialized_accounts
+            .get(&validator.owner_account_address.into())
+            .unwrap();
+
+        if seen_owners.contains_key(&validator.owner_account_address.into()) {
+            errors.push(CliError::UnexpectedError(format!(
+                "Owner {} in validator {} has been seen before as an owner of validator {}",
+                validator.owner_account_address,
+                name,
+                seen_owners
+                    .get(&validator.owner_account_address.into())
+                    .unwrap()
+            )));
+        }
+        seen_owners.insert(validator.owner_account_address.into(), i);
+
+        if unique_accounts.contains(&validator.owner_account_address.into()) {
+            errors.push(CliError::UnexpectedError(format!(
+                "Owner '{}' in validator {} has already been seen elsewhere",
+                validator.owner_account_address, name
+            )));
+        }
+        unique_accounts.insert(validator.owner_account_address.into());
+
+        if unique_accounts.contains(&validator.operator_account_address.into()) {
+            errors.push(CliError::UnexpectedError(format!(
+                "Operator '{}' in validator {} has already been seen elsewhere",
+                validator.operator_account_address, name
+            )));
+        }
+        unique_accounts.insert(validator.operator_account_address.into());
+
+        // Pooled validators have a combined balance
+        // TODO: Make this field optional but checked
+        if !is_pooled_validator && *owner_balance < validator.stake_amount {
+            errors.push(CliError::UnexpectedError(format!(
+                "Owner {} in validator {} has less in it's balance {} than the stake amount for the validator {}",
+                validator.owner_account_address, name, owner_balance, validator.stake_amount
+            )));
+        }
+        if validator.stake_amount < layout.min_stake {
+            errors.push(CliError::UnexpectedError(format!(
+                "Validator {} has stake {} under the min stake {}",
+                name, validator.stake_amount, layout.min_stake
+            )));
+        }
+        if validator.stake_amount > layout.max_stake {
+            errors.push(CliError::UnexpectedError(format!(
+                "Validator {} has stake {} over the max stake {}",
+                name, validator.stake_amount, layout.max_stake
+            )));
+        }
+
+        // Ensure that the validator is setup correctly if it's joining in genesis
+        if validator.join_during_genesis {
+            if validator.validator_network_public_key.is_none() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} does not have a validator network public key, though it's joining during genesis",
+                    name
+                )));
+            }
+            if validator.validator_host.is_none() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} does not have a validator host, though it's joining during genesis",
+                    name
+                )));
+            }
+            if validator.consensus_public_key.is_none() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} does not have a consensus public key, though it's joining during genesis",
+                    name
+                )));
+            }
+            if validator.proof_of_possession.is_none() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} does not have a consensus proof of possession, though it's joining during genesis",
+                    name
+                )));
+            }
+
+            match (
+                validator.full_node_host.as_ref(),
+                validator.full_node_network_public_key.as_ref(),
+            ) {
+                (None, None) => {
+                    info!("Validator {} does not have a full node setup", name);
+                }
+                (Some(_), None) | (None, Some(_)) => {
+                    errors.push(CliError::UnexpectedError(format!(
+                        "Validator {} has a full node host or public key but not both",
+                        name
+                    )));
+                }
+                (Some(full_node_host), Some(full_node_network_public_key)) => {
+                    // Ensure that the validator and the full node aren't the same
+                    let validator_host = validator.validator_host.as_ref().unwrap();
+                    let validator_network_public_key =
+                        validator.validator_network_public_key.as_ref().unwrap();
+                    if validator_host == full_node_host {
+                        errors.push(CliError::UnexpectedError(format!(
+                            "Validator {} has a validator and a full node host that are the same {:?}",
+                            name,
+                            validator_host
+                        )));
+                    }
+                    if validator_network_public_key == full_node_network_public_key {
+                        errors.push(CliError::UnexpectedError(format!(
+                            "Validator {} has a validator and a full node network public key that are the same {}",
+                            name,
+                            validator_network_public_key
+                        )));
+                    }
+                }
+            }
+        } else {
+            if validator.validator_network_public_key.is_some() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a validator network public key, but it is *NOT* joining during genesis",
+                    name
+                )));
+            }
+            if validator.validator_host.is_some() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a validator host, but it is *NOT* joining during genesis",
+                    name
+                )));
+            }
+            if validator.consensus_public_key.is_some() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a consensus public key, but it is *NOT* joining during genesis",
+                    name
+                )));
+            }
+            if validator.proof_of_possession.is_some() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a consensus proof of possession, but it is *NOT* joining during genesis",
+                    name
+                )));
+            }
+            if validator.full_node_network_public_key.is_some() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a full node public key, but it is *NOT* joining during genesis",
+                    name
+                )));
+            }
+            if validator.full_node_host.is_some() {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a full node host, but it is *NOT* joining during genesis",
+                    name
+                )));
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        eprintln!("{:#?}", errors);
+
+        Err(CliError::UnexpectedError(
+            "Failed to validate validators".to_string(),
+        ))
+    }
+}
+
+fn validate_employee_accounts(
+    employee_vesting_accounts: &[EmployeePool],
+    initialized_accounts: &BTreeMap<AccountAddress, u64>,
+    unique_accounts: &mut BTreeSet<AccountAddress>,
+) -> CliTypedResult<()> {
+    // Check accounts for employee accounts
+    for (i, pool) in employee_vesting_accounts.iter().enumerate() {
+        let mut total_stake_pool_amount = 0;
+        for (j, account) in pool.accounts.iter().enumerate() {
+            if !initialized_accounts.contains_key(account) {
+                return Err(CliError::UnexpectedError(format!(
+                    "Account #{} '{}' in employee pool #{} is not in the balances.yaml file",
+                    j, account, i
+                )));
+            }
+            if unique_accounts.contains(account) {
+                return Err(CliError::UnexpectedError(format!(
+                    "Account #{} '{}' in employee pool #{} has already been seen elsewhere",
+                    j, account, i
+                )));
+            }
+            unique_accounts.insert(*account);
+
+            total_stake_pool_amount += initialized_accounts.get(account).unwrap();
+        }
+
+        if total_stake_pool_amount != pool.validator.validator.stake_amount {
+            return Err(CliError::UnexpectedError(format!(
+                "Stake amount {} in employee pool #{} does not match combined of accounts {}",
+                pool.validator.validator.stake_amount, i, total_stake_pool_amount
+            )));
+        }
+
+        if !initialized_accounts.contains_key(&pool.validator.validator.owner_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Owner address {} in employee pool #{} is is not in the balances.yaml file",
+                pool.validator.validator.owner_address, i
+            )));
+        }
+        if !initialized_accounts.contains_key(&pool.validator.validator.operator_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Operator address {} in employee pool #{} is is not in the balances.yaml file",
+                pool.validator.validator.operator_address, i
+            )));
+        }
+        if !initialized_accounts.contains_key(&pool.validator.validator.voter_address) {
+            return Err(CliError::UnexpectedError(format!(
+                "Voter address {} in employee pool #{} is is not in the balances.yaml file",
+                pool.validator.validator.voter_address, i
+            )));
+        }
+        if !initialized_accounts.contains_key(&pool.beneficiary_resetter) {
+            return Err(CliError::UnexpectedError(format!(
+                "Beneficiary resetter {} in employee pool #{} is is not in the balances.yaml file",
+                pool.beneficiary_resetter, i
+            )));
+        }
+    }
+    Ok(())
 }
