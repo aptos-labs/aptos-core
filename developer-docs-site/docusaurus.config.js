@@ -115,7 +115,6 @@ const config = {
           {
             type: "dropdown",
             label: "Nodes",
-            to: "nodes/nodes-index",
             position: "left",
             items: [
               {
