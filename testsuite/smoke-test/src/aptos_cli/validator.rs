@@ -753,9 +753,9 @@ async fn test_owner_create_and_delegate_flow() {
 
     let mut keygen = KeyGen::from_os_rng();
 
-    let owner_initial_coins = 1100000;
-    let voter_initial_coins = 10000;
-    let operator_initial_coins = 10000;
+    let owner_initial_coins = 20000000;
+    let voter_initial_coins = 1000000;
+    let operator_initial_coins = 1000000;
 
     // Owner of the coins receives coins
     let owner_cli_index = cli
