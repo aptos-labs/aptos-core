@@ -98,7 +98,7 @@ module aptos_names::domains {
 
     /// This is only callable during genesis or framework upgrades
     public fun initialize(framework: &signer, funds_address: address, admin_multisig_address: address) {
-        assert!(signer::address_of(framework) == @0x4, ENOT_AUTHORIZED);
+        assert!(signer::address_of(framework) == @0x4, error::permission_denied(ENOT_AUTHORIZED));
         config::initialize_v1(framework, admin_multisig_address, funds_address);
 
         move_to(
@@ -211,7 +211,15 @@ module aptos_names::domains {
     /// Forcefully set the name of a domain.
     /// This is a privileged operation, used via multisig governance, to forcefully set a domain address
     /// This can be used, for example, to forcefully set the domain for a system address domain
-    public entry fun force_set_name_address(sign: &signer, subdomain_name: Option<String>, domain_name: String, new_owner: address) acquires NameRegistryV1, SetNameAddressEventsV1 {
+    public entry fun force_set_domain_address(sign: &signer, domain_name: String, new_owner: address) acquires NameRegistryV1, SetNameAddressEventsV1 {
+        force_set_name_address(sign, option::none(), domain_name, new_owner);
+    }
+
+    public entry fun force_set_subdomain_address(sign: &signer, subdomain_name: String, domain_name: String, new_owner: address) acquires NameRegistryV1, SetNameAddressEventsV1 {
+        force_set_name_address(sign, option::some(subdomain_name), domain_name, new_owner);
+    }
+
+    public fun force_set_name_address(sign: &signer, subdomain_name: Option<String>, domain_name: String, new_owner: address) acquires NameRegistryV1, SetNameAddressEventsV1 {
         config::assert_signer_is_admin(sign);
         set_name_address_internal(subdomain_name, domain_name, new_owner);
     }
@@ -221,7 +229,15 @@ module aptos_names::domains {
     /// The `registration_duration_secs` parameter is the number of seconds to register the domain for, but is not limited to the maximum set in the config for domains registered normally.
     /// This allows, for example, to create a domain for the system address for 100 years so we don't need to worry about expiry
     /// Or for moderation purposes, it allows us to seize a racist/harassing domain for 100 years, and park it somewhere safe
-    public entry fun force_create_or_seize_name(sign: &signer, subdomain_name: Option<String>, domain_name: String, registration_duration_secs: u64) acquires NameRegistryV1, RegisterNameEventsV1 {
+    public entry fun force_create_or_seize_domain_name(sign: &signer, domain_name: String, registration_duration_secs: u64) acquires NameRegistryV1, RegisterNameEventsV1 {
+        force_create_or_seize_name(sign, option::none(), domain_name, registration_duration_secs);
+    }
+
+    public entry fun force_create_or_seize_subdomain_name(sign: &signer, subdomain_name: String, domain_name: String, registration_duration_secs: u64) acquires NameRegistryV1, RegisterNameEventsV1 {
+        force_create_or_seize_name(sign, option::some(subdomain_name), domain_name, registration_duration_secs);
+    }
+
+    public fun force_create_or_seize_name(sign: &signer, subdomain_name: Option<String>, domain_name: String, registration_duration_secs: u64) acquires NameRegistryV1, RegisterNameEventsV1 {
         config::assert_signer_is_admin(sign);
         register_name_internal(sign, subdomain_name, domain_name, registration_duration_secs, 0);
     }
