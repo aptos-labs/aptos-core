@@ -19,7 +19,7 @@ pub struct PrivateIdentity {
 }
 
 /// Type for serializing public keys file
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PublicIdentity {
     pub account_address: AccountAddress,
     pub account_public_key: Ed25519PublicKey,

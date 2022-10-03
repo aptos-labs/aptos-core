@@ -57,7 +57,12 @@ impl CliCommand<String> for FundWithFaucet {
         let client = self.rest_options.client(&self.profile_options.profile)?;
         for hash in hashes {
             client
-                .wait_for_transaction_by_hash(hash, sys_time, Some(Duration::from_secs(60)), None)
+                .wait_for_transaction_by_hash(
+                    hash.into(),
+                    sys_time,
+                    Some(Duration::from_secs(60)),
+                    None,
+                )
                 .await?;
         }
         return Ok(format!(

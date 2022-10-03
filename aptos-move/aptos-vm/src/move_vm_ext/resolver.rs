@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use framework::natives::state_storage::StateStorageUsageResolver;
-use move_deps::{move_core_types::resolver::MoveResolver, move_table_extension::TableResolver};
+use move_core_types::resolver::MoveResolver;
+use move_table_extension::TableResolver;
 use std::fmt::Debug;
 
 pub trait MoveResolverExt:

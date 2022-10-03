@@ -12,7 +12,7 @@ use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use framework::ReleaseBundle;
 use storage_interface::DbReaderWriter;
-use vm_genesis::{AccountMap, EmployeeAccountMap, ValidatorWithCommissionRate};
+use vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -45,9 +45,9 @@ pub struct MainnetGenesisInfo {
 
     // MAINNET SPECIFIC FIELDS.
     /// Initial accounts and balances.
-    accounts: Vec<AccountMap>,
+    accounts: Vec<AccountBalance>,
     /// Employee vesting configurations.
-    employee_vesting_accounts: Vec<EmployeeAccountMap>,
+    employee_vesting_accounts: Vec<EmployeePool>,
     /// Set of configurations for validators who will be joining the genesis validator set.
     validators: Vec<ValidatorWithCommissionRate>,
 }
@@ -55,8 +55,8 @@ pub struct MainnetGenesisInfo {
 impl MainnetGenesisInfo {
     pub fn new(
         chain_id: ChainId,
-        accounts: Vec<AccountMap>,
-        employee_vesting_accounts: Vec<EmployeeAccountMap>,
+        accounts: Vec<AccountBalance>,
+        employee_vesting_accounts: Vec<EmployeePool>,
         validators: Vec<ValidatorConfiguration>,
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,

@@ -3,13 +3,15 @@
 
 use aptos_config::config::HANDSHAKE_VERSION;
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519};
+use aptos_types::account_address::AccountAddressWithChecks;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     network_address::{DnsName, NetworkAddress, Protocol},
     transaction::authenticator::AuthenticationKey,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::{BTreeMap, HashSet};
 use std::{
     convert::TryFrom,
     fs::File,
@@ -18,24 +20,30 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use vm_genesis::{Validator, ValidatorWithCommissionRate};
+use vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
 
 /// Template for setting up Github for Genesis
 ///
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Layout {
-    /// Root key for the blockchain
-    /// TODO: In the future, we won't need a root key
+    /// Root key for the blockchain only for test chains
+    #[serde(default)]
     pub root_key: Option<Ed25519PublicKey>,
     /// List of usernames or identifiers
     pub users: Vec<String>,
     /// ChainId for the target network
     pub chain_id: ChainId,
     /// Whether to allow new validators to join the set after genesis
+    ///
+    /// Ignored for mainnet
     #[serde(default)]
     pub allow_new_validators: bool,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
+    /// Whether this is a test network or not
+    ///
+    /// Ignored for mainnet
+    #[serde(default)]
     pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
@@ -53,6 +61,8 @@ pub struct Layout {
     pub voting_duration_secs: u64,
     /// % of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+    /// Total supply of coins
+    pub total_supply: Option<u64>,
 }
 
 impl Layout {
@@ -87,6 +97,7 @@ impl Default for Layout {
             rewards_apy_percentage: 10,
             voting_duration_secs: 43_200,
             voting_power_increase_limit: 20,
+            total_supply: None,
         }
     }
 }
@@ -96,12 +107,12 @@ impl Default for Layout {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidatorConfiguration {
     /// Account address
-    pub owner_account_address: AccountAddress,
+    pub owner_account_address: AccountAddressWithChecks,
     /// Key used for signing transactions with the account
     pub owner_account_public_key: Ed25519PublicKey,
-    pub operator_account_address: AccountAddress,
+    pub operator_account_address: AccountAddressWithChecks,
     pub operator_account_public_key: Ed25519PublicKey,
-    pub voter_account_address: AccountAddress,
+    pub voter_account_address: AccountAddressWithChecks,
     pub voter_account_public_key: Ed25519PublicKey,
     /// Key used for signing in consensus
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -179,28 +190,31 @@ impl TryFrom<ValidatorConfiguration> for Validator {
 
         let auth_key = AuthenticationKey::ed25519(&config.owner_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.owner_account_address != derived_address {
+        let owner_address = AccountAddress::from(config.owner_account_address);
+        if owner_address != derived_address {
             return Err(anyhow::Error::msg(format!(
                 "owner_account_address {} does not match account key derived one {}",
-                config.owner_account_address, derived_address
+                owner_address, derived_address
             )));
         }
 
         let auth_key = AuthenticationKey::ed25519(&config.operator_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.operator_account_address != derived_address {
+        let operator_address = AccountAddress::from(config.operator_account_address);
+        if operator_address != derived_address {
             return Err(anyhow::Error::msg(format!(
                 "operator_account_address {} does not match account key derived one {}",
-                config.operator_account_address, derived_address
+                operator_address, derived_address
             )));
         }
 
         let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.voter_account_address != derived_address {
+        let voter_address = AccountAddress::from(config.voter_account_address);
+        if voter_address != derived_address {
             return Err(anyhow::Error::msg(format!(
                 "voter_account_address {} does not match account key derived one {}",
-                config.voter_account_address, derived_address
+                voter_address, derived_address
             )));
         }
 
@@ -216,9 +230,9 @@ impl TryFrom<ValidatorConfiguration> for Validator {
         };
 
         Ok(Validator {
-            owner_address: config.owner_account_address,
-            operator_address: config.operator_account_address,
-            voter_address: config.voter_account_address,
+            owner_address,
+            operator_address,
+            voter_address,
             consensus_pubkey,
             proof_of_possession,
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
@@ -231,7 +245,7 @@ impl TryFrom<ValidatorConfiguration> for Validator {
 const LOCALHOST: &str = "localhost";
 
 /// Combined Host (DnsName or IP) and port
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct HostAndPort {
     pub host: DnsName,
     pub port: u16,
@@ -297,11 +311,11 @@ impl FromStr for HostAndPort {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OwnerConfiguration {
-    pub owner_account_address: AccountAddress,
+    pub owner_account_address: AccountAddressWithChecks,
     pub owner_account_public_key: Ed25519PublicKey,
-    pub voter_account_address: AccountAddress,
+    pub voter_account_address: AccountAddressWithChecks,
     pub voter_account_public_key: Ed25519PublicKey,
-    pub operator_account_address: AccountAddress,
+    pub operator_account_address: AccountAddressWithChecks,
     pub operator_account_public_key: Ed25519PublicKey,
     pub stake_amount: u64,
     pub commission_percentage: u64,
@@ -310,7 +324,7 @@ pub struct OwnerConfiguration {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OperatorConfiguration {
-    pub operator_account_address: AccountAddress,
+    pub operator_account_address: AccountAddressWithChecks,
     pub operator_account_public_key: Ed25519PublicKey,
     pub consensus_public_key: bls12381::PublicKey,
     pub consensus_proof_of_possession: bls12381::ProofOfPossession,
@@ -343,4 +357,294 @@ pub struct StringOperatorConfiguration {
     pub validator_host: HostAndPort,
     pub full_node_network_public_key: Option<String>,
     pub full_node_host: Option<HostAndPort>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AccountBalanceMap {
+    pub account_balances: Vec<BTreeMap<AccountAddress, u64>>,
+}
+
+impl Serialize for AccountBalanceMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.account_balances.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AccountBalanceMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let account_balances =
+            <Vec<BTreeMap<AccountAddressWithChecks, u64>>>::deserialize(deserializer)?;
+        let account_balances = account_balances
+            .into_iter()
+            .map(|map| {
+                map.into_iter()
+                    .map(|(addr, balance)| (addr.into(), balance))
+                    .collect()
+            })
+            .collect();
+        Ok(AccountBalanceMap { account_balances })
+    }
+}
+
+impl TryFrom<Vec<AccountBalance>> for AccountBalanceMap {
+    type Error = anyhow::Error;
+
+    fn try_from(balances: Vec<AccountBalance>) -> Result<Self, Self::Error> {
+        let mut accounts = HashSet::new();
+        let mut vector = vec![];
+        let mut errors = vec![];
+        for balance in balances {
+            let mut map = BTreeMap::new();
+            map.insert(balance.account_address, balance.balance);
+            if !accounts.insert(balance.account_address) {
+                errors.push(anyhow::anyhow!(
+                    "An account was duplicated {}",
+                    balance.account_address
+                ));
+            }
+
+            vector.push(map);
+        }
+
+        if !errors.is_empty() {
+            Err(anyhow::anyhow!(
+                "There are duplicated accounts: {:?}",
+                errors
+            ))
+        } else {
+            Ok(AccountBalanceMap {
+                account_balances: vector,
+            })
+        }
+    }
+}
+
+impl TryFrom<AccountBalanceMap> for Vec<AccountBalance> {
+    type Error = anyhow::Error;
+
+    fn try_from(balance_map: AccountBalanceMap) -> Result<Self, Self::Error> {
+        let mut accounts = HashSet::new();
+        let mut balances = vec![];
+        let mut errors = vec![];
+        for (i, balance_entry) in balance_map.account_balances.iter().enumerate() {
+            let (account_address, balance) = balance_entry
+                .iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("No account in entry #{}", i))?;
+
+            if !accounts.insert(*account_address) {
+                errors.push(anyhow::anyhow!(
+                    "An account was duplicated {} in the balances at entry #{}",
+                    account_address,
+                    i
+                ));
+            }
+
+            balances.push(AccountBalance {
+                account_address: *account_address,
+                balance: *balance,
+            });
+        }
+
+        if !errors.is_empty() {
+            Err(anyhow::anyhow!(
+                "There are duplicated accounts: {:?}",
+                errors
+            ))
+        } else {
+            Ok(balances)
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EmployeePoolMap {
+    pub inner: Vec<EmployeePoolConfig>,
+}
+
+impl Serialize for EmployeePoolMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.inner.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for EmployeePoolMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let inner = <Vec<EmployeePoolConfig>>::deserialize(deserializer)?;
+        Ok(EmployeePoolMap { inner })
+    }
+}
+
+impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
+    type Error = anyhow::Error;
+
+    fn try_from(map: EmployeePoolMap) -> Result<Self, Self::Error> {
+        let mut vesting_schedule_numbers: Option<(Vec<u64>, u64)> = None;
+        let mut beneficiary_resetter: Option<AccountAddress> = None;
+
+        let mut employee_accounts = HashSet::new();
+        let mut pools = vec![];
+        let mut errors = vec![];
+        for (i, pool) in map.inner.into_iter().enumerate() {
+            // Check for duplicate employee accounts
+            for (j, employee_account) in pool.accounts.iter().enumerate() {
+                if !employee_accounts.insert(*employee_account) {
+                    errors.push(anyhow::anyhow!(
+                        "Employee account #{} {} duplicated in employee pool #{}",
+                        j,
+                        employee_account,
+                        i
+                    ));
+                }
+            }
+
+            // Check vesting schedule adds up properly, we only have to check once, then check they are all the same
+            if let Some((numerators, denominator)) = vesting_schedule_numbers.as_ref() {
+                if numerators != &pool.vesting_schedule_numerators {
+                    errors.push(anyhow::anyhow!("Numerators are not the same on every pool in employee pool #{}.  Expected: {:?}, got {:?}", i, numerators, pool.vesting_schedule_numerators));
+                }
+
+                if denominator != &pool.vesting_schedule_denominator {
+                    errors.push(anyhow::anyhow!("Denominator are not the same on every pool in employee pool #{}.  Expected: {:?}, got {:?}", i, denominator, pool.vesting_schedule_denominator));
+                }
+            } else {
+                let mut numerators = 0;
+                let denominator = pool.vesting_schedule_denominator;
+                let mut last_numerator = 0;
+                for numerator in pool.vesting_schedule_numerators.iter() {
+                    numerators += *numerator;
+                    last_numerator = *numerator;
+                }
+
+                if denominator == 0 {
+                    errors.push(anyhow::anyhow!(
+                        "Denominator can't be 0 for employee pool #{}",
+                        i
+                    ));
+                }
+
+                if numerators > denominator {
+                    errors.push(anyhow::anyhow!(
+                        "Numerators {} add up over the denominator {} for employee pool #{}",
+                        numerators,
+                        denominator,
+                        i
+                    ));
+                } else if (denominator - numerators) % last_numerator != 0 {
+                    errors.push(anyhow::anyhow!("Numerators don't add up to the denominator {} (with the last one {} being repeated for employee pool #{}", denominator, last_numerator, i));
+                }
+
+                vesting_schedule_numbers = Some((
+                    pool.vesting_schedule_numerators.clone(),
+                    pool.vesting_schedule_denominator,
+                ))
+            }
+
+            // I'm going to assume no one wants to pay more than 50% of their rewards away
+            if pool.validator.commission_percentage > 50 {
+                errors.push(anyhow::anyhow!(
+                    "Commission percentage is larger than 50% ({}%) for employee pool #{}",
+                    pool.validator.commission_percentage,
+                    i
+                ));
+            }
+
+            // If joining during genesis, it needs all the setup
+            if pool.validator.join_during_genesis {
+                if pool.validator.consensus_public_key.is_none() {
+                    errors.push(anyhow::anyhow!("Employee pool #{} is setup to join during genesis but missing a consensus public key", i));
+                }
+                if pool.validator.proof_of_possession.is_none() {
+                    errors.push(anyhow::anyhow!("Employee pool #{} is setup to join during genesis but missing a proof of possession", i));
+                }
+                if pool.validator.validator_host.is_none() {
+                    errors.push(anyhow::anyhow!(
+                        "Employee pool #{} is setup to join during genesis but missing a validator host",
+                        i
+                    ));
+                }
+                if pool.validator.validator_network_public_key.is_none() {
+                    errors.push(anyhow::anyhow!("Employee pool #{} is setup to join during genesis but missing a validator network public key", i));
+                }
+                if pool.validator.stake_amount < 100000000000000 {
+                    errors.push(anyhow::anyhow!(
+                        "Employee pool #{} is setup to join during genesis but has a low stake amount {} < 1000000 APT",
+                        i,
+                        pool.validator.stake_amount
+                    ));
+                }
+            }
+
+            let pool_beneficiary_resetter = AccountAddress::from(pool.beneficiary_resetter);
+            if let Some(beneficiary_resetter) = beneficiary_resetter {
+                if beneficiary_resetter != pool_beneficiary_resetter {
+                    errors.push(anyhow::anyhow!(
+                        "Employee pool #{} has the wrong beneficiary resetter.  Found {}, should have {}",
+                        i,
+                        pool.beneficiary_resetter,
+                        beneficiary_resetter
+                    ));
+                }
+            } else {
+                beneficiary_resetter = Some(pool_beneficiary_resetter);
+            }
+
+            pools.push(EmployeePool::try_from(pool)?);
+        }
+
+        if errors.is_empty() {
+            Ok(pools)
+        } else {
+            Err(anyhow::anyhow!(
+                "Failed with the following errors: {:?}",
+                errors
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmployeePoolConfig {
+    pub accounts: Vec<AccountAddressWithChecks>,
+    pub validator: ValidatorConfiguration,
+    pub vesting_schedule_numerators: Vec<u64>,
+    pub vesting_schedule_denominator: u64,
+    pub beneficiary_resetter: AccountAddressWithChecks,
+}
+
+impl TryFrom<EmployeePoolConfig> for EmployeePool {
+    type Error = anyhow::Error;
+
+    fn try_from(pool: EmployeePoolConfig) -> Result<Self, Self::Error> {
+        let validator_commission_percentage = pool.validator.commission_percentage;
+        let join_during_genesis = pool.validator.join_during_genesis;
+        let validator = Validator::try_from(pool.validator)?;
+        Ok(EmployeePool {
+            accounts: pool
+                .accounts
+                .into_iter()
+                .map(|inner| inner.into())
+                .collect(),
+            validator: ValidatorWithCommissionRate {
+                validator,
+                validator_commission_percentage,
+                join_during_genesis,
+            },
+            vesting_schedule_numerators: pool.vesting_schedule_numerators,
+            vesting_schedule_denominator: pool.vesting_schedule_denominator,
+            beneficiary_resetter: pool.beneficiary_resetter.into(),
+        })
+    }
 }

@@ -13,7 +13,7 @@ aptos-gas = { path = "../aptos-gas" }
 clap = "3.1.8"
 
 aptos-types = { path = "../../types" }
-aptos-vm = { path = "../aptos-vm" }
+aptos-vm = { path = "../aptos-vm", features = ["testing"] }
 
 move-deps = { path = "../../aptos-move/move-deps", features = ["table-extension"] }
 

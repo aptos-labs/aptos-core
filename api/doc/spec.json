@@ -11257,7 +11257,7 @@
       },
       "IndexResponse": {
         "type": "object",
-        "description": "The struct holding all data returned to the client by the\nindex endpoint (i.e., GET \"/\").",
+        "description": "The struct holding all data returned to the client by the\nindex endpoint (i.e., GET \"/\").  Only for responding in JSON",
         "required": [
           "chain_id",
           "epoch",
@@ -11294,6 +11294,9 @@
           },
           "block_height": {
             "$ref": "#/components/schemas/U64"
+          },
+          "git_hash": {
+            "type": "string"
           }
         }
       },

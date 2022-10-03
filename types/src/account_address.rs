@@ -1,3 +1,6 @@
+use anyhow::bail;
+use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction::authenticator::AuthenticationKey;
@@ -7,10 +10,121 @@ use aptos_crypto::{
     x25519,
 };
 
-pub use move_deps::move_core_types::account_address::AccountAddress;
+pub use move_core_types::account_address::AccountAddress;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 const SALT: &[u8] = b"aptos_framework::staking_contract";
 const VESTING_POOL_SALT: &[u8] = b"aptos_framework::vesting";
+
+/// A wrapper struct that gives better error messages when the account address
+/// can't be deserialized in a human readable format
+///
+/// TODO: Put this in the upstream AccountAddress
+#[derive(Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub struct AccountAddressWithChecks(AccountAddress);
+
+impl Display for AccountAddressWithChecks {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Debug for AccountAddressWithChecks {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl FromStr for AccountAddressWithChecks {
+    type Err = anyhow::Error;
+
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        const NUM_CHARS: usize = AccountAddress::LENGTH * 2;
+        let mut has_0x = false;
+        let mut working = str.trim();
+
+        // Checks if it has a 0x at the beginning, which is okay
+        if working.starts_with("0x") {
+            has_0x = true;
+            working = &working[2..];
+        }
+
+        if working.len() > NUM_CHARS {
+            bail!(
+                "AccountAddress {} is too long {} must be {} hex characters with or without a 0x in front",
+                str,
+                working.len(),
+               NUM_CHARS
+            )
+        } else if !has_0x && working.len() < NUM_CHARS {
+            bail!(
+                "AccountAddress {} is too short {} must be {} hex characters",
+                str,
+                working.len(),
+                NUM_CHARS
+            )
+        }
+
+        if !working.chars().all(|c| char::is_ascii_hexdigit(&c)) {
+            bail!("AccountAddress {} contains a non-hex character", str)
+        }
+
+        let account_address = if has_0x {
+            AccountAddress::from_hex_literal(str.trim())
+        } else {
+            AccountAddress::from_str(str.trim())
+        }?;
+
+        Ok(account_address.into())
+    }
+}
+
+impl From<AccountAddress> for AccountAddressWithChecks {
+    fn from(addr: AccountAddress) -> Self {
+        AccountAddressWithChecks(addr)
+    }
+}
+
+impl From<&AccountAddress> for AccountAddressWithChecks {
+    fn from(addr: &AccountAddress) -> Self {
+        AccountAddressWithChecks(*addr)
+    }
+}
+
+impl From<AccountAddressWithChecks> for AccountAddress {
+    fn from(addr: AccountAddressWithChecks) -> Self {
+        addr.0
+    }
+}
+
+impl From<&AccountAddressWithChecks> for AccountAddress {
+    fn from(addr: &AccountAddressWithChecks) -> Self {
+        addr.0
+    }
+}
+
+impl Serialize for AccountAddressWithChecks {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AccountAddressWithChecks {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(if deserializer.is_human_readable() {
+            AccountAddressWithChecks::from_str(&<String>::deserialize(deserializer)?)
+                .map_err(serde::de::Error::custom)?
+        } else {
+            AccountAddressWithChecks(<AccountAddress>::deserialize(deserializer)?)
+        })
+    }
+}
 
 pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
     AuthenticationKey::ed25519(public_key).derived_address()

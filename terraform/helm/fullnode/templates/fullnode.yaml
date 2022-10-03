@@ -33,7 +33,7 @@ spec:
         - -c
         - |-
           set -e
-          {{- if not .Values.chain.genesisConfigmap }}
+          {{- if and (not .Values.chain.genesisConfigmap) (not .Values.chain.genesisSecret) }}
           # Download genesis and waypoint if necessary
           curl -o /opt/aptos/genesis/waypoint.txt {{ (get .Values.aptos_chains .Values.chain.name).waypoint_txt_url }}
           curl -o /opt/aptos/genesis/genesis.blob {{ (get .Values.aptos_chains .Values.chain.name).genesis_blob_url }}
@@ -112,6 +112,9 @@ spec:
       {{- if .Values.chain.genesisConfigmap }}
         configMap:
           name: {{ .Values.chain.genesisConfigmap }}
+      {{- else if .Values.chain.genesisSecret }}
+        secret:
+          secretName: {{ .Values.chain.genesisSecret }}
       {{- else }}
         emptyDir: {}
       {{- end }}

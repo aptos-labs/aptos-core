@@ -26,7 +26,7 @@ use aptos_crypto::{
     SigningKey, Uniform,
 };
 use aptos_proptest_helpers::ValueGenerator;
-use move_deps::move_core_types::{
+use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
 };

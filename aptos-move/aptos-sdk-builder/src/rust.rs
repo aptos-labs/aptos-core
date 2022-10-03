@@ -5,7 +5,7 @@ use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
-use move_deps::move_core_types::{
+use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, TypeTag},
 };
@@ -15,7 +15,7 @@ use serde_generate::{
 };
 
 use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
-use move_deps::move_core_types::language_storage::StructTag;
+use move_core_types::language_storage::StructTag;
 use once_cell::sync::Lazy;
 use serde_reflection::ContainerFormat;
 use std::str::FromStr;
@@ -257,10 +257,10 @@ impl EntryFunctionCall {
         let definitions = if local_types {
             vec![
                 (
-                    "move_deps::move_core_types::language_storage",
+                    "move_core_types::language_storage",
                     vec!["ModuleId", "TypeTag"],
                 ),
-                ("move_deps::move_core_types", vec!["ident_str"]),
+                ("move_core_types", vec!["ident_str"]),
                 (
                     "aptos_types::transaction",
                     vec!["TransactionPayload", "EntryFunction"],

@@ -37,6 +37,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
+use std::time::Duration;
 use std::{
     collections::BTreeMap,
     fmt::{Debug, Display, Formatter},
@@ -479,6 +480,19 @@ impl RngArgs {
         }
     }
 
+    pub fn from_string_seed(str: &str) -> RngArgs {
+        assert!(str.len() < 32);
+
+        let mut seed = [0u8; 32];
+        for (i, byte) in str.bytes().enumerate() {
+            seed[i] = byte;
+        }
+
+        RngArgs {
+            random_seed: Some(hex::encode(seed)),
+        }
+    }
+
     /// Returns a key generator with the seed if given
     pub fn key_generator(&self) -> CliTypedResult<KeyGen> {
         if let Some(ref seed) = self.random_seed {
@@ -798,11 +812,18 @@ pub struct RestOptions {
     /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
     #[clap(long)]
     pub(crate) url: Option<reqwest::Url>,
+
+    /// Connection timeout in seconds, used for the REST endpoint of the fullnode
+    #[clap(long, default_value = "30")]
+    pub connection_timeout_s: u64,
 }
 
 impl RestOptions {
-    pub fn new(url: Option<reqwest::Url>) -> Self {
-        RestOptions { url }
+    pub fn new(url: Option<reqwest::Url>, connection_timeout_s: Option<u64>) -> Self {
+        RestOptions {
+            url,
+            connection_timeout_s: connection_timeout_s.unwrap_or(30),
+        }
     }
 
     /// Retrieve the URL from the profile or the command line
@@ -823,7 +844,10 @@ impl RestOptions {
     }
 
     pub fn client(&self, profile: &str) -> CliTypedResult<Client> {
-        Ok(Client::new(self.url(profile)?))
+        Ok(Client::new_with_timeout(
+            self.url(profile)?,
+            Duration::from_secs(self.connection_timeout_s),
+        ))
     }
 }
 
