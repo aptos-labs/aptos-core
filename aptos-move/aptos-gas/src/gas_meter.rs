@@ -738,7 +738,7 @@ impl AptosGasMeter {
                 .storage_gas_params
                 .as_ref()
                 .unwrap()
-                .calculate_write_set_gas(ops),
+                .calculate_write_set_gas(ops, self.feature_version),
         };
         self.charge(cost).map_err(|e| e.finish(Location::Undefined))
     }
