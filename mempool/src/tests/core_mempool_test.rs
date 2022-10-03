@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::tests::common::setup_mempool_with_broadcast_buckets;
 use crate::{
     core_mempool::{CoreMempool, MempoolTransaction, TimelineState},
     tests::common::{add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool, TestTransaction},
@@ -256,25 +257,79 @@ fn test_timeline() {
             .map(SignedTransaction::sequence_number)
             .collect()
     };
-    let (timeline, _) = pool.read_timeline(0, 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
     assert_eq!(view(timeline), vec![0, 1]);
     // Txns 3 and 5 should be in parking lot.
     assert_eq!(2, pool.get_parking_lot_size());
 
     // Add txn 2 to unblock txn3.
     add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 2, 1)]);
-    let (timeline, _) = pool.read_timeline(0, 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
     assert_eq!(view(timeline), vec![0, 1, 2, 3]);
     // Txn 5 should be in parking lot.
     assert_eq!(1, pool.get_parking_lot_size());
 
     // Try different start read position.
-    let (timeline, _) = pool.read_timeline(2, 10);
+    let (timeline, _) = pool.read_timeline(&vec![2].into(), 10);
     assert_eq!(view(timeline), vec![2, 3]);
 
     // Simulate callback from consensus to unblock txn 5.
     pool.remove_transaction(&TestTransaction::get_address(1), 4, false);
-    let (timeline, _) = pool.read_timeline(0, 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
+    assert_eq!(view(timeline), vec![5]);
+    // check parking lot is empty
+    assert_eq!(0, pool.get_parking_lot_size());
+}
+
+#[test]
+fn test_multi_bucket_timeline() {
+    let mut pool = setup_mempool_with_broadcast_buckets(vec![0, 101, 201]).0;
+    add_txns_to_mempool(
+        &mut pool,
+        vec![
+            TestTransaction::new(1, 0, 1),   // bucket 0
+            TestTransaction::new(1, 1, 100), // bucket 0
+            TestTransaction::new(1, 3, 200), // bucket 1
+            TestTransaction::new(1, 5, 300), // bucket 2
+        ],
+    );
+    // TODO: different implementations may not sort the same way
+    let view = |txns: Vec<SignedTransaction>| -> Vec<u64> {
+        txns.iter()
+            .map(SignedTransaction::sequence_number)
+            .collect()
+    };
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    assert_eq!(view(timeline), vec![0, 1]);
+    // Txns 3 and 5 should be in parking lot.
+    assert_eq!(2, pool.get_parking_lot_size());
+
+    // Add txn 2 to unblock txn3.
+    add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 2, 1)]);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    assert_eq!(view(timeline), vec![0, 1, 2, 3]);
+    // Txn 5 should be in parking lot.
+    assert_eq!(1, pool.get_parking_lot_size());
+
+    // Try different start read positions. Expected buckets: [[0, 1, 2], [3], []]
+    let (timeline, _) = pool.read_timeline(&vec![1, 0, 0].into(), 10);
+    assert_eq!(view(timeline), vec![1, 2, 3]);
+    let (timeline, _) = pool.read_timeline(&vec![2, 0, 0].into(), 10);
+    assert_eq!(view(timeline), vec![2, 3]);
+    let (timeline, _) = pool.read_timeline(&vec![0, 1, 0].into(), 10);
+    assert_eq!(view(timeline), vec![0, 1, 2]);
+    let (timeline, _) = pool.read_timeline(&vec![1, 1, 0].into(), 10);
+    assert_eq!(view(timeline), vec![1, 2]);
+    let (timeline, _) = pool.read_timeline(&vec![2, 1, 0].into(), 10);
+    assert_eq!(view(timeline), vec![2]);
+    let (timeline, _) = pool.read_timeline(&vec![3, 0, 0].into(), 10);
+    assert_eq!(view(timeline), vec![3]);
+    let (timeline, _) = pool.read_timeline(&vec![3, 1, 0].into(), 10);
+    assert!(view(timeline).is_empty());
+
+    // Simulate callback from consensus to unblock txn 5.
+    pool.remove_transaction(&TestTransaction::get_address(1), 4, false);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
     assert_eq!(view(timeline), vec![5]);
     // check parking lot is empty
     assert_eq!(0, pool.get_parking_lot_size());
@@ -451,7 +506,7 @@ fn test_gc_ready_transaction() {
     add_txn(&mut pool, TestTransaction::new(1, 3, 1)).unwrap();
 
     // Check that all txns are ready.
-    let (timeline, _) = pool.read_timeline(0, 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
     assert_eq!(timeline.len(), 4);
 
     // GC expired transaction.
@@ -462,7 +517,7 @@ fn test_gc_ready_transaction() {
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 0);
 
-    let (timeline, _) = pool.read_timeline(0, 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline[0].sequence_number(), 0);
 
@@ -470,7 +525,7 @@ fn test_gc_ready_transaction() {
     add_txn(&mut pool, TestTransaction::new(1, 1, 1)).unwrap();
 
     // Make sure txns 2 and 3 can be broadcast after txn 1 is resubmitted
-    let (timeline, _) = pool.read_timeline(0, 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
     assert_eq!(timeline.len(), 4);
 }
 
