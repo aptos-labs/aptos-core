@@ -13,6 +13,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import collapseHexString from 'core/utils/hex';
+import { trimAddressLeadingZeros } from 'core/utils/account';
 
 const positiveAmountColor = 'green.500';
 const negativeAmountColor = 'salmon.400';
@@ -27,6 +28,7 @@ function extractActivityItemsFromTransaction(
   activeAccountAddress: string,
   txn: Transaction,
 ) {
+  const address = trimAddressLeadingZeros(activeAccountAddress);
   const common = {
     key: `${txn.version}`,
     timestamp: txn.timestamp,
@@ -34,8 +36,8 @@ function extractActivityItemsFromTransaction(
   };
 
   if (txn.type === 'transfer') {
-    const wereCoinsSent = activeAccountAddress === txn.sender;
-    const wereCoinsReceived = activeAccountAddress === txn.recipient;
+    const wereCoinsSent = address === txn.sender;
+    const wereCoinsReceived = address === txn.recipient;
 
     if (wereCoinsSent && wereCoinsReceived) {
       return [{
@@ -79,7 +81,7 @@ function extractActivityItemsFromTransaction(
     }];
   }
 
-  return Object.values(txn.coinBalanceChanges[activeAccountAddress])
+  return Object.values(txn.coinBalanceChanges[address])
     .flatMap(({ amount, coinInfo }, index) => {
       const amountColor = amount > 0 ? positiveAmountColor : negativeAmountColor;
       const icon = amount > 0 ? coinDepositIcon : coinWithdrawalIcon;
