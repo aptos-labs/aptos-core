@@ -342,8 +342,6 @@ async fn create_employee_vesting_accounts_file(
                     stake_amount: 2 * INITIAL_BALANCE,
                     commission_percentage: 0,
                     join_during_genesis: true,
-                    ans_funds_address: None,
-                    ans_admin_multisig_auth_key: None,
                 }
             } else {
                 ValidatorConfiguration {
@@ -362,8 +360,6 @@ async fn create_employee_vesting_accounts_file(
                     stake_amount: 2 * INITIAL_BALANCE,
                     commission_percentage: 0,
                     join_during_genesis: false,
-                    ans_funds_address: None,
-                    ans_admin_multisig_auth_key: None,
                 }
             };
 

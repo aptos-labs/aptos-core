@@ -35,9 +35,7 @@ use clap::Parser;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
-use vm_genesis::{
-    get_test_ans_admin_multisig_auth_key, get_test_ans_funds_address, AccountBalance, EmployeePool,
-};
+use vm_genesis::{AccountBalance, EmployeePool};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
@@ -403,8 +401,6 @@ fn get_config(
             stake_amount,
             commission_percentage,
             join_during_genesis,
-            ans_funds_address: None,
-            ans_admin_multisig_auth_key: None,
         });
     };
 
@@ -489,8 +485,6 @@ fn get_config(
         stake_amount,
         commission_percentage,
         join_during_genesis,
-        ans_funds_address: Some(get_test_ans_funds_address()),
-        ans_admin_multisig_auth_key: Some(get_test_ans_admin_multisig_auth_key()),
     })
 }
 
