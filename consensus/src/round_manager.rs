@@ -56,6 +56,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::{sleep, Instant};
+use tokio::sync::oneshot as TokioOneshot;
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -164,6 +165,8 @@ pub enum VerifiedEvent {
     ProofOfStoreBroadcast(Box<ProofOfStore>),
     // local messages
     LocalTimeout(Round),
+    // Shutdown the NetworkListener
+    Shutdown(TokioOneshot::Sender<()>),
 }
 
 #[cfg(test)]

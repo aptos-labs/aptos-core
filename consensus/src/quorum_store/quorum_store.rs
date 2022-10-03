@@ -53,6 +53,7 @@ pub struct QuorumStore {
     batch_aggregator: BatchAggregator,
     batch_store_tx: Sender<BatchStoreCommand>,
     proof_builder_tx: Sender<ProofBuilderCommand>,
+    nerwork_listener_tx_vec: Vec<aptos_channel::Sender<PeerId, VerifiedEvent>>,
 }
 
 // TODO: change to appropriately signed integers.
@@ -108,6 +109,7 @@ impl QuorumStore {
         my_peer_id: PeerId,
         db: Arc<QuorumStoreDB>,
         network_msg_rx_vec: Vec<aptos_channel::Receiver<PeerId, VerifiedEvent>>,
+        nerwork_listener_tx_vec: Vec<aptos_channel::Sender<PeerId, VerifiedEvent>>,
         network_sender: NetworkSender,
         config: QuorumStoreConfig,
         validator_verifier: ValidatorVerifier, //TODO: pass the epoch config
@@ -171,6 +173,7 @@ impl QuorumStore {
                 epoch,
                 my_peer_id,
                 network_sender,
+                nerwork_listener_tx_vec,
                 command_rx: wrapper_command_rx,
                 fragment_id: 0,
                 batch_aggregator: BatchAggregator::new(config.max_batch_bytes),
@@ -270,6 +273,7 @@ impl QuorumStore {
         while let Some(command) = self.command_rx.recv().await {
             match command {
                 QuorumStoreCommand::Shutdown(ack_tx) => {
+
                     let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
                     self.batch_store_tx
                         .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
@@ -289,6 +293,17 @@ impl QuorumStore {
                     proof_builder_shutdown_rx
                         .await
                         .expect("Failed to stop ProofBuilder");
+                    
+                    for network_listener_tx in self.nerwork_listener_tx_vec {
+                        let (network_listener_shutdown_tx, network_listener_shutdown_rx) = oneshot::channel();
+                        match network_listener_tx.push(self.my_peer_id, VerifiedEvent::Shutdown(network_listener_shutdown_tx)) {
+                            Ok(()) => debug!("QS: shutdown network listener sent"),
+                            Err(err) => panic!("Failed to send to NetworkListener, Err {:?}", err),
+                        };
+                        network_listener_shutdown_rx
+                        .await
+                        .expect("Failed to stop NetworkListener");
+                    }
 
                     ack_tx
                         .send(())

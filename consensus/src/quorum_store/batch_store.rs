@@ -122,7 +122,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 }
             });
         }
-        _ = spawn_named!("Quorum:BatchReader", async move {
+        _ = spawn_named!(&("Quorum:BatchReader epoch ".to_owned() + &epoch.to_string()), async move {
             metrics_monitor
                 .instrument(batch_reader_clone.start(
                     batch_reader_rx,
@@ -229,6 +229,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     }
                 }
                 BatchStoreCommand::BatchRequest(digest, peer_id, maybe_tx) => {
+                    counters::GET_BATCH_FROM_DB_COUNT.inc();
+
                     match self.db.get_batch(digest) {
                         Ok(Some(persisted_value)) => {
                             let payload = persisted_value

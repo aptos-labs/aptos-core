@@ -117,10 +117,17 @@ impl NetworkListener {
         //Keep in memory caching in side the DB wrapper.
         //chack id -> self, call PoQSB.
         while let Some(msg) = self.network_msg_rx.next().await {
-            debug!("QS: network_listener msg {:?}", msg);
+            // debug!("QS: network_listener msg {:?}", msg);
             match msg {
+                VerifiedEvent::Shutdown(ack_tx) => {
+                    debug!("QS: shutdown network listener received");
+                    ack_tx
+                        .send(())
+                        .expect("Failed to send shutdown ack to QuorumStore");
+                    break;
+                }
                 VerifiedEvent::SignedDigest(signed_digest) => {
-                    debug!("QS: got SignedDigest from network");
+                    // debug!("QS: got SignedDigest from network");
                     let cmd = ProofBuilderCommand::AppendSignature(*signed_digest);
                     self.proof_builder_tx
                         .send(cmd)

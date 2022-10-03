@@ -454,7 +454,7 @@ impl EpochManager {
         );
         // TODO: do we need to destroy the async thread with explicit shutdown?
         if let Err(e) = spawn_named!(
-            "Quorum Store",
+            &("QuorumStore epoch ".to_owned() + &self.epoch().to_string()),
             quorum_store.start(consensus_to_quorum_store_rx)
         ) {
             debug!("QS: spawn_named quorum store error {:?}", e);
@@ -516,6 +516,7 @@ impl EpochManager {
             self.author,
             self.quorum_store_storage.clone(),
             quorum_store_msg_rx_vec,
+            self.quorum_store_msg_tx_vec.clone(),
             network_sender,
             config,
             verifier,
@@ -534,7 +535,7 @@ impl EpochManager {
             });
         }
         if let Err(e) = spawn_named!(
-            "QuorumStore",
+            &("QuorumStore epoch ".to_owned() + &self.epoch().to_string()),
             metrics_monitor.instrument(quorum_store.start())
         ) {
             debug!("QS: spawn_named QuorumStore error {:?}", e);
@@ -585,7 +586,7 @@ impl EpochManager {
         }
 
         _ = spawn_named!(
-            "QuorumStoreWrapper",
+            &("QuorumStoreWrapper epoch ".to_owned() + &self.epoch().to_string()),
             metrics_monitor.instrument(quorum_store_wrapper.start(
                 network_sender,
                 consensus_to_quorum_store_rx,
