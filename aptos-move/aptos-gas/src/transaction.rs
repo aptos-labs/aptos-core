@@ -53,6 +53,7 @@ impl StorageGasParameters {
     pub fn calculate_write_set_gas<'a>(
         &self,
         ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        feature_version: u64,
     ) -> InternalGas {
         use WriteOp::*;
 
@@ -73,15 +74,19 @@ impl StorageGasParameters {
             match op {
                 Creation(data) => {
                     num_items_create += 1.into();
-
-                    num_bytes_create += key_size();
-                    num_bytes_create += NumBytes::new(data.len() as u64);
+                    num_bytes_create += Self::write_op_bytes(
+                        key_size(),
+                        NumBytes::new(data.len() as u64),
+                        feature_version,
+                    );
                 }
                 Modification(data) => {
                     num_items_write += 1.into();
-
-                    num_bytes_write += key_size();
-                    num_bytes_write += NumBytes::new(data.len() as u64);
+                    num_bytes_write += Self::write_op_bytes(
+                        key_size(),
+                        NumBytes::new(data.len() as u64),
+                        feature_version,
+                    );
                 }
                 Deletion => (),
             }
@@ -91,6 +96,17 @@ impl StorageGasParameters {
             + num_items_write * self.per_item_write
             + num_bytes_create * self.per_byte_create
             + num_bytes_write * self.per_byte_write
+    }
+
+    fn write_op_bytes(key_size: NumBytes, value_size: NumBytes, feature_version: u64) -> NumBytes {
+        let kb = NumBytes::new(1024);
+
+        let total = key_size + value_size;
+        if feature_version > 2 {
+            total.checked_sub(kb).unwrap_or(NumBytes::zero())
+        } else {
+            total
+        }
     }
 }
 
