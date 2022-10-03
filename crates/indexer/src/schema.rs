@@ -32,6 +32,7 @@ diesel::table! {
         uri_mutable -> Bool,
         description_mutable -> Bool,
         inserted_at -> Timestamp,
+        table_handle -> Varchar,
     }
 }
 
@@ -49,6 +50,7 @@ diesel::table! {
         description_mutable -> Bool,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        table_handle -> Varchar,
     }
 }
 
