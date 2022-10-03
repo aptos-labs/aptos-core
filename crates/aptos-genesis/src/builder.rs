@@ -24,12 +24,7 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
-use aptos_types::{
-    account_address::AccountAddress,
-    chain_id::ChainId,
-    transaction::{authenticator::AuthenticationKey, Transaction},
-    waypoint::Waypoint,
-};
+use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
@@ -404,9 +399,6 @@ pub struct GenesisConfiguration {
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voting_power_increase_limit: u64,
-    // Aptos Names configuration
-    pub ans_funds_address: Option<AccountAddress>,
-    pub ans_admin_multisig_auth_key: Option<AuthenticationKey>,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
@@ -602,8 +594,6 @@ impl Builder {
             rewards_apy_percentage: 10,
             voting_duration_secs: ONE_DAY / 24,
             voting_power_increase_limit: 50,
-            ans_funds_address: None,
-            ans_admin_multisig_auth_key: None,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);

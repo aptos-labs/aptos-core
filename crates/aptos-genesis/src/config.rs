@@ -62,10 +62,6 @@ pub struct Layout {
     pub voting_power_increase_limit: u64,
     /// Total supply of coins
     pub total_supply: Option<u64>,
-    /// Address to send ANS registry fees to
-    pub ans_funds_address: Option<AccountAddress>,
-    /// AuthKey of account controlling ANS registry
-    pub ans_admin_multisig_auth_key: Option<AuthenticationKey>,
 }
 
 impl Layout {
@@ -101,8 +97,6 @@ impl Default for Layout {
             voting_duration_secs: 43_200,
             voting_power_increase_limit: 20,
             total_supply: None,
-            ans_funds_address: None,
-            ans_admin_multisig_auth_key: None,
         }
     }
 }

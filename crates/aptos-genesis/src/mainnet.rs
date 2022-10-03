@@ -2,18 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
-use anyhow::Context;
 use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_temppath::TempPath;
-use aptos_types::{
-    account_address::AccountAddress,
-    chain_id::ChainId,
-    transaction::{authenticator::AuthenticationKey, Transaction},
-    waypoint::Waypoint,
-};
+use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use framework::ReleaseBundle;
@@ -56,10 +50,6 @@ pub struct MainnetGenesisInfo {
     employee_vesting_accounts: Vec<EmployeePool>,
     /// Set of configurations for validators who will be joining the genesis validator set.
     validators: Vec<ValidatorWithCommissionRate>,
-    /// Address to send ANS registry fees to
-    pub ans_funds_address: AccountAddress,
-    /// AuthKey of account controlling ANS registry
-    pub ans_admin_multisig_auth_key: AuthenticationKey,
 }
 
 impl MainnetGenesisInfo {
@@ -71,12 +61,6 @@ impl MainnetGenesisInfo {
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<MainnetGenesisInfo> {
-        let ans_funds_address = genesis_config
-            .ans_funds_address
-            .context("Expected ANS funds address")?;
-        let ans_admin_multisig_auth_key = genesis_config
-            .ans_admin_multisig_auth_key
-            .context("Expected ANS Admin Multisig AuthKey")?;
         Ok(MainnetGenesisInfo {
             chain_id,
             accounts,
@@ -96,8 +80,6 @@ impl MainnetGenesisInfo {
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
-            ans_funds_address,
-            ans_admin_multisig_auth_key,
         })
     }
 
@@ -129,8 +111,6 @@ impl MainnetGenesisInfo {
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
                 voting_power_increase_limit: self.voting_power_increase_limit,
-                ans_funds_address: self.ans_funds_address,
-                ans_admin_multisig_auth_key: self.ans_admin_multisig_auth_key,
             },
         )
     }

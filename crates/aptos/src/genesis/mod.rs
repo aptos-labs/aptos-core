@@ -226,8 +226,6 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             rewards_apy_percentage: layout.rewards_apy_percentage,
             voting_duration_secs: layout.voting_duration_secs,
             voting_power_increase_limit: layout.voting_power_increase_limit,
-            ans_funds_address: layout.ans_funds_address,
-            ans_admin_multisig_auth_key: layout.ans_admin_multisig_auth_key,
         },
     )?)
 }
@@ -263,8 +261,6 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             rewards_apy_percentage: layout.rewards_apy_percentage,
             voting_duration_secs: layout.voting_duration_secs,
             voting_power_increase_limit: layout.voting_power_increase_limit,
-            ans_funds_address: layout.ans_funds_address,
-            ans_admin_multisig_auth_key: layout.ans_admin_multisig_auth_key,
         },
     )?)
 }
