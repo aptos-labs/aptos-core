@@ -200,8 +200,8 @@ mod tests {
         crate::db_generator::run(
             25, /* num_accounts */
             // TODO(Gas): double check if this is correct
-            10_000, /* init_account_balance */
-            5,      /* block_size */
+            100_000_000, /* init_account_balance */
+            5,           /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             true,

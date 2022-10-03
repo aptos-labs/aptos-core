@@ -1012,6 +1012,7 @@ async fn test_transaction_vm_status(
     context.check_golden_output(resp);
 }
 
+#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_submit_transaction_rejects_payload_too_large_bcs_txn_body() {
     let mut context = new_test_context(current_function_name!());
@@ -1069,6 +1070,7 @@ async fn test_submit_transaction_rejects_invalid_json() {
     context.check_golden_output(resp);
 }
 
+#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_signing_message_rejects_payload_too_large_json_body() {
     let mut context = new_test_context(current_function_name!());

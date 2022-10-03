@@ -27,6 +27,9 @@ use std::collections::BTreeMap;
 // Change log:
 // - V3
 //   - Add memory quota
+//   - Storage charges:
+//     - Distinguish between new and existing resources
+//     - One item write comes with 1K free bytes
 // - V2
 //   - Table
 //     - Fix the gas formula for loading resources so that they are consistent with other

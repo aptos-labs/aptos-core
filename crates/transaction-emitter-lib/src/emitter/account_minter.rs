@@ -93,7 +93,7 @@ impl<'t> AccountMinter<'t> {
             .checked_add(aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price)
             .unwrap();
         info!(
-            "Account creationg plan created for {} accounts with {} balance each.",
+            "Account creation plan created for {} accounts with {} balance each.",
             num_accounts, coins_per_account
         );
         info!(
