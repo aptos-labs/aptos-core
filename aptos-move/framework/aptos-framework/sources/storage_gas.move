@@ -38,10 +38,12 @@
 /// item-wise and byte-wise storage, then each epoch, gas parameters are
 /// reconfigured based on the "utilization ratio" for each of the two
 /// utilization dimensions. The utilization ratio for a given dimension,
-/// either item-wise or byte-wise, is taken as the the quotient
-/// of actual utilization and target utilization. For example, given a
-/// 500 GB target and 250 GB actual utilization, the byte-wise
-/// utilization ratio is 50%.
+/// either item-wise or byte-wise, is taken as the quotient of actual
+/// utilization and target utilization. For example, given a 500 GB
+/// target and 250 GB actual utilization, the byte-wise utilization
+/// ratio is 50%.
+///
+/// See `base_8192_exponential_curve()` for mathematical definitions.
 ///
 /// ## Gas curve lookup
 ///
@@ -64,8 +66,7 @@
 /// For example, if the byte-wise utilization ratio is 50%, then
 /// per-byte reads will charge the minimum per-byte gas cost, plus
 /// 1.09% of the difference between the maximum and the minimum cost.
-///
-/// See `base_8192_exponential_curve()` for the relevant equation.
+/// See `base_8192_exponential_curve()` for a supporting calculation.
 ///
 /// ## Item-wise operations
 ///
@@ -272,7 +273,7 @@ module aptos_framework::storage_gas {
     ///
     /// # Example
     ///
-    /// Hence for a utilization ratio of 50% ($u_r = 0.5$):
+    /// Hence for a utilization ratio of 50% ( $u_r = 0.5$ ):
     ///
     /// $$g(0.5) = g_{min} + \frac{8192^{0.5} - 1}{8192 - 1} \Delta_g$$
     ///
@@ -414,12 +415,12 @@ module aptos_framework::storage_gas {
             error::already_exists(ESTORAGE_GAS)
         );
         move_to(aptos_framework, StorageGas {
-            per_item_read: 8000,
-            per_item_create: 1280000,
-            per_item_write: 160000,
-            per_byte_read: 1000,
-            per_byte_create: 10000,
-            per_byte_write: 10000,
+            per_item_read: 80000,
+            per_item_create: 2000000,
+            per_item_write: 400000,
+            per_byte_read: 40,
+            per_byte_create: 1000,
+            per_byte_write: 200,
         });
     }
 
