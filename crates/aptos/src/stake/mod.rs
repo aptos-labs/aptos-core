@@ -226,6 +226,8 @@ pub struct SetDelegatedVoter {
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub voter_address: AccountAddress,
 
+    /// The pool address to vote on behalf of.
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }

@@ -237,9 +237,18 @@ impl ValidatorNetworkAddressesArgs {
 }
 
 #[derive(Debug, Serialize)]
+pub enum StakePoolType {
+    Direct,
+    StakingContract,
+    Vesting,
+}
+
+#[derive(Debug, Serialize)]
 pub struct StakePoolResult {
     pool_address: AccountAddress,
     operator_address: AccountAddress,
+    voter_address: AccountAddress,
+    pool_type: StakePoolType,
 }
 
 #[derive(Parser)]
@@ -263,18 +272,13 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
 
     async fn execute(mut self) -> CliTypedResult<Vec<StakePoolResult>> {
         let owner_address = self.owner_address;
-        let mut stake_pool_results: Vec<StakePoolResult> = vec![];
         let client = self.rest_options.client(&self.profile_options.profile)?;
 
+        let mut stake_pool_results: Vec<StakePoolResult> = vec![];
         // Add direct stake pool if any.
-        let stake_pool = client
-            .get_account_resource_bcs::<StakePool>(owner_address, "0x1::stake::StakePool")
-            .await;
-        if let Ok(stake_pool) = stake_pool {
-            stake_pool_results.push(StakePoolResult {
-                pool_address: owner_address,
-                operator_address: stake_pool.into_inner().operator_address,
-            });
+        let direct_stake_pool = get_stake_pool_info(owner_address, StakePoolType::Direct);
+        if let Ok(direct_stake_pool) = direct_stake_pool {
+            stake_pool_results.push(direct_stake_pool);
         };
 
         // Fetch all stake pools managed via staking contracts.
@@ -289,10 +293,7 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
                 .into_inner()
                 .staking_contracts
                 .into_iter()
-                .map(|staking_contract| StakePoolResult {
-                    pool_address: staking_contract.value.pool_address,
-                    operator_address: staking_contract.key,
-                })
+                .map(|staking_contract| get_stake_pool_info(staking_contract.value.pool_address, StakePoolType::StakingContract))
                 .collect();
             stake_pool_results.append(&mut managed_stake_pools);
         };
@@ -309,17 +310,26 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
                 .into_inner()
                 .vesting_contracts
                 .into_iter()
-                .map(|pool_address| StakePoolResult {
-                    pool_address,
-                    // TODO: Query the operator address for each employee stake pool.
-                    operator_address: AccountAddress::ZERO,
-                })
+                .map(|pool_address| get_stake_pool_info(pool_address, StakePoolType::Vesting))
                 .collect();
             stake_pool_results.append(&mut employee_stake_pools);
         };
 
         Ok(stake_pool_results)
     }
+}
+
+async fn get_stake_pool_info(pool_address: AccountAddress, pool_type: StakePoolType) -> CliTypedResult<StakePoolResult> {
+    let stake_pool = client
+        .get_account_resource_bcs::<StakePool>(pool_address, "0x1::stake::StakePool")
+        .await?
+        .into_inner();
+    Ok(StakePoolResult {
+        pool_address,
+        operator_address: stake_pool.operator_address,
+        voter_address: stake_pool.voter_address,
+        pool_type,
+    })
 }
 
 /// Register the current account as a validator node operator of it's own owned stake.
