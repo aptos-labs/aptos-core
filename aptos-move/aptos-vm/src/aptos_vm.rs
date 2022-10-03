@@ -40,7 +40,7 @@ use aptos_types::{
         WriteSetPayload,
     },
     vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
-    write_set::WriteSet,
+    write_set::{WriteOp, WriteSet},
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
@@ -79,6 +79,9 @@ static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
 pub fn allow_module_bundle_for_test() {
     MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
 }
+
+// Put a hard_limit on per item size, 4MB.
+static MAX_ITEM_SIZE_ALLOWED: usize = 4 << 20;
 
 #[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
@@ -381,6 +384,21 @@ impl AptosVM {
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
             let change_set_ext = session_output.into_change_set(&mut ())?;
 
+            for (key, op) in change_set_ext.write_set().iter() {
+                let key_size = || {
+                    key.encode()
+                        .expect("Should be able to serialize state key")
+                        .len()
+                };
+                match op {
+                    WriteOp::Creation(data) | WriteOp::Modification(data) => {
+                        if data.len() + key_size() > MAX_ITEM_SIZE_ALLOWED {
+                            return Err(VMStatus::Error(StatusCode::ABORTED));
+                        }
+                    }
+                    WriteOp::Deletion => (),
+                }
+            }
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
             // TODO(Gas): Charge for aggregator writes
