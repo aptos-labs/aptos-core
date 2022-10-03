@@ -373,12 +373,12 @@ module aptos_framework::storage_gas {
     ///
     /// | Data style | Operation | Minimum gas | Maximum gas |
     /// |------------|-----------|-------------|-------------|
-    /// | Per item   | Read      | 80000       | 8000000     |
-    /// | Per item   | Create    | 2000000     | 200000000   |
-    /// | Per item   | Write     | 400000      | 40000000    |
-    /// | Per byte   | Read      | 40          | 4000        |
-    /// | Per byte   | Create    | 1000        | 100000      |
-    /// | Per byte   | Write     | 200         | 20000       |
+    /// | Per item   | Read      | 3M          | 3M * 100    |
+    /// | Per item   | Create    | 50M         | 50M * 100   |
+    /// | Per item   | Write     | 3M          | 3M * 100    |
+    /// | Per byte   | Read      | 3K          | 3K * 100    |
+    /// | Per byte   | Create    | 50K         | 50K * 100   |
+    /// | Per byte   | Write     | 50K         | 50K * 100   |
     ///
     /// `StorageGas` values are additionally initialized, but per
     /// `on_reconfig()`, they will be reconfigured for each subsequent
@@ -393,17 +393,20 @@ module aptos_framework::storage_gas {
             error::already_exists(ESTORAGE_GAS_CONFIG)
         );
 
+        let k: u64 = 1000;
+        let m: u64 = 1000 * 1000;
+
         let item_config = UsageGasConfig {
             target_usage: 1000000000, // 1 billion
-            read_curve: base_8192_exponential_curve(80000, 80000 * 100),
-            create_curve: base_8192_exponential_curve(2000000, 2000000 * 100),
-            write_curve: base_8192_exponential_curve(400000, 400000 * 100),
+            read_curve: base_8192_exponential_curve(3 * m, 3 * m * 100),
+            create_curve: base_8192_exponential_curve(50 * m, 50 * m * 100),
+            write_curve: base_8192_exponential_curve(3 * m, 3 * m * 100),
         };
         let byte_config = UsageGasConfig {
             target_usage: 500000000000, // 500 GB
-            read_curve: base_8192_exponential_curve(40, 40 * 100),
-            create_curve: base_8192_exponential_curve(1000, 1000 * 100),
-            write_curve: base_8192_exponential_curve(200, 200 * 100),
+            read_curve: base_8192_exponential_curve(3 * k, 3 * k * 100),
+            create_curve: base_8192_exponential_curve(50 * k,  50 * k * 100),
+            write_curve: base_8192_exponential_curve(50 * k,  50 * k * 100),
         };
         move_to(aptos_framework, StorageGasConfig {
             item_config,
@@ -415,12 +418,12 @@ module aptos_framework::storage_gas {
             error::already_exists(ESTORAGE_GAS)
         );
         move_to(aptos_framework, StorageGas {
-            per_item_read: 80000,
-            per_item_create: 2000000,
-            per_item_write: 400000,
-            per_byte_read: 40,
-            per_byte_create: 1000,
-            per_byte_write: 200,
+            per_item_read: 3 * m,
+            per_item_create: 50 * m,
+            per_item_write: 3 * m,
+            per_byte_read: 3 * k,
+            per_byte_create: 50 * k,
+            per_byte_write: 50 * k,
         });
     }
 
