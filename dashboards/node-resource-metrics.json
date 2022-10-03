@@ -94,7 +94,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "deckbytes",
           "min": 0,
           "color": { "mode": "palette-classic" },
           "thresholds": {
@@ -540,7 +540,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 6,
+  "version": 7,
   "links": [
     {
       "title": "Other Dashboards",
