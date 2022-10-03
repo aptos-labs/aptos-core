@@ -3,6 +3,7 @@
 
 /// This module provides various indexes used by Mempool.
 use crate::core_mempool::transaction::{MempoolTransaction, SequenceInfo, TimelineState};
+use crate::shared_mempool::types::TimelineId;
 use crate::{
     counters,
     logging::{LogEntry, LogSchema},
@@ -252,6 +253,100 @@ impl TimelineIndex {
 
     pub(crate) fn size(&self) -> usize {
         self.timeline.len()
+    }
+}
+
+pub struct MultiBucketTimelineIndex {
+    timelines: Vec<TimelineIndex>,
+    bucket_mins: Vec<u64>,
+}
+
+impl MultiBucketTimelineIndex {
+    pub(crate) fn new(bucket_mins: Vec<u64>) -> anyhow::Result<Self> {
+        anyhow::ensure!(!bucket_mins.is_empty(), "Must not be empty");
+        anyhow::ensure!(bucket_mins[0] == 0, "First bucket must start at 0");
+
+        let mut prev = None;
+        let mut timelines = vec![];
+        for entry in bucket_mins.clone() {
+            if let Some(prev) = prev {
+                anyhow::ensure!(prev < entry, "Values must be sorted and not repeat");
+            }
+            prev = Some(entry);
+            timelines.push(TimelineIndex::new());
+        }
+
+        Ok(Self {
+            timelines,
+            bucket_mins,
+        })
+    }
+
+    /// Read all transactions from the timeline since <timeline_id>.
+    /// At most `count` transactions will be returned.
+    pub(crate) fn read_timeline(
+        &self,
+        timeline_id: &TimelineId,
+        count: usize,
+    ) -> Vec<Vec<(AccountAddress, u64)>> {
+        assert!(timeline_id.0.len() == self.bucket_mins.len());
+
+        let mut added = 0;
+        let mut returned = vec![];
+        for (timeline, &timeline_id) in self.timelines.iter().rev().zip(timeline_id.0.iter().rev())
+        {
+            let txns = timeline.read_timeline(timeline_id, count - added);
+            added += txns.len();
+            returned.push(txns);
+
+            if added == count {
+                break;
+            }
+        }
+        while returned.len() < self.timelines.len() {
+            returned.push(vec![]);
+        }
+        returned.iter().rev().cloned().collect()
+    }
+
+    /// Read transactions from the timeline from `start_id` (exclusive) to `end_id` (inclusive).
+    pub(crate) fn timeline_range(
+        &self,
+        start_end_pairs: &Vec<(u64, u64)>,
+    ) -> Vec<(AccountAddress, u64)> {
+        assert_eq!(start_end_pairs.len(), self.timelines.len());
+
+        let mut all_txns = vec![];
+        for (timeline, &(start_id, end_id)) in self.timelines.iter().zip(start_end_pairs.iter()) {
+            let mut txns = timeline.timeline_range(start_id, end_id);
+            all_txns.append(&mut txns);
+        }
+        all_txns
+    }
+
+    #[inline]
+    fn get_timeline(&mut self, ranking_score: u64) -> &mut TimelineIndex {
+        let index = self
+            .bucket_mins
+            .binary_search(&ranking_score)
+            .unwrap_or_else(|i| i - 1);
+        self.timelines.get_mut(index).unwrap()
+    }
+
+    pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction) {
+        self.get_timeline(txn.ranking_score).insert(txn);
+    }
+
+    pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
+        self.get_timeline(txn.ranking_score).remove(txn);
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        let mut size = 0;
+        for timeline in self.timelines.iter() {
+            size += timeline.size()
+        }
+        size
     }
 }
 

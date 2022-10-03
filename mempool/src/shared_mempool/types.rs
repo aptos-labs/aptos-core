@@ -24,6 +24,7 @@ use futures::{
 };
 use network::{application::storage::PeerMetadataStorage, transport::ConnectionMetadata};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
@@ -217,15 +218,16 @@ pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
 /// `is_alive` - is connection healthy
 #[derive(Clone, Debug)]
 pub(crate) struct PeerSyncState {
-    pub timeline_id: u64,
+    pub timeline_id: TimelineId,
     pub broadcast_info: BroadcastInfo,
     pub metadata: ConnectionMetadata,
 }
 
+// TODO: pass in number of buckets to initialize timeline_id instead of None?
 impl PeerSyncState {
-    pub fn new(metadata: ConnectionMetadata) -> Self {
+    pub fn new(metadata: ConnectionMetadata, num_broadcast_buckets: usize) -> Self {
         PeerSyncState {
-            timeline_id: 0,
+            timeline_id: TimelineId::new(num_broadcast_buckets),
             broadcast_info: BroadcastInfo::new(),
             metadata,
         }
@@ -236,7 +238,7 @@ impl PeerSyncState {
 /// For BatchId(`start_id`, `end_id`), (`start_id`, `end_id`) is the range of timeline IDs read from
 /// the core mempool timeline index that produced the txns in this batch.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct BatchId(pub u64, pub u64);
+struct BatchId(pub u64, pub u64);
 
 impl PartialOrd for BatchId {
     fn partial_cmp(&self, other: &BatchId) -> Option<std::cmp::Ordering> {
@@ -250,13 +252,77 @@ impl Ord for BatchId {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct TimelineId(pub Vec<u64>);
+
+impl TimelineId {
+    pub(crate) fn new(num_buckets: usize) -> Self {
+        Self(vec![0; num_buckets])
+    }
+
+    pub(crate) fn update(&mut self, batch_id: &MultiBatchId) {
+        if self.0.len() != batch_id.0.len() {
+            return;
+        }
+
+        let updated: Vec<_> = self
+            .0
+            .iter()
+            .zip(batch_id.0.iter())
+            .map(|(&cur, &(_start, end))| std::cmp::max(cur, end))
+            .collect();
+
+        self.0 = updated;
+    }
+}
+
+impl From<Vec<u64>> for TimelineId {
+    fn from(vector: Vec<u64>) -> Self {
+        Self(vector)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct MultiBatchId(pub Vec<(u64, u64)>);
+
+impl MultiBatchId {
+    pub(crate) fn from_timeline_ids(old: &TimelineId, new: &TimelineId) -> Self {
+        Self(old.0.iter().cloned().zip(new.0.iter().cloned()).collect())
+    }
+}
+
+// Note: in rev order to check significant pairs first
+impl PartialOrd for MultiBatchId {
+    fn partial_cmp(&self, other: &MultiBatchId) -> Option<std::cmp::Ordering> {
+        for (&self_pair, &other_pair) in self.0.iter().rev().zip(other.0.iter().rev()) {
+            let ordering = self_pair.cmp(&other_pair);
+            if ordering != Ordering::Equal {
+                return Some(ordering);
+            }
+        }
+        Some(Ordering::Equal)
+    }
+}
+
+impl Ord for MultiBatchId {
+    fn cmp(&self, other: &MultiBatchId) -> std::cmp::Ordering {
+        for (&self_pair, &other_pair) in self.0.iter().rev().zip(other.0.iter().rev()) {
+            let ordering = self_pair.cmp(&other_pair);
+            if ordering != Ordering::Equal {
+                return ordering;
+            }
+        }
+        Ordering::Equal
+    }
+}
+
 /// Txn broadcast-related info for a given remote peer.
 #[derive(Clone, Debug)]
 pub struct BroadcastInfo {
     // Sent broadcasts that have not yet received an ack.
-    pub sent_batches: BTreeMap<BatchId, SystemTime>,
+    pub sent_batches: BTreeMap<MultiBatchId, SystemTime>,
     // Broadcasts that have received a retry ack and are pending a resend.
-    pub retry_batches: BTreeSet<BatchId>,
+    pub retry_batches: BTreeSet<MultiBatchId>,
     // Whether broadcasting to this peer is in backoff mode, e.g. broadcasting at longer intervals.
     pub backoff_mode: bool,
 }
