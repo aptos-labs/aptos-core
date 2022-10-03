@@ -1,6 +1,6 @@
 {
   "name": "@petra/extension",
-  "version": "0.1.14",
+  "version": "1.0.0",
   "private": true,
   "dependencies": {
     "@chakra-ui/icons": "^2.0.6",
