@@ -124,6 +124,8 @@ impl GenesisInfo {
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
                 voting_power_increase_limit: self.voting_power_increase_limit,
+                ans_funds_address: vm_genesis::get_test_ans_funds_address(),
+                ans_admin_multisig_auth_key: vm_genesis::get_test_ans_admin_multisig_auth_key(),
             },
         )
     }

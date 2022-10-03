@@ -35,7 +35,9 @@ use clap::Parser;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
-use vm_genesis::{AccountBalance, EmployeePool};
+use vm_genesis::{
+    get_test_ans_admin_multisig_auth_key, get_test_ans_funds_address, AccountBalance, EmployeePool,
+};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
@@ -226,6 +228,8 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             rewards_apy_percentage: layout.rewards_apy_percentage,
             voting_duration_secs: layout.voting_duration_secs,
             voting_power_increase_limit: layout.voting_power_increase_limit,
+            ans_funds_address: layout.ans_funds_address,
+            ans_admin_multisig_auth_key: layout.ans_admin_multisig_auth_key,
         },
     )?)
 }
@@ -261,6 +265,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             rewards_apy_percentage: layout.rewards_apy_percentage,
             voting_duration_secs: layout.voting_duration_secs,
             voting_power_increase_limit: layout.voting_power_increase_limit,
+            ans_funds_address: layout.ans_funds_address,
+            ans_admin_multisig_auth_key: layout.ans_admin_multisig_auth_key,
         },
     )?)
 }
@@ -397,6 +403,8 @@ fn get_config(
             stake_amount,
             commission_percentage,
             join_during_genesis,
+            ans_funds_address: None,
+            ans_admin_multisig_auth_key: None,
         });
     };
 
@@ -481,6 +489,8 @@ fn get_config(
         stake_amount,
         commission_percentage,
         join_during_genesis,
+        ans_funds_address: Some(get_test_ans_funds_address()),
+        ans_admin_multisig_auth_key: Some(get_test_ans_admin_multisig_auth_key()),
     })
 }
 

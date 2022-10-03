@@ -62,6 +62,10 @@ pub struct Layout {
     pub voting_power_increase_limit: u64,
     /// Total supply of coins
     pub total_supply: Option<u64>,
+    /// Address to send ANS registry fees to
+    pub ans_funds_address: Option<AccountAddress>,
+    /// AuthKey of account controlling ANS registry
+    pub ans_admin_multisig_auth_key: Option<AuthenticationKey>,
 }
 
 impl Layout {
@@ -97,6 +101,8 @@ impl Default for Layout {
             voting_duration_secs: 43_200,
             voting_power_increase_limit: 20,
             total_supply: None,
+            ans_funds_address: None,
+            ans_admin_multisig_auth_key: None,
         }
     }
 }
@@ -139,6 +145,13 @@ pub struct ValidatorConfiguration {
     /// If set to false, the validator will be fully initialized but won't be added to the
     /// validator set.
     pub join_during_genesis: bool,
+
+    /// Address to send ANS registry fees to
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ans_funds_address: Option<AccountAddress>,
+    /// AuthKey of account controlling ANS registry
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ans_admin_multisig_auth_key: Option<AuthenticationKey>,
 }
 
 impl TryFrom<ValidatorConfiguration> for ValidatorWithCommissionRate {
