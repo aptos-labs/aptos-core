@@ -71,7 +71,7 @@ impl Mempool {
     ) {
         trace!(
             LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
-            is_rejected = false
+            is_rejected = true
         );
         self.log_latency(*sender, sequence_number, counters::COMMIT_REJECTED_LABEL);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
