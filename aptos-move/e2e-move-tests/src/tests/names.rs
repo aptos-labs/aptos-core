@@ -65,7 +65,7 @@ fn test_names_end_to_end() {
         &user1,
         aptos_names_sdk_builder::domains_set_domain_address(
             "max".to_string().into_bytes(),
-            user2.address().clone()
+            *user2.address()
         ),
     ));
 
