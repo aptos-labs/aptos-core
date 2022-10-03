@@ -45,7 +45,7 @@ The CLI command examples used in this section use testnet. You can use the same 
 Before joining the network, you need to make sure the validator node is bootstrapped with the correct genesis blob and waypoint for corresponding network. To bootstrap your node, first you need to know the pool address to use:
 
 ```
-aptos node get-stake-pool --owner-address <owner_address>
+aptos node get-stake-pool --owner-address <owner_address> --url <REST API URL>
 ```
 
 ### Using source code
