@@ -75,6 +75,7 @@ module aptos_framework::account {
     }
 
     const MAX_U64: u128 = 18446744073709551615;
+    const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
     const ED25519_SCHEME: u8 = 0;
     const MULTI_ED25519_SCHEME: u8 = 1;
@@ -409,6 +410,11 @@ module aptos_framework::account {
             create_account_unchecked(resource_addr)
         };
 
+        // By default, only the SignerCapability should have control over the resource account and not the auth key.
+        // If the source account wants direct control via auth key, they would need to explicitly rotate the auth key
+        // of the resource account using the SignerCapability.
+        rotate_authentication_key_internal(&resource, ZERO_AUTH_KEY);
+
         let account = borrow_global_mut<Account>(resource_addr);
         account.signer_capability_offer.for = option::some(resource_addr);
         let signer_cap = SignerCapability { account: resource_addr };
@@ -486,6 +492,31 @@ module aptos_framework::account {
         let resource_addr = signer::address_of(&resource_account);
         assert!(resource_addr != signer::address_of(&user), 0);
         assert!(resource_addr == get_signer_capability_address(&resource_account_cap), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10007)]
+    public entry fun test_cannot_control_resource_account_via_auth_key() acquires Account {
+        let alice_pk = x"4141414141414141414141414141414141414141414141414141414141414145";
+        let alice = create_account_from_ed25519_public_key(alice_pk);
+        let alice_auth = get_authentication_key(signer::address_of(&alice)); // must look like a valid public key
+
+        let eve_pk = x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+        let eve = create_account_from_ed25519_public_key(eve_pk);
+
+        let seed = *&eve_pk; // multisig public key
+        vector::push_back(&mut seed, 1); // multisig threshold
+        vector::push_back(&mut seed, 1); // signature scheme id
+        let (resource, _) = create_resource_account(&alice, seed);
+
+        let signer_capability_sig_bytes = x"587e200320086d8a8d674181f85a8f8b24ee4fd7269870554d18fe830129e7c71f2730a4988c8374c4de5845b52bea4d182640ab6c50c176a3ae90d18002e603";
+        vector::append(&mut signer_capability_sig_bytes, x"40000000");
+        let account_scheme = MULTI_ED25519_SCHEME;
+        let account_public_key_bytes = alice_auth;
+        vector::append(&mut account_public_key_bytes, *&eve_pk);
+        vector::push_back(&mut account_public_key_bytes, 1);
+        let recipient_address = signer::address_of(&eve);
+        offer_signer_capability(&resource, signer_capability_sig_bytes, account_scheme, account_public_key_bytes, recipient_address);
     }
 
     #[test_only]
