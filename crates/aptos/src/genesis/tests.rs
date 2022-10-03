@@ -205,6 +205,7 @@ async fn create_users(
             operator_identity.as_path(),
             voter_identity.as_path(),
             commission_rate,
+            i as u16,
         )
         .await;
     }
@@ -325,12 +326,13 @@ async fn set_validator_config(
     operator_identity_file: &Path,
     voter_identity_file: &Path,
     commission_percentage: u64,
+    port: u16,
 ) {
     let command = SetValidatorConfiguration {
         username,
         git_options,
         owner_public_identity_file: Some(owner_identity_file.to_path_buf()),
-        validator_host: HostAndPort::from_str("localhost:6180").unwrap(),
+        validator_host: HostAndPort::from_str(&format!("localhost:{}", port)).unwrap(),
         stake_amount: 100_000_000_000_000,
         full_node_host: None,
         operator_public_identity_file: Some(operator_identity_file.to_path_buf()),

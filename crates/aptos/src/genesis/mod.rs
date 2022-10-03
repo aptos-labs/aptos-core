@@ -19,10 +19,11 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
-use aptos_crypto::{bls12381, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
+use aptos_crypto::{bls12381, x25519, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_genesis::builder::GenesisConfiguration;
 use aptos_genesis::config::{
-    AccountBalanceMap, EmployeePoolMap, StringOperatorConfiguration, StringOwnerConfiguration,
+    AccountBalanceMap, EmployeePoolMap, HostAndPort, StringOperatorConfiguration,
+    StringOwnerConfiguration,
 };
 use aptos_genesis::{
     config::{Layout, ValidatorConfiguration},
@@ -34,7 +35,7 @@ use aptos_types::account_address::{AccountAddress, AccountAddressWithChecks};
 use async_trait::async_trait;
 use clap::Parser;
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
 use vm_genesis::{AccountBalance, EmployeePool};
@@ -184,6 +185,10 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
     let employee_vesting_accounts: Vec<EmployeePool> = employee_vesting_accounts.try_into()?;
     let validators = get_validator_configs(&client, &layout, true).map_err(parse_error)?;
     let mut unique_accounts = BTreeSet::new();
+    let mut unique_network_keys = HashSet::new();
+    let mut unique_consensus_keys = HashSet::new();
+    let mut unique_consensus_pop = HashSet::new();
+    let mut unique_hosts = HashSet::new();
 
     validate_employee_accounts(
         &employee_vesting_accounts,
@@ -197,6 +202,10 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         &employee_validators,
         &initialized_accounts,
         &mut unique_accounts,
+        &mut unique_network_keys,
+        &mut unique_consensus_keys,
+        &mut unique_consensus_pop,
+        &mut unique_hosts,
         &mut seen_owners,
         true,
     )?;
@@ -205,6 +214,10 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         &validators,
         &initialized_accounts,
         &mut unique_accounts,
+        &mut unique_network_keys,
+        &mut unique_consensus_keys,
+        &mut unique_consensus_pop,
+        &mut unique_hosts,
         &mut seen_owners,
         false,
     )?;
@@ -582,6 +595,10 @@ fn validate_validators(
     validators: &[ValidatorConfiguration],
     initialized_accounts: &BTreeMap<AccountAddress, u64>,
     unique_accounts: &mut BTreeSet<AccountAddress>,
+    unique_network_keys: &mut HashSet<x25519::PublicKey>,
+    unique_consensus_keys: &mut HashSet<bls12381::PublicKey>,
+    unique_consensus_pops: &mut HashSet<bls12381::ProofOfPossession>,
+    unique_hosts: &mut HashSet<HostAndPort>,
     seen_owners: &mut BTreeMap<AccountAddress, usize>,
     is_pooled_validator: bool,
 ) -> CliTypedResult<()> {
@@ -675,22 +692,57 @@ fn validate_validators(
                     name
                 )));
             }
+            if !unique_network_keys.insert(validator.validator_network_public_key.unwrap()) {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a repeated validator network key{}",
+                    name,
+                    validator.validator_network_public_key.unwrap()
+                )));
+            }
+
             if validator.validator_host.is_none() {
                 errors.push(CliError::UnexpectedError(format!(
                     "Validator {} does not have a validator host, though it's joining during genesis",
                     name
                 )));
             }
+            if !unique_hosts.insert(validator.validator_host.as_ref().unwrap().clone()) {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a repeated validator host {:?}",
+                    name,
+                    validator.validator_host.as_ref().unwrap()
+                )));
+            }
+
             if validator.consensus_public_key.is_none() {
                 errors.push(CliError::UnexpectedError(format!(
                     "Validator {} does not have a consensus public key, though it's joining during genesis",
                     name
                 )));
             }
+            if !unique_consensus_keys
+                .insert(validator.consensus_public_key.as_ref().unwrap().clone())
+            {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a repeated a consensus public key {}",
+                    name,
+                    validator.consensus_public_key.as_ref().unwrap()
+                )));
+            }
+
             if validator.proof_of_possession.is_none() {
                 errors.push(CliError::UnexpectedError(format!(
                     "Validator {} does not have a consensus proof of possession, though it's joining during genesis",
                     name
+                )));
+            }
+            if !unique_consensus_pops
+                .insert(validator.proof_of_possession.as_ref().unwrap().clone())
+            {
+                errors.push(CliError::UnexpectedError(format!(
+                    "Validator {} has a repeated a consensus proof of possessions {}",
+                    name,
+                    validator.proof_of_possession.as_ref().unwrap()
                 )));
             }
 
@@ -719,11 +771,27 @@ fn validate_validators(
                             validator_host
                         )));
                     }
+                    if !unique_hosts.insert(validator.full_node_host.as_ref().unwrap().clone()) {
+                        errors.push(CliError::UnexpectedError(format!(
+                            "Validator {} has a repeated full node host {:?}",
+                            name,
+                            validator.full_node_host.as_ref().unwrap()
+                        )));
+                    }
+
                     if validator_network_public_key == full_node_network_public_key {
                         errors.push(CliError::UnexpectedError(format!(
                             "Validator {} has a validator and a full node network public key that are the same {}",
                             name,
                             validator_network_public_key
+                        )));
+                    }
+                    if !unique_network_keys.insert(validator.full_node_network_public_key.unwrap())
+                    {
+                        errors.push(CliError::UnexpectedError(format!(
+                            "Validator {} has a repeated full node network key {}",
+                            name,
+                            validator.full_node_network_public_key.unwrap()
                         )));
                     }
                 }
