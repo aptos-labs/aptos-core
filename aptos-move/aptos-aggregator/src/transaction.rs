@@ -4,10 +4,10 @@
 use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use anyhow::bail;
 use aptos_state_view::StateView;
-use aptos_types::write_set::TransactionWrite;
 use aptos_types::{
+    contract_event::ContractEvent,
     transaction::{ChangeSet, TransactionOutput},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut},
 };
 use std::collections::btree_map;
 
@@ -48,6 +48,10 @@ impl ChangeSetExt {
 
     pub fn write_set(&self) -> &WriteSet {
         self.change_set.write_set()
+    }
+
+    pub fn events(&self) -> &[ContractEvent] {
+        self.change_set.events()
     }
 
     pub fn into_inner(self) -> (DeltaChangeSet, ChangeSet) {
