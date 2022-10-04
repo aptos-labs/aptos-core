@@ -73,7 +73,7 @@ impl Page {
         if limit > self.max_page_size {
             return Err(E::bad_request_with_code(
                 &format!(
-                    "Given limit value ({}) is too large, it must be < {}",
+                    "Given limit value ({}) is too large, it must be <= {}",
                     limit, self.max_page_size
                 ),
                 AptosErrorCode::InvalidInput,
