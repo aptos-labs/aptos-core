@@ -368,7 +368,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*($container)-e.*\"}",
+          "datasource": { "type": "prometheus", "uid": "P968F4F8972F6D74D" },
+          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*$container.*\"}",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
           "format": "time_series"
@@ -447,16 +448,10 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", pod=~\".+$container(-e[0-9]+)?-0\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", pod=~\".+$container(-e[0-9]+)?-0\"}[$interval])",
+          "datasource": { "type": "prometheus", "uid": "P968F4F8972F6D74D" },
+          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{pod}}",
-          "format": "time_series"
-        },
-        {
-          "refId": "B",
-          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", pod_name=~\".+$container(-e[0-9]+)?-0\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", pod_name=~\".+$container(-e[0-9]+)?-0\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{pod}}-{{pod_name}}",
           "format": "time_series"
         }
       ],
@@ -703,6 +698,25 @@
     "list": [
       {
         "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      },
+      {
+        "name": "Annotations \u0026 Alerts",
         "datasource": { "type": "datasource", "uid": "grafana" },
         "showLine": false,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -722,8 +736,8 @@
       }
     ]
   },
-  "schemaVersion": 36,
-  "version": 1,
+  "schemaVersion": 37,
+  "version": 3,
   "links": [
     {
       "title": "Other Dashboards",
