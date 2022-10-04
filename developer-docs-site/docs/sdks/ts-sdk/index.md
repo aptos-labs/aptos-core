@@ -6,6 +6,6 @@ hidden: false
 
 # TS SDK
 
-- ### [Typescript SDK](typescript-sdk)
-- ### [Typescript SDK Overview](typescript-sdk-overview)
-
+- ### [Typescript SDK Installation](typescript-sdk.md)
+- ### [Typescript SDK Overview](typescript-sdk-overview.md)
+- ### [Typescript SDK Reference](https://aptos-labs.github.io/ts-sdk-doc/)
