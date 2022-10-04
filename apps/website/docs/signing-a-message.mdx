@@ -5,9 +5,9 @@ slug: "signing-a-message"
 
 # Signing Messages
 
-A web app can also request the user to sign a message, by using <CompanyName /> API `wallet.signMessage(payload: SignMessagePayload)`. 
+A web app can also request the user to sign a message, by using <CompanyName /> API: `wallet.signMessage(payload: SignMessagePayload)`
 
-Web apps can write their own message, then send it to <CompanyName />. The user will be prompted to sign that message, and then the signed message will be returned to the web app.
+Web apps can write their own message and then send it to <CompanyName />. The user will be prompted to sign that message, and then the signed message will be returned to the web app.
 
 The following is provided for additional security.
 
@@ -36,7 +36,7 @@ export interface SignMessageResponse {
 }
 ```
 
-### Example message and response
+## Example message and response
 `signMessage({nonce: 1234034, message: "Welcome to dapp!" })`
 
 This would generate the `fullMessage` to be signed and returned as the `signature`:
@@ -47,7 +47,7 @@ message: Welcome to dapp!
 ```
 
 ## Verifying a signature
-The most common usecase for signing a message is to verify ownership of a private.
+The most common use case for signing a message is to verify ownership of a private resource.
 
 ```typescript
 import nacl from 'tweetnacl';

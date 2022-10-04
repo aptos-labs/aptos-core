@@ -5,16 +5,16 @@ slug: "sending-a-transaction"
 
 # Sending a Transaction
 
-After the web app is connected to <CompanyName />, the web app can prompt the user to sign and send transactions to the Aptos blockchain.
+After your web app is connected to <CompanyName />, the web app can prompt the user to sign and send transactions to the Aptos blockchain.
 
-<CompanyName /> API handles the transactions in the following two ways:
+<CompanyName /> API handles the transactions in two ways:
 
 1. Sign a transaction and submit it to the Aptos blockchain. Return a pending transaction to the web app.
-2. Sign a transaction but do not submit the transaction to the Aptos blockchain. Return the signed transaction to the web app, for the web app to submit the transaction.
+2. Sign a transaction but do not submit the transaction to the Aptos blockchain. Return the signed transaction to the web app for the web app to submit the transaction.
 
 See the below examples for both the options.
 
-<Info>For more on Aptos transactions, see the&nbsp;[Aptos Typescript SDK](https://aptos-labs.github.io/ts-sdk-doc/)&nbsp;and&nbsp;[Transactions guide from Aptos](https://aptos.dev/guides/creating-a-signed-transaction). </Info>
+<Info>For more on Aptos transactions, see the [Aptos SDKs](https://aptos.dev/sdks/index) and [Transactions guide from Aptos](https://aptos.dev/guides/creating-a-signed-transaction).</Info>
 
 
 ## Sign and submit
@@ -47,10 +47,10 @@ try {
 
 ## Sign only
 
+**IMPORTANT**: We don't recommend using this because in most cases you don't need it, and it isn't super safe for users. They will receive an extra warning for this.
+
+
 The below code example shows how to use the `signTransaction()` API to only sign the transaction, without submitting it to the Aptos blockchain.
-
-**We don't recommend using this because in most cases you don't need it, and it isn't super safe for users. They will receive an extra warning for this.
-
 
 ```typescript
 const wallet = getAptosWallet(); // see "Connecting"

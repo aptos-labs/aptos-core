@@ -5,7 +5,7 @@ slug: "connect-to-wallet"
 
 # Connecting to <CompanyName />
 
-To use <CompanyName /> with your dApp, your user must first install <CompanyName /> on their Chrome browser. <CompanyName /> injects an `aptos` object into the [window](https://developer.mozilla.org/en-US/docs/Web/API/Window) of any web app the user visits. 
+To use <CompanyName /> with your dApp, your users must first install the <CompanyName /> [Chrome extension](https://chrome.google.com/webstore/detail/petra-aptos-wallet/ejjladinnckdgjemekebdpeokbikhfci) in their browser. <CompanyName /> injects an `aptos` object into the [window](https://developer.mozilla.org/en-US/docs/Web/API/Window) of any web app the user visits. 
 
 To check if the user has installed <CompanyName />, perform the below check:
 
@@ -28,13 +28,18 @@ const getAptosWallet = () => {
 
 ## Installing <CompanyName /> 
 
-To install <CompanyName /> on your Chrome browser, you can download it from the [chrome store](https://chrome.google.com/webstore/detail/petra-aptos-wallet/ejjladinnckdgjemekebdpeokbikhfci?hl=encategory=extensions).
+To install <CompanyName /> on your Chrome browser, you can either:
+
+* Download the latest stable version from the [Chrome Web Store](https://chrome.google.com/webstore/detail/petra-aptos-wallet/ejjladinnckdgjemekebdpeokbikhfci?hl=encategory=extensions) 
+* Install the latest development release from [GitHub](https://aptos.dev/guides/install-petra-wallet-extension#install-from-the-github-repo)
+
+The first option offers simplicity and reliability; the second gives you an opportunity to experiment with the <CompanyName /> itself.
 
 ## Connecting to <CompanyName />
 
 After confirming that the web app has the `aptos` object, we can connect to <CompanyName /> by calling `wallet.connect()`. 
 
-When you call `wallet.connect()`, it prompts the user to allow your web app to make additional calls to <CompanyName />, and obtains from the user basic information like the `address` and `public key`. 
+When you call `wallet.connect()`, it prompts the user to allow your web app to make additional calls to <CompanyName />, and obtains from the user basic information such as the `address` and `public key`. 
 
 See the example code below:
 
