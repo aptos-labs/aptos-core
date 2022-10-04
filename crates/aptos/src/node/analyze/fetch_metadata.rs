@@ -197,7 +197,7 @@ impl FetchMetadata {
             }
         }
 
-        let batch: u16 = 1000;
+        let batch: u16 = 100;
         let mut batch_index = 0;
 
         println!(

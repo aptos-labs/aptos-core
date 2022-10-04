@@ -30,7 +30,7 @@ use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -319,6 +319,19 @@ impl MoveHarness {
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
+    }
+
+    /// Write the resource data `T`.
+    pub fn set_resource<T: Serialize>(
+        &mut self,
+        addr: AccountAddress,
+        struct_tag: StructTag,
+        data: &T,
+    ) {
+        let path = AccessPath::resource_access_path(ResourceKey::new(addr, struct_tag));
+        let state_key = StateKey::AccessPath(path);
+        self.executor
+            .write_state_value(state_key, bcs::to_bytes(data).unwrap());
     }
 
     /// Enables features

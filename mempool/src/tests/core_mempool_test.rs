@@ -159,7 +159,7 @@ fn test_update_invalid_transaction_in_mempool() {
 }
 
 #[test]
-fn test_remove_transaction() {
+fn test_commit_transaction() {
     let (mut pool, mut consensus) = setup_mempool();
 
     // Test normal flow.
@@ -168,7 +168,7 @@ fn test_remove_transaction() {
         vec![TestTransaction::new(0, 0, 1), TestTransaction::new(0, 1, 2)],
     );
     for txn in txns {
-        pool.remove_transaction(&txn.sender(), txn.sequence_number(), false);
+        pool.commit_transaction(&txn.sender(), txn.sequence_number());
     }
     let new_txns = add_txns_to_mempool(
         &mut pool,
@@ -183,6 +183,56 @@ fn test_remove_transaction() {
         consensus.get_block(&mut pool, 1, 1024),
         vec!(new_txns[1].clone())
     );
+}
+
+#[test]
+fn test_reject_transaction() {
+    let (mut pool, _) = setup_mempool();
+
+    let txns = add_txns_to_mempool(
+        &mut pool,
+        vec![TestTransaction::new(0, 0, 1), TestTransaction::new(0, 1, 2)],
+    );
+
+    // reject with wrong hash should have no effect
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        0,
+        &txns[1].clone().committed_hash(), // hash of other txn
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 0)
+        .is_some());
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        1,
+        &txns[0].clone().committed_hash(), // hash of other txn
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 1)
+        .is_some());
+
+    // reject with correct hash should have effect
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        0,
+        &txns[0].clone().committed_hash(),
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 0)
+        .is_none());
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        1,
+        &txns[1].clone().committed_hash(),
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 1)
+        .is_none());
 }
 
 #[test]
@@ -217,7 +267,7 @@ fn test_commit_callback() {
     // Check that pool is empty.
     assert!(pool.get_batch(1, 1024, HashSet::new()).is_empty());
     // Transaction 5 got back from consensus.
-    pool.remove_transaction(&TestTransaction::get_address(1), 5, false);
+    pool.commit_transaction(&TestTransaction::get_address(1), 5);
     // Verify that we can execute transaction 6.
     assert_eq!(pool.get_batch(1, 1024, HashSet::new())[0], txns[0]);
 }
@@ -225,6 +275,12 @@ fn test_commit_callback() {
 #[test]
 fn test_reset_sequence_number_on_failure() {
     let mut pool = setup_mempool().0;
+    let txns = vec![TestTransaction::new(1, 0, 1), TestTransaction::new(1, 1, 1)];
+    let hashes: Vec<_> = txns
+        .iter()
+        .cloned()
+        .map(|txn| txn.make_signed_transaction().committed_hash())
+        .collect();
     // Add two transactions for account.
     add_txns_to_mempool(
         &mut pool,
@@ -232,8 +288,8 @@ fn test_reset_sequence_number_on_failure() {
     );
 
     // Notify mempool about failure in arbitrary order
-    pool.remove_transaction(&TestTransaction::get_address(1), 0, true);
-    pool.remove_transaction(&TestTransaction::get_address(1), 1, true);
+    pool.reject_transaction(&TestTransaction::get_address(1), 0, &hashes[0]);
+    pool.reject_transaction(&TestTransaction::get_address(1), 1, &hashes[1]);
 
     // Verify that new transaction for this account can be added.
     assert!(add_txn(&mut pool, TestTransaction::new(1, 0, 1)).is_ok());
@@ -273,7 +329,7 @@ fn test_timeline() {
     assert_eq!(view(timeline), vec![2, 3]);
 
     // Simulate callback from consensus to unblock txn 5.
-    pool.remove_transaction(&TestTransaction::get_address(1), 4, false);
+    pool.commit_transaction(&TestTransaction::get_address(1), 4);
     let (timeline, _) = pool.read_timeline(0, 10);
     assert_eq!(view(timeline), vec![5]);
     // check parking lot is empty
@@ -292,7 +348,7 @@ fn test_capacity() {
     assert!(add_txn(&mut pool, TestTransaction::new(1, 1, 1)).is_err());
 
     // Commit transaction and free space.
-    pool.remove_transaction(&TestTransaction::get_address(1), 0, false);
+    pool.commit_transaction(&TestTransaction::get_address(1), 0);
     assert!(add_txn(&mut pool, TestTransaction::new(1, 1, 1)).is_ok());
 
     // Fill it up and check that GC routine will clear space.
@@ -572,15 +628,17 @@ fn test_transaction_store_remove_account_if_empty() {
     add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 2);
 
-    pool.remove_transaction(&TestTransaction::get_address(1), 0, false);
-    pool.remove_transaction(&TestTransaction::get_address(1), 1, false);
-    pool.remove_transaction(&TestTransaction::get_address(2), 0, true);
+    pool.commit_transaction(&TestTransaction::get_address(1), 0);
+    pool.commit_transaction(&TestTransaction::get_address(1), 1);
+    pool.commit_transaction(&TestTransaction::get_address(2), 0);
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 
-    add_txn(&mut pool, TestTransaction::new(2, 2, 1)).unwrap();
+    let txn = TestTransaction::new(2, 2, 1).make_signed_transaction();
+    let hash = txn.clone().committed_hash();
+    add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 
-    pool.remove_transaction(&TestTransaction::get_address(2), 2, true);
+    pool.reject_transaction(&TestTransaction::get_address(2), 2, &hash);
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 }
 
@@ -592,9 +650,9 @@ fn test_sequence_number_behavior_at_capacity() {
 
     add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
     add_txn(&mut pool, TestTransaction::new(1, 0, 1)).unwrap();
-    pool.remove_transaction(&TestTransaction::get_address(1), 0, false);
+    pool.commit_transaction(&TestTransaction::get_address(1), 0);
     add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
-    pool.remove_transaction(&TestTransaction::get_address(2), 0, false);
+    pool.commit_transaction(&TestTransaction::get_address(2), 0);
 
     let batch = pool.get_batch(10, 10240, HashSet::new());
     assert_eq!(batch.len(), 1);

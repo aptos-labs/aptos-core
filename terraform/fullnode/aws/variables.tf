@@ -63,6 +63,11 @@ variable "chain_id" {
   default     = "DEVNET"
 }
 
+variable "chain_name" {
+  description = "Aptos chain name"
+  default     = "devnet"
+}
+
 variable "pfn_helm_values" {
   description = "Map of values to pass to testnet Helm"
   type        = any

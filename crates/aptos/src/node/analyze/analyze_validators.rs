@@ -195,7 +195,7 @@ pub struct AnalyzeValidators {}
 impl AnalyzeValidators {
     /// Fetch all events from a single epoch from DB.
     pub fn fetch_epoch(epoch: u64, aptos_db: &dyn DbReader) -> Result<Vec<VersionedNewBlockEvent>> {
-        let batch = 1000;
+        let batch = 100;
 
         let mut cursor = u64::max_value();
         let mut result: Vec<VersionedNewBlockEvent> = vec![];

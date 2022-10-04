@@ -3,7 +3,7 @@
   "slug": "",
   "title": "Storage Overview",
   "originalTitle": "",
-  "tags": [],
+  "tags": ["aptos-core"],
   "style": "dark",
   "timezone": "",
   "editable": true,
@@ -1583,15 +1583,17 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 87,
+  "version": 88,
   "links": [
     {
-      "title": "Other Dashboards",
+      "title": "aptos core",
       "type": "dashboards",
       "asDropdown": true,
       "icon": "external link",
       "includeVars": true,
-      "keepTime": true
+      "keepTime": true,
+      "tags": ["aptos-core"],
+      "targetBlank": true
     }
   ],
   "time": { "from": "now-3h", "to": "now" },
