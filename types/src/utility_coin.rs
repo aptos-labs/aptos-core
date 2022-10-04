@@ -9,10 +9,10 @@ use move_core_types::{
 use once_cell::sync::Lazy;
 
 pub static APTOS_COIN_TYPE: Lazy<TypeTag> = Lazy::new(|| {
-    TypeTag::Struct(StructTag {
+    TypeTag::Struct(Box::new(StructTag {
         address: AccountAddress::ONE,
         module: ident_str!("aptos_coin").to_owned(),
         name: ident_str!("AptosCoin").to_owned(),
         type_params: vec![],
-    })
+    }))
 });

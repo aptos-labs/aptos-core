@@ -283,7 +283,7 @@ prop_compose! {
             let event = ContractEvent::new(
                 new_block_event_key(),
                 seq,
-                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 bcs::to_bytes(&new_block_event).unwrap(),
             );
             seq += 1;
