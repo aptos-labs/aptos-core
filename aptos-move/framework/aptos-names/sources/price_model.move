@@ -4,7 +4,7 @@ module aptos_names::price_model {
     use std::error;
 
 
-    /// The domain length is too short- currently the minimum is 1 character
+    /// The domain length is too short- currently the minimum is 2 characters
     const EDOMAIN_TOO_SHORT: u64 = 1;
 
     /// The longer the name is registered for, the more expensive it is per year.
@@ -30,9 +30,9 @@ module aptos_names::price_model {
         scale_price_for_years(config::domain_price_for_length(length_to_charge_for), registration_years)
     }
 
-    /// Subdomains have a unit cost, that exponentially per number of years
-    public fun price_for_subdomain_v1(registration_years: u8): u64 {
-        scale_price_for_years(config::subdomain_price(), registration_years)
+    /// Subdomains have a fixed unit cost
+    public fun price_for_subdomain_v1(_registration_duration_secs: u64): u64 {
+        config::subdomain_price()
     }
 
     #[test(myself = @aptos_names, framework = @0x1)]

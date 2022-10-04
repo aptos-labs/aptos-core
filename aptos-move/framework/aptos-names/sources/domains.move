@@ -42,7 +42,8 @@ module aptos_names::domains {
     const ESUBDOMAIN_HAS_INVALID_CHARACTERS: u64 = 13;
     /// The subdomain registration duration can not be longer than its parent domain
     const ESUBDOMAIN_CAN_NOT_EXCEED_DOMAIN_REGISTRATION: u64 = 14;
-
+    /// The subdomain name is too short (must be >= 2)
+    const ESUBDOMAIN_TOO_SHORT: u64 = 15;
 
     struct NameRecordKeyV1 has copy, drop, store {
         subdomain_name: Option<String>,
@@ -167,22 +168,22 @@ module aptos_names::domains {
         let (is_valid, length) = utf8_utils::string_is_allowed(&subdomain_name);
         assert!(is_valid, error::invalid_argument(ESUBDOMAIN_HAS_INVALID_CHARACTERS));
         assert!(length <= config::max_domain_length(), error::out_of_range(ESUBDOMAIN_TOO_LONG));
+        assert!(length >= 2, error::out_of_range(ESUBDOMAIN_TOO_SHORT));
 
         // Ensure signer owns the domain we're registering a subdomain for
         let signer_addr = signer::address_of(sign);
         let (is_owner, _token_id) = is_owner_of_name(signer_addr, option::none(), domain_name);
         assert!(is_owner, error::permission_denied(ENOT_OWNER_OF_DOMAIN));
 
-        let registration_years = time_helper::seconds_to_years(registration_duration_secs);
-        let price = price_model::price_for_subdomain_v1((registration_years as u8));
+        let price = price_model::price_for_subdomain_v1(registration_duration_secs);
         coin::transfer<AptosCoin>(sign, config::foundation_fund_address(), price);
 
-        register_name_internal(sign, option::some(subdomain_name), domain_name, registration_duration_secs, 0);
+        register_name_internal(sign, option::some(subdomain_name), domain_name, registration_duration_secs, price);
     }
 
     /// Register a nane. Accepts an optional subdomain name, a required domain name, and a registration duration in seconds.
     /// For domains, the registration duration is only allowed to be in increments of 1 year, for now
-    /// Since the owner of the domain is the only one that can create teh subdomain, we allow them to decide how long they want the underlying registration to be
+    /// Since the owner of the domain is the only one that can create the subdomain, we allow them to decide how long they want the underlying registration to be
     /// The maximum subdomain registration duration is limited to the duration of its parent domain registration
     fun register_name_internal(sign: &signer, subdomain_name: Option<String>, domain_name: String, registration_duration_secs: u64, price: u64) acquires NameRegistryV1, RegisterNameEventsV1 {
         let aptos_names = borrow_global_mut<NameRegistryV1>(@aptos_names);
@@ -236,7 +237,7 @@ module aptos_names::domains {
         force_set_name_address(sign, option::some(subdomain_name), domain_name, new_owner);
     }
 
-    public fun force_set_name_address(sign: &signer, subdomain_name: Option<String>, domain_name: String, new_owner: address) acquires NameRegistryV1, SetNameAddressEventsV1 {
+    fun force_set_name_address(sign: &signer, subdomain_name: Option<String>, domain_name: String, new_owner: address) acquires NameRegistryV1, SetNameAddressEventsV1 {
         config::assert_signer_is_admin(sign);
         set_name_address_internal(subdomain_name, domain_name, new_owner);
     }

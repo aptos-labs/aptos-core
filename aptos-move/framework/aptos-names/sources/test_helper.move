@@ -94,7 +94,7 @@ module aptos_names::test_helper {
         let user_balance_after = coin::balance<AptosCoin>(user_addr);
         if (is_subdomain) {
             // If it's a subdomain, we only charge a nomincal fee
-            expected_user_balance_after = user_balance_before - price_model::price_for_subdomain_v1(years);
+            expected_user_balance_after = user_balance_before - price_model::price_for_subdomain_v1(registration_duration_secs);
         }else {
             let domain_price = price_model::price_for_domain_v1(string::length(&domain_name), years);
             assert!(domain_price / config::octas() == 30, domain_price / config::octas());
@@ -102,7 +102,7 @@ module aptos_names::test_helper {
         };
 
         test_utils::print_actual_expected(b"user_balance_after: ", user_balance_after, expected_user_balance_after, false);
-        assert!(user_balance_after == expected_user_balance_after, expected_user_balance_after / config::octas());
+        assert!(user_balance_after == expected_user_balance_after, expected_user_balance_after);
 
         // Ensure the name was registered correctly, with an expiration timestamp one year in the future
         let (property_version, expiration_time_sec, target_address) = domains::get_name_record_v1_props_for_name(subdomain_name, domain_name);

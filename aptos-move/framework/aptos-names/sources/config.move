@@ -11,7 +11,7 @@ module aptos_names::config {
     use aptos_framework::account;
     use aptos_framework::aptos_account;
     use aptos_names::utf8_utils;
-    use aptos_token::property_map::{Self, PropertyMap, PropertyValue};
+    use aptos_token::property_map::{Self, PropertyMap};
     use std::error;
     use std::signer;
     use std::string::{Self, String};
@@ -253,10 +253,6 @@ module aptos_names::config {
 
     public fun config_key_subdomain_price(): String {
         string::utf8(CONFIG_KEY_SUBDOMAIN_PRICE)
-    }
-
-    fun remove_v1(addr: address, config_name: &String): (String, PropertyValue) acquires ConfigurationV1 {
-        property_map::remove(&mut borrow_global_mut<ConfigurationV1>(addr).config, config_name)
     }
 
     fun set_v1<T: copy>(addr: address, config_name: String, value: &T) acquires ConfigurationV1 {

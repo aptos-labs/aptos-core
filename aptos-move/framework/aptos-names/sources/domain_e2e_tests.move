@@ -133,7 +133,7 @@ module aptos_names::domain_e2e_tests {
         // Register the domain
         test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
 
-        domains::force_set_name_address(myself, option::none(), test_helper::domain_name(), rando_addr);
+        domains::force_set_domain_address(myself, test_helper::domain_name(), rando_addr);
         let (_property_version, _expiration_time_sec, target_address) = domains::get_name_record_v1_props_for_name(option::none(), test_helper::domain_name());
         test_utils::print_actual_expected(b"set_domain_address: ", target_address, option::some(rando_addr), false);
         assert!(target_address == option::some(rando_addr), 33);
@@ -152,7 +152,7 @@ module aptos_names::domain_e2e_tests {
         test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
 
         // Rando is not allowed to do this
-        domains::force_set_name_address(rando, option::none(), test_helper::domain_name(), rando_addr);
+        domains::force_set_domain_address(rando, test_helper::domain_name(), rando_addr);
     }
 
 
