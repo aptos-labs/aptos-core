@@ -134,7 +134,10 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
         }
-        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(conn_pool.clone())),
+        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
+            conn_pool.clone(),
+            config.ans_contract_address,
+        )),
     };
 
     let options =
