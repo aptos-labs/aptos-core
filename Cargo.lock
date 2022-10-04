@@ -966,6 +966,7 @@ dependencies = [
  "anyhow",
  "aptos-aggregator",
  "aptos-infallible",
+ "aptos-metrics-core",
  "aptos-state-view",
  "aptos-types",
  "arc-swap",
