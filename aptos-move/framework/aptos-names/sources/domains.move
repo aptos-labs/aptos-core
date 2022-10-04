@@ -132,7 +132,7 @@ module aptos_names::domains {
 
     /// A wrapper around `register_name` as an entry function.
     /// Option<String> is not currently serializable, so we have these convenience methods
-    public entry fun register_domain(sign: &signer, domain_name: String, num_years: u8) acquires NameRegistryV1, RegisterNameEventsV1 {
+    public entry fun register_domain(sign: &signer, domain_name: String, num_years: u8) acquires NameRegistryV1, RegisterNameEventsV1, SetNameAddressEventsV1 {
         assert!(config::is_enabled(), error::unavailable(ENOT_ENABLED));
         assert!(num_years > 0 && num_years <= config::max_number_of_years_registered(), error::out_of_range(EINVALID_NUMBER_YEARS));
 
@@ -152,6 +152,8 @@ module aptos_names::domains {
         coin::transfer<AptosCoin>(sign, config::foundation_fund_address(), price);
 
         register_name_internal(sign, subdomain_name, domain_name, registration_duration_secs, price);
+        // Automatically set the name to point to the sender's address
+        set_name_address_internal(subdomain_name, domain_name, signer::address_of(sign));
     }
 
     /// A wrapper around `register_name` as an entry function.

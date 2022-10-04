@@ -107,8 +107,15 @@ module aptos_names::test_helper {
         // Ensure the name was registered correctly, with an expiration timestamp one year in the future
         let (property_version, expiration_time_sec, target_address) = domains::get_name_record_v1_props_for_name(subdomain_name, domain_name);
         assert!(time_helper::seconds_to_days(expiration_time_sec - timestamp::now_seconds()) == 365, 10);
-        // We haven't set a target address yet!
-        assert!(target_address == option::none(), 11);
+
+        if (is_subdomain) {
+            // We haven't set a target address yet!
+            assert!(target_address == option::none(), 11);
+        } else {
+            // Should automatically point to the users address
+            assert!(target_address == option::some(user_addr), 11);
+        };
+
         // And the property version is correct
         test_utils::print_actual_expected(b"property_version: ", property_version, expected_property_version, false);
         assert!(property_version == expected_property_version, 12);
@@ -127,8 +134,15 @@ module aptos_names::test_helper {
         test_utils::print_actual_expected(b"register_name_event_v1_num_emitted: ", register_name_event_v1_num_emitted, 1, false);
         assert!(register_name_event_v1_num_emitted == 1, register_name_event_v1_num_emitted);
 
-        test_utils::print_actual_expected(b"set_name_address_event_v1_num_emitted: ", set_name_address_event_v1_num_emitted, 0, false);
-        assert!(set_name_address_event_v1_num_emitted == 0, set_name_address_event_v1_num_emitted);
+        if (is_subdomain) {
+            // We haven't set a target address yet!
+            test_utils::print_actual_expected(b"set_name_address_event_v1_num_emitted: ", set_name_address_event_v1_num_emitted, 0, false);
+            assert!(set_name_address_event_v1_num_emitted == 0, set_name_address_event_v1_num_emitted);
+        } else {
+            // Should automatically point to the users address
+            test_utils::print_actual_expected(b"set_name_address_event_v1_num_emitted: ", set_name_address_event_v1_num_emitted, 1, false);
+            assert!(set_name_address_event_v1_num_emitted == 1, set_name_address_event_v1_num_emitted);
+        };
     }
 
     /// Set the domain address, and verify the address was set correctly
