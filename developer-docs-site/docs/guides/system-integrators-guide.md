@@ -25,6 +25,8 @@ There are three well-supported networks for integrating with the Aptos blockchai
 1. Devnet -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
 1. Testnet -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 
+See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for full details on each environment.
+
 ### Local testnet
 
 There are two options to run a local testnet:
