@@ -79,28 +79,29 @@ pub struct QuorumStoreConfig {
     pub num_nodes_per_worker_handles: usize,
 }
 
-use std::future::Future;
+// use std::future::Future;
 use std::time::Duration;
 
-pub fn spawn_monitored<T>(name: &'static str, future: T)
-where
-    T: Future + Send + 'static,
-    T::Output: Send + 'static,
-{
-    let metrics_monitor = tokio_metrics::TaskMonitor::new();
-    {
-        let metrics_monitor = metrics_monitor.clone();
-        tokio::spawn(async move {
-            for interval in metrics_monitor.intervals() {
-                // pretty-print the metric interval
-                println!("{name}{:?}", interval);
-                // wait 500ms
-                tokio::time::sleep(Duration::from_secs(5)).await;
-            }
-        });
-    }
-    _ = spawn_named!(name, metrics_monitor.instrument(future));
-}
+// pub fn spawn_monitored<T>(name: &'static str, future: T)
+// where
+//     T: Future + Send + 'static,
+//     T::Output: Send + 'static,
+// {
+//     let metrics_monitor = tokio_metrics::TaskMonitor::new();
+//     {
+//         let metrics_monitor = metrics_monitor.clone();
+//         tokio::spawn(async move {
+//             for interval in metrics_monitor.intervals() {
+//                 // pretty-print the metric interval
+//                 println!("{name}{:?}", interval);
+//                 // wait 500ms
+//                 tokio::time::sleep(Duration::from_secs(5)).await;
+//             }
+//         });
+//     }
+//     _ = spawn_named!(name, metrics_monitor.instrument(future));
+// }
+
 impl QuorumStore {
     // TODO: pass epoch state
     pub fn new(
@@ -147,10 +148,22 @@ impl QuorumStore {
             config.db_quota,
         );
 
-        spawn_monitored(
-            "Quorum:ProofBuilder",
-            proof_builder.start(proof_builder_rx, validator_verifier),
+        let metrics_monitor = tokio_metrics::TaskMonitor::new();
+        {
+            let metrics_monitor = metrics_monitor.clone();
+            tokio::spawn(async move {
+                for interval in metrics_monitor.intervals() {
+                    println!("QuorumStore:{:?}", interval);
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
+            });
+        }
+
+        _ = spawn_named!(
+            &("Quorum:ProofBuilder epoch ".to_owned() + &epoch.to_string()),
+            metrics_monitor.instrument(proof_builder.start(proof_builder_rx, validator_verifier))
         );
+
         for network_msg_rx in network_msg_rx_vec.into_iter() {
             let net = NetworkListener::new(
                 epoch,
@@ -160,11 +173,15 @@ impl QuorumStore {
                 proof_builder_tx.clone(),
                 config.max_batch_bytes,
             );
-            spawn_monitored("Quorum:NetworkListener", net.start());
+            _ = spawn_named!(
+                &("Quorum:NetworkListener epoch ".to_owned() + &epoch.to_string()),
+                metrics_monitor.instrument(net.start())
+            );
         }
-        spawn_monitored(
-            "Quorum:BatchStore",
-            batch_store.start(batch_store_rx, proof_builder_tx.clone()),
+
+        _ = spawn_named!(
+            &("Quorum:BatchStore epoch ".to_owned() + &epoch.to_string()),
+            metrics_monitor.instrument(batch_store.start(batch_store_rx, proof_builder_tx.clone()))
         );
 
         debug!("QS: QuorumStore created");

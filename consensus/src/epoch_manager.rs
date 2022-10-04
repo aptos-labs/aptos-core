@@ -798,7 +798,7 @@ impl EpochManager {
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
-                num_nodes_per_worker_handles: 20,
+                num_nodes_per_worker_handles: 5,
             };
 
             // update the number of network_listener workers when start a new round_manager
