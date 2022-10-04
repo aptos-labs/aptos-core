@@ -161,7 +161,7 @@ If you are an advanced user and would like to build the CLI binary by downloadin
 <details>
 <summary>macOS</summary>
 
-### MmcOS
+### macOS
 #### Setup dependencies
 
 **> Using the automated script**
