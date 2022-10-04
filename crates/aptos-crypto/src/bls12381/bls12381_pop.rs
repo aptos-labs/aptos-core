@@ -23,7 +23,7 @@ use std::{convert::TryFrom, fmt};
 /// which is also just a signature.
 pub const DST_BLS_POP_IN_G2: &[u8] = b"BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
 
-#[derive(Clone, SerializeKey, DeserializeKey)]
+#[derive(Clone, Eq, SerializeKey, DeserializeKey)]
 /// A proof-of-possesion (PoP) of a BLS12381 private key.
 /// This is just a BLS signature on the corresponding public key.
 pub struct ProofOfPossession {
@@ -114,6 +114,12 @@ impl ValidCryptoMaterial for ProofOfPossession {
 impl Length for ProofOfPossession {
     fn length(&self) -> usize {
         Self::LENGTH
+    }
+}
+
+impl PartialEq for ProofOfPossession {
+    fn eq(&self, other: &Self) -> bool {
+        self.pop.to_bytes() == other.to_bytes()
     }
 }
 

@@ -20,14 +20,13 @@ use move_core_types::{
 };
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
-use poem_openapi::types::Type;
-use poem_openapi::{Enum, Object, Union};
+use poem_openapi::{types::Type, Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::Display;
 use std::{
     collections::BTreeMap,
     convert::{From, Into, TryFrom, TryInto},
     fmt,
+    fmt::Display,
     result::Result,
     str::FromStr,
 };
@@ -533,10 +532,10 @@ pub enum MoveType {
 }
 
 /// Maximum number of recursive types
-/// Currently, this is allowed up to the serde limit of 128
+/// Currently, this is allowed up to the serde limit of 16
 ///
 /// TODO: Should this number be re-evaluated
-const MAX_RECURSIVE_TYPES_ALLOWED: u8 = 128;
+pub const MAX_RECURSIVE_TYPES_ALLOWED: u8 = 16;
 
 impl VerifyInputWithRecursion for MoveType {
     fn verify(&self, recursion_count: u8) -> anyhow::Result<()> {

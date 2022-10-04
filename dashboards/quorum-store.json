@@ -536,61 +536,6 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 7, "w": 6, "x": 12, "y": 17 },
-      "id": 136,
-      "isNew": false,
-      "span": 0,
-      "title": "POS_COUNT",
-      "description": "Count of the proof-of-store (PoS) gathered since last restart.",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_PoS_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
-          "legendFormat": "__auto"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "single" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "auto",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 17 },
       "id": 156,
       "isNew": false,
       "span": 0,
@@ -642,9 +587,174 @@
       }
     },
     {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 17 },
+      "id": 198,
+      "isNew": false,
+      "span": 0,
+      "title": "GET_BATCH_FROM_DB_COUNT",
+      "description": "Count of the number of get batch request from QS DB.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_get_batch_from_db_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 24 },
+      "id": 136,
+      "isNew": false,
+      "span": 0,
+      "title": "LOCAL_POS_COUNT",
+      "description": "Count of the created proof-of-store (PoS) since last restart.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_local_PoS_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 24 },
+      "id": 196,
+      "isNew": false,
+      "span": 0,
+      "title": "REMOTE_POS_COUNT",
+      "description": "Count of the received PoS since last restart.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_remote_PoS_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
       "id": 186,
       "isNew": false,
       "span": 0,
@@ -658,7 +768,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 25 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 32 },
       "id": 188,
       "isNew": false,
       "span": 0,
@@ -713,7 +823,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 25 },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 32 },
       "id": 190,
       "isNew": false,
       "span": 0,
@@ -768,7 +878,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 25 },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 32 },
       "id": 192,
       "isNew": false,
       "span": 0,
@@ -823,7 +933,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 25 },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 32 },
       "id": 194,
       "isNew": false,
       "span": 0,
@@ -877,7 +987,7 @@
     {
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
       "id": 148,
       "isNew": false,
       "span": 0,
@@ -891,7 +1001,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 34 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 41 },
       "id": 150,
       "isNew": false,
       "span": 0,
@@ -946,7 +1056,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 34 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 41 },
       "id": 152,
       "isNew": false,
       "span": 0,
@@ -1001,7 +1111,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 34 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 41 },
       "id": 154,
       "isNew": false,
       "span": 0,
@@ -1055,7 +1165,7 @@
     {
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
       "id": 178,
       "isNew": false,
       "span": 0,
@@ -1069,7 +1179,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 43 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 50 },
       "id": 172,
       "isNew": false,
       "span": 0,
@@ -1124,7 +1234,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 43 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 50 },
       "id": 174,
       "isNew": false,
       "span": 0,
@@ -1179,7 +1289,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 43 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 50 },
       "id": 176,
       "isNew": false,
       "span": 0,
@@ -1234,7 +1344,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 51 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 58 },
       "id": 182,
       "isNew": false,
       "span": 0,
@@ -1289,7 +1399,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 51 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 58 },
       "id": 184,
       "isNew": false,
       "span": 0,
@@ -1343,7 +1453,7 @@
     {
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 66 },
       "id": 168,
       "isNew": false,
       "span": 0,
@@ -1357,7 +1467,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 60 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 67 },
       "id": 158,
       "isNew": false,
       "span": 0,
@@ -1412,7 +1522,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 60 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 67 },
       "id": 160,
       "isNew": false,
       "span": 0,
@@ -1467,7 +1577,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 60 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 67 },
       "id": 166,
       "isNew": false,
       "span": 0,
@@ -1672,7 +1782,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 20,
+  "version": 22,
   "links": [],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }

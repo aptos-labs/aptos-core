@@ -112,6 +112,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let processor_tasks = config.processor_tasks.unwrap();
     let emit_every = config.emit_every.unwrap();
     let batch_size = config.batch_size.unwrap();
+    let lookback_versions = config.gap_lookback_versions.unwrap() as i64;
 
     info!(processor_name = processor_name, "Starting indexer...");
 
@@ -148,7 +149,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     }
 
     let starting_version_from_db = tailer
-        .get_start_version(&processor_name)
+        .get_start_version(&processor_name, lookback_versions)
         .unwrap_or_else(|| {
             info!(
                 processor_name = processor_name,

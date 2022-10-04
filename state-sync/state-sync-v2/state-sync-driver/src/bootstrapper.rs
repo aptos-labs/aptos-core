@@ -12,10 +12,7 @@ use crate::{
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
-use aptos_logger::{
-    prelude::*,
-    sample::{SampleRate, Sampling},
-};
+use aptos_logger::{prelude::*, sample::SampleRate};
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,

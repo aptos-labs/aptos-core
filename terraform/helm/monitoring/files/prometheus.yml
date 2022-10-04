@@ -183,26 +183,6 @@ scrape_configs:
   - source_labels: [__meta_kubernetes_namespace]
     action: replace
     target_label: namespace
-  - source_labels: [__meta_kubernetes_pod_name]
-    action: replace
-    target_label: kubernetes_pod_name
-  # Explicitly drop all vector metrics
-  - source_labels: [namespace]
-    regex: 'vector'
-    action: drop
-
-- job_name: "aptos-procs"
-
-  kubernetes_sd_configs:
-  - role: pod
-
-  relabel_configs:
-  - source_labels: [__meta_kubernetes_pod_container_port_number]
-    action: keep
-    regex: "9101"
-  - source_labels: [__meta_kubernetes_namespace]
-    action: replace
-    target_label: namespace
   - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
     action: replace
     target_label: role
@@ -212,6 +192,10 @@ scrape_configs:
   - source_labels: [__meta_kubernetes_pod_name]
     action: replace
     target_label: kubernetes_pod_name
+  # Explicitly drop all vector metrics
+  - source_labels: [namespace]
+    regex: 'vector'
+    action: drop
 
 {{ if .Values.monitoring.prometheus.remote_write.enabled }}
 {{ with .Values.monitoring.prometheus.remote_write }}

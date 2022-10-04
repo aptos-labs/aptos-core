@@ -10,6 +10,7 @@ use aptos_types::on_chain_config::{FeatureFlag, GasScheduleV2};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
+    account_config::AccountResource,
     state_store::state_key::StateKey,
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
@@ -21,6 +22,7 @@ use language_e2e_tests::{
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_core_types::move_resource::MoveStructType;
 use move_deps::move_core_types::value::MoveValue;
 use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
@@ -50,7 +52,7 @@ use std::path::Path;
 pub struct MoveHarness {
     /// The executor being used.
     pub executor: FakeExecutor,
-    /// The current transaction sequence number, by account address.
+    /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 }
 
@@ -145,9 +147,10 @@ impl MoveHarness {
         account: &Account,
         payload: TransactionPayload,
     ) -> SignedTransaction {
+        let on_chain_seq_no = self.sequence_number(account.address());
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
-        let seq_no = *seq_no_ref;
-        *seq_no_ref += 1;
+        let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
+        *seq_no_ref = seq_no + 1;
         account
             .transaction()
             .sequence_number(seq_no)
@@ -370,6 +373,12 @@ impl MoveHarness {
                     .unwrap(),
             ],
         );
+    }
+
+    pub fn sequence_number(&self, addr: &AccountAddress) -> u64 {
+        self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
+            .unwrap()
+            .sequence_number()
     }
 }
 
