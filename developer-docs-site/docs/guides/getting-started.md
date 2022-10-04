@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 
 # Getting Started
 
-To kickstart your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
+To kickstart your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section. See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for the supported operating systems.
 
 ## Clone the Aptos-core repo
 
