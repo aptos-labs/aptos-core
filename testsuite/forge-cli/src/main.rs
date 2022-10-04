@@ -834,7 +834,14 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
-        }))
+        })).with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 7000 })
+                .transaction_mix(vec![
+                    (TransactionType::P2P, 80),
+                    (TransactionType::AccountGeneration, 20),
+                ]),
+        )
         .with_success_criteria(SuccessCriteria::new(
             if duration.as_secs() > 1200 {
                 5000
@@ -858,13 +865,6 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 max_no_progress_secs: 10.0,
                 max_round_gap: 4,
             }),
-        ).with_emit_job(
-            EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 7000 })
-                .transaction_mix(vec![
-                    (TransactionType::P2P, 80),
-                    (TransactionType::AccountGeneration, 20),
-                ]),
         ))
 }
 

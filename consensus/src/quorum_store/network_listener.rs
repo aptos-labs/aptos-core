@@ -71,7 +71,6 @@ impl NetworkListener {
                     fragment.take_transactions(),
                 ) {
                     Ok((num_bytes, payload, digest)) => {
-                        debug!("QS: persist to batchstore 1");
                         let persist_cmd = BatchStoreCommand::Persist(PersistRequest::new(
                             source, payload, digest, num_bytes, expiration,
                         ));
@@ -79,7 +78,6 @@ impl NetworkListener {
                             .send(persist_cmd)
                             .await
                             .expect("BatchStore receiver not available");
-                        debug!("QS: persist to batchstore 2");
                     }
                     Err(e) => {
                         debug!("Could not append batch from {:?}, error {:?}", source, e);
