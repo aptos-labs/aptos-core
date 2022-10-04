@@ -7,6 +7,7 @@ pub mod submission_worker;
 
 use again::RetryPolicy;
 use anyhow::{anyhow, format_err, Result};
+use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
@@ -225,7 +226,7 @@ impl EmitJobRequest {
                     wait_millis: 0,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
                     transactions_per_account,
-                    max_submit_batch_size: 100,
+                    max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     start_offset_multiplier_millis: 0.0,
                     start_jitter_millis: 5000,
                     accounts_per_worker: 1,
@@ -254,7 +255,7 @@ impl EmitJobRequest {
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
-                let transactions_per_account = min(100, tps);
+                let transactions_per_account = min(20, tps);
                 assert!(
                     transactions_per_account > 0,
                     "TPS ({}) needs to be larger than 0",
@@ -298,7 +299,7 @@ impl EmitJobRequest {
                     wait_millis: wait_seconds * 1000,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
                     transactions_per_account,
-                    max_submit_batch_size: 100,
+                    max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     start_offset_multiplier_millis: (wait_seconds * 1000) as f64
                         / (num_workers_per_endpoint * clients_count) as f64,
                     // Using jitter here doesn't make TPS vary enough, as we have many workers.

@@ -73,7 +73,9 @@ impl<'t> AccountMinter<'t> {
             if total_requested_accounts / req.rest_clients.len() > MAX_CHILD_VASP_NUM {
                 total_requested_accounts / MAX_CHILD_VASP_NUM + 1
             } else {
-                (total_requested_accounts / 50).max(1)
+                (total_requested_accounts / 50)
+                    .max(1)
+                    .min(CREATION_PARALLELISM)
             };
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
         let coins_per_account = (MAX_TXNS / total_requested_accounts as u64)
@@ -168,7 +170,7 @@ impl<'t> AccountMinter<'t> {
             });
 
         // Each future creates 50 accounts, limit concurrency to 30.
-        let stream = futures::stream::iter(account_futures).buffer_unordered(30);
+        let stream = futures::stream::iter(account_futures).buffer_unordered(CREATION_PARALLELISM);
         // wait for all futures to complete
         let mut minted_accounts = stream
             .collect::<Vec<_>>()
@@ -573,3 +575,4 @@ pub async fn execute_and_wait_transactions(
 
 const MAX_CHILD_VASP_NUM: usize = 65536;
 const MAX_VASP_ACCOUNT_NUM: usize = 16;
+const CREATION_PARALLELISM: usize = 200;
