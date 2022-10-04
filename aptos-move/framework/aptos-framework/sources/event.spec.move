@@ -1,4 +1,4 @@
-spec aptos_std::event {
+spec aptos_framework::event {
     spec emit_event {
         pragma opaque;
         aborts_if [abstract] false;
