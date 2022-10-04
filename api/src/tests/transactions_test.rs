@@ -1027,6 +1027,7 @@ async fn test_submit_transaction_rejects_payload_too_large_bcs_txn_body() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore]
 async fn test_submit_transaction_rejects_payload_too_large_json_body() {
     let mut context = new_test_context(current_function_name!());
 
