@@ -134,7 +134,7 @@ where
 
     // Genesis never produces the delta change set.
     let (_, change_set) = session_out
-        .into_change_set(&mut ())
+        .into_change_set(&mut (), false)
         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
         .unwrap()
         .into_inner();
