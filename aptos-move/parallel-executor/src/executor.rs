@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters,
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
     scheduler::{Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version},
@@ -291,6 +292,8 @@ where
         let aborted = !valid && scheduler.try_abort(idx_to_validate, incarnation);
 
         if aborted {
+            counters::SPECULATIVE_ABORT_COUNT.inc();
+
             // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
             for k in last_input_output.modified_keys(idx_to_validate) {
                 versioned_data_cache.mark_estimate(&k, idx_to_validate);
@@ -393,6 +396,7 @@ where
         let mut final_results = Vec::with_capacity(num_txns);
 
         let maybe_err = if last_input_output.module_publishing_may_race() {
+            counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
             Some(Error::ModulePathReadWrite)
         } else {
             let mut ret = None;
