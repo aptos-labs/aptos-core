@@ -538,7 +538,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             // as no useful transaction reach their mempool.
             // something to potentially improve upon.
             // So having VFNs for all validators
-            .with_initial_fullnode_count(10)
+            .with_initial_fullnode_count(4)
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
             .with_emit_job(
                 EmitJobRequest::default()
