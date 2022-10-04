@@ -16,7 +16,7 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
-use consensus_types::common::TransactionSummary;
+use consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
     future::Future,
@@ -164,7 +164,7 @@ pub enum QuorumStoreRequest {
     /// Notifications about *rejected* committed txns.
     RejectNotification(
         // rejected transactions from consensus
-        Vec<TransactionSummary>,
+        Vec<RejectedTransactionSummary>,
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
