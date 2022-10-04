@@ -829,7 +829,7 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_fullnode_count(0)
         .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
@@ -858,6 +858,13 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 max_no_progress_secs: 10.0,
                 max_round_gap: 4,
             }),
+        ).with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 7000 })
+                .transaction_mix(vec![
+                    (TransactionType::P2P, 80),
+                    (TransactionType::AccountGeneration, 20),
+                ]),
         ))
 }
 

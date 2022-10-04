@@ -67,7 +67,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
                         .with_label_values(&["success"])
                         .inc();
                 }
-                TransactionStatus::Discard(_) => {
+                TransactionStatus::Discard(status) => {
+                    debug!("QS: discard status {:?}", status);
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["failed"])
                         .inc();
