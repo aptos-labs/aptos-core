@@ -9,10 +9,14 @@ slug: "install-petra-wallet-extension"
 
 ## Install from the Chrome Web Store
 
+For the latest stable release, install the extension from the Chrome Web Store:
+
 1. Visit the [Petra Wallet extension page](https://chrome.google.com/webstore/detail/petra/ejjladinnckdgjemekebdpeokbikhfci).
 2. Click the **Add to Chrome** button.
 
 ## Install from the GitHub repo
+
+For the latest development release, install the extension from GitHub:
 
 1. Download the latest [Petra Wallet release](https://github.com/aptos-labs/aptos-core/releases?q=wallet&expanded=true) and unzip it.
 2. Open a Chrome window and navigate to the *Extensions* using any of the below methods:
