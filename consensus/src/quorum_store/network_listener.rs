@@ -142,6 +142,7 @@ impl NetworkListener {
                 VerifiedEvent::Batch(batch) => {
                     let cmd: BatchReaderCommand;
                     if batch.maybe_payload.is_some() {
+                        counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
                         debug!(
                             "QS: batch response from {:?} digest {}",
                             batch.source, batch.batch_info.digest
