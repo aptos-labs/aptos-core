@@ -180,7 +180,7 @@ impl<'a> TableInfoParser<'a> {
         self.parse_move_value(
             &self
                 .annotator
-                .view_value(&TypeTag::Struct(struct_tag), bytes)?,
+                .view_value(&TypeTag::Struct(Box::new(struct_tag)), bytes)?,
         )
     }
 
