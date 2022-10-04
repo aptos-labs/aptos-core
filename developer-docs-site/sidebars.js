@@ -99,6 +99,21 @@ const sidebars = {
     "nodes/aptos-deployments",
     "nodes/leaderboard-metrics",
     "nodes/node-files",
+    "nodes/keys-and-identities",
+    /** Delete during clean up
+    {
+      type: "category",
+      label: "AIT-3",
+      link: { type: "doc", id: "nodes/ait/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "nodes/ait/whats-new-in-ait3",
+        "nodes/ait/steps-in-ait3",
+        
+      ],
+    },  */
+
     {
       type: "category",
       label: "Validators",
@@ -184,6 +199,7 @@ const sidebars = {
       collapsed: true,
       items: ["nodes/node-health-checker/node-health-checker-faq"],
     },
+    "nodes/leaderboard-metrics",
     "reference/telemetry",
     {
       type: "html",
