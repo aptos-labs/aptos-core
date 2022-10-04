@@ -552,24 +552,24 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
 
     def testGetHumioLogsLinkRelative(self) -> None:
         link = get_humio_logs_link("forge-pr-2983", True)
-        self.assertFixture(link, "testGetHumioLogsLinkRelative.fixture")
         self.assertIn("forge-pr-2983", link)
+        self.assertFixture(link, "testGetHumioLogsLinkRelative.fixture")
 
     def testGetHumioLogsLinkAbsolute(self) -> None:
         time = FakeTime()
         link = get_humio_logs_link("forge-pr-2984", (time.now(), time.now()))
-        self.assertFixture(link, "testGetHumioLogsLinkAbsolute.fixture")
         self.assertIn("forge-pr-2984", link)
+        self.assertFixture(link, "testGetHumioLogsLinkAbsolute.fixture")
 
     def testGetHumioForgeLinkRelative(self) -> None:
         link = get_humio_forge_link("forge-pr-2985", True)
-        self.assertFixture(link, "testGetHumioForgeLinkRelative.fixture")
         self.assertIn("forge-pr-2985", link)
+        self.assertFixture(link, "testGetHumioForgeLinkRelative.fixture")
 
     def testGetHumioForgeLinkAbsolute(self) -> None:
         link = get_humio_forge_link("forge-pr-2986", True)
-        self.assertFixture(link, "testGetHumioForgeLinkAbsolute.fixture")
         self.assertIn("forge-pr-2986", link)
+        self.assertFixture(link, "testGetHumioForgeLinkAbsolute.fixture")
 
     def testDashboardLinkAutoRefresh(self) -> None:
         self.assertFixture(
@@ -596,10 +596,14 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
 
     def testFormatPreComment(self) -> None:
         context = fake_context()
-        self.assertFixture(
-            format_pre_comment(context),
-            "testFormatPreComment.fixture",
+        pre_comment = format_pre_comment(context)
+        self.maxDiff = 10
+        self.assertIn(
+            "var-namespace=forge-potato",
+            pre_comment,
+            "Wrong forge namespace in pre comment"
         )
+        self.assertFixture(pre_comment, "testFormatPreComment.fixture")
 
     def testFormatComment(self) -> None:
         context = fake_context()
@@ -607,10 +611,13 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         with ForgeResult.with_context(context) as forge_result:
             forge_result.set_state(ForgeState.PASS)
             forge_result.set_output(report_fixture.read_text())
-        self.assertFixture(
-            format_comment(context, forge_result),
-            "testFormatComment.fixture",
+        forge_comment = format_comment(context, forge_result)
+        self.assertIn(
+            "var-namespace=forge-potato",
+            forge_comment,
+            "Wrong forge namespace in comment"
         )
+        self.assertFixture(forge_comment, "testFormatComment.fixture")
 
     def testFormatReport(self) -> None:
         context = fake_context()
@@ -842,7 +849,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
         )
         filesystem = SpyFilesystem({}, {}, ["temp1", "temp2"])
         processes = SpyProcesses()
-        context = SystemContext(shell, filesystem, processes)
+        context = SystemContext(shell, filesystem, processes, FakeTime())
         jobs = await get_all_forge_jobs(context, fake_clusters)
         expected_jobs = [
             ForgeJob(

@@ -590,7 +590,7 @@ pub fn setup_environment(
             node_config.storage.storage_pruner_config,
             node_config.storage.rocksdb_configs,
             node_config.storage.enable_indexer,
-            node_config.storage.target_snapshot_size,
+            node_config.storage.buffered_state_target_items,
             node_config.storage.max_num_nodes_per_lru_cache_shard,
         )
         .map_err(|err| anyhow!("DB failed to open {}", err))?,
@@ -608,6 +608,10 @@ pub fn setup_environment(
     } else {
         info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");
     }
+    AptosVM::set_runtime_config(
+        node_config.execution.paranoid_type_verification,
+        node_config.execution.paranoid_hot_potato_verification,
+    );
     AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
@@ -896,5 +900,11 @@ mod tests {
 
         // Starting the node should panic
         setup_environment(node_config, None, None).unwrap();
+    }
+
+    #[cfg(feature = "check-vm-features")]
+    #[test]
+    fn test_aptos_vm_does_not_have_test_natives() {
+        aptos_vm::natives::assert_no_test_natives()
     }
 }

@@ -74,7 +74,7 @@ monitoring:
   grafana:
     image:
       repo: grafana/grafana
-      tag: latest
+      tag: 9.0.9@sha256:4a6b9d8d88522d2851f947f8f84cca10b6a43ca26d5e93102daf3a87935f10a5
       pullPolicy: IfNotPresent
     resources:
       limits:

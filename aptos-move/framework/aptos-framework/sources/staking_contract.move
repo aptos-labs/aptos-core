@@ -538,6 +538,7 @@ module aptos_framework::staking_contract {
         // In case there's any dust left, send them all to the staker.
         if (coin::value(&coins) > 0) {
             coin::deposit(staker, coins);
+            pool_u64::update_total_coins(distribution_pool, 0);
         } else {
             coin::destroy_zero(coins);
         }
@@ -812,6 +813,7 @@ module aptos_framework::staking_contract {
         let staker_balance = coin::balance<AptosCoin>(staker_address);
         // Staker receives the extra dust due to rounding error.
         assert!(staker_balance == withdrawn_amount + 1, staker_balance);
+        assert_no_pending_distributions(staker_address, operator_address);
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
@@ -1168,8 +1170,11 @@ module aptos_framework::staking_contract {
     #[test_only]
     public fun assert_no_pending_distributions(staker: address, operator: address) acquires Store {
         let staking_contract = simple_map::borrow(&borrow_global<Store>(staker).staking_contracts, &operator);
-        let shareholders_count = pool_u64::shareholders_count(&staking_contract.distribution_pool);
+        let distribution_pool = &staking_contract.distribution_pool;
+        let shareholders_count = pool_u64::shareholders_count(distribution_pool);
         assert!(shareholders_count == 0, shareholders_count);
+        let total_coins_remaining = pool_u64::total_coins(distribution_pool);
+        assert!(total_coins_remaining == 0, total_coins_remaining);
     }
 
     #[test_only]

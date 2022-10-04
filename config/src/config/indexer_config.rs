@@ -60,6 +60,11 @@ pub struct IndexerConfig {
     /// Set to 0 to disable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub emit_every: Option<u64>,
+
+    /// Indicates how many versions we should look back for gaps (default 1.5M versions, meaning
+    /// we will only find gaps within MAX - 1.5M versions)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gap_lookback_versions: Option<u64>,
 }
 
 pub fn env_or_default<T: std::str::FromStr>(

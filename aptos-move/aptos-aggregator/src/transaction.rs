@@ -58,14 +58,14 @@ impl ChangeSetExt {
         use btree_map::Entry::*;
         use WriteOp::*;
 
-        let (mut delta, change_set) = self.into_inner();
+        let (mut delta_set, change_set) = self.into_inner();
         let (write_set, events) = change_set.into_inner();
         let mut write_set = write_set.into_mut();
 
-        let delta_ops = delta.as_inner_mut();
+        let delta_ops = delta_set.as_inner_mut();
         let write_ops = write_set.as_inner_mut();
 
-        for (key, op) in other.into_iter() {
+        for (key, mut op) in other.into_iter() {
             if let Some(r) = write_ops.get_mut(&key) {
                 match r {
                     Creation(data) => {
@@ -83,7 +83,10 @@ impl ChangeSetExt {
             } else {
                 match delta_ops.entry(key) {
                     Occupied(entry) => {
-                        entry.into_mut().merge_with(op)?;
+                        // In this case, we need to merge the new incoming `op` to the existing
+                        // delta, ensuring the strict ordering.
+                        op.merge_onto(*entry.get())?;
+                        *entry.into_mut() = op;
                     }
                     Vacant(entry) => {
                         entry.insert(op);
@@ -93,7 +96,7 @@ impl ChangeSetExt {
         }
 
         Ok(Self {
-            delta_change_set: delta,
+            delta_change_set: delta_set,
             change_set: ChangeSet::new(write_set.freeze()?, events),
         })
     }

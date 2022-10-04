@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 03 October 2022
+
+- [How Base Gas Works](/docs/concepts/base-gas.md) describes the types of gas involved in Aptos transactions and offers optimizations for your use.
+
 ## 26 September 2022
 
 - [Installing Aptos CLI](/docs/cli-tools/aptos-cli-tool/install-aptos-cli.md) provides detailed guidance for all major operating systems: Linux, macOS, and Windows.
@@ -33,11 +37,11 @@ When [using the Aptos CLI to publish Move modules](/docs/cli-tools/aptos-cli-too
 
 ## 16 September 2022
 
-When [connecting to Aptos Testnet](/docs/nodes/ait/connect-to-testnet.md), use the `testnet` rather than `testnet-stable` branch. See that document for the latest commit and Docker image tag.
+When [connecting to Aptos Testnet](/docs/nodes/validator-node/operator/connect-to-aptos-network.md), use the `testnet` rather than `testnet-stable` branch. See that document for the latest commit and Docker image tag.
 
 ## 15 September 2022
 
-The [hardware requirements](/docs/nodes/ait/node-requirements.md#hardware-requirements) for Aptos nodes have grown for both Amazon Web Services and Google Cloud.
+The [hardware requirements](/docs/nodes/validator-node/operator/node-requirements.md#hardware-requirements) for Aptos nodes have grown for both Amazon Web Services and Google Cloud.
 
 ## 13 September 2022
 
@@ -56,7 +60,7 @@ The [hardware requirements](/docs/nodes/ait/node-requirements.md#hardware-requir
 
 ## 29 August 2022
 
-- A new guide, [AIT-3 Leaderboard Metrics](/nodes/ait/ait3-leaderboard-metrics.md), describing the [AIT-3 Validator Status](https://aptoslabs.com/leaderboard/it3) page is released.
+- A new guide, [Leaderboard Metrics](/nodes/leaderboard-metrics), describing the [Aptos Validator Status](https://aptoslabs.com/leaderboard/it3) page is released.
 
 ## 25 August 2022
 
@@ -77,7 +81,7 @@ The [hardware requirements](/docs/nodes/ait/node-requirements.md#hardware-requir
 
 - The [Aptos White Paper](/aptos-white-paper/aptos-white-paper-index) is released.
 
-- A section explaining the network [Port settings](/nodes/ait/node-requirements#ports) for the nodes connecting to an Aptos network is added.
+- A section explaining the network [Port settings](/nodes/validator-node/operator/node-requirements#ports) for the nodes connecting to an Aptos network is added.
 
 ## 08 August 2022
 

@@ -216,7 +216,7 @@ impl CliCommand<()> for SetValidatorConfiguration {
 
         // Build operator configuration file
         let operator_config = OperatorConfiguration {
-            operator_account_address: operator_identity.account_address,
+            operator_account_address: operator_identity.account_address.into(),
             operator_account_public_key: operator_identity.account_public_key.clone(),
             consensus_public_key,
             consensus_proof_of_possession,
@@ -227,11 +227,11 @@ impl CliCommand<()> for SetValidatorConfiguration {
         };
 
         let owner_config = OwnerConfiguration {
-            owner_account_address: owner_identity.account_address,
+            owner_account_address: owner_identity.account_address.into(),
             owner_account_public_key: owner_identity.account_public_key,
-            voter_account_address: voter_identity.account_address,
+            voter_account_address: voter_identity.account_address.into(),
             voter_account_public_key: voter_identity.account_public_key,
-            operator_account_address: operator_identity.account_address,
+            operator_account_address: operator_identity.account_address.into(),
             operator_account_public_key: operator_identity.account_public_key,
             stake_amount: self.stake_amount,
             commission_percentage: self.commission_percentage,

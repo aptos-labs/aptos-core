@@ -11,7 +11,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.57"
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "f94869cdfa1b5d2c9892016e8fb0c59fda1eea2d" }
 blst = "0.3.7"
 bytes = "1.1.0"
 curve25519-dalek = { version = "3", default-features = false }
@@ -19,6 +19,7 @@ digest = "0.9.0"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 hex = "0.4.3"
 hkdf = "0.10.0"
+libsecp256k1 = "0.7.0"
 more-asserts = "0.3.0"
 once_cell = "1.10.0"
 proptest = { version = "1.0.0", optional = true }
@@ -32,7 +33,7 @@ serde_bytes = "0.11.6"
 sha2 = "0.9.3"
 static_assertions = "1.1.0"
 thiserror = "1.0.31"
-tiny-keccak = { version = "2.0.2", features = ["sha3"] }
+tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 x25519-dalek = { version = "1.2.0" }
 
 aptos-crypto-derive = { path = "../aptos-crypto-derive", version = "0.0.3" }
@@ -54,7 +55,7 @@ cloneable-private-keys = []
 fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys"]
 
 [[bench]]
-name = "noise"
+name = "bls12381"
 harness = false
 
 [[bench]]
@@ -62,5 +63,17 @@ name = "ed25519"
 harness = false
 
 [[bench]]
-name = "bls12381"
+name = "hash"
+harness = false
+
+[[bench]]
+name = "noise"
+harness = false
+
+[[bench]]
+name = "ristretto255"
+harness = false
+
+[[bench]]
+name = "secp256k1"
 harness = false

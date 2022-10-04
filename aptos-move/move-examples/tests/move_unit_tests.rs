@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_vm::natives;
 use move_deps::move_unit_test::UnitTestingConfig;
 use move_deps::{
@@ -81,7 +81,13 @@ fn test_message_board() {
 #[test]
 fn test_minter() {
     let named_address = BTreeMap::new();
-    run_tests_for_pkg("minter_script", named_address);
+    run_tests_for_pkg("scripts/minter", named_address);
+}
+
+#[test]
+fn test_two_by_two_transfer() {
+    let named_address = BTreeMap::new();
+    run_tests_for_pkg("scripts/two_by_two_transfer", named_address);
 }
 
 #[test]
@@ -91,4 +97,16 @@ fn test_shared_account() {
         AccountAddress::from_hex_literal("0x1").unwrap(),
     )]);
     run_tests_for_pkg("shared_account", named_address);
+}
+
+#[test]
+fn test_mint_nft() {
+    let named_address = BTreeMap::from([(
+        String::from("mint_nft"),
+        create_resource_address(
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+            vec![].as_slice(),
+        ),
+    )]);
+    run_tests_for_pkg("mint_nft", named_address);
 }

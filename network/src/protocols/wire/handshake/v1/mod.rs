@@ -37,6 +37,9 @@ mod test;
 // ProtocolId
 //
 
+pub const USER_INPUT_RECURSION_LIMIT: usize = 32;
+pub const RECURSION_LIMIT: usize = 64;
+
 /// Unique identifier associated with each application protocol.
 #[repr(u8)]
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Deserialize, Serialize)]
@@ -61,8 +64,8 @@ pub enum ProtocolId {
 
 /// The encoding types for Protocols
 enum Encoding {
-    Bcs,
-    CompressedBcs,
+    Bcs(usize),
+    CompressedBcs(usize),
     Json,
 }
 
@@ -108,10 +111,12 @@ impl ProtocolId {
     fn encoding(self) -> Encoding {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
-            ProtocolId::ConsensusDirectSendCompressed
-            | ProtocolId::ConsensusRpcCompressed
-            | ProtocolId::MempoolDirectSend => Encoding::CompressedBcs,
-            _ => Encoding::Bcs,
+            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                Encoding::CompressedBcs(RECURSION_LIMIT)
+            }
+            ProtocolId::MempoolDirectSend => Encoding::CompressedBcs(USER_INPUT_RECURSION_LIMIT),
+            ProtocolId::MempoolRpc => Encoding::Bcs(USER_INPUT_RECURSION_LIMIT),
+            _ => Encoding::Bcs(RECURSION_LIMIT),
         }
     }
 
@@ -136,10 +141,10 @@ impl ProtocolId {
 
     pub fn to_bytes<T: Serialize>(&self, value: &T) -> anyhow::Result<Vec<u8>> {
         match self.encoding() {
-            Encoding::Bcs => self.bcs_encode(value),
-            Encoding::CompressedBcs => {
+            Encoding::Bcs(limit) => self.bcs_encode(value, limit),
+            Encoding::CompressedBcs(limit) => {
                 let compression_client = self.get_compression_client();
-                let bcs_bytes = self.bcs_encode(value)?;
+                let bcs_bytes = self.bcs_encode(value, limit)?;
                 aptos_compression::compress(
                     bcs_bytes,
                     compression_client,
@@ -153,8 +158,8 @@ impl ProtocolId {
 
     pub fn from_bytes<T: DeserializeOwned>(&self, bytes: &[u8]) -> anyhow::Result<T> {
         match self.encoding() {
-            Encoding::Bcs => self.bcs_decode(bytes),
-            Encoding::CompressedBcs => {
+            Encoding::Bcs(limit) => self.bcs_decode(bytes, limit),
+            Encoding::CompressedBcs(limit) => {
                 let compression_client = self.get_compression_client();
                 let raw_bytes = aptos_compression::decompress(
                     &bytes.to_vec(),
@@ -162,18 +167,18 @@ impl ProtocolId {
                     MAX_APPLICATION_MESSAGE_SIZE,
                 )
                 .map_err(|e| anyhow! {"{:?}", e})?;
-                self.bcs_decode(&raw_bytes)
+                self.bcs_decode(&raw_bytes, limit)
             }
             Encoding::Json => serde_json::from_slice(bytes).map_err(|e| anyhow!("{:?}", e)),
         }
     }
 
-    fn bcs_encode<T: Serialize>(&self, value: &T) -> anyhow::Result<Vec<u8>> {
-        bcs::to_bytes(value).map_err(|e| anyhow!("{:?}", e))
+    fn bcs_encode<T: Serialize>(&self, value: &T, limit: usize) -> anyhow::Result<Vec<u8>> {
+        bcs::to_bytes_with_limit(value, limit).map_err(|e| anyhow!("{:?}", e))
     }
 
-    fn bcs_decode<T: DeserializeOwned>(&self, bytes: &[u8]) -> anyhow::Result<T> {
-        bcs::from_bytes(bytes).map_err(|e| anyhow!("{:?}", e))
+    fn bcs_decode<T: DeserializeOwned>(&self, bytes: &[u8], limit: usize) -> anyhow::Result<T> {
+        bcs::from_bytes_with_limit(bytes, limit).map_err(|e| anyhow!("{:?}", e))
     }
 }
 

@@ -16,7 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
 };
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     language_storage::{ModuleId, TypeTag},
 };

@@ -4,10 +4,6 @@
 export const $Event = {
     description: `An event from a transaction`,
     properties: {
-        key: {
-            type: 'EventKey',
-            isRequired: true,
-        },
         guid: {
             type: 'EventGuid',
             isRequired: true,

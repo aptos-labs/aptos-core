@@ -20,10 +20,13 @@ pub const PARKING_LOT_INDEX_LABEL: &str = "parking_lot";
 pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
 pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 
-// Core mempool commit stages labels
-pub const GET_BLOCK_STAGE_LABEL: &str = "get_block";
+// Core mempool stages labels
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
+pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
+pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
+pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
+pub const BROADCAST_BATCHED_LABEL: &str = "broadcast_batched";
 
 // Core mempool GC type labels
 pub const GC_SYSTEM_TTL_LABEL: &str = "system_ttl";
@@ -76,6 +79,14 @@ pub const SENT_LABEL: &str = "sent";
 // invalid ACK type labels
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
+// Inserted transaction scope labels
+pub const LOCAL_LABEL: &str = "local";
+pub const E2E_LABEL: &str = "e2e";
+
+// Event types for ranking_score
+pub const INSERT_LABEL: &str = "insert";
+pub const REMOVE_LABEL: &str = "remove";
+
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -110,13 +121,38 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub fn core_mempool_txn_commit_latency(
+    stage: &'static str,
+    scope: &'static str,
+    latency: Duration,
+) {
+    CORE_MEMPOOL_TXN_COMMIT_LATENCY
+        .with_label_values(&[stage, scope])
+        .observe(latency.as_secs_f64());
+}
+
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
-pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
-        &["stage"]
+        &["stage", "scope"]
+    )
+    .unwrap()
+});
+
+pub fn core_mempool_txn_ranking_score(stage: &'static str, status: &str, ranking_score: u64) {
+    CORE_MEMPOOL_TXN_RANKING_SCORE
+        .with_label_values(&[stage, status])
+        .observe(ranking_score as f64);
+}
+
+static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_core_mempool_txn_ranking_score",
+        "Ranking score of txn reaching various stages in core mempool",
+        &["stage", "status"]
     )
     .unwrap()
 });

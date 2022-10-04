@@ -362,6 +362,7 @@ class SystemContext:
     shell: Shell
     filesystem: Filesystem
     processes: Processes
+    time: Time
 
 
 @dataclass
@@ -1242,10 +1243,12 @@ async def run_multiple(
     pending_suites = []
     pending_comment = []
 
+    start_time = context.time.now()
+
     for suite in forge_test_suites:
         new_namespace = f"{forge_namespace}-{suite}"
         short_link = shorten_link(get_humio_forge_link(new_namespace, True))
-        pending_comment.append(f"Running {suite}: [Runner logs]{short_link}")
+        pending_comment.append(f"Running {suite}: [Runner logs]({short_link})")
         if forge_runner_mode != "pre-forge":
             pending_results.append(
                 context.shell.gen_run(
@@ -1270,10 +1273,12 @@ async def run_multiple(
     else:
         final_forge_comment = []
         results = await asyncio.gather(*pending_results)
+        stop_time = context.time.now()
         assert len(results) == len(pending_suites)
         failed = False
         for i, result in enumerate(results):
             suite, namespace = pending_suites[i]
+            short_link = shorten_link(get_humio_forge_link(namespace, (start_time, stop_time)))
             if result.succeeded():
                 final_forge_comment.append(f"{suite} succeeded")
             else:
@@ -1385,11 +1390,11 @@ def test(
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
     time = SystemTime()
-    context = SystemContext(shell, filesystem, processes)
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
-    if forge_namespace is None:
+    if not forge_namespace:
         forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
 
     assert forge_namespace is not None, "Forge namespace is required"
@@ -1733,7 +1738,8 @@ def list_jobs(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
@@ -1767,7 +1773,8 @@ def tail(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
@@ -1957,7 +1964,8 @@ def create_config() -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.create()
 
@@ -1967,7 +1975,8 @@ def get_config() -> None:
     shell = LocalShell(True)
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
     pprint(config.dump())
@@ -1996,7 +2005,8 @@ def set_config(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     if config_path:
@@ -2022,7 +2032,7 @@ def config_edit(ctx: click.Context) -> None:
     shell = LocalShell(True)
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
@@ -2049,7 +2059,7 @@ def cluster_config_delete(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2072,7 +2082,8 @@ def cluster_config_add(cluster: str) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2092,7 +2103,8 @@ def cluster_config_enable(cluster: str) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2116,7 +2128,8 @@ def cluster_config_disable(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2133,7 +2146,8 @@ def cluster_config_list() -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2168,7 +2182,8 @@ def test_config_add(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2207,7 +2222,8 @@ def test_config_show(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2235,7 +2251,8 @@ def test_config_list() -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2256,7 +2273,8 @@ def test_config_delete(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2286,7 +2304,8 @@ def test_config_enable(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2318,7 +2337,8 @@ def test_config_disable(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes)
+    time = SystemTime()
+    context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()

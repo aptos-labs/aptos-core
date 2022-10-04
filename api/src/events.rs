@@ -13,10 +13,9 @@ use crate::response::{
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    verify_field_identifier, Address, AptosErrorCode, EventKey as EventKeyParam, IdentifierWrapper,
-    LedgerInfo, MoveStructTag, VerifyInputWithRecursion, U64,
+    verify_field_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
+    MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
 };
-use aptos_api_types::{AsConverter, VersionedEvent};
 use aptos_types::event::EventKey;
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
@@ -28,55 +27,6 @@ pub struct EventsApi {
 
 #[OpenApi]
 impl EventsApi {
-    /// Get events by event key
-    ///
-    /// This endpoint allows you to get a list of events of a specific type
-    /// as identified by its event key, which is a globally unique ID.
-    #[oai(
-        path = "/events/:event_key",
-        method = "get",
-        operation_id = "get_events_by_event_key",
-        tag = "ApiTags::Events",
-        deprecated
-    )]
-    async fn get_events_by_event_key(
-        &self,
-        accept_type: AcceptType,
-        /// Event key to retrieve events by
-        event_key: Path<EventKeyParam>,
-        /// Starting sequence number of events.
-        ///
-        /// If unspecified, by default will retrieve the most recent events
-        start: Query<Option<U64>>,
-        /// Max number of events to retrieve.
-        ///
-        /// If unspecified, defaults to default page size
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<VersionedEvent>> {
-        fail_point_poem("endpoint_get_events_by_event_key")?;
-        self.context
-            .check_api_output_enabled("Get events by event key", &accept_type)?;
-        let page = Page::new(
-            start.0.map(|v| v.0),
-            limit.0,
-            self.context.max_events_page_size(),
-        );
-
-        // Ensure that account exists
-        let account = Account::new(
-            self.context.clone(),
-            event_key.0 .0.get_creator_address().into(),
-            None,
-        )?;
-        account.account_state()?;
-        self.list(
-            account.latest_ledger_info,
-            accept_type,
-            page,
-            event_key.0 .0,
-        )
-    }
-
     /// Get events by creation number
     ///
     /// Event types are globally identifiable by an account `address` and

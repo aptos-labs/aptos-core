@@ -36,11 +36,6 @@ Below is a summary flow diagram of how staking on the Aptos blockchain works. Th
   }}
 /> --->
 
-:::tip Staking and Governance in AIT-3
-
-For a step-by-step walkthrough of staking and voting, see [Steps in AIT-3](/nodes/ait/steps-in-ait3.md).
-
-:::
 
 ### How a custodian can stake on Aptos
 
@@ -101,7 +96,7 @@ Participating as a validator node on the Aptos network works like this:
 4. Your stake will automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
 
 :::tip Joining the validator set
-For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](/nodes/ait/connect-to-testnet#joining-validator-set).
+For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](/nodes/validator-node/operator/connect-to-aptos-network#joining-validator-set).
 :::
 
 ### Minimum and maximum stake

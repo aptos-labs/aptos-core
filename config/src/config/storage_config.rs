@@ -11,7 +11,7 @@ use std::{
 // Lru cache will consume about 2G RAM based on this default value.
 pub const DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD: usize = 1 << 13;
 
-pub const TARGET_SNAPSHOT_SIZE: usize = 100_000;
+pub const BUFFERED_STATE_TARGET_ITEMS: usize = 100_000;
 
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
@@ -77,8 +77,13 @@ pub struct StorageConfig {
     pub storage_pruner_config: PrunerConfig,
     #[serde(skip)]
     data_dir: PathBuf,
-    /// The threshold that determine whether a snapshot should be committed to state merkle db.
-    pub target_snapshot_size: usize,
+    /// AptosDB persists the state authentication structure off the critical path
+    /// of transaction execution and batch up recent changes for performance. Once
+    /// the number of buffered state updates exceeds this config, a dump of all
+    /// buffered values into a snapshot is triggered. (Alternatively, if too many
+    /// transactions have been processed since last dump, a new dump is processed
+    /// as well.)
+    pub buffered_state_target_items: usize,
     /// The max # of nodes for a lru cache shard.
     pub max_num_nodes_per_lru_cache_shard: usize,
     /// Rocksdb-specific configurations
@@ -190,8 +195,10 @@ impl Default for StateMerklePrunerConfig {
             enable: true,
             // This allows a block / chunk being executed to have access to a non-latest state tree.
             // It needs to be greater than the number of versions the state committing thread is
-            // able to commit during the execution of the block / chunk.
-            prune_window: 100_000,
+            // able to commit during the execution of the block / chunk. If the bad case indeed
+            // happens due to this being too small, a node restart should recover it.
+            // Still, defaulting to 1M to be super safe.
+            prune_window: 1_000_000,
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             batch_size: 1_000,
@@ -232,7 +239,7 @@ impl Default for StorageConfig {
             data_dir: PathBuf::from("/opt/aptos/data"),
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,
-            target_snapshot_size: TARGET_SNAPSHOT_SIZE,
+            buffered_state_target_items: BUFFERED_STATE_TARGET_ITEMS,
             max_num_nodes_per_lru_cache_shard: DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         }
     }

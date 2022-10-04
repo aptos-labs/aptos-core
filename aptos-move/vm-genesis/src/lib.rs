@@ -31,16 +31,14 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use framework::{ReleaseBundle, ReleasePackage};
-use move_deps::{
-    move_core_types::{
-        account_address::AccountAddress,
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-        resolver::MoveResolver,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    resolver::MoveResolver,
+    value::{serialize_values, MoveValue},
 };
+use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -70,6 +68,8 @@ pub struct GenesisConfiguration {
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voting_power_increase_limit: u64,
+    pub employee_vesting_start: u64,
+    pub employee_vesting_period_duration: u64,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -80,8 +80,8 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 });
 
 pub fn encode_aptos_mainnet_genesis_transaction(
-    accounts: &[AccountMap],
-    employees: &[EmployeeAccountMap],
+    accounts: &[AccountBalance],
+    employees: &[EmployeePool],
     validators: &[ValidatorWithCommissionRate],
     framework: &ReleaseBundle,
     chain_id: ChainId,
@@ -111,7 +111,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     initialize_aptos_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
-    create_employee_validators(&mut session, employees);
+    create_employee_validators(&mut session, employees, genesis_config);
     create_and_initialize_validators_with_commission(&mut session, validators);
     set_genesis_end(&mut session);
 
@@ -303,10 +303,11 @@ fn exec_function(
         )
         .unwrap_or_else(|e| {
             panic!(
-                "Error calling {}.{}: {}",
+                "Error calling {}.{}: ({:#x}) {}",
                 module_name,
                 function_name,
-                e.into_vm_status()
+                e.sub_status().unwrap_or_default(),
+                e,
             )
         });
 }
@@ -417,7 +418,7 @@ fn initialize_on_chain_governance(
     );
 }
 
-fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountMap]) {
+fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountBalance]) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
@@ -432,10 +433,14 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
 
 fn create_employee_validators(
     session: &mut SessionExt<impl MoveResolver>,
-    employees: &[EmployeeAccountMap],
+    employees: &[EmployeePool],
+    genesis_config: &GenesisConfiguration,
 ) {
     let employees_bytes = bcs::to_bytes(employees).expect("AccountMaps can be serialized");
-    let mut serialized_values = serialize_values(&[]);
+    let mut serialized_values = serialize_values(&vec![
+        MoveValue::U64(genesis_config.employee_vesting_start),
+        MoveValue::U64(genesis_config.employee_vesting_period_duration),
+    ]);
     serialized_values.push(employees_bytes);
 
     exec_function(
@@ -717,6 +722,8 @@ pub fn generate_test_genesis(
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
+            employee_vesting_start: 1663456089,
+            employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
     );
     (genesis, test_validators)
@@ -757,17 +764,19 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         rewards_apy_percentage: 10,
         voting_duration_secs: 7 * 24 * 3600, // 7 days
         voting_power_increase_limit: 30,
+        employee_vesting_start: 1663456089,
+        employee_vesting_period_duration: 5 * 60, // 5 minutes
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountMap {
+pub struct AccountBalance {
     pub account_address: AccountAddress,
     pub balance: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmployeeAccountMap {
+pub struct EmployeePool {
     pub accounts: Vec<AccountAddress>,
     pub validator: ValidatorWithCommissionRate,
     pub vesting_schedule_numerators: Vec<u64>,
@@ -839,79 +848,79 @@ pub fn test_mainnet_end_to_end() {
     let admin2 = AccountAddress::from_hex_literal("0x302").unwrap();
 
     let accounts = vec![
-        AccountMap {
+        AccountBalance {
             account_address: account44,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account45,
             balance: balance * 3, // Three times the balance so it can host 2 operators.
         },
-        AccountMap {
+        AccountBalance {
             account_address: account46,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account47,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account48,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account49,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator3,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator4,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator5,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter3,
             balance: non_validator_balance,
         },
@@ -944,7 +953,7 @@ pub fn test_mainnet_end_to_end() {
     same_owner_validator_3.voter_address = voter3;
 
     let employees = vec![
-        EmployeeAccountMap {
+        EmployeePool {
             accounts: vec![account46, account47],
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_1,
@@ -955,7 +964,7 @@ pub fn test_mainnet_end_to_end() {
             vesting_schedule_denominator: 48,
             beneficiary_resetter: AccountAddress::ZERO,
         },
-        EmployeeAccountMap {
+        EmployeePool {
             accounts: vec![account48, account49],
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_2,

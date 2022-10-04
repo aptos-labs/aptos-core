@@ -23,6 +23,7 @@ use crate::{
     persistent_liveness_storage::PersistentLivenessStorage,
 };
 use anyhow::{bail, ensure, Context, Result};
+use aptos_config::config::ConsensusConfig;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -148,11 +149,10 @@ pub struct RoundManager {
     safety_rules: Arc<Mutex<MetricsSafetyRules>>,
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
-    sync_only: bool,
     onchain_config: OnChainConsensusConfig,
     round_manager_tx:
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
-    back_pressure_proposal_timeout_ms: u64,
+    local_config: ConsensusConfig,
 }
 
 impl RoundManager {
@@ -165,19 +165,18 @@ impl RoundManager {
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         network: NetworkSender,
         storage: Arc<dyn PersistentLivenessStorage>,
-        sync_only: bool,
         onchain_config: OnChainConsensusConfig,
         round_manager_tx: aptos_channel::Sender<
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
-        back_pressure_proposal_timeout_ms: u64,
+        local_config: ConsensusConfig,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
         counters::OP_COUNTERS
             .gauge("sync_only")
-            .set(sync_only as i64);
+            .set(local_config.sync_only as i64);
         counters::OP_COUNTERS
             .gauge("decoupled_execution")
             .set(onchain_config.decoupled_execution() as i64);
@@ -190,10 +189,9 @@ impl RoundManager {
             safety_rules,
             network,
             storage,
-            sync_only,
             onchain_config,
             round_manager_tx,
-            back_pressure_proposal_timeout_ms,
+            local_config,
         }
     }
 
@@ -491,14 +489,14 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         if self.decoupled_execution() {
-            let sync_or_not = self.sync_only || self.block_store.back_pressure();
+            let sync_or_not = self.local_config.sync_only || self.block_store.back_pressure();
             counters::OP_COUNTERS
                 .gauge("sync_only")
                 .set(sync_or_not as i64);
 
             sync_or_not
         } else {
-            self.sync_only
+            self.local_config.sync_only
         }
     }
 
@@ -587,6 +585,22 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
+        let payload_len = proposal.payload().map_or(0, |payload| payload.len());
+        let payload_size = proposal.payload().map_or(0, |payload| payload.size());
+        ensure!(
+            payload_len as u64 <= self.local_config.max_receiving_block_txns,
+            "Payload len {} exceeds the limit {}",
+            payload_len,
+            self.local_config.max_receiving_block_txns,
+        );
+
+        ensure!(
+            payload_size as u64 <= self.local_config.max_receiving_block_bytes,
+            "Payload size {} exceeds the limit {}",
+            payload_size,
+            self.local_config.max_receiving_block_bytes,
+        );
+
         ensure!(
             self.proposer_election.is_valid_proposal(&proposal),
             "[RoundManager] Proposer {} for block {} is not a valid proposer for this round or created duplicate proposal",
@@ -627,7 +641,7 @@ impl RoundManager {
                 .resend_verified_proposal_to_self(
                     proposal,
                     BACK_PRESSURE_POLLING_INTERVAL_MS,
-                    self.back_pressure_proposal_timeout_ms,
+                    self.local_config.round_initial_timeout_ms,
                 )
                 .await)
         } else {

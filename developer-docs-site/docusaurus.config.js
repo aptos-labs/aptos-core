@@ -30,6 +30,12 @@ const config = {
           editUrl: "https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/",
           remarkPlugins: [codeInjector],
         },
+        sitemap: {
+          changefreq: "daily",
+          priority: 0.5,
+          ignorePatterns: ["/tags/**"],
+          filename: "sitemap.xml",
+        },
         blog: false,
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
@@ -115,7 +121,6 @@ const config = {
           {
             type: "dropdown",
             label: "Nodes",
-            to: "nodes/nodes-index",
             position: "left",
             items: [
               {
@@ -256,10 +261,6 @@ const config = {
             from: "/tutorials/run-a-fullnode-on-gcp",
           },
           {
-            to: "/nodes/ait/node-requirements",
-            from: "/tutorials/validator-node/intro",
-          },
-          {
             to: "/nodes/validator-node/validators",
             from: [
               "/tutorials/validator-node/run-validator-node-using-gcp",
@@ -268,14 +269,6 @@ const config = {
               "/tutorials/validator-node/run-validator-node-using-docker",
               "/tutorials/validator-node/run-validator-node-using-source",
             ],
-          },
-          {
-            to: "/nodes/ait/connect-to-testnet",
-            from: "/tutorials/validator-node/connect-to-testnet",
-          },
-          {
-            to: "/nodes/ait/node-liveness-criteria",
-            from: "/reference/node-liveness-criteria",
           },
           {
             to: "/concepts/aptos-concepts",
@@ -321,6 +314,22 @@ const config = {
           {
             to: "/concepts/basics-txns-states",
             from: "/concepts/basics-merkle-proof",
+          },
+          {
+            to: "/nodes/validator-node/operator/connect-to-aptos-network",
+            from: "/nodes/ait/connect-to-testnet",
+          },
+          {
+            to: "/nodes/validator-node/operator/node-requirements",
+            from: "/nodes/ait/node-requirements",
+          },
+          {
+            to: "/nodes/validator-node/operator/node-liveness-criteria",
+            from: "/nodes/ait/node-liveness-criteria",
+          },
+          {
+            to: "/issues-and-workarounds",
+            from: "/nodes/full-node/troubleshooting-fullnode-setup",
           },
         ],
       },

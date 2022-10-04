@@ -11,17 +11,17 @@ use aptos_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
 };
-use move_deps::{
-    move_bytecode_utils::module_cache::SyncModuleCache,
-    move_core_types::{
-        ident_str,
-        identifier::{IdentStr, Identifier},
-        language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
-        resolver::ModuleResolver,
-        value::{serialize_values, MoveValue},
-    },
-    read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis},
+
+use move_bytecode_utils::module_cache::SyncModuleCache;
+use move_core_types::{
+    ident_str,
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
+    resolver::ModuleResolver,
+    value::{serialize_values, MoveValue},
 };
+use read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis};
+
 use once_cell::sync::Lazy;
 use std::ops::Deref;
 

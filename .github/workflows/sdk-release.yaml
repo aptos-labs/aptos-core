@@ -37,6 +37,7 @@ jobs:
     env:
       APTOS_NODE_URL: http://127.0.0.1:8080/v1
       APTOS_FAUCET_URL: http://127.0.0.1:8081
+      FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -87,6 +88,7 @@ jobs:
       # Set up dotenv file for tests (jest doesn't read env vars properly).
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
       - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
+      - run: echo "FAUCET_AUTH_TOKEN=$FAUCET_AUTH_TOKEN" >> ./ecosystem/typescript/sdk/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 

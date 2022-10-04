@@ -32,9 +32,11 @@ pub(crate) const HTTPBIN_URL: &str = "https://httpbin.org/ip";
 pub(crate) const TELEMETRY_SERVICE_URL: &str = "https://telemetry.aptoslabs.com";
 
 // Frequencies for the various metrics and pushes
+pub(crate) const NODE_BUILD_INFO_FREQ_SECS: u64 = 60 * 60; // 60 minutes
 pub(crate) const NODE_CORE_METRICS_FREQ_SECS: u64 = 30; // 30 seconds
 pub(crate) const NODE_NETWORK_METRICS_FREQ_SECS: u64 = 60; // 1 minute
 pub(crate) const NODE_SYS_INFO_FREQ_SECS: u64 = 5 * 60; // 5 minutes
+pub(crate) const NODE_CONFIG_FREQ_SECS: u64 = 60 * 60; // 60 minutes
 
 // TODO: consider making this interval configurable
 pub(crate) const PROMETHEUS_PUSH_METRICS_FREQ_SECS: u64 = 15; // 15 seconds

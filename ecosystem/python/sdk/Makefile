@@ -12,5 +12,6 @@ fmt:
 examples:
 	- poetry run python -m examples.transfer-coin
 	- poetry run python -m examples.simple-nft
+	- poetry run python -m examples.transfer-two-by-two
 
 .PHONY: test fmt examples

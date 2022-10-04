@@ -1,22 +1,78 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Result;
+use crate::{create_k8s_client, Get, K8sApi, Result};
 
 use anyhow::bail;
 use aptos_logger::info;
+use k8s_openapi::api::core::v1::Secret;
 use prometheus_http_query::{response::PromqlResult, Client as PrometheusClient};
 use reqwest::{header, Client as HttpClient};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
-pub fn get_prometheus_client() -> Result<PrometheusClient> {
-    let prom_url =
-        std::env::var("PROMETHEUS_URL").unwrap_or_else(|_| "http://127.0.0.1:9090".to_string());
-    info!("Attempting to create prometheus client with: {} ", prom_url);
+pub async fn get_prometheus_client() -> Result<PrometheusClient> {
+    // read from the environment
+    let kube_client = create_k8s_client().await;
+    let secrets_api = Arc::new(K8sApi::<Secret>::from_client(
+        kube_client,
+        Some("default".to_string()),
+    ));
+    create_prometheus_client_from_environment(secrets_api).await
+}
+
+async fn create_prometheus_client_from_environment(
+    secrets_api: Arc<dyn Get<Secret>>,
+) -> Result<PrometheusClient> {
+    let prom_url_env = std::env::var("PROMETHEUS_URL");
+    let prom_token_env = std::env::var("PROMETHEUS_TOKEN");
+
+    let (prom_url, prom_token) = match (prom_url_env.clone(), prom_token_env) {
+        // if both variables are provided, use them, otherwise try inferring from environment
+        (Ok(url), Ok(token)) => {
+            info!("Creating prometheus client from environment variables");
+            (url, Some(token))
+        }
+        _ => {
+            // try reading a cluster-local secret
+            match secrets_api.get("prometheus-read-only").await {
+                Ok(secret) => {
+                    if let Some(data) = secret.data {
+                        let prom_url_k8s_secret = data.get("url");
+                        let prom_token_k8s_secret = data.get("token");
+                        match (prom_url_k8s_secret, prom_token_k8s_secret) {
+                            (Some(url), Some(token)) => {
+                                info!("Creating prometheus client from kubernetes secret");
+                                (
+                                    String::from_utf8(url.0.clone()).unwrap(),
+                                    Some(String::from_utf8(token.0.clone()).unwrap()),
+                                )
+                            }
+                            _ => {
+                                bail!("Failed to read prometheus-read-only url and token");
+                            }
+                        }
+                    } else {
+                        bail!("Failed to read prometheus-read-only secret data");
+                    }
+                }
+                Err(e) => {
+                    // There's no remote prometheus secret setup. Try reading from a local prometheus backend
+                    info!("Failed to get prometheus-read-only secret: {}", e);
+                    info!("Creating prometheus client from local");
+                    // Try reading from remote prometheus first, otherwise assume it's local
+                    if let Ok(prom_url_env) = prom_url_env {
+                        (prom_url_env, None)
+                    } else {
+                        ("http://127.0.0.1:9090".to_string(), None)
+                    }
+                }
+            }
+        }
+    };
 
     // add auth header if specified
     let mut headers = header::HeaderMap::new();
-    if let Ok(token) = std::env::var("PROMETHEUS_TOKEN") {
+    if let Some(token) = prom_token {
         if let Ok(mut auth_value) =
             header::HeaderValue::from_str(format!("Bearer {}", token.as_str()).as_str())
         {
@@ -79,21 +135,112 @@ pub async fn query_with_metadata(
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
+    use k8s_openapi::ByteString;
+    use kube::{api::ObjectMeta, error::ErrorResponse, Error as KubeError};
     use prometheus_http_query::Error as PrometheusError;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::{
+        env,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     use super::*;
 
+    struct MockSecretApi {
+        secret: Option<Secret>,
+    }
+
+    impl MockSecretApi {
+        fn from_secret(secret: Option<Secret>) -> Self {
+            MockSecretApi { secret }
+        }
+    }
+
+    #[async_trait]
+    impl Get<Secret> for MockSecretApi {
+        async fn get(&self, _name: &str) -> Result<Secret, KubeError> {
+            match self.secret {
+                Some(ref s) => Ok(s.clone()),
+                None => Err(KubeError::Api(ErrorResponse {
+                    status: "status".to_string(),
+                    message: "message".to_string(),
+                    reason: "reason".to_string(),
+                    code: 404,
+                })),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_client_secret() {
+        let secret_api = Arc::new(MockSecretApi::from_secret(Some(Secret {
+            metadata: ObjectMeta {
+                name: Some("prometheus-read-only".to_string()),
+                ..ObjectMeta::default()
+            },
+            data: Some(BTreeMap::from([
+                (
+                    "url".to_string(),
+                    ByteString("http://prometheus.site".to_string().into_bytes()),
+                ),
+                (
+                    "token".to_string(),
+                    ByteString("token".to_string().into_bytes()),
+                ),
+            ])),
+            string_data: None,
+            type_: None,
+        })));
+
+        create_prometheus_client_from_environment(secret_api)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_client_none() {
+        let secret_api = Arc::new(MockSecretApi::from_secret(None));
+
+        create_prometheus_client_from_environment(secret_api)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_client_env() {
+        let secret_api = Arc::new(MockSecretApi::from_secret(None));
+
+        env::set_var("PROMETHEUS_URL", "http://prometheus.site");
+
+        // this is the worst case and will default to local (and not panic)
+        create_prometheus_client_from_environment(secret_api.clone())
+            .await
+            .unwrap();
+
+        env::set_var("PROMETHEUS_TOKEN", "token");
+
+        // this should use the envs
+        create_prometheus_client_from_environment(secret_api)
+            .await
+            .unwrap();
+
+        // cleanup
+        env::remove_var("PROMETHEUS_URL");
+        env::remove_var("PROMETHEUS_TOKEN");
+    }
+
     #[tokio::test]
     async fn test_query_prometheus() {
-        let client = get_prometheus_client().unwrap();
+        let client = get_prometheus_client().await.unwrap();
 
         // try a simple instant query
         // if it fails to connect to a prometheus instance, skip the test
-        let query = r#"rate(container_cpu_usage_seconds_total{pod=~".*validator.*", container="validator"}[1m])"#;
+        let query = r#"container_cpu_usage_seconds_total{chain_name=~".*forge.*", pod="aptos-node-0-validator-0", container="validator"}"#;
         let response = client.query(query, None, None).await;
         match response {
-            Ok(pres) => println!("{:?}", pres),
+            Ok(pres) => {
+                println!("{:?}", pres);
+            }
             Err(PrometheusError::Client(e)) => {
                 println!("Skipping test. Failed to create prometheus client: {}", e);
                 return;

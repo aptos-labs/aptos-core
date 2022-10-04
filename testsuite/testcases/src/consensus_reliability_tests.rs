@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use aptos_logger::{info, warn};
-use aptos_rest_client::error::RestError;
-use aptos_sdk::types::account_config::CORE_CODE_ADDRESS;
 use forge::test_utils::consensus_utils::{
     test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
 };
@@ -56,15 +54,6 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
 
         let num_validators = validators.len();
 
-        let validator_set: serde_json::Value = runtime
-            .block_on(
-                validators[0]
-                    .1
-                    .get_resource(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet"),
-            )?
-            .into_inner();
-        info!("ValidatorSet : {:?}", validator_set);
-
         let num_always_healthy = self.always_healthy_nodes;
         // largest number of (small) nodes that can fail simultaneously, while we have enough for quorum
         let can_fail_for_quorum =
@@ -89,23 +78,38 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
             "Always healthy {} nodes, every cycle having {} nodes out of {} down, rotating {} each cycle, expecting first {} validators to have 10x larger stake",
             num_always_healthy, max_fail_in_test, num_validators, cycle_offset, self.num_large_validators);
 
-        if self.add_execution_delay {
+        let slow_allowed_lagging = if self.add_execution_delay {
             runtime.block_on(async {
                 let mut rng = rand::thread_rng();
-                for (name, validator) in &validators[num_always_healthy..num_validators] {
+                let mut slow_allowed_lagging = HashSet::new();
+                for (index, (name, validator)) in
+                    validators.iter().enumerate().skip(num_always_healthy)
+                {
                     let sleep_time = rng.gen_range(20, 500);
+                    if sleep_time > 100 {
+                        slow_allowed_lagging.insert(index);
+                    }
                     let name = name.clone();
+
                     validator
                         .set_failpoint(
                             "aptos_vm::execution::block_metadata".to_string(),
                             format!("sleep({})", sleep_time),
                         )
                         .await
-                        .with_context(|| name)?;
+                        .map_err(|e| {
+                            anyhow!(
+                                "set_failpoint to remove execution delay on {} failed, {:?}",
+                                name,
+                                e
+                            )
+                        })?;
                 }
-                Ok::<(), RestError>(())
-            })?;
-        }
+                Ok::<HashSet<usize>, anyhow::Error>(slow_allowed_lagging)
+            })?
+        } else {
+            HashSet::new()
+        };
 
         let min_tps = self.min_tps;
         let check_period_s = self.check_period_s;
@@ -136,56 +140,96 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
                     (vec![], false)
                 }
             }))),
-            Box::new(move |cycle, _, _, _, cur, previous| {
+            Box::new(move |cycle, _, _, _, cycle_end, cycle_start| {
+                // we group nodes into 3 groups:
+                // - active - nodes we expect to be making progress, and doing so together. we check wery strict rule of min(cycle_end) vs max(cycle_start)
+                // - allowed_lagging - nodes that are allowed to not be up-to-date to the tip of the chain, but are required to be making individual progress.
+                //                     We treat all nodes that were recently down as those (while state-sync is given time to catch-up), or nodes that
+                //                     were added slowness into execution via add_execution_delay param.
+                // - down - nodes that are cut-off from the rest of the nodes, and so shouldn't be seeing any progress. There should be no progress
+                //          on the ordered certificates, but since we are only seeing committed ones, we allow for only minimal progress there, for
+                //          what they already have in the buffer.
+
                 let down_indices = down_indices_f(cycle);
-                let prev_down_indices = if cycle > 0 { down_indices_f(cycle - 1) } else { HashSet::new() };
-                fn split(all: Vec<NodeState>, down_indices: &HashSet<usize>) -> (Vec<(usize, NodeState)>, Vec<NodeState>) {
-                    let (down, active): (Vec<_>, Vec<_>) = all.into_iter().enumerate().partition(|(idx, _state)| down_indices.contains(idx));
-                    (down, active.into_iter().map(|(_idx, state)| state).collect())
+                let recently_down_indices = if cycle > 0 { down_indices_f(cycle - 1) } else { HashSet::new() };
+                fn split(all: Vec<NodeState>, down_indices: &HashSet<usize>, allowed_lagging_indices: &HashSet<usize>) -> (Vec<(usize, NodeState)>, Vec<(usize, NodeState)>, Vec<NodeState>) {
+                    let (down, not_down): (Vec<_>, Vec<_>) = all.into_iter().enumerate().partition(|(idx, _state)| down_indices.contains(idx));
+                    let (allowed_lagging, active)  = not_down.into_iter().partition(|(idx, _state)| allowed_lagging_indices.contains(idx));
+                    (down, allowed_lagging, active.into_iter().map(|(_idx, state)| state).collect())
                 }
 
-                let (cur_down, cur_active) = split(cur, &down_indices);
-                let (prev_down, prev_active) = split(previous, &down_indices);
+                let allowed_lagging = recently_down_indices.union(&slow_allowed_lagging).cloned().collect::<HashSet<_>>();
+                let (cycle_end_down, cycle_end_allowed_lagging, cycle_end_active) = split(cycle_end, &down_indices, &allowed_lagging);
+                let (cycle_start_down, cycle_start_allowed_lagging, cycle_start_active) = split(cycle_start, &down_indices, &allowed_lagging);
 
-                // Make sure that every active node is making progress, so we compare min(cur) vs max(previous)
-                let (cur_min_epoch, cur_min_round) = cur_active.iter().map(|s| (s.epoch, s.round)).min().unwrap();
-                let (prev_max_epoch, prev_max_round) = prev_active.iter().map(|s| (s.epoch, s.round)).max().unwrap();
+                // Make sure that every active node is making progress, so we compare min(cycle_end) vs max(cycle_start)
+                let (cycle_end_min_epoch, cycle_end_min_round) = cycle_end_active.iter().map(|s| (s.epoch, s.round)).min().unwrap();
+                let (cycle_start_max_epoch, cycle_start_max_round) = cycle_start_active.iter().map(|s| (s.epoch, s.round)).max().unwrap();
 
-                let epochs_progress = cur_min_epoch as i64 - prev_max_epoch as i64;
-                let round_progress = cur_min_round as i64 - prev_max_round as i64;
+                let epochs_progress = cycle_end_min_epoch as i64 - cycle_start_max_epoch as i64;
+                let round_progress = cycle_end_min_round as i64 - cycle_start_max_round as i64;
 
-                let transaction_progress = cur_active.iter().map(|s| s.version).min().unwrap() as i64
-                    - prev_active.iter().map(|s| s.version).max().unwrap() as i64;
+                let transaction_progress = cycle_end_active.iter().map(|s| s.version).min().unwrap() as i64
+                    - cycle_start_active.iter().map(|s| s.version).max().unwrap() as i64;
 
                 if transaction_progress < (min_tps * check_period_s) as i64 {
                     bail!(
-                        "no progress with active consensus, only {} transactions, expected >= {} ({} TPS). Down indices {:?}, Prev active: {:?}. Cur active: {:?}",
+                        "not enough progress with active consensus, only {} transactions, expected >= {} ({} TPS). Down indices {:?}, cycle start active: {:?}. cycle end active: {:?}",
                         transaction_progress,
-                        (min_tps * check_period_s),
+                        min_tps * check_period_s,
                         min_tps,
                         down_indices,
-                        prev_active,
-                        cur_active,
+                        cycle_start_active,
+                        cycle_end_active,
                     );
                 }
                 if epochs_progress < 0 || (epochs_progress == 0 && round_progress < (check_period_s / 2) as i64) {
-                    bail!("no progress with active consensus, only {} epochs and {} rounds, expectd >= {}",
-                    epochs_progress,
-                    round_progress,
-                        (check_period_s / 2),
+                    bail!(
+                        "not enough progress with active consensus, only {} epochs and {} rounds, expectd >= {}",
+                        epochs_progress,
+                        round_progress,
+                        check_period_s / 2,
                     );
                 }
 
+                // Make sure that allowed_lagging nodes are making progress
+                for ((node_idx, cycle_end_state), (node_idx_p, cycle_start_state)) in cycle_end_allowed_lagging.iter().zip(cycle_start_allowed_lagging.iter()) {
+                    assert_eq!(node_idx, node_idx_p, "{:?} {:?}", cycle_end_allowed_lagging, cycle_start_allowed_lagging);
+                    let transaction_progress = cycle_end_state.version as i64 - cycle_start_state.version as i64;
+                    if transaction_progress < (min_tps * check_period_s) as i64 {
+                        bail!(
+                            "not enough individual progress on allowed lagging node ({}), only {} transactions, expected >= {} ({} TPS)",
+                            node_idx,
+                            transaction_progress,
+                            min_tps * check_period_s,
+                            min_tps,
+                        );
+                    }
+
+                    let epochs_progress = cycle_end_state.epoch as i64 - cycle_start_state.epoch as i64;
+                    let round_progress = cycle_end_state.round as i64 - cycle_start_state.round as i64;
+                    if epochs_progress < 0 || (epochs_progress == 0 && round_progress < (check_period_s / 2) as i64) {
+                        bail!(
+                            "not enough individual progress on allowed lagging node ({}), only {} epochs and {} rounds, expectd >= {}. Transaction progress was {}.",
+                            node_idx,
+                            epochs_progress,
+                            round_progress,
+                            check_period_s / 2,
+                            transaction_progress,
+                        );
+                    }
+                }
+
                 // Make sure down nodes don't make progress:
-                for ((node_idx, cur_state), (node_idx_p, prev_state)) in cur_down.iter().zip(prev_down.iter()) {
-                    assert_eq!(node_idx, node_idx_p, "{:?} {:?}", cur_down, prev_down);
-                    if cur_state.round > prev_state.round + 3 {
+                for ((node_idx, cycle_end_state), (node_idx_p, cycle_start_state)) in cycle_end_down.iter().zip(cycle_start_down.iter()) {
+                    assert_eq!(node_idx, node_idx_p, "{:?} {:?}", cycle_end_down, cycle_start_down);
+                    if cycle_end_state.round > cycle_start_state.round + 3 {
                         // if we just failed the node, some progress can happen due to pipeline in consensus,
                         // or buffer of received messages in state sync
-                        if prev_down_indices.contains(node_idx) {
-                            bail!("progress on down node {} from ({}, {}) to ({}, {})", node_idx, prev_state.epoch, prev_state.round, cur_state.epoch, cur_state.round);
+                        if recently_down_indices.contains(node_idx) {
+                            bail!("progress on down node {} from ({}, {}) to ({}, {})", node_idx, cycle_start_state.epoch, cycle_start_state.round, cycle_end_state.epoch, cycle_end_state.round);
                         } else {
-                            warn!("progress on down node {} immediatelly after turning off from ({}, {}) to ({}, {})", node_idx, prev_state.epoch, prev_state.round, cur_state.epoch, cur_state.round)
+                            warn!("progress on down node {} immediatelly after turning off from ({}, {}) to ({}, {})", node_idx, cycle_start_state.epoch, cycle_start_state.round, cycle_end_state.epoch, cycle_end_state.round)
                         }
                     }
                 }
@@ -194,8 +238,31 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
             }),
             false,
             true,
-        ))?;
+        )).context("test_consensus_fault_tolerance failed")?;
 
+        // undo slowing down.
+        if self.add_execution_delay {
+            runtime.block_on(async {
+                for (name, validator) in validators.iter().skip(num_always_healthy) {
+                    let name = name.clone();
+
+                    validator
+                        .set_failpoint(
+                            "aptos_vm::execution::block_metadata".to_string(),
+                            "off".to_string(),
+                        )
+                        .await
+                        .map_err(|e| {
+                            anyhow!(
+                                "set_failpoint to remove execution delay on {} failed, {:?}",
+                                name,
+                                e
+                            )
+                        })?;
+                }
+                Ok::<(), anyhow::Error>(())
+            })?;
+        }
         Ok(())
     }
 }

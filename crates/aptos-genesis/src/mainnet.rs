@@ -3,8 +3,8 @@
 
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
 use aptos_config::config::{
-    RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
-    TARGET_SNAPSHOT_SIZE,
+    RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
@@ -12,7 +12,7 @@ use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use framework::ReleaseBundle;
 use storage_interface::DbReaderWriter;
-use vm_genesis::{AccountMap, EmployeeAccountMap, ValidatorWithCommissionRate};
+use vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -45,22 +45,33 @@ pub struct MainnetGenesisInfo {
 
     // MAINNET SPECIFIC FIELDS.
     /// Initial accounts and balances.
-    accounts: Vec<AccountMap>,
+    accounts: Vec<AccountBalance>,
     /// Employee vesting configurations.
-    employee_vesting_accounts: Vec<EmployeeAccountMap>,
+    employee_vesting_accounts: Vec<EmployeePool>,
     /// Set of configurations for validators who will be joining the genesis validator set.
     validators: Vec<ValidatorWithCommissionRate>,
+    /// Timestamp (in seconds) when employee vesting starts.
+    employee_vesting_start: u64,
+    /// Duration of each vesting period (in seconds).
+    employee_vesting_period_duration: u64,
 }
 
 impl MainnetGenesisInfo {
     pub fn new(
         chain_id: ChainId,
-        accounts: Vec<AccountMap>,
-        employee_vesting_accounts: Vec<EmployeeAccountMap>,
+        accounts: Vec<AccountBalance>,
+        employee_vesting_accounts: Vec<EmployeePool>,
         validators: Vec<ValidatorConfiguration>,
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<MainnetGenesisInfo> {
+        let employee_vesting_start = genesis_config
+            .employee_vesting_start
+            .expect("Employee vesting start time (in secs) needs to be provided");
+        let employee_vesting_period_duration = genesis_config
+            .employee_vesting_period_duration
+            .expect("Employee vesting period duration (in secs) needs to be provided");
+
         Ok(MainnetGenesisInfo {
             chain_id,
             accounts,
@@ -80,6 +91,8 @@ impl MainnetGenesisInfo {
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
+            employee_vesting_start,
+            employee_vesting_period_duration,
         })
     }
 
@@ -111,6 +124,8 @@ impl MainnetGenesisInfo {
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
                 voting_power_increase_limit: self.voting_power_increase_limit,
+                employee_vesting_start: self.employee_vesting_start,
+                employee_vesting_period_duration: self.employee_vesting_period_duration,
             },
         )
     }
@@ -124,7 +139,7 @@ impl MainnetGenesisInfo {
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
             false,
-            TARGET_SNAPSHOT_SIZE,
+            BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);

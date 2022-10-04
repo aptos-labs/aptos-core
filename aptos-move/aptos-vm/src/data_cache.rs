@@ -18,15 +18,13 @@ use aptos_types::{
 };
 use fail::fail_point;
 use framework::natives::state_storage::StateStorageUsageResolver;
-use move_deps::{
-    move_binary_format::errors::*,
-    move_core_types::{
-        account_address::AccountAddress,
-        language_storage::{ModuleId, StructTag},
-        resolver::{ModuleResolver, ResourceResolver},
-    },
-    move_table_extension::{TableHandle, TableResolver},
+use move_binary_format::errors::*;
+use move_core_types::{
+    account_address::AccountAddress,
+    language_storage::{ModuleId, StructTag},
+    resolver::{ModuleResolver, ResourceResolver},
 };
+use move_table_extension::{TableHandle, TableResolver};
 use std::{
     collections::btree_map::BTreeMap,
     ops::{Deref, DerefMut},

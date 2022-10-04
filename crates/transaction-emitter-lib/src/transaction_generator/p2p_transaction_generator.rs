@@ -7,6 +7,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
+use async_trait::async_trait;
 use rand::{
     distributions::{Distribution, Standard},
     prelude::{SliceRandom, StdRng},
@@ -212,8 +213,9 @@ impl P2PTransactionGeneratorCreator {
     }
 }
 
+#[async_trait]
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(P2PTransactionGenerator::new(
             self.rng.clone(),
             self.amount,

@@ -71,9 +71,9 @@ module std::bit_vector {
         let x = vector::borrow_mut(&mut bitvector.bit_field, bit_index);
         *x = false;
     }
-    spec set {
+    spec unset {
         include UnsetAbortsIf;
-        ensures bitvector.bit_field[bit_index];
+        ensures !bitvector.bit_field[bit_index];
     }
     spec schema UnsetAbortsIf {
         bitvector: BitVector;

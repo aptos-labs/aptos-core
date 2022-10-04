@@ -8,7 +8,6 @@ mod bytecode;
 mod convert;
 mod derives;
 mod error;
-mod event_key;
 mod hash;
 mod headers;
 mod index;
@@ -25,16 +24,16 @@ pub use block::{BcsBlock, Block};
 pub use bytecode::Bytecode;
 pub use convert::{new_vm_utf8_string, AsConverter, ExplainVMStatus, MoveConverter};
 pub use error::{AptosError, AptosErrorCode};
-pub use event_key::EventKey;
 pub use hash::HashValue;
 pub use headers::*;
-pub use index::IndexResponse;
+pub use index::{IndexResponse, IndexResponseBcs};
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
     verify_field_identifier, verify_function_identifier, verify_module_identifier, EntryFunctionId,
     HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
     MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue, U128, U64,
+    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue,
+    MAX_RECURSIVE_TYPES_ALLOWED, U128, U64,
 };
 use serde::{Deserialize, Deserializer};
 use std::str::FromStr;

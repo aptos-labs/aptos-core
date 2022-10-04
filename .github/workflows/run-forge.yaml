@@ -13,7 +13,7 @@ on:
         type: string
         description: The docker image tag to test. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
       FORGE_NAMESPACE:
-        required: true
+        required: false
         type: string
         description: The Forge k8s namespace to be used for test. This value should manage Forge test concurrency. It may be truncated.
       FORGE_CLUSTER_NAME:
@@ -44,6 +44,10 @@ on:
         required: false
         type: string
         description: Whether to use failpoints images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
+      FORGE_ENABLE_HAPROXY:
+        required: false
+        type: string
+        description: Whether to use HAPRoxy
       FORGE_ENABLE_PERFORMANCE:
         required: false
         type: string
@@ -69,6 +73,7 @@ env:
   FORGE_RUNNER_MODE: k8s
   FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
+  FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
   FORGE_ENABLE_FAILPOINTS: ${{ inputs.FORGE_ENABLE_FAILPOINTS }}
@@ -107,10 +112,6 @@ jobs:
 
       - name: Run Forge
         shell: bash
-        env:
-          PUSH_GATEWAY: ${{ secrets.PUSH_GATEWAY }}
-          PUSH_GATEWAY_USER: ${{ secrets.PUSH_GATEWAY_USER }}
-          PUSH_GATEWAY_PASSWORD: ${{ secrets.PUSH_GATEWAY_PASSWORD }}
         run: testsuite/run_forge.sh
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR
