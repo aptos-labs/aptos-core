@@ -6,7 +6,6 @@ use std::time::Duration;
 use aptos_logger::{
     debug, error,
     prelude::{sample, SampleRate},
-    sample::Sampling,
     Schema,
 };
 use warp::{
