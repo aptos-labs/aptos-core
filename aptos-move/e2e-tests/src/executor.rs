@@ -580,7 +580,7 @@ impl FakeExecutor {
             let session_out = session.finish().expect("Failed to generate txn effects");
             // TODO: Support deltas in fake executor.
             let (_, change_set) = session_out
-                .into_change_set(&mut ())
+                .into_change_set(&mut (), false)
                 .expect("Failed to generate writeset")
                 .into_inner();
             let (write_set, _events) = change_set.into_inner();
@@ -619,7 +619,7 @@ impl FakeExecutor {
         let session_out = session.finish().expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (_, change_set) = session_out
-            .into_change_set(&mut ())
+            .into_change_set(&mut (), false)
             .expect("Failed to generate writeset")
             .into_inner();
         let (writeset, _events) = change_set.into_inner();
