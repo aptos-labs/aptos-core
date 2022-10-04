@@ -118,6 +118,7 @@ members = [
     "testsuite/aptos-fuzzer/fuzz",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
+    "testsuite/dos/http_test",
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/generate-format",
