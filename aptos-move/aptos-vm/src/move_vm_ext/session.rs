@@ -249,7 +249,7 @@ impl SessionOutput {
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        let change_set = ChangeSet::new(write_set, events);
+        let change_set = ChangeSet::new(write_set, events)?;
         Ok(ChangeSetExt::new(delta_change_set, change_set))
     }
 

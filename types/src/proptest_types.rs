@@ -104,7 +104,7 @@ impl Arbitrary for ChangeSet {
     type Parameters = ();
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         (any::<WriteSet>(), vec(any::<ContractEvent>(), 0..10))
-            .prop_map(|(ws, events)| ChangeSet::new(ws, events))
+            .prop_map(|(ws, events)| ChangeSet::new(ws, events).unwrap())
             .boxed()
     }
 
