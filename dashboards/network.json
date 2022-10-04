@@ -3,7 +3,7 @@
   "slug": "",
   "title": "Network",
   "originalTitle": "",
-  "tags": [],
+  "tags": ["aptos-core"],
   "style": "dark",
   "timezone": "",
   "editable": true,
@@ -4009,15 +4009,17 @@
   },
   "refresh": "10s",
   "schemaVersion": 37,
-  "version": 4,
+  "version": 5,
   "links": [
     {
-      "title": "Other Dashboards",
+      "title": "aptos core",
       "type": "dashboards",
       "asDropdown": true,
       "icon": "external link",
       "includeVars": true,
-      "keepTime": true
+      "keepTime": true,
+      "tags": ["aptos-core"],
+      "targetBlank": true
     }
   ],
   "time": { "from": "now-1h", "to": "now" },

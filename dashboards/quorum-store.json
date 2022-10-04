@@ -1782,7 +1782,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 22,
+  "version": 23,
   "links": [],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }
