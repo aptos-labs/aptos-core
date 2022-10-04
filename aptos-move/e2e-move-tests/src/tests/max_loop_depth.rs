@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{assert_success, assert_vm_status, enable_golden, tests::common, MoveHarness};
 use aptos_types::{account_address::AccountAddress, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +14,7 @@ struct ModuleData {
 #[test]
 fn module_loop_depth_at_limit() {
     let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, MoveHarness};
+use crate::{assert_success, enable_golden, MoveHarness};
 use aptos_crypto::multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey};
 use aptos_crypto::{Signature, SigningKey, Uniform, ValidCryptoMaterial};
 use aptos_types::{
@@ -18,6 +18,7 @@ use move_deps::move_core_types::parser::parse_struct_tag;
 #[test]
 fn rotate_auth_key_ed25519_to_ed25519() {
     let mut harness = MoveHarness::new();
+    enable_golden!(&mut harness);
     let account1 = harness.new_account_with_key_pair();
 
     let account2 = harness.new_account_with_key_pair();
@@ -65,6 +66,7 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
 #[test]
 fn rotate_auth_key_twice() {
     let mut harness = MoveHarness::new();
+    enable_golden!(&mut harness);
     let mut account1 = harness.new_account_with_key_pair();
 
     let account2 = harness.new_account_with_key_pair();

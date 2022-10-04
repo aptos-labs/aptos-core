@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_abort, assert_success, tests::common, MoveHarness};
+use crate::{assert_abort, assert_success, enable_golden, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
 use move_deps::move_core_types::parser::parse_struct_tag;
 use package_builder::PackageBuilder;
@@ -16,6 +16,7 @@ struct ModuleData {
 #[test]
 fn init_module() {
     let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
 
     // Load the code
     let acc = h.aptos_framework_account();
@@ -44,6 +45,7 @@ fn init_module() {
 #[test]
 fn init_module_when_republishing_package() {
     let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
 
     // Deploy a package that initially does not have the module that has the init_module function.
     let acc = h.aptos_framework_account();
@@ -68,6 +70,7 @@ fn init_module_when_republishing_package() {
 #[test]
 fn init_module_with_abort_and_republish() {
     let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x12").unwrap());
 
     let mut p1 = PackageBuilder::new("Pack");

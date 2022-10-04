@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, enable_golden, tests::common, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
@@ -10,6 +10,7 @@ use aptos_types::{
 #[test]
 fn push_u128s_onto_vector() {
     let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
@@ -38,6 +39,7 @@ fn push_u128s_onto_vector() {
 #[test]
 fn clone_large_vectors() {
     let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());

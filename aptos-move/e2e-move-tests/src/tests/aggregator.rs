@@ -6,7 +6,7 @@ use crate::{
         add, add_and_materialize, check, destroy, initialize, materialize, materialize_and_add,
         materialize_and_sub, new, sub, sub_add, sub_and_materialize,
     },
-    assert_abort, assert_success,
+    assert_abort, assert_success, enable_golden,
     tests::common,
     MoveHarness,
 };
@@ -20,6 +20,7 @@ fn setup() -> (MoveHarness, Account) {
 #[test]
 fn test_aggregators_e2e() {
     let (mut h, acc) = setup();
+    enable_golden!(&mut h);
     let block_size = 1000;
 
     // Create many aggregators with deterministic limit.
@@ -72,6 +73,7 @@ fn test_aggregators_e2e() {
 #[test]
 fn test_aggregator_lifetime() {
     let (mut h, acc) = setup();
+    enable_golden!(&mut h);
 
     let txns = vec![
         new(&mut h, &acc, 0, 1500),

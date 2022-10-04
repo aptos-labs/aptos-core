@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{tests::common, MoveHarness};
+use crate::{enable_golden, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
@@ -10,6 +10,7 @@ use package_builder::PackageBuilder;
 #[test]
 fn generate_upgrade_script() {
     let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Construct two packages: one for which a proposal is created, the other for
