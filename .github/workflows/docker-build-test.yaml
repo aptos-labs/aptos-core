@@ -28,13 +28,17 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
     # For most PRs run workflows from main, not the PR commit for security
     paths-ignore:
       - 'documentation/**'
+      - 'developer-docs-site/**'
       - '.github/**'
   # For PR that modify .github, run from that PR
   # This will fail to get secrets if you are not from aptos
   pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
     paths:
-      - '.github/**'
+      - '.github/workflows/docker-build-test.yaml'
+      - '.github/workflows/run-forge.yaml'
+      - '.github/workflows/docker-rust-build.yaml'
+      - '.github/workflows/sdk-release.yaml'
   push:
     branches:
       - main
