@@ -43,8 +43,7 @@ impl CliCommand<String> for FundWithFaucet {
 
     async fn execute(self) -> CliTypedResult<String> {
         let hashes = fund_account(
-            self.faucet_options
-                .faucet_url(&self.profile_options.profile)?,
+            self.faucet_options.faucet_url(&self.profile_options)?,
             self.amount,
             self.account,
         )
@@ -54,7 +53,7 @@ impl CliCommand<String> for FundWithFaucet {
             .map_err(|e| CliError::UnexpectedError(e.to_string()))?
             .as_secs()
             + 30;
-        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let client = self.rest_options.client(&self.profile_options)?;
         for hash in hashes {
             client
                 .wait_for_transaction_by_hash(

@@ -358,6 +358,11 @@ impl NodeConfig {
         self.indexer.processor_tasks =
             default_if_zero_u8(self.indexer.processor_tasks, DEFAULT_PROCESSOR_TASKS);
         self.indexer.emit_every = self.indexer.emit_every.or(Some(0));
+        self.indexer.gap_lookback_versions = env_or_default(
+            "GAP_LOOKBACK_VERSIONS",
+            self.indexer.gap_lookback_versions.or(Some(1_500_000)),
+            None,
+        );
 
         Ok(self)
     }

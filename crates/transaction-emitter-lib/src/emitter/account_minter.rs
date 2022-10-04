@@ -3,14 +3,14 @@
 
 use crate::emitter::wait_for_single_account_sequence;
 use crate::{
-    emitter::{GAS_AMOUNT, MAX_TXNS, RETRY_POLICY, SEND_AMOUNT},
+    emitter::{RETRY_POLICY, SEND_AMOUNT},
     query_sequence_number, EmitJobRequest, EmitModeParams,
 };
 use anyhow::{anyhow, format_err, Context, Result};
 use aptos::common::types::EncodingType;
+use aptos::common::utils::prompt_yes;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_infallible::Mutex;
-use aptos_logger::sample::Sampling;
 use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosError, Client as RestClient};
 use aptos_sdk::{
@@ -38,24 +38,24 @@ use std::{collections::HashMap, path::Path};
 pub struct AccountMinter<'t> {
     txn_factory: TransactionFactory,
     rng: StdRng,
-    root_account: &'t mut LocalAccount,
+    source_account: &'t mut LocalAccount,
 }
 
 impl<'t> AccountMinter<'t> {
     pub fn new(
-        root_account: &'t mut LocalAccount,
+        source_account: &'t mut LocalAccount,
         txn_factory: TransactionFactory,
         rng: StdRng,
     ) -> Self {
         Self {
-            root_account,
+            source_account,
             txn_factory,
             rng,
         }
     }
     /// workflow of create accounts:
-    /// 1. Use given root_account as the money source
-    /// 1a. Optionally, mint balance to that account
+    /// 1. Use given source_account as the money source
+    /// 1a. Optionally, and if it is root account, mint balance to that account
     /// 2. load tc account to create seed accounts, one seed account for each endpoint
     /// 3. mint coins from faucet to new created seed accounts
     /// 4. split number of requested accounts into equally size of groups
@@ -70,46 +70,81 @@ impl<'t> AccountMinter<'t> {
         total_requested_accounts: usize,
     ) -> Result<Vec<LocalAccount>> {
         let mut accounts = vec![];
-        let expected_num_seed_accounts =
-            if total_requested_accounts / req.rest_clients.len() > MAX_CHILD_VASP_NUM {
-                total_requested_accounts / MAX_CHILD_VASP_NUM + 1
-            } else {
-                (total_requested_accounts / 50).max(1)
-            };
+        let expected_num_seed_accounts = (total_requested_accounts / 50)
+            .max(1)
+            .min(CREATION_PARALLELISM);
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
-        let coins_per_account = (MAX_TXNS / total_requested_accounts as u64)
-            .checked_mul(SEND_AMOUNT + GAS_AMOUNT)
+        let coins_per_account = (req.expected_max_txns / total_requested_accounts as u64)
+            .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn)
+            .unwrap()
+            .checked_add(aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price)
             .unwrap(); // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();
         let expected_children_per_seed_account =
             (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
         let coins_per_seed_account = (expected_children_per_seed_account as u64)
-            .checked_mul(coins_per_account + GAS_AMOUNT)
+            .checked_mul(coins_per_account + req.expected_gas_per_txn)
+            .unwrap()
+            .checked_add(aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price)
             .unwrap();
-        let coins_for_root = coins_per_seed_account
+        let coins_for_source = coins_per_seed_account
             .checked_mul(expected_num_seed_accounts as u64)
             .unwrap()
-            .checked_add(1_000_000)
+            .checked_add(aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price)
             .unwrap();
+        info!(
+            "Account creationg plan created for {} accounts with {} balance each.",
+            num_accounts, coins_per_account
+        );
+        info!(
+            "    through {} seed accounts with {} each",
+            expected_num_seed_accounts, coins_per_seed_account
+        );
+        info!(
+            "    because of expecting {} txns and {} gas fee for each ",
+            req.expected_max_txns, req.expected_gas_per_txn
+        );
+
         if req.mint_to_root {
-            self.mint_to_root(&req.rest_clients, coins_for_root).await?;
+            self.mint_to_root(&req.rest_clients, coins_for_source)
+                .await?;
         } else {
+            if req.promt_before_spending {
+                if !prompt_yes(&format!(
+                    "plan will consume in total {} balance, are you sure you want to proceed",
+                    coins_for_source
+                )) {
+                    panic!("Aborting");
+                }
+            } else {
+                let max_allowed = 2 * req
+                    .expected_max_txns
+                    .checked_mul(req.expected_gas_per_txn)
+                    .unwrap();
+                assert!(coins_for_source <= max_allowed,
+                    "Estimated total coins needed for load test ({}) are larger than expected_max_txns * expected_gas_per_txn, multiplied by 2 to account for rounding up ({})",
+                    coins_for_source,
+                    max_allowed,
+                );
+            }
+
             let balance = &self
                 .pick_mint_client(&req.rest_clients)
-                .get_account_balance(self.root_account.address())
+                .get_account_balance(self.source_account.address())
                 .await?
                 .into_inner();
             info!(
-                "Root account current balance is {}, needed {} coins",
+                "Source account {} current balance is {}, needed {} coins",
+                self.source_account.address(),
                 balance.get(),
-                coins_for_root
+                coins_for_source
             );
-            if balance.get() < coins_for_root {
+            if balance.get() < coins_for_source {
                 return Err(anyhow!(
-                    "Root ({}) doesn't have enough coins, balance {} < needed {}",
-                    self.root_account.address(),
+                    "Source ({}) doesn't have enough coins, balance {} < needed {}",
+                    self.source_account.address(),
                     balance.get(),
-                    coins_for_root
+                    coins_for_source
                 ));
             }
         }
@@ -123,7 +158,6 @@ impl<'t> AccountMinter<'t> {
                 expected_num_seed_accounts,
                 coins_per_seed_account,
                 mode_params.max_submit_batch_size,
-                req.reuse_accounts,
                 &failed_requests,
             )
             .await?;
@@ -169,7 +203,7 @@ impl<'t> AccountMinter<'t> {
             });
 
         // Each future creates 50 accounts, limit concurrency to 30.
-        let stream = futures::stream::iter(account_futures).buffer_unordered(30);
+        let stream = futures::stream::iter(account_futures).buffer_unordered(CREATION_PARALLELISM);
         // wait for all futures to complete
         let mut minted_accounts = stream
             .collect::<Vec<_>>()
@@ -199,13 +233,13 @@ impl<'t> AccountMinter<'t> {
         info!("Minting new coins to root");
 
         let txn = self
-            .root_account
+            .source_account
             .sign_with_transaction_builder(self.txn_factory.payload(
-                aptos_stdlib::aptos_coin_mint(self.root_account.address(), amount),
+                aptos_stdlib::aptos_coin_mint(self.source_account.address(), amount),
             ));
         execute_and_wait_transactions(
             &self.pick_mint_client(rest_clients).clone(),
-            self.root_account,
+            self.source_account,
             vec![txn],
             &AtomicUsize::new(0),
         )
@@ -220,35 +254,23 @@ impl<'t> AccountMinter<'t> {
         seed_account_num: usize,
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
-        vasp: bool,
         failed_requests: &AtomicUsize,
     ) -> Result<Vec<LocalAccount>> {
         info!("Creating and minting seeds accounts");
         let mut i = 0;
         let mut seed_accounts = vec![];
-        if vasp {
-            let client = self.pick_mint_client(rest_clients).clone();
-            info!("Loading VASP account as seed accounts");
-            let load_account_num = min(seed_account_num, MAX_VASP_ACCOUNT_NUM);
-            for i in 0..load_account_num {
-                let account = self.load_vasp_account(&client, i).await?;
-                seed_accounts.push(account);
-            }
-            info!("Loaded {} VASP accounts", seed_accounts.len());
-            return Ok(seed_accounts);
-        }
         while i < seed_account_num {
             let client = self.pick_mint_client(rest_clients).clone();
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
             let mut batch = gen_random_accounts(batch_size, &mut rng);
-            let creation_account = &mut self.root_account;
+            let source_account = &mut self.source_account;
             let txn_factory = &self.txn_factory;
             let create_requests = batch
                 .iter()
                 .map(|account| {
                     create_and_fund_account_request(
-                        creation_account,
+                        source_account,
                         coins_per_seed_account,
                         account.public_key(),
                         txn_factory,
@@ -257,7 +279,7 @@ impl<'t> AccountMinter<'t> {
                 .collect();
             execute_and_wait_transactions(
                 &client,
-                creation_account,
+                source_account,
                 create_requests,
                 failed_requests,
             )
@@ -282,8 +304,9 @@ impl<'t> AccountMinter<'t> {
         let address = account_key.authentication_key().derived_address();
         let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
             format_err!(
-                "query_sequence_number on {:?} for dd account failed: {:?}",
-                client,
+                "query_sequence_number on {:?} for dd account {} failed: {:?}",
+                client.path_prefix_string(),
+                index,
                 e
             )
         })?;
@@ -572,5 +595,4 @@ pub async fn execute_and_wait_transactions(
     Ok(())
 }
 
-const MAX_CHILD_VASP_NUM: usize = 65536;
-const MAX_VASP_ACCOUNT_NUM: usize = 16;
+const CREATION_PARALLELISM: usize = 200;

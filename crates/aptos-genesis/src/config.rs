@@ -251,7 +251,7 @@ impl TryFrom<ValidatorConfiguration> for Validator {
 const LOCALHOST: &str = "localhost";
 
 /// Combined Host (DnsName or IP) and port
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct HostAndPort {
     pub host: DnsName,
     pub port: u16,
@@ -308,9 +308,14 @@ impl FromStr for HostAndPort {
                 "Invalid host and port, must be of the form 'host:port` e.g. '127.0.0.1:6180'",
             ))
         } else {
-            let host = DnsName::from_str(*parts.first().unwrap())?;
-            let port = u16::from_str(parts.get(1).unwrap())?;
-            Ok(HostAndPort { host, port })
+            let host_str = *parts.first().unwrap();
+            if host_str.trim().is_empty() {
+                Err(anyhow::Error::msg("Invalid host, host is empty"))
+            } else {
+                let host = DnsName::from_str(host_str)?;
+                let port = u16::from_str(parts.get(1).unwrap())?;
+                Ok(HostAndPort { host, port })
+            }
         }
     }
 }

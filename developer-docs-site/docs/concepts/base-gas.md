@@ -121,7 +121,7 @@ Instruction gas parameters are defined at [`instr.rs`] and include the following
 
 | Parameter | Meaning           |
 |-----------|-------------------|
-| `bit_or`  | `OR`: `\|`        |
+| `bit_or`  | `OR`: <code>&#124;</code>         |
 | `bit_and` | `AND`: `&`        |
 | `xor`     | `XOR`: `^`        |
 | `shl`     | Shift left: `<<`  |
@@ -131,7 +131,7 @@ Instruction gas parameters are defined at [`instr.rs`] and include the following
 
 | Parameter | Meaning      |
 |-----------|--------------|
-| `or`      | `OR`: `\|\|` |
+| `or`      | `OR`: <code>&#124;&#124;</code> |
 | `and`     | `AND`: `&&`  |
 | `not`     | `NOT`: `!`   |
 

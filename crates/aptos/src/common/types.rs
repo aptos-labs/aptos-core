@@ -49,6 +49,7 @@ use std::{
 use thiserror::Error;
 
 const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
+pub const DEFAULT_PROFILE: &str = "default";
 
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
@@ -279,11 +280,24 @@ impl CliConfig {
     }
 
     pub fn load_profile(
-        profile: &str,
+        profile: Option<&str>,
         mode: ConfigSearchMode,
     ) -> CliTypedResult<Option<ProfileConfig>> {
         let mut config = Self::load(mode)?;
-        Ok(config.remove_profile(profile))
+
+        // If no profile was given, use `default`
+        if let Some(profile) = profile {
+            if let Some(account_profile) = config.remove_profile(profile) {
+                Ok(Some(account_profile))
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Profile {} not found",
+                    profile
+                )))
+            }
+        } else {
+            Ok(config.remove_profile(DEFAULT_PROFILE))
+        }
     }
 
     pub fn remove_profile(&mut self, profile: &str) -> Option<ProfileConfig> {
@@ -355,14 +369,16 @@ impl FromStr for KeyType {
     }
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct ProfileOptions {
     /// Profile to use from the CLI config
     ///
     /// This will be used to override associated settings such as
-    /// the REST URL, the Faucet URL, and the private key arguments
-    #[clap(long, default_value = "default")]
-    pub profile: String,
+    /// the REST URL, the Faucet URL, and the private key arguments.
+    ///
+    /// Defaults to "default"
+    #[clap(long)]
+    pub profile: Option<String>,
 }
 
 impl ProfileOptions {
@@ -372,7 +388,11 @@ impl ProfileOptions {
             return Ok(account);
         }
 
-        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+        Err(CliError::ConfigNotFoundError(
+            self.profile
+                .clone()
+                .unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
+        ))
     }
 
     pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
@@ -381,25 +401,29 @@ impl ProfileOptions {
             return Ok(public_key);
         }
 
-        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+        Err(CliError::ConfigNotFoundError(
+            self.profile
+                .clone()
+                .unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
+        ))
+    }
+
+    pub fn profile_name(&self) -> Option<&str> {
+        self.profile.as_ref().map(|inner| inner.trim())
     }
 
     pub fn profile(&self) -> CliTypedResult<ProfileConfig> {
         if let Some(profile) =
-            CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
+            CliConfig::load_profile(self.profile_name(), ConfigSearchMode::CurrentDirAndParents)?
         {
             return Ok(profile);
         }
 
-        Err(CliError::ConfigNotFoundError(self.profile.clone()))
-    }
-}
-
-impl Default for ProfileOptions {
-    fn default() -> Self {
-        Self {
-            profile: "default".to_string(),
-        }
+        Err(CliError::ConfigNotFoundError(
+            self.profile
+                .clone()
+                .unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
+        ))
     }
 }
 
@@ -596,16 +620,18 @@ impl ExtractPublicKey for PublicKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
         if let Some(ref file) = self.public_key_file {
             encoding.load_key("--public-key-file", file.as_path())
         } else if let Some(ref key) = self.public_key {
             let key = key.as_bytes().to_vec();
             encoding.decode_key("--public-key", key)
-        } else if let Some(Some(public_key)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|p| p.public_key)
+        } else if let Some(Some(public_key)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.public_key)
         {
             Ok(public_key)
         } else {
@@ -683,7 +709,7 @@ impl PrivateKeyInputOptions {
     pub fn extract_private_key_and_address(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
         maybe_address: Option<AccountAddress>,
     ) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
         // Order of operations
@@ -698,9 +724,11 @@ impl PrivateKeyInputOptions {
                 let address = account_address_from_public_key(&key.public_key());
                 Ok((key, address))
             }
-        } else if let Some((Some(key), maybe_config_address)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|p| (p.private_key, p.account))
+        } else if let Some((Some(key), maybe_config_address)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| (p.private_key, p.account))
         {
             match (maybe_address, maybe_config_address) {
                 (Some(address), _) => Ok((key, address)),
@@ -721,13 +749,15 @@ impl PrivateKeyInputOptions {
     pub fn extract_private_key(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PrivateKey> {
         if let Some(key) = self.extract_private_key_cli(encoding)? {
             Ok(key)
-        } else if let Some(Some(private_key)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|p| p.private_key)
+        } else if let Some(Some(private_key)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.private_key)
         {
             Ok(private_key)
         } else {
@@ -754,7 +784,7 @@ impl ExtractPublicKey for PrivateKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
         self.extract_private_key(encoding, profile)
             .map(|private_key| private_key.public_key())
@@ -765,7 +795,7 @@ pub trait ExtractPublicKey {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey>;
 }
 
@@ -827,12 +857,14 @@ impl RestOptions {
     }
 
     /// Retrieve the URL from the profile or the command line
-    pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
+    pub fn url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref url) = self.url {
             Ok(url.clone())
-        } else if let Some(Some(url)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|p| p.rest_url)
+        } else if let Some(Some(url)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.rest_url)
         {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
@@ -843,7 +875,7 @@ impl RestOptions {
         }
     }
 
-    pub fn client(&self, profile: &str) -> CliTypedResult<Client> {
+    pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
         Ok(Client::new_with_timeout(
             self.url(profile)?,
             Duration::from_secs(self.connection_timeout_s),
@@ -919,7 +951,8 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
     } else if let Some(Some(private_key)) =
-        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+            .map(|p| p.private_key)
     {
         let public_key = private_key.public_key();
         Ok(account_address_from_public_key(&public_key))
@@ -959,7 +992,8 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(Some(account_address))
     } else if let Some(Some(private_key)) =
-        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+            .map(|p| p.private_key)
     {
         let public_key = private_key.public_key();
         Ok(Some(account_address_from_public_key(&public_key)))
@@ -1131,12 +1165,14 @@ impl FaucetOptions {
         FaucetOptions { faucet_url }
     }
 
-    pub fn faucet_url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
+    pub fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
             Ok(faucet_url.clone())
-        } else if let Some(Some(url)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|profile| profile.faucet_url)
+        } else if let Some(Some(url)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|profile| profile.faucet_url)
         {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
@@ -1214,7 +1250,7 @@ pub struct TransactionOptions {
 impl TransactionOptions {
     /// Builds a rest client
     fn rest_client(&self) -> CliTypedResult<Client> {
-        self.rest_options.client(&self.profile_options.profile)
+        self.rest_options.client(&self.profile_options)
     }
 
     /// Retrieves the public key and the associated address
@@ -1222,7 +1258,7 @@ impl TransactionOptions {
     pub fn get_key_and_address(&self) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
         self.private_key_options.extract_private_key_and_address(
             self.encoding_options.encoding,
-            &self.profile_options.profile,
+            &self.profile_options,
             self.sender_account,
         )
     }

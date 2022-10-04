@@ -56,7 +56,8 @@ resource "helm_release" "fullnode" {
   values = [
     jsonencode({
       chain = {
-        era = var.era
+        era  = var.era
+        name = var.chain_name
       }
       image = {
         tag = local.image_tag

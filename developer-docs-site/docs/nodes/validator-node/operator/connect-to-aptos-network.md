@@ -185,7 +185,7 @@ Follow these steps to setup the validator node using the operator account and jo
 
     ```bash
     aptos node join-validator-set \
-      --pool-address <owner-address> \
+      --pool-address <pool-address> \
       --profile testnet-operator \
       --max-gas 10000 
     ```

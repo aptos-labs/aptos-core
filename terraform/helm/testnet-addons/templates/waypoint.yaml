@@ -40,9 +40,9 @@ spec:
       - name: http
         resources:
           {{- toYaml .Values.waypoint.resources | nindent 10 }}
-        image: pierrezemb/gostatic
-        imagePullPolicy: IfNotPresent
-        args: ["-port", "8080", "-enable-health"]
+        image: {{ .Values.waypoint.image.repo }}:{{ .Values.waypoint.image.tag }}
+        imagePullPolicy: {{ .Values.waypoint.image.pullPolicy }}
+        args: ["--port", "8080", "--root", "/srv/http"]
         ports:
         - containerPort: 8080
         volumeMounts:

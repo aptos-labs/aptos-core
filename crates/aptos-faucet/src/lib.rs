@@ -149,6 +149,7 @@ impl FaucetArgs {
 pub struct Service {
     pub faucet_account: Mutex<LocalAccount>,
     pub transaction_factory: TransactionFactory,
+    pub outstanding_requests: std::sync::RwLock<Vec<crate::mint::MintParams>>,
     client: Client,
     endpoint: Url,
     maximum_amount: Option<u64>,
@@ -167,6 +168,7 @@ impl Service {
             transaction_factory: TransactionFactory::new(chain_id)
                 .with_gas_unit_price(std::cmp::max(1, aptos_global_constants::GAS_UNIT_PRICE))
                 .with_transaction_expiration_time(30),
+            outstanding_requests: std::sync::RwLock::new(vec![]),
             client,
             endpoint,
             maximum_amount,

@@ -234,7 +234,7 @@ impl CliCommand<RotateSummary> for RotateKey {
     }
 }
 
-/// Command to lookup the account adress through on-chain lookup table
+/// Command to lookup the account address through on-chain lookup table
 ///
 #[derive(Debug, Parser)]
 pub struct LookupAddress {
@@ -253,15 +253,13 @@ pub struct LookupAddress {
 
 impl LookupAddress {
     pub(crate) fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
-        self.public_key_options.extract_public_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )
+        self.public_key_options
+            .extract_public_key(self.encoding_options.encoding, &self.profile_options)
     }
 
     /// Builds a rest client
     fn rest_client(&self) -> CliTypedResult<Client> {
-        self.rest_options.client(&self.profile_options.profile)
+        self.rest_options.client(&self.profile_options)
     }
 }
 

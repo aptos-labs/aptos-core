@@ -6,7 +6,6 @@ use aptos_config::config::LedgerPrunerConfig;
 use aptos_logger::{
     error,
     prelude::{sample, SampleRate},
-    sample::Sampling,
 };
 use aptos_types::transaction::Version;
 use std::sync::atomic::{AtomicBool, Ordering};
