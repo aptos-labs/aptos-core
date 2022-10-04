@@ -30,6 +30,11 @@ module aptos_names::price_model {
         scale_price_for_years(config::domain_price_for_length(length_to_charge_for), registration_years)
     }
 
+    /// Subdomains have a unit cost, that exponentially per number of years
+    public fun price_for_subdomain_v1(registration_years: u8): u64 {
+        scale_price_for_years(config::subdomain_price(), registration_years)
+    }
+
     #[test(myself = @aptos_names, framework = @0x1)]
     fun test_price_for_domain_v1(myself: &signer, framework: &signer) {
         use aptos_names::config;
@@ -45,6 +50,7 @@ module aptos_names::price_model {
         coin::register<AptosCoin>(myself);
         config::initialize_v1(myself, @aptos_names, @aptos_names);
 
+        config::set_subdomain_price(myself, config::octas() / 5);
         config::set_domain_price_for_length(myself, (100 * config::octas()), 2);
         config::set_domain_price_for_length(myself, (60 * config::octas()), 3);
         config::set_domain_price_for_length(myself, (30 * config::octas()), 4);

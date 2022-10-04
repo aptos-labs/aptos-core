@@ -171,6 +171,10 @@ module aptos_names::domains {
         let (is_owner, _token_id) = is_owner_of_name(signer_addr, option::none(), domain_name);
         assert!(is_owner, error::permission_denied(ENOT_OWNER_OF_DOMAIN));
 
+        let registration_years = time_helper::seconds_to_years(registration_duration_secs);
+        let price = price_model::price_for_subdomain_v1((registration_years as u8));
+        coin::transfer<AptosCoin>(sign, config::foundation_fund_address(), price);
+
         register_name_internal(sign, option::some(subdomain_name), domain_name, registration_duration_secs, 0);
     }
 

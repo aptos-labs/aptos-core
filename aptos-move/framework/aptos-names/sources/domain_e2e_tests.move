@@ -109,6 +109,20 @@ module aptos_names::domain_e2e_tests {
     }
 
     #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
+    fun owner_can_clear_domain_address_e2e_test(myself: &signer, user: signer, aptos: signer, rando: signer, foundation: signer) {
+        let users = test_helper::e2e_test_setup(myself, user, &aptos, rando, &foundation);
+        let user = vector::borrow(&users, 0);
+        let rando = vector::borrow(&users, 1);
+
+        // Register the domain, and set its address
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::set_name_address(user, option::none(), test_helper::domain_name(), signer::address_of(rando));
+
+        // Ensure we can clear as owner
+        test_helper::clear_name_address(user, option::none(), test_helper::domain_name());
+    }
+
+    #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
     fun admin_can_force_set_name_address_e2e_test(myself: &signer, user: signer, aptos: signer, rando: signer, foundation: signer) {
         let users = test_helper::e2e_test_setup(myself, user, &aptos, rando, &foundation);
         let user = vector::borrow(&users, 0);

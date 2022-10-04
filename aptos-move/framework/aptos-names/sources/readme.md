@@ -67,7 +67,8 @@ the same method to `clear` the name, removing the mapping.
 
 ### Pricing
 
-In order to help deter spam, we will be charging a fee for registering a domain name.
+In order to help deter spam, we will be charging a fee for registering a domain name, and a significantly lower fee for
+subdomain names..
 The fee is variable, depending on the length of the name, and the duration of the registration.
 This fee is sent to an account controlled by the `Aptos Foundation`, and will be used to fund grants for the ecosystem.
 
@@ -76,7 +77,6 @@ The price per year also increases as the number of years registered increases, t
 squatting and more quickly return 'lost' names to those who will use them.
 The maximum number of years that a domain can be registered for (excluding renewals) is 10. Names can however be renewed
 indefinitely.
-
 
 ### Governance
 

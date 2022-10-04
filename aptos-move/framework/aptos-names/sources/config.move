@@ -27,6 +27,7 @@ module aptos_names::config {
     const CONFIG_KEY_TOKENDATA_DESCRIPTION: vector<u8> = b"tokendata_description";
     const CONFIG_KEY_TOKENDATA_URL_PREFIX: vector<u8> = b"tokendata_url_prefix";
     const CONFIG_KEY_DOMAIN_PRICE_PREFIX: vector<u8> = b"domain_price_";
+    const CONFIG_KEY_SUBDOMAIN_PRICE: vector<u8> = b"subdomain_price";
 
     const DOMAIN_TYPE: vector<u8> = b"domain";
     const SUBDOMAIN_TYPE: vector<u8> = b"subdomain";
@@ -60,6 +61,8 @@ module aptos_names::config {
         set_tokendata_url_prefix(framework, string::utf8(b"https://aptosnames.com/api/v1/metadata/"));
 
         // TODO: SET REAL VALUES FOR DOMAIN PRICES
+        // 0.2 APT
+        set_subdomain_price(framework, octas() / 5);
         set_domain_price_for_length(framework, (100 * octas()), 2);
         set_domain_price_for_length(framework, (60 * octas()), 3);
         set_domain_price_for_length(framework, (30 * octas()), 4);
@@ -135,6 +138,10 @@ module aptos_names::config {
         read_u64_v1(@aptos_names, &config_key_domain_price(domain_length))
     }
 
+    public fun subdomain_price(): u64 acquires ConfigurationV1 {
+        read_u64_v1(@aptos_names, &config_key_subdomain_price())
+    }
+
 
     //
     // Setters
@@ -178,6 +185,11 @@ module aptos_names::config {
     public entry fun set_tokendata_url_prefix(sign: &signer, description: String) acquires ConfigurationV1 {
         assert_signer_is_admin(sign);
         set_v1(@aptos_names, config_key_tokendata_url_prefix(), &description)
+    }
+
+    public entry fun set_subdomain_price(sign: &signer, price: u64) acquires ConfigurationV1 {
+        assert_signer_is_admin(sign);
+        set_v1(@aptos_names, config_key_subdomain_price(), &price)
     }
 
     public entry fun set_domain_price_for_length(sign: &signer, price: u64, length: u64) acquires ConfigurationV1 {
@@ -236,6 +248,10 @@ module aptos_names::config {
         let key = string::utf8(CONFIG_KEY_DOMAIN_PRICE_PREFIX);
         string::append(&mut key, utf8_utils::u128_to_string((domain_length as u128)));
         key
+    }
+
+    public fun config_key_subdomain_price(): String {
+        string::utf8(CONFIG_KEY_SUBDOMAIN_PRICE)
     }
 
     fun remove_v1(addr: address, config_name: &String): (String, PropertyValue) acquires ConfigurationV1 {

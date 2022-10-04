@@ -67,8 +67,9 @@ module aptos_names::test_helper {
         let register_name_event_v1_event_count_before = domains::get_register_name_event_v1_count();
         let set_name_address_event_v1_event_count_before = domains::get_set_name_address_event_v1_count();
 
+        let years = (time_helper::seconds_to_years(registration_duration_secs) as u8);
         if (option::is_none(&subdomain_name)) {
-            domains::register_domain(user, domain_name, (time_helper::seconds_to_years(registration_duration_secs) as u8));
+            domains::register_domain(user, domain_name, years);
         } else {
             domains::register_subdomain(user, *option::borrow(&subdomain_name), domain_name, registration_duration_secs);
         };
@@ -92,10 +93,10 @@ module aptos_names::test_helper {
         let expected_user_balance_after;
         let user_balance_after = coin::balance<AptosCoin>(user_addr);
         if (is_subdomain) {
-            // If it's a subdomain, we don't charge for it
-            expected_user_balance_after = user_balance_before;
+            // If it's a subdomain, we only charge a nomincal fee
+            expected_user_balance_after = user_balance_before - price_model::price_for_subdomain_v1(years);
         }else {
-            let domain_price = price_model::price_for_domain_v1(string::length(&domain_name), 1);
+            let domain_price = price_model::price_for_domain_v1(string::length(&domain_name), years);
             assert!(domain_price / config::octas() == 30, domain_price / config::octas());
             expected_user_balance_after = user_balance_before - domain_price;
         };
