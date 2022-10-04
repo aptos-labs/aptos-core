@@ -141,6 +141,15 @@ pub static DELIVERED_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the delivered end batch since last restart.
+pub static DELIVERED_END_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_delivered_end_batch_count",
+        "Count of the delivered end batch since last restart."
+    )
+    .unwrap()
+});
+
 /// Count of the missed batches when execute.
 pub static MISSED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

@@ -57,6 +57,7 @@ impl NetworkListener {
             .entry(source)
             .or_insert(BatchAggregator::new(self.max_batch_bytes));
         if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
+            counters::DELIVERED_END_BATCH_COUNT.inc();
             // end batch message
             debug!(
                 "QS: got end batch message from {:?} batch_id {}, fragment_id {}",
