@@ -38,7 +38,6 @@ The Aptos Move adapter features include:
 The Aptos framework ships with many useful libraries:
 * A [Token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) that makes it possible to create NFTs and other rich tokens without publishing a smart contract
 * A [Coin standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) that makes it possible to create type-safe Coins by publishing a trivial module
-* An [iterable Table](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/data_structures/sources/iterable_table.move) that allows for traversing all the entries within a table
 * A staking and delegation framework
 * A [`type_of`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/type_info.move) service to identify at run-time the address, module, and struct name of a given type
 * Multi-signer framework that allows multiple `signer` entities
