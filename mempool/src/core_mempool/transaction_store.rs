@@ -550,7 +550,7 @@ impl TransactionStore {
     ) -> (Vec<SignedTransaction>, TimelineId) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
-        let mut last_timeline_id = timeline_id.clone();
+        let mut last_timeline_id = timeline_id.0.clone();
 
         // Add as many transactions to the batch as possible
         for (i, bucket) in self
