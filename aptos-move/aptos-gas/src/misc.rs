@@ -13,14 +13,14 @@ crate::params::define_gas_parameters!(
     "misc.abs_val",
     [
         // abstract value size
-        [u8: AbstractValueSize, "u8", 1],
-        [u64: AbstractValueSize, "u64", 8],
-        [u128: AbstractValueSize, "u128", 16],
-        [bool: AbstractValueSize, "bool", 1],
-        [address: AbstractValueSize, "address", 32],
-        [struct_: AbstractValueSize, "struct", 8],
-        [vector: AbstractValueSize, "vector", 16],
-        [reference: AbstractValueSize, "reference", 16],
+        [u8: AbstractValueSize, "u8", 40],
+        [u64: AbstractValueSize, "u64", 40],
+        [u128: AbstractValueSize, "u128", 40],
+        [bool: AbstractValueSize, "bool", 40],
+        [address: AbstractValueSize, "address", 40],
+        [struct_: AbstractValueSize, "struct", 40],
+        [vector: AbstractValueSize, "vector", 40],
+        [reference: AbstractValueSize, "reference", 40],
         [per_u8_packed: AbstractValueSizePerArg, "per_u8_packed", 1],
         [per_u64_packed: AbstractValueSizePerArg, "per_u64_packed", 8],
         [
@@ -109,13 +109,15 @@ where
 }
 
 struct AbstractValueSizeVisitor<'a> {
+    feature_version: u64,
     params: &'a AbstractValueSizeGasParameters,
     size: AbstractValueSize,
 }
 
 impl<'a> AbstractValueSizeVisitor<'a> {
-    fn new(params: &'a AbstractValueSizeGasParameters) -> Self {
+    fn new(params: &'a AbstractValueSizeGasParameters, feature_version: u64) -> Self {
         Self {
+            feature_version,
             params,
             size: 0.into(),
         }
@@ -166,27 +168,47 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
 
     #[inline]
     fn visit_vec_u8(&mut self, _depth: usize, vals: &[u8]) {
-        self.size += self.params.per_u8_packed * NumArgs::new(vals.len() as u64);
+        let mut size = self.params.per_u8_packed * NumArgs::new(vals.len() as u64);
+        if self.feature_version >= 3 {
+            size += self.params.vector;
+        }
+        self.size += size;
     }
 
     #[inline]
     fn visit_vec_u64(&mut self, _depth: usize, vals: &[u64]) {
-        self.size += self.params.per_u64_packed * NumArgs::new(vals.len() as u64);
+        let mut size = self.params.per_u64_packed * NumArgs::new(vals.len() as u64);
+        if self.feature_version >= 3 {
+            size += self.params.vector;
+        }
+        self.size += size;
     }
 
     #[inline]
     fn visit_vec_u128(&mut self, _depth: usize, vals: &[u128]) {
-        self.size += self.params.per_u128_packed * NumArgs::new(vals.len() as u64);
+        let mut size = self.params.per_u128_packed * NumArgs::new(vals.len() as u64);
+        if self.feature_version >= 3 {
+            size += self.params.vector;
+        }
+        self.size += size;
     }
 
     #[inline]
     fn visit_vec_bool(&mut self, _depth: usize, vals: &[bool]) {
-        self.size += self.params.per_bool_packed * NumArgs::new(vals.len() as u64);
+        let mut size = self.params.per_bool_packed * NumArgs::new(vals.len() as u64);
+        if self.feature_version >= 3 {
+            size += self.params.vector;
+        }
+        self.size += size;
     }
 
     #[inline]
     fn visit_vec_address(&mut self, _depth: usize, vals: &[AccountAddress]) {
-        self.size += self.params.per_address_packed * NumArgs::new(vals.len() as u64);
+        let mut size = self.params.per_address_packed * NumArgs::new(vals.len() as u64);
+        if self.feature_version >= 3 {
+            size += self.params.vector;
+        }
+        self.size += size;
     }
 
     #[inline]
@@ -198,18 +220,251 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
 
 impl AbstractValueSizeGasParameters {
     /// Calculates the abstract size of the given value.
-    pub fn abstract_value_size(&self, val: impl ValueView) -> AbstractValueSize {
-        let mut visitor = AbstractValueSizeVisitor::new(self);
+    pub fn abstract_value_size(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> AbstractValueSize {
+        let mut visitor = AbstractValueSizeVisitor::new(self, feature_version);
         val.visit(&mut visitor);
         visitor.finish()
     }
 
     /// Calculates the abstract size of the given value.
     /// If the value is a reference, then the size of the value behind it will be returned.
-    pub fn abstract_value_size_dereferenced(&self, val: impl ValueView) -> AbstractValueSize {
-        let mut visitor = DerefVisitor::new(AbstractValueSizeVisitor::new(self));
+    pub fn abstract_value_size_dereferenced(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> AbstractValueSize {
+        let mut visitor = DerefVisitor::new(AbstractValueSizeVisitor::new(self, feature_version));
         val.visit(&mut visitor);
         visitor.into_inner().finish()
+    }
+}
+
+impl AbstractValueSizeGasParameters {
+    pub fn abstract_stack_size(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> AbstractValueSize {
+        struct Visitor<'a> {
+            feature_version: u64,
+            params: &'a AbstractValueSizeGasParameters,
+            res: Option<AbstractValueSize>,
+        }
+
+        impl<'a> ValueVisitor for Visitor<'a> {
+            #[inline]
+            fn visit_u8(&mut self, _depth: usize, _val: u8) {
+                self.res = Some(self.params.u8);
+            }
+
+            #[inline]
+            fn visit_u64(&mut self, _depth: usize, _val: u64) {
+                self.res = Some(self.params.u64);
+            }
+
+            #[inline]
+            fn visit_u128(&mut self, _depth: usize, _val: u128) {
+                self.res = Some(self.params.u128);
+            }
+
+            #[inline]
+            fn visit_bool(&mut self, _depth: usize, _val: bool) {
+                self.res = Some(self.params.bool);
+            }
+
+            #[inline]
+            fn visit_address(&mut self, _depth: usize, _val: AccountAddress) {
+                self.res = Some(self.params.address);
+            }
+
+            #[inline]
+            fn visit_struct(&mut self, _depth: usize, _len: usize) -> bool {
+                self.res = Some(self.params.struct_);
+                false
+            }
+
+            #[inline]
+            fn visit_vec(&mut self, _depth: usize, _len: usize) -> bool {
+                self.res = Some(self.params.vector);
+                false
+            }
+
+            #[inline]
+            fn visit_ref(&mut self, _depth: usize, _is_global: bool) -> bool {
+                self.res = Some(self.params.reference);
+                false
+            }
+
+            // TODO(Gas): The following function impls are necessary due to a bug upstream.
+            //            Remove them once the bug is fixed.
+            #[inline]
+            fn visit_vec_u8(&mut self, depth: usize, vals: &[u8]) {
+                if self.feature_version < 3 {
+                    self.res = Some(0.into());
+                } else {
+                    self.visit_vec(depth, vals.len());
+                }
+            }
+
+            #[inline]
+            fn visit_vec_u64(&mut self, depth: usize, vals: &[u64]) {
+                if self.feature_version < 3 {
+                    self.res = Some(0.into());
+                } else {
+                    self.visit_vec(depth, vals.len());
+                }
+            }
+
+            #[inline]
+            fn visit_vec_u128(&mut self, depth: usize, vals: &[u128]) {
+                if self.feature_version < 3 {
+                    self.res = Some(0.into());
+                } else {
+                    self.visit_vec(depth, vals.len());
+                }
+            }
+
+            #[inline]
+            fn visit_vec_bool(&mut self, depth: usize, vals: &[bool]) {
+                if self.feature_version < 3 {
+                    self.res = Some(0.into());
+                } else {
+                    self.visit_vec(depth, vals.len());
+                }
+            }
+
+            #[inline]
+            fn visit_vec_address(&mut self, depth: usize, vals: &[AccountAddress]) {
+                if self.feature_version < 3 {
+                    self.res = Some(0.into());
+                } else {
+                    self.visit_vec(depth, vals.len());
+                }
+            }
+        }
+
+        let mut visitor = Visitor {
+            feature_version,
+            params: self,
+            res: None,
+        };
+        val.visit(&mut visitor);
+        visitor.res.unwrap()
+    }
+
+    pub fn abstract_packed_size(&self, val: impl ValueView) -> AbstractValueSize {
+        struct Visitor<'a> {
+            params: &'a AbstractValueSizeGasParameters,
+            res: Option<AbstractValueSize>,
+        }
+
+        impl<'a> ValueVisitor for Visitor<'a> {
+            #[inline]
+            fn visit_u8(&mut self, _depth: usize, _val: u8) {
+                self.res = Some(self.params.per_u8_packed * NumArgs::from(1));
+            }
+
+            #[inline]
+            fn visit_u64(&mut self, _depth: usize, _val: u64) {
+                self.res = Some(self.params.per_u64_packed * NumArgs::from(1));
+            }
+
+            #[inline]
+            fn visit_u128(&mut self, _depth: usize, _val: u128) {
+                self.res = Some(self.params.per_u128_packed * NumArgs::from(1));
+            }
+
+            #[inline]
+            fn visit_bool(&mut self, _depth: usize, _val: bool) {
+                self.res = Some(self.params.per_bool_packed * NumArgs::from(1));
+            }
+
+            #[inline]
+            fn visit_address(&mut self, _depth: usize, _val: AccountAddress) {
+                self.res = Some(self.params.per_address_packed * NumArgs::from(1));
+            }
+
+            #[inline]
+            fn visit_struct(&mut self, _depth: usize, _len: usize) -> bool {
+                self.res = Some(self.params.struct_);
+                false
+            }
+
+            #[inline]
+            fn visit_vec(&mut self, _depth: usize, _len: usize) -> bool {
+                self.res = Some(self.params.vector);
+                false
+            }
+
+            #[inline]
+            fn visit_ref(&mut self, _depth: usize, _is_global: bool) -> bool {
+                // TODO(Gas): This should be unreachable...
+                //            See if we can handle this in a more graceful way.
+                self.res = Some(self.params.reference);
+                false
+            }
+
+            // TODO(Gas): The following function impls are necessary due to a bug upstream.
+            //            Remove them once the bug is fixed.
+            #[inline]
+            fn visit_vec_u8(&mut self, depth: usize, vals: &[u8]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            #[inline]
+            fn visit_vec_u64(&mut self, depth: usize, vals: &[u64]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            #[inline]
+            fn visit_vec_u128(&mut self, depth: usize, vals: &[u128]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            #[inline]
+            fn visit_vec_bool(&mut self, depth: usize, vals: &[bool]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            #[inline]
+            fn visit_vec_address(&mut self, depth: usize, vals: &[AccountAddress]) {
+                self.visit_vec(depth, vals.len());
+            }
+        }
+
+        let mut visitor = Visitor {
+            params: self,
+            res: None,
+        };
+        val.visit(&mut visitor);
+        visitor.res.unwrap()
+    }
+
+    pub fn abstract_value_size_stack_and_heap(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> (AbstractValueSize, AbstractValueSize) {
+        let stack_size = self.abstract_stack_size(&val, feature_version);
+        let abs_size = self.abstract_value_size(val, feature_version);
+        let heap_size = abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into());
+
+        (stack_size, heap_size)
+    }
+
+    pub fn abstract_heap_size(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> AbstractValueSize {
+        let stack_size = self.abstract_stack_size(&val, feature_version);
+        let abs_size = self.abstract_value_size(val, feature_version);
+
+        abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into())
     }
 }
 
