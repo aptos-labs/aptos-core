@@ -23,6 +23,7 @@ pub struct TransactionMetadata {
     pub expiration_timestamp_secs: u64,
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
+    pub script_size: NumBytes,
 }
 
 impl TransactionMetadata {
@@ -48,6 +49,13 @@ impl TransactionMetadata {
                 TransactionPayload::EntryFunction(_) => vec![],
                 TransactionPayload::ModuleBundle(_) => vec![],
             },
+            script_size: match txn.payload() {
+                TransactionPayload::Script(s) => (bcs::to_bytes(s.code())
+                    .expect("Unable to serialize Script")
+                    .len() as u64)
+                    .into(),
+                _ => NumBytes::zero(),
+            },
         }
     }
 
@@ -57,6 +65,10 @@ impl TransactionMetadata {
 
     pub fn gas_unit_price(&self) -> FeePerGasUnit {
         self.gas_unit_price
+    }
+
+    pub fn script_size(&self) -> NumBytes {
+        self.script_size
     }
 
     pub fn sender(&self) -> AccountAddress {
@@ -109,6 +121,7 @@ impl Default for TransactionMetadata {
             expiration_timestamp_secs: 0,
             chain_id: ChainId::test(),
             script_hash: vec![],
+            script_size: NumBytes::zero(),
         }
     }
 }

@@ -42,6 +42,8 @@ use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
+pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
+
 #[derive(Clone)]
 /// A wrapper to make VMRuntime standalone and thread safe.
 pub struct AptosVMImpl {
@@ -215,13 +217,17 @@ impl AptosVMImpl {
             let valid = if let Ok(Some(data)) = data {
                 let approved_execution_hashes =
                     bcs::from_bytes::<ApprovedExecutionHashes>(&data).ok();
-                approved_execution_hashes
+                let valid = approved_execution_hashes
                     .map(|aeh| {
                         aeh.entries
                             .into_iter()
                             .any(|(_, hash)| hash == txn_data.script_hash)
                     })
-                    .unwrap_or(false)
+                    .unwrap_or(false);
+                valid
+                    && (txn_data.script_size + txn_gas_params.max_transaction_size_in_bytes
+                        > txn_data.transaction_size)
+                    && txn_data.transaction_size <= MAXIMUM_APPROVED_TRANSACTION_SIZE.into()
             } else {
                 false
             };
