@@ -53,7 +53,6 @@ impl BatchRequesterState {
     // TODO: if None, then return an error to the caller
     fn serve_request(self, digest: HashValue, maybe_payload: Option<Vec<SignedTransaction>>) {
         if let Some(payload) = maybe_payload {
-            counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
             debug!(
                 "QS: batch to oneshot, digest {}, tx {:?}",
                 digest, self.ret_tx
@@ -129,10 +128,9 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
         for digest in self.timeouts.expire() {
             debug!("QS: timed out batch request, digest = {}", digest);
             if let Some(state) = self.digest_to_state.get_mut(&digest) {
-                // Quoruo Store measurements
-                counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();
-
                 if let Some(request_peers) = state.next_request_peers(self.request_num_peers) {
+                    // Quorum Store measurements
+                    counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();
                     self.send_requests(digest, request_peers).await;
                     self.timeouts.add_digest(digest, self.request_timeout_ms);
                 } else {
