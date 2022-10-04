@@ -259,6 +259,7 @@ impl TimelineIndex {
 pub struct MultiBucketTimelineIndex {
     timelines: Vec<TimelineIndex>,
     bucket_mins: Vec<u64>,
+    bucket_mins_to_string: Vec<String>,
 }
 
 impl MultiBucketTimelineIndex {
@@ -276,9 +277,15 @@ impl MultiBucketTimelineIndex {
             timelines.push(TimelineIndex::new());
         }
 
+        let bucket_mins_to_string: Vec<_> = bucket_mins
+            .iter()
+            .map(|bucket_min| bucket_min.to_string())
+            .collect();
+
         Ok(Self {
             timelines,
             bucket_mins,
+            bucket_mins_to_string,
         })
     }
 
@@ -351,6 +358,14 @@ impl MultiBucketTimelineIndex {
             size += timeline.size()
         }
         size
+    }
+
+    pub(crate) fn get_sizes(&self) -> Vec<(&str, usize)> {
+        self.bucket_mins_to_string
+            .iter()
+            .zip(self.timelines.iter())
+            .map(|(bucket_min, timeline)| (bucket_min.as_str(), timeline.size()))
+            .collect()
     }
 }
 

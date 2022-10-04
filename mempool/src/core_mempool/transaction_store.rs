@@ -90,7 +90,7 @@ impl TransactionStore {
             })),
             priority_index: PriorityIndex::new(),
             timeline_index: MultiBucketTimelineIndex::new(config.broadcast_buckets.clone())
-                .expect("MultiBucketTimelineIndex must be initialized"),
+                .unwrap(),
             parking_lot_index: ParkingLotIndex::new(),
             hash_index: HashMap::new(),
 
@@ -299,6 +299,7 @@ impl TransactionStore {
             counters::TIMELINE_INDEX_LABEL,
             self.timeline_index.size(),
         );
+        counters::core_mempool_timeline_index_size(&self.timeline_index.get_sizes());
         counters::core_mempool_index_size(
             counters::TRANSACTION_HASH_INDEX_LABEL,
             self.hash_index.len(),
