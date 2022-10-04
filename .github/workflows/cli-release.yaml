@@ -20,9 +20,24 @@ on:
         description: "Name of the release, e.g. \"Aptos CLI devnet release 2022-06-09\":"
 
 jobs:
-  build-linux-binary:
-    name: "Build Linux binary"
-    runs-on: ubuntu-latest
+  build-ubuntu20-binary:
+    name: "Build Ubuntu 20.04 binary"
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh
+      - name: Upload Binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: cli-builds
+          path: aptos-cli-*.zip
+
+  build-ubuntu22-binary:
+    name: "Build Ubuntu 22.04 binary"
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -68,7 +83,8 @@ jobs:
   release-binaries:
     name: "Release binaries"
     needs:
-      - build-linux-binary
+      - build-ubuntu20-binary
+      - build-ubuntu22-binary
       - build-os-x-binary
       - build-windows-binary
     runs-on: ubuntu-latest
