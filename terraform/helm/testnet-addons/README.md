@@ -14,14 +14,10 @@ Additional components for aptos-nodes testnet
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| aws.cluster_name | string | `nil` | AWS EKS cluster resources are deployed in |
-| aws.region | string | `nil` | AWS region resources are deployed in |
-| aws.role_arn | string | `nil` | AWS Role ARN for k8s integrations |
-| aws.vpc_id | string | `nil` | AWS VPC ID resources are deployed in |
-| aws.zone_name | string | `nil` | Route53 zone name to create external-dns records in |
 | genesis.chain_id | string | `nil` | Aptos Chain ID |
 | genesis.numValidators | string | `nil` | Number of validators deployed in this testnet |
 | genesis.username_prefix | string | `"aptos-node"` | Validator username prefix, used to get genesis secrets. This should be the fullname for the aptos-node helm release |
+| imageTag | string | `"devnet"` | Default image tag to use for all aptos images |
 | ingress.acm_certificate | string | `nil` | The ACM certificate to install on the ingress |
 | ingress.cookieDurationSeconds | int | `86400` | If stickiness is enabled, how long the session cookie should last |
 | ingress.enableStickyness | bool | `true` | Whether to enable session stickiness on the underlying load balancer |
@@ -29,10 +25,10 @@ Additional components for aptos-nodes testnet
 | ingress.wafAclArn | string | `nil` | The ARN of the WAF ACL to install on the ingress |
 | load_test.affinity | object | `{}` |  |
 | load_test.config.duration | int | `300` | How long to emit transactions for |
-| load_test.config.target_tps | int | `0` | Whether to target constant TPS |
 | load_test.config.mempool_backlog | int | `5000` | Number of transactions outstanding in mempool |
 | load_test.config.mint_key | string | `nil` | The private key used to mint to fund load test |
 | load_test.config.numFullnodeGroups | string | `nil` | The number of fullnode groups to run traffic against |
+| load_test.config.target_tps | int | `0` | Whether to target a constant TPS, or 0 if not used. Cannot be used with mempool_backlog. |
 | load_test.config.txn_expiration_time_secs | int | `30` | How long to wait for transactions to be expired |
 | load_test.config.use_validators | bool | `false` | Whether to submit transactions through validator REST API |
 | load_test.enabled | bool | `false` | Whether to enable the load test CronJob |
@@ -51,7 +47,12 @@ Additional components for aptos-nodes testnet
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
 | serviceAccount.name | string | `nil` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template |
 | waypoint.affinity | object | `{}` |  |
+| waypoint.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for waypoint image |
+| waypoint.image.repo | string | `"joseluisq/static-web-server"` | Image repo to use for serving waypoint and genesis |
+| waypoint.image.tag | string | `"2.12@sha256:a3b147754be4c38ce96189c4dbaa708c36f39dfcc043c470812c33dd53fea7d0"` | Image tag to use for serving waypoint and genesis |
 | waypoint.nodeSelector | object | `{}` |  |
+| waypoint.resources.requests.cpu | string | `"200m"` |  |
+| waypoint.resources.requests.memory | string | `"512Mi"` |  |
 | waypoint.tolerations | list | `[]` |  |
 
 ----------------------------------------------
