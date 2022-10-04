@@ -1,14 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{tests::common, MoveHarness};
+use crate::{enable_golden, tests::common, MoveHarness};
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use language_e2e_tests::account::Account;
 use move_deps::move_core_types::account_address::AccountAddress;
 
 #[test]
 fn can_upgrade_framework_on_testnet() {
-    let mut h = MoveHarness::new_testnet();
+    let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
     h.increase_transaction_size();
 
     // Upgrade all frameworks in bottom up order as they may have dependencies from each other

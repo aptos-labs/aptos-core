@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    assert_abort, assert_success, get_stake_pool, get_validator_config, get_validator_set,
-    initialize_staking, join_validator_set, leave_validator_set, rotate_consensus_key,
-    setup_staking, unlock_stake, withdraw_stake, MoveHarness,
+    assert_abort, assert_success, enable_golden, get_stake_pool, get_validator_config,
+    get_validator_set, initialize_staking, join_validator_set, leave_validator_set,
+    rotate_consensus_key, setup_staking, unlock_stake, withdraw_stake, MoveHarness,
 };
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use cached_packages::aptos_stdlib;
@@ -13,6 +13,7 @@ use move_deps::move_core_types::language_storage::CORE_CODE_ADDRESS;
 #[test]
 fn test_staking_end_to_end() {
     let mut harness = MoveHarness::new();
+    enable_golden!(&mut harness);
     let owner = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
     let operator = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap());
     let owner_address = *owner.address();

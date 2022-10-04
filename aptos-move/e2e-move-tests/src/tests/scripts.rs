@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, enable_golden, tests::common, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CoinStoreResource,
@@ -13,6 +13,7 @@ use move_deps::move_core_types::move_resource::MoveStructType;
 #[test]
 fn test_two_to_two_transfer() {
     let mut h = MoveHarness::new();
+    enable_golden!(&mut h);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
