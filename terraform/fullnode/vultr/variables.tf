@@ -46,6 +46,11 @@ variable "chain_id" {
   default     = "DEVNET"
 }
 
+variable "chain_name" {
+  description = "Aptos chain name"
+  default     = "devnet"
+}
+
 variable "machine_type" {
   description = "Machine type for running fullnode. All configurations can be obtained at https://www.vultr.com/api/#tag/plans"
   default     = "vc2-16c-32gb"

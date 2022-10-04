@@ -30,6 +30,13 @@ impl fmt::Display for TransactionSummary {
     }
 }
 
+#[derive(Clone)]
+pub struct RejectedTransactionSummary {
+    pub sender: AccountAddress,
+    pub sequence_number: u64,
+    pub hash: HashValue,
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {

@@ -5,7 +5,7 @@ use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
-use consensus_types::common::TransactionSummary;
+use consensus_types::{block::Block, common::RejectedTransactionSummary, common::TransactionSummary};
 use executor_types::StateComputeResult;
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
@@ -71,9 +71,10 @@ impl TxnNotifier for MempoolNotifier {
         let user_txn_status = &compute_status[1..txns.len() + 1];
         for (txn, status) in txns.iter().zip_eq(user_txn_status) {
             if let TransactionStatus::Discard(_) = status {
-                rejected_txns.push(TransactionSummary {
+                rejected_txns.push(RejectedTransactionSummary {
                     sender: txn.sender(),
                     sequence_number: txn.sequence_number(),
+                    hash: txn.clone().committed_hash(),
                 });
             }
         }
