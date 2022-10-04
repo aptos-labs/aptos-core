@@ -590,7 +590,7 @@ impl CliCommand<&'static str> for DownloadPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let url = self.rest_options.url(&self.profile_options.profile)?;
+        let url = self.rest_options.url(&self.profile_options)?;
         let registry = CachedPackageRegistry::create(url, self.account).await?;
         let output_dir = dir_default_to_current(self.output_dir)?;
 
@@ -666,7 +666,7 @@ impl CliCommand<&'static str> for ListPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let url = self.rest_options.url(&self.profile_options.profile)?;
+        let url = self.rest_options.url(&self.profile_options)?;
         let registry = CachedPackageRegistry::create(url, self.account).await?;
         match self.query {
             ListQuery::Packages => {

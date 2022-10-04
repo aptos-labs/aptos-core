@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::ConfigSearchMode;
+use crate::common::types::{ConfigSearchMode, DEFAULT_PROFILE};
 use crate::common::{
     types::{
         account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
@@ -62,17 +62,20 @@ impl CliCommand<()> for InitTool {
             CliConfig::default()
         };
 
+        let profile_name = self
+            .profile_options
+            .profile_name()
+            .unwrap_or(DEFAULT_PROFILE);
+
         // Select profile we're using
-        let mut profile_config = if let Some(profile_config) =
-            config.remove_profile(&self.profile_options.profile)
-        {
-            prompt_yes_with_override(&format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile_options.profile), self.prompt_options)?;
+        let mut profile_config = if let Some(profile_config) = config.remove_profile(profile_name) {
+            prompt_yes_with_override(&format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", profile_name), self.prompt_options)?;
             profile_config
         } else {
             ProfileConfig::default()
         };
 
-        eprintln!("Configuring for profile {}", self.profile_options.profile);
+        eprintln!("Configuring for profile {}", profile_name);
 
         // Rest Endpoint
         let rest_url = if let Some(rest_url) = self.rest_url {
@@ -187,7 +190,7 @@ impl CliCommand<()> for InitTool {
             .profiles
             .as_mut()
             .unwrap()
-            .insert(self.profile_options.profile, profile_config);
+            .insert(profile_name.to_string(), profile_config);
         config.save()?;
         eprintln!("Aptos is now set up for account {}!  Run `aptos help` for more information about commands", address);
         Ok(())
