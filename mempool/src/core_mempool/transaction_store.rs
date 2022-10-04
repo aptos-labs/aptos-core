@@ -550,7 +550,7 @@ impl TransactionStore {
     ) -> (Vec<SignedTransaction>, TimelineId) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
-        let mut last_timeline_id = vec![0; timeline_id.0.len()];
+        let mut last_timeline_id = timeline_id.clone();
 
         // Add as many transactions to the batch as possible
         for (i, bucket) in self
@@ -558,6 +558,7 @@ impl TransactionStore {
             .read_timeline(timeline_id, count)
             .iter()
             .enumerate()
+            .rev()
         {
             for (address, sequence_number) in bucket {
                 if let Some(txn) = self.get_mempool_txn(address, *sequence_number) {
