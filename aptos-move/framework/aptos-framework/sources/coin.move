@@ -8,7 +8,7 @@ module aptos_framework::coin {
     use aptos_framework::account;
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
-    use aptos_std::event::{Self, EventHandle};
+    use aptos_std::event::{EventHandle, emit_event};
 
     use aptos_std::type_info;
 
@@ -102,6 +102,12 @@ module aptos_framework::coin {
         supply: Option<OptionalAggregator>,
     }
 
+    /// Events stored for a specific coin.
+    struct CoinEvents<phantom CoinType> has key {
+        mint_events: EventHandle<MintEvent>,
+        burn_events: EventHandle<BurnEvent>,
+    }
+
     /// Event emitted when some amount of a coin is deposited into an account.
     struct DepositEvent has drop, store {
         amount: u64,
@@ -109,6 +115,16 @@ module aptos_framework::coin {
 
     /// Event emitted when some amount of a coin is withdrawn from an account.
     struct WithdrawEvent has drop, store {
+        amount: u64,
+    }
+
+    /// Event emitted when some amount of a coin is minted.
+    struct MintEvent has drop, store {
+        amount: u64,
+    }
+
+    /// Event emitted when some amount of a coin is burnt.
+    struct BurnEvent has drop, store {
         amount: u64,
     }
 
@@ -204,7 +220,7 @@ module aptos_framework::coin {
     public fun burn<CoinType>(
         coin: Coin<CoinType>,
         _cap: &BurnCapability<CoinType>,
-    ) acquires CoinInfo {
+    ) acquires CoinEvents, CoinInfo {
         let Coin { value: amount } = coin;
         assert!(amount > 0, error::invalid_argument(EZERO_COIN_AMOUNT));
 
@@ -212,7 +228,15 @@ module aptos_framework::coin {
         if (option::is_some(maybe_supply)) {
             let supply = option::borrow_mut(maybe_supply);
             optional_aggregator::sub(supply, (amount as u128));
-        }
+        };
+
+        // We specifically don't want to emit burn events for APT when transaction fees are burnt as this would break
+        // parallelization of transactions.
+        if (coin_address != @aptos_framework) {
+            create_coin_events<CoinType>(account);
+            let coin_events = borrow_global_mut<CoinEvents<CoinType>>(coin_address);
+            emit_event(&mut coin_events.burn_events, BurnEvent { amount });
+        };
     }
 
     /// Burn `coin` from the specified `account` with capability.
@@ -224,7 +248,7 @@ module aptos_framework::coin {
         account_addr: address,
         amount: u64,
         burn_cap: &BurnCapability<CoinType>,
-    ) acquires CoinInfo, CoinStore {
+    ) acquires CoinEvents, CoinInfo, CoinStore {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount == 0) {
             return
@@ -248,7 +272,7 @@ module aptos_framework::coin {
             error::permission_denied(EFROZEN),
         );
 
-        event::emit_event<DepositEvent>(
+        emit_event(
             &mut coin_store.deposit_events,
             DepositEvent { amount: coin.value },
         );
@@ -379,6 +403,7 @@ module aptos_framework::coin {
             supply: if (monitor_supply) { option::some(optional_aggregator::new(MAX_U128, parallelizable)) } else { option::none() },
         };
         move_to(account, coin_info);
+        create_coin_events<CoinType>(account);
 
         (BurnCapability<CoinType> {}, FreezeCapability<CoinType> {}, MintCapability<CoinType> {})
     }
@@ -399,16 +424,21 @@ module aptos_framework::coin {
     public fun mint<CoinType>(
         amount: u64,
         _cap: &MintCapability<CoinType>,
-    ): Coin<CoinType> acquires CoinInfo {
+    ): Coin<CoinType> acquires CoinEvents, CoinInfo {
         if (amount == 0) {
             return zero<CoinType>()
         };
 
-        let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
+        let coin_address = coin_address<CoinType>();
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address).supply;
         if (option::is_some(maybe_supply)) {
             let supply = option::borrow_mut(maybe_supply);
             optional_aggregator::add(supply, (amount as u128));
         };
+
+        create_coin_events<CoinType>(account);
+        let coin_events = borrow_global_mut<CoinEvents<CoinType>>(coin_address);
+        emit_event(&mut coin_events.mint_events, MintEvent { amount });
 
         Coin<CoinType> { value: amount }
     }
@@ -462,7 +492,7 @@ module aptos_framework::coin {
             error::permission_denied(EFROZEN),
         );
 
-        event::emit_event<WithdrawEvent>(
+        emit_event(
             &mut coin_store.withdraw_events,
             WithdrawEvent { amount },
         );
@@ -490,6 +520,15 @@ module aptos_framework::coin {
     /// Destroy a burn capability.
     public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
         let BurnCapability<CoinType> {} = burn_cap;
+    }
+
+    public fun create_coin_events<CoinType>(account: &signer) {
+        if (!exists<CoinEvents<CoinType>>(signer::address_of(account))) {
+            move_to(account, CoinEvents<CoinType> {
+                mint_events: account::new_event_handle<MintEvent>(account),
+                burn_events: account::new_event_handle<BurnEvent>(account),
+            });
+        };
     }
 
     #[test_only]
