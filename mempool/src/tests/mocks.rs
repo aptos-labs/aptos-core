@@ -170,7 +170,7 @@ impl MockSharedMempool {
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {
         let mut pool = self.mempool.lock();
-        pool.remove_transaction(&txn.sender(), txn.sequence_number(), false)
+        pool.commit_transaction(&txn.sender(), txn.sequence_number())
     }
 
     /// True if all the given txns are in mempool, else false.

@@ -45,28 +45,45 @@ impl Mempool {
     }
 
     /// This function will be called once the transaction has been stored.
-    pub(crate) fn remove_transaction(
-        &mut self,
-        sender: &AccountAddress,
-        sequence_number: u64,
-        is_rejected: bool,
-    ) {
+    pub(crate) fn commit_transaction(&mut self, sender: &AccountAddress, sequence_number: u64) {
         trace!(
             LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
-            is_rejected = is_rejected
+            is_rejected = false
         );
-        let metric_label = if is_rejected {
-            counters::COMMIT_REJECTED_LABEL
-        } else {
-            counters::COMMIT_ACCEPTED_LABEL
-        };
-        self.log_latency(*sender, sequence_number, metric_label);
+        self.log_latency(*sender, sequence_number, counters::COMMIT_ACCEPTED_LABEL);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
-            counters::core_mempool_txn_ranking_score(REMOVE_LABEL, metric_label, ranking_score);
+            counters::core_mempool_txn_ranking_score(
+                REMOVE_LABEL,
+                counters::COMMIT_ACCEPTED_LABEL,
+                ranking_score,
+            );
         }
 
         self.transactions
-            .remove(sender, sequence_number, is_rejected);
+            .commit_transaction(sender, sequence_number);
+    }
+
+    pub(crate) fn reject_transaction(
+        &mut self,
+        sender: &AccountAddress,
+        sequence_number: u64,
+        hash: &HashValue,
+    ) {
+        trace!(
+            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
+            is_rejected = true
+        );
+        self.log_latency(*sender, sequence_number, counters::COMMIT_REJECTED_LABEL);
+        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+            counters::core_mempool_txn_ranking_score(
+                REMOVE_LABEL,
+                counters::COMMIT_REJECTED_LABEL,
+                ranking_score,
+            );
+        }
+
+        self.transactions
+            .reject_transaction(sender, sequence_number, hash);
     }
 
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
