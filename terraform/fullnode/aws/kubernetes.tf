@@ -20,20 +20,10 @@ resource "helm_release" "pfn" {
           numFullnodes             = var.num_fullnodes
           loadBalancerSourceRanges = var.client_sources_ipv4
         }
-        monitoring = {
-          loadBalancerSourceRanges = var.admin_sources_ipv4
-        }
       }
       ingress = {
         acm_certificate          = var.zone_id != "" ? aws_acm_certificate.ingress[0].arn : null
         loadBalancerSourceRanges = var.client_sources_ipv4
-      }
-      monitoring = {
-        prometheus = {
-          storage = {
-            class = "gp2"
-          }
-        }
       }
     }),
     jsonencode(var.pfn_helm_values),
