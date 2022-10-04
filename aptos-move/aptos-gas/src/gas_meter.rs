@@ -237,6 +237,11 @@ impl AptosGasMeter {
             self.memory_quota += amount;
         }
     }
+
+    #[inline]
+    pub fn charge_new_resource_as_modify(&self) -> bool {
+        self.feature_version <= 1
+    }
 }
 
 impl GasMeter for AptosGasMeter {
