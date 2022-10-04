@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use thiserror::Error as ThisError;
 use transaction_emitter_lib::{
-    emit_transactions_with_cluster, Cluster, ClusterArgs, EmitArgs, MintArgs,
+    emit_transactions_with_cluster, Cluster, ClusterArgs, CoinSourceArgs, EmitArgs,
 };
 
 use super::types::DirectEvaluatorInput;
@@ -53,7 +53,7 @@ pub struct TpsEvaluatorArgs {
     // We choose to take this in in the baseline config because we can't
     // securely transmit this at request time over the wire.
     #[clap(flatten)]
-    pub mint_args: MintArgs,
+    pub coin_source_args: CoinSourceArgs,
 
     /// The minimum TPS required to pass the test.
     #[clap(long, default_value_t = 1000)]
@@ -94,7 +94,7 @@ impl Evaluator for TpsEvaluator {
         let cluster_args = ClusterArgs {
             targets: vec![target_url; self.args.repeat_target_count],
             reuse_accounts: false,
-            mint_args: self.args.mint_args.clone(),
+            coin_source_args: self.args.coin_source_args.clone(),
             chain_id: input.baseline_node_information.chain_id,
         };
         let cluster = Cluster::try_from_cluster_args(&cluster_args)
@@ -160,8 +160,8 @@ impl Evaluator for TpsEvaluator {
         //   - Either option was chosen but the content was invalid.
         evaluator_args
             .tps_args
-            .mint_args
-            .get_mint_key()
+            .coin_source_args
+            .get_private_key()
             .context("Failed to get private key for TPS evaluator")?;
         Ok(Self::new(evaluator_args.tps_args.clone()))
     }

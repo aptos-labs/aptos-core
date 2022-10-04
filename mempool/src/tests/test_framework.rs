@@ -152,7 +152,7 @@ impl MempoolNode {
         for txn in sign_transactions(txns) {
             self.mempool
                 .lock()
-                .remove_transaction(&txn.sender(), txn.sequence_number(), false);
+                .commit_transaction(&txn.sender(), txn.sequence_number());
         }
     }
 
