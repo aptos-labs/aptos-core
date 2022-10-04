@@ -3,6 +3,7 @@
 
 use crate::{
     quorum_store::{
+        counters,
         batch_aggregator::BatchAggregator,
         batch_reader::BatchReaderCommand,
         batch_store::{BatchStoreCommand, PersistRequest},
@@ -136,6 +137,7 @@ impl NetworkListener {
                 }
 
                 VerifiedEvent::Fragment(fragment) => {
+                    counters::DELIVERED_FRAGMENTS_COUNT.inc();
                     self.handle_fragment(*fragment).await;
                 }
 

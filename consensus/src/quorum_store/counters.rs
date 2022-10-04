@@ -123,11 +123,20 @@ pub static REMOTE_POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the created batches since last restart.
+/// Count of the delivered batches since last restart.
 pub static DELIVERED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_delivered_batch_count",
         "Count of the delivered batches since last restart."
+    )
+    .unwrap()
+});
+
+/// Count of the delivered fragments since last restart.
+pub static DELIVERED_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_delivered_fragments_count",
+        "Count of the delivered fragments since last restart."
     )
     .unwrap()
 });
