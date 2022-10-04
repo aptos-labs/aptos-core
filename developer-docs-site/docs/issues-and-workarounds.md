@@ -13,6 +13,91 @@ If you found an issue that is not on this page, submit a [GitHub Issue](https://
 
 ## Nodes
 
+### Invalid EpochChangeProof: Waypoint value mismatch
+
+#### Description
+
+I am trying to run a validator node and got this error:
+
+```json
+{"error":"Invalid EpochChangeProof: Waypoint value mismatch: waypoint value = 3384a932349524093cda8cea714691e668d668fb34260d8a5f77c667d7724372, given value = 81ee9bd880acd25ad617e55913b7345dc01b861adf43971259a22e9a5c82315c","event":"error","name":"initialize"}
+```
+
+#### Workaround
+
+Delete the `secure-data.json` file because very likely you are using an older version of this file. See [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network#bootstrapping-validator-node) for where to find this file. 
+
+### How to find out when the next epoch starts
+
+To track epoch changes, follow these steps:
+
+1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure **Premainnet** is selected at the top right.
+2. Switch to **RESOURCES** tab.
+3. Using the browser search (do not use the **Search transactions** field), search for `last_reconfiguration_time`. You will find the last epoch transition timestamp in microseconds. The text display looks like this:
+  ```json
+  {
+    "epoch": "25",
+    "events": {
+      "counter": "25",
+      "guid": {
+        "id": {
+          "addr": "0x1",
+          "creation_num": "2"
+        }
+      }
+    },
+    "last_reconfiguration_time": "1664919592960637"
+  }
+  ```
+
+4. You can then go to https://www.epochconverter.com/ and put this epoch timestamp in to convert to a human readable date. 
+  :::tip Current epoch duration
+  The Aptos current epoch duration is 1 hour.
+  :::
+
+### How to check if a validator address is in validator set
+
+You can check if a validator address is in the validator set in either of the below two ways:
+
+- Run the below command:
+```bash
+aptos node show-validator-set --profile operator | jq -r '.Result.active_validators[].addr' | grep <stake pool address>
+```
+
+or
+
+- Follow these steps on the Aptos Explorer:
+
+1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure **Premainnet** is selected at the top right.
+2. Switch to **RESOURCES** tab.
+3. Using the browser search (do not use the **Search transactions** field), search for the validator address. 
+
+### How to find stake pool address
+
+To find out which stake pool address to use (for example, to bootstrap your node), run the below command. This example is for Premainnet. For other networks, use the appropriate REST URL for the `--url` field. See [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network/#bootstrapping-validator-node):
+
+```bash
+aptos node get-stake-pool \
+  --owner-address 0x0756c80f0597fc221fe043d5388949b34151a4efe5753965bbfb0ed7d0be08ea \
+  --url https://premainnet.aptosdev.com
+```
+
+### How to check if an address is the correct stake pool address or a correct validator address
+
+Follow these steps on the Aptos Explorer:
+
+1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure **Premainnet** is selected at the top right.
+2. Switch to **RESOURCES** tab.
+3. Using the browser search (do not use the **Search transactions** field), search for `StakePool`. If the `StakePool` resource exists for the address, then it is the correct stake pool address. You can double check by searching for the operator and seeing if that’s your operator address. 
+
+### How to see previous epoch rewards
+
+To see the previous epoch rewards for a given pool address, click on a URL of the below format. This example is for Premainnet and for the pool address `0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4`. Use the pool address of your choice in this place:
+
+```html
+https://premainnet.aptosdev.com/v1/accounts/0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4/events/10
+```
+
 ### Terraform "Connection Refused" error
 
 #### Description
