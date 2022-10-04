@@ -3,7 +3,7 @@
   "slug": "",
   "title": "Node Resource Metrics",
   "originalTitle": "",
-  "tags": [],
+  "tags": ["aptos-core"],
   "style": "dark",
   "timezone": "",
   "editable": true,
@@ -540,15 +540,17 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 7,
+  "version": 8,
   "links": [
     {
-      "title": "Other Dashboards",
+      "title": "aptos core ",
       "type": "dashboards",
       "asDropdown": true,
       "icon": "external link",
       "includeVars": true,
-      "keepTime": true
+      "keepTime": true,
+      "tags": ["aptos-core"],
+      "targetBlank": true
     }
   ],
   "time": { "from": "now-1h", "to": "now" },

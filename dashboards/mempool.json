@@ -3,7 +3,7 @@
   "slug": "",
   "title": "Mempool",
   "originalTitle": "",
-  "tags": [],
+  "tags": ["aptos-core"],
   "style": "dark",
   "timezone": "",
   "editable": true,
@@ -3915,8 +3915,8 @@
         "datasource": null,
         "refresh": 2,
         "options": [
-          { "text": "auto", "value": "$__auto_interval_interval", "selected": false },
-          { "text": "1m", "value": "1m", "selected": true },
+          { "text": "auto", "value": "$__auto_interval_interval", "selected": true },
+          { "text": "1m", "value": "1m", "selected": false },
           { "text": "5m", "value": "5m", "selected": false },
           { "text": "10m", "value": "10m", "selected": false },
           { "text": "30m", "value": "30m", "selected": false },
@@ -3986,7 +3986,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 45,
+  "version": 47,
   "links": [
     {
       "title": "Other Dashboards",
@@ -3995,6 +3995,18 @@
       "icon": "external link",
       "includeVars": true,
       "keepTime": true
+    },
+    {
+      "title": "aptos core",
+      "type": "dashboards",
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["aptos-core"],
+      "targetBlank": true,
+      "tooltip": "",
+      "url": ""
     }
   ],
   "time": { "from": "2022-09-29T06:52:47.000Z", "to": "2022-09-29T07:07:19.000Z" },
