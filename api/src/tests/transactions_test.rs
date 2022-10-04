@@ -102,11 +102,9 @@ async fn test_get_transactions_with_zero_limit() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_transactions_param_limit_exceeds_limit() {
+    // Exceeding the limit, will return only the amount expected
     let mut context = new_test_context(current_function_name!());
-    let resp = context
-        .expect_status_code(400)
-        .get("/transactions?limit=2000")
-        .await;
+    let resp = context.get("/transactions?limit=2000").await;
     context.check_golden_output(resp);
 }
 
