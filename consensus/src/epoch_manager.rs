@@ -178,7 +178,7 @@ impl EpochManager {
             epoch_state: None,
             block_retrieval_tx: None,
             quorum_store_storage: Arc::new(QuorumStoreDB::new(path)),
-            num_network_listener_workers: 1,
+            num_network_listener_workers: 3,
             quorum_store_msg_tx_vec: Vec::new(),
             wrapper_quorum_store_tx: None,
         }
@@ -801,11 +801,11 @@ impl EpochManager {
                 num_nodes_per_worker_handles: 5,
             };
 
-            // update the number of network_listener workers when start a new round_manager
-            self.num_network_listener_workers = usize::max(
-                1,
-                epoch_state.verifier.len() / config.num_nodes_per_worker_handles,
-            );
+            // // update the number of network_listener workers when start a new round_manager
+            // self.num_network_listener_workers = usize::max(
+            //     1,
+            //     epoch_state.verifier.len() / config.num_nodes_per_worker_handles,
+            // );
 
             let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
                 tokio::sync::mpsc::channel(config.channel_size);
@@ -1055,15 +1055,27 @@ impl EpochManager {
                     bail!("QuorumStore wrapper not started but received QuorumStore Message");
                 }
             }
-            quorum_store_event @ (VerifiedEvent::SignedDigest(_)
-            | VerifiedEvent::Fragment(_)
-            | VerifiedEvent::Batch(_)) => {
-                let idx = peer_id.to_vec()[0] as usize % self.num_network_listener_workers;
-                debug!(
-                    "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
-                    peer_id, self.num_network_listener_workers, idx
-                );
-                let sender = &mut self.quorum_store_msg_tx_vec[idx];
+            // quorum_store_event @ (VerifiedEvent::SignedDigest(_)
+            // | VerifiedEvent::Fragment(_)
+            // | VerifiedEvent::Batch(_)) => {
+            //     let idx = peer_id.to_vec()[0] as usize % self.num_network_listener_workers;
+            //     debug!(
+            //         "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
+            //         peer_id, self.num_network_listener_workers, idx
+            //     );
+            //     let sender = &mut self.quorum_store_msg_tx_vec[idx];
+            //     sender.push(peer_id, quorum_store_event)?;
+            // }
+            quorum_store_event @ VerifiedEvent::SignedDigest(_) => {
+                let sender = &mut self.quorum_store_msg_tx_vec[0];
+                sender.push(peer_id, quorum_store_event)?;
+            }
+            quorum_store_event @ VerifiedEvent::Fragment(_) => {
+                let sender = &mut self.quorum_store_msg_tx_vec[1];
+                sender.push(peer_id, quorum_store_event)?;
+            }
+            quorum_store_event @ VerifiedEvent::Batch(_) => {
+                let sender = &mut self.quorum_store_msg_tx_vec[2];
                 sender.push(peer_id, quorum_store_event)?;
             }
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
