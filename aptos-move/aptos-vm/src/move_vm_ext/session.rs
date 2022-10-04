@@ -170,6 +170,7 @@ impl SessionOutput {
     pub fn into_change_set<C: AccessPathCache>(
         self,
         ap_cache: &mut C,
+        charge_new_resource_as_modify: bool,
     ) -> Result<ChangeSetExt, VMStatus> {
         use MoveStorageOp::*;
         let Self {
@@ -188,7 +189,14 @@ impl SessionOutput {
                 let ap = ap_cache.get_resource_path(addr, struct_tag);
                 let op = match blob_op {
                     Delete => WriteOp::Deletion,
-                    New(blob) | Modify(blob) => WriteOp::Modification(blob),
+                    New(blob) => {
+                        if charge_new_resource_as_modify {
+                            WriteOp::Modification(blob)
+                        } else {
+                            WriteOp::Creation(blob)
+                        }
+                    }
+                    Modify(blob) => WriteOp::Modification(blob),
                 };
                 write_set_mut.insert((StateKey::AccessPath(ap), op))
             }
