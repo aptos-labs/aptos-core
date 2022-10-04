@@ -4,7 +4,7 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::algebra::{FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
+use crate::algebra::{AbstractValueSize, FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
 use aptos_types::{
     on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
 };
@@ -179,6 +179,7 @@ crate::params::define_gas_parameters!(
             "write_data.per_byte_in_val",
             10_000
         ],
+        [memory_quota: AbstractValueSize, optional "memory_quota", 10_000_000],
     ]
 );
 
