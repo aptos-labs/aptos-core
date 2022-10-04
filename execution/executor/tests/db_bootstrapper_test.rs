@@ -250,13 +250,13 @@ fn test_new_genesis() {
             ContractEvent::new(
                 *configuration.events().key(),
                 0,
-                TypeTag::Struct(ConfigurationResource::struct_tag()),
+                TypeTag::Struct(Box::new(ConfigurationResource::struct_tag())),
                 vec![],
             ),
             ContractEvent::new(
                 new_block_event_key(),
                 0,
-                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 vec![],
             ),
         ],
