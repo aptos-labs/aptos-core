@@ -14,6 +14,7 @@ An application built on the Aptos blockchain, on any blockchain for that matter,
 
 Indexer is a solution to this problem. See below a high-level block diagram of how Aptos indexing works. 
 
+<center>
 <ThemedImage
 alt="Signed Transaction Flow"
 sources={{
@@ -21,6 +22,7 @@ sources={{
     dark: useBaseUrl('/img/docs/aptos-indexing-dark.svg'),
   }}
 />
+</center>
 
 ## Indexing the Aptos blockchain data
 
