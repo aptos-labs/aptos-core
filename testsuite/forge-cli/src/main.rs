@@ -544,8 +544,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 EmitJobRequest::default()
                     .mode(EmitJobMode::ConstTps { tps: 15000 })
                     .transaction_mix(vec![
-                        (TransactionType::Transfer, 98),
-                        (TransactionType::TransferHighPri, 2),
+                        (TransactionType::Transfer, 93),
+                        (TransactionType::TransferHighPri, 7),
                     ]),
             )
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
