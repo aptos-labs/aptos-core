@@ -35,7 +35,7 @@ impl Page {
     }
 
     /// Retrieve the start of the page
-    pub fn start<E: BadRequestError>(
+    fn start<E: BadRequestError>(
         &self,
         default: u64,
         max: u64,
