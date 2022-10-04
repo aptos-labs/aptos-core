@@ -5,7 +5,7 @@ slug: "issues-and-workarounds"
 
 # Issues and Workarounds
 
-This page documents issues that frequently come up and the suggested workarounds. 
+This page provides workarounds and answers for issues and questions that frequently come up. 
 
 :::tip Help keep this page up-to-date
 If you found an issue that is not on this page, submit a [GitHub Issue](https://github.com/aptos-labs/aptos-core/issues). Make sure to follow the issue format used in this document. 
