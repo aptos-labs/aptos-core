@@ -24,6 +24,7 @@ use futures::{
 };
 use network::{application::storage::PeerMetadataStorage, transport::ConnectionMetadata};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
@@ -290,20 +291,28 @@ impl MultiBatchId {
     }
 }
 
-// TODO: lexical comparison of the whole vector?
+// Note: in rev order to check significant pairs first
 impl PartialOrd for MultiBatchId {
     fn partial_cmp(&self, other: &MultiBatchId) -> Option<std::cmp::Ordering> {
-        let self_first = self.0[0];
-        let other_first = other.0[0];
-        Some((other_first.0, other_first.1).cmp(&(self_first.0, self_first.1)))
+        for (&self_pair, &other_pair) in self.0.iter().rev().zip(other.0.iter().rev()) {
+            let ordering = self_pair.cmp(&other_pair);
+            if ordering != Ordering::Equal {
+                return Some(ordering);
+            }
+        }
+        Some(Ordering::Equal)
     }
 }
 
 impl Ord for MultiBatchId {
     fn cmp(&self, other: &MultiBatchId) -> std::cmp::Ordering {
-        let self_first = self.0[0];
-        let other_first = other.0[0];
-        (other_first.0, other_first.1).cmp(&(self_first.0, self_first.1))
+        for (&self_pair, &other_pair) in self.0.iter().rev().zip(other.0.iter().rev()) {
+            let ordering = self_pair.cmp(&other_pair);
+            if ordering != Ordering::Equal {
+                return ordering;
+            }
+        }
+        Ordering::Equal
     }
 }
 

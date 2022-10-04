@@ -314,7 +314,7 @@ impl MultiBucketTimelineIndex {
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
     ) -> Vec<(AccountAddress, u64)> {
-        assert!(start_end_pairs.len() == self.timelines.len());
+        assert_eq!(start_end_pairs.len(), self.timelines.len());
 
         let mut all_txns = vec![];
         for (timeline, &(start_id, end_id)) in self.timelines.iter().zip(start_end_pairs.iter()) {
