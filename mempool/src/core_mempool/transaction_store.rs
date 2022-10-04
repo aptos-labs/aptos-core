@@ -4,7 +4,7 @@
 use crate::counters::{
     BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL, LOCAL_LABEL,
 };
-use crate::shared_mempool::types::TimelineId;
+use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     core_mempool::{
         index::{
@@ -540,12 +540,12 @@ impl TransactionStore {
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
-        timeline_id: &TimelineId,
+        timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-    ) -> (Vec<SignedTransaction>, TimelineId) {
+    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
-        let mut last_timeline_id = timeline_id.0.clone();
+        let mut last_timeline_id = timeline_id.id_per_bucket.clone();
 
         // Add as many transactions to the batch as possible
         for (i, bucket) in self
