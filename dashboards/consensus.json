@@ -3,7 +3,7 @@
   "slug": "",
   "title": "Consensus",
   "originalTitle": "",
-  "tags": [],
+  "tags": ["aptos-core"],
   "style": "dark",
   "timezone": "browser",
   "editable": true,
@@ -5226,15 +5226,19 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 57,
+  "version": 59,
   "links": [
     {
-      "title": "Other Dashboards",
+      "title": "aptos-core",
       "type": "dashboards",
       "asDropdown": true,
       "icon": "external link",
       "includeVars": true,
-      "keepTime": true
+      "keepTime": true,
+      "tags": ["aptos-core"],
+      "targetBlank": true,
+      "tooltip": "",
+      "url": ""
     }
   ],
   "time": { "from": "now-3h", "to": "now" },
