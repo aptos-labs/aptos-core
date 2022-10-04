@@ -3,7 +3,7 @@
 
 /// This module provides various indexes used by Mempool.
 use crate::core_mempool::transaction::{MempoolTransaction, SequenceInfo, TimelineState};
-use crate::shared_mempool::types::TimelineId;
+use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     counters,
     logging::{LogEntry, LogSchema},
@@ -286,14 +286,18 @@ impl MultiBucketTimelineIndex {
     /// At most `count` transactions will be returned.
     pub(crate) fn read_timeline(
         &self,
-        timeline_id: &TimelineId,
+        timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
     ) -> Vec<Vec<(AccountAddress, u64)>> {
-        assert!(timeline_id.0.len() == self.bucket_mins.len());
+        assert!(timeline_id.id_per_bucket.len() == self.bucket_mins.len());
 
         let mut added = 0;
         let mut returned = vec![];
-        for (timeline, &timeline_id) in self.timelines.iter().rev().zip(timeline_id.0.iter().rev())
+        for (timeline, &timeline_id) in self
+            .timelines
+            .iter()
+            .zip(timeline_id.id_per_bucket.iter())
+            .rev()
         {
             let txns = timeline.read_timeline(timeline_id, count - added);
             added += txns.len();
@@ -343,7 +347,7 @@ impl MultiBucketTimelineIndex {
 
     pub(crate) fn size(&self) -> usize {
         let mut size = 0;
-        for timeline in self.timelines.iter() {
+        for timeline in &self.timelines {
             size += timeline.size()
         }
         size

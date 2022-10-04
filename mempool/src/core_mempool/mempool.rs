@@ -4,7 +4,7 @@
 //! Mempool is used to track transactions which have been submitted but not yet
 //! agreed upon.
 use crate::counters::{CONSENSUS_PULLED_LABEL, E2E_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL};
-use crate::shared_mempool::types::TimelineId;
+use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     core_mempool::{
         index::TxnPointer,
@@ -268,9 +268,9 @@ impl Mempool {
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
-        timeline_id: &TimelineId,
+        timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-    ) -> (Vec<SignedTransaction>, TimelineId) {
+    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
         self.transactions.read_timeline(timeline_id, count)
     }
 

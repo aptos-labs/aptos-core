@@ -218,16 +218,15 @@ pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
 /// `is_alive` - is connection healthy
 #[derive(Clone, Debug)]
 pub(crate) struct PeerSyncState {
-    pub timeline_id: TimelineId,
+    pub timeline_id: MultiBucketTimelineIndexIds,
     pub broadcast_info: BroadcastInfo,
     pub metadata: ConnectionMetadata,
 }
 
-// TODO: pass in number of buckets to initialize timeline_id instead of None?
 impl PeerSyncState {
     pub fn new(metadata: ConnectionMetadata, num_broadcast_buckets: usize) -> Self {
         PeerSyncState {
-            timeline_id: TimelineId::new(num_broadcast_buckets),
+            timeline_id: MultiBucketTimelineIndexIds::new(num_broadcast_buckets),
             broadcast_info: BroadcastInfo::new(),
             metadata,
         }
@@ -242,7 +241,7 @@ struct BatchId(pub u64, pub u64);
 
 impl PartialOrd for BatchId {
     fn partial_cmp(&self, other: &BatchId) -> Option<std::cmp::Ordering> {
-        Some((other.0, other.1).cmp(&(self.0, self.1)))
+        Some(self.cmp(other))
     }
 }
 
@@ -253,32 +252,33 @@ impl Ord for BatchId {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct TimelineId(pub Vec<u64>);
+pub struct MultiBucketTimelineIndexIds {
+    pub id_per_bucket: Vec<u64>,
+}
 
-impl TimelineId {
+impl MultiBucketTimelineIndexIds {
     pub(crate) fn new(num_buckets: usize) -> Self {
-        Self(vec![0; num_buckets])
+        Self {
+            id_per_bucket: vec![0; num_buckets],
+        }
     }
 
     pub(crate) fn update(&mut self, batch_id: &MultiBatchId) {
-        if self.0.len() != batch_id.0.len() {
+        if self.id_per_bucket.len() != batch_id.0.len() {
             return;
         }
 
-        let updated: Vec<_> = self
-            .0
-            .iter()
-            .zip(batch_id.0.iter())
-            .map(|(&cur, &(_start, end))| std::cmp::max(cur, end))
-            .collect();
-
-        self.0 = updated;
+        for (cur, &(_start, end)) in self.id_per_bucket.iter_mut().zip(batch_id.0.iter()) {
+            *cur = std::cmp::max(*cur, end)
+        }
     }
 }
 
-impl From<Vec<u64>> for TimelineId {
-    fn from(vector: Vec<u64>) -> Self {
-        Self(vector)
+impl From<Vec<u64>> for MultiBucketTimelineIndexIds {
+    fn from(timeline_ids: Vec<u64>) -> Self {
+        Self {
+            id_per_bucket: timeline_ids,
+        }
     }
 }
 
@@ -286,24 +286,27 @@ impl From<Vec<u64>> for TimelineId {
 pub struct MultiBatchId(pub Vec<(u64, u64)>);
 
 impl MultiBatchId {
-    pub(crate) fn from_timeline_ids(old: &TimelineId, new: &TimelineId) -> Self {
-        Self(old.0.iter().cloned().zip(new.0.iter().cloned()).collect())
+    pub(crate) fn from_timeline_ids(
+        old: &MultiBucketTimelineIndexIds,
+        new: &MultiBucketTimelineIndexIds,
+    ) -> Self {
+        Self(
+            old.id_per_bucket
+                .iter()
+                .cloned()
+                .zip(new.id_per_bucket.iter().cloned())
+                .collect(),
+        )
     }
 }
 
-// Note: in rev order to check significant pairs first
 impl PartialOrd for MultiBatchId {
     fn partial_cmp(&self, other: &MultiBatchId) -> Option<std::cmp::Ordering> {
-        for (&self_pair, &other_pair) in self.0.iter().rev().zip(other.0.iter().rev()) {
-            let ordering = self_pair.cmp(&other_pair);
-            if ordering != Ordering::Equal {
-                return Some(ordering);
-            }
-        }
-        Some(Ordering::Equal)
+        Some(self.cmp(other))
     }
 }
 
+// Note: in rev order to check significant pairs first (right -> left)
 impl Ord for MultiBatchId {
     fn cmp(&self, other: &MultiBatchId) -> std::cmp::Ordering {
         for (&self_pair, &other_pair) in self.0.iter().rev().zip(other.0.iter().rev()) {
@@ -313,6 +316,29 @@ impl Ord for MultiBatchId {
             }
         }
         Ordering::Equal
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::shared_mempool::types::{MultiBatchId, MultiBucketTimelineIndexIds};
+
+    #[test]
+    fn test_multi_bucket_timeline_ids_update() {
+        let mut timeline_ids = MultiBucketTimelineIndexIds {
+            id_per_bucket: vec![1, 2, 3],
+        };
+        let batch_id = MultiBatchId(vec![(1, 3), (1, 1), (3, 6)]);
+        timeline_ids.update(&batch_id);
+        assert_eq!(vec![3, 2, 6], timeline_ids.id_per_bucket);
+    }
+
+    #[test]
+    fn test_multi_batch_id_ordering() {
+        let left = MultiBatchId(vec![(0, 3), (1, 4), (2, 5)]);
+        let right = MultiBatchId(vec![(2, 5), (1, 4), (0, 3)]);
+
+        assert!(left > right);
     }
 }
 
