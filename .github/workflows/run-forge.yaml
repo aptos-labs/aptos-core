@@ -112,10 +112,6 @@ jobs:
 
       - name: Run Forge
         shell: bash
-        env:
-          PUSH_GATEWAY: ${{ secrets.PUSH_GATEWAY }}
-          PUSH_GATEWAY_USER: ${{ secrets.PUSH_GATEWAY_USER }}
-          PUSH_GATEWAY_PASSWORD: ${{ secrets.PUSH_GATEWAY_PASSWORD }}
         run: testsuite/run_forge.sh
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR

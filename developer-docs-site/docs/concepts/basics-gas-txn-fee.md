@@ -7,11 +7,11 @@ slug: "basics-gas-txn-fee"
 
 ## Concept
 
-To conduct any transaction with the Aptos blockchain on the mainnet, you are required to pay a processing fees. This includes transactions from a client application, from a stake owner, a node operator, or from a voter. The processing fee you are required to pay is based on the computing and storage resources you use on the blockchain to:
+To conduct any transaction with the Aptos blockchain on the mainnet, you are required to pay a processing fee. This fee is derived from transactions with a client application, stake owner, node operator, or voter. The processing fee you are required to pay is based on the computing and storage resources you use on the blockchain to:
 
 1. Process your transactions on the blockchain.
-2. Propagate the validated record throughout the distributed network of the mainnet.
-3. Store the validated record in the distributed blockchain storage.  
+1. Propagate the validated record throughout the distributed network of the mainnet.
+1. Store the validated record in the distributed blockchain storage.  
 
 :::tip 
 Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
@@ -19,11 +19,11 @@ Conceptually, this fee can be thought of as quite similar to how we pay for our 
  
 ### Prioritizing your transaction
 
-You can even bump up your transaction to a higher priority level on the blockchain by paying a larger processing fee. In your transaction, you can commit to paying a gas price that is higher than the market gas price. This is one way you can move your transaction higher in the priority list and have it  processed quicker. 
+You can even bump up your transaction to a higher priority level on the blockchain by paying a larger processing fee. In your transaction, you can commit to paying a gas price that is higher than the market gas price. This is one way you can move your transaction higher in the priority list and have it processed more quickly. 
 
 ### Unit of gas
 
-You can make a simple transaction, or a complicated transaction that requires the blockchain to perform lots of computation and distributed storage. In either case, you will be required to spend a processing fee sufficient to complete the transaction. This is where the notion of **gas** becomes clear. Here is how it works:
+You can make a simple and inexpensive transaction or a complicated transaction that requires the blockchain to perform much computation and distributed storage. In either case, you will be required to spend a processing fee sufficient to complete the transaction. This is where the notion of **gas** becomes clear. Here is how it works:
 
 In the Aptos blockchain a **unit of gas** represents a basic unit of resource consumption. A single unit of gas is a combined representation of:
 
@@ -31,6 +31,8 @@ In the Aptos blockchain a **unit of gas** represents a basic unit of resource co
 - Storage resource.
 
 When your transaction is executed on the blockchain, instead of separately presenting you an account of each unit of the specific resource consumed, the blockchain simply presents an account of the number of units of gas being consumed by the transaction. 
+
+See [How Base Gas Works](base-gas.md) for a detailed description of gas fee types and available optimizations.
 
 ### Gas price
 

@@ -207,14 +207,95 @@ class ModuleBundle:
 
 
 class Script:
-    def __init__(self):
-        raise NotImplementedError
+    code: bytes
+    ty_args: List[TypeTag]
+    args: List[ScriptArgument]
+
+    def __init__(self, code: bytes, ty_args: List[TypeTag], args: List[ScriptArgument]):
+        self.code = code
+        self.ty_args = ty_args
+        self.args = args
 
     def deserialize(deserializer: Deserializer) -> Script:
-        raise NotImplementedError
+        code = deserializer.bytes()
+        ty_args = deserializer.sequence(TypeTag.deserialize)
+        args = deserializer.sequence(ScriptArgument.deserialize)
+        return Script(code, ty_args, args)
 
     def serialize(self, serializer: Serializer):
-        raise NotImplementedError
+        serializer.bytes(self.code)
+        serializer.sequence(self.ty_args, Serializer.struct)
+        serializer.sequence(self.args, Serializer.struct)
+
+    def __eq__(self, other: ScriptArgument) -> bool:
+        return (
+                self.code == other.code
+                and self.ty_args == other.ty_args
+                and self.args == other.args
+                )
+
+    def __str__(self):
+        return f"<{self.ty_args}>({self.args})"
+
+
+class ScriptArgument:
+    U8: int = 0
+    U64: int = 1
+    U128: int = 2
+    ADDRESS: int = 3
+    U8_VECTOR: int = 4
+    BOOL: int = 5,
+
+    variant: int
+    value: typing.Any
+
+    def __init__(self, variant: int, value: typing.Any):
+        if variant < 0 or variant > 5:
+            raise Exception("Invalid variant")
+
+        self.variant = variant
+        self.value = value
+
+    def deserialize(deserializer: Deserializer) -> ScriptArgument:
+        variant = deserializer.u8()
+        if variant == ScriptArgument.U8:
+            value = deserializer.u8()
+        elif variant == ScriptArgument.U64:
+            value = deserializer.u64()
+        elif variant == ScriptArgument.U128:
+            value = deserializer.u128()
+        elif variant == ScriptArgument.ADDRESS:
+            value = AccountAddress.deserialize(deserializer)
+        elif variant == ScriptArgument.U8_VECTOR:
+            value = deserializer.bytes()
+        elif variant == ScriptArgument.BOOL:
+            value = deserializer.bool()
+        else:
+            raise Exception("Invalid variant")
+        return ScriptArgument(variant, value)
+
+    def serialize(self, serializer: Serializer):
+        serializer.u8(self.variant)
+        if self.variant == ScriptArgument.U8:
+            serializer.u8(self.value)
+        elif self.variant == ScriptArgument.U64:
+            serializer.u64(self.value)
+        elif self.variant == ScriptArgument.U128:
+            serializer.u128(self.value)
+        elif self.variant == ScriptArgument.ADDRESS:
+            serializer.struct(self.value)
+        elif self.variant == ScriptArgument.U8_VECTOR:
+            serializer.bytes(self.value)
+        elif self.variant == ScriptArgument.BOOL:
+            serializer.bool(self.value)
+        else:
+            raise Exception("Invalid variant")
+
+    def __eq__(self, other: ScriptArgument) -> bool:
+        return self.variant == other.variant and self.value == other.value
+
+    def __str__(self):
+        return f"[{self.variant}] {self.value}"
 
 
 class EntryFunction:

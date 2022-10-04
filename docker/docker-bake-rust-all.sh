@@ -40,5 +40,5 @@ if [ "$CI" == "true" ]; then
   REGISTRY_BASE="$GCP_DOCKER_ARTIFACT_REPO" SOURCE_TAG="cache-${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}" TARGET_TAG="cache-${IMAGE_TAG_PREFIX}${GIT_SHA}" ./docker/retag-rust-images.sh
 else
   BUILD_TARGET="${1:-all}"
-  TARGET_REGISTRY=local docker buildx bake --file docker/docker-bake-rust-all.hcl $BUILD_TARGET
+  TARGET_REGISTRY=local docker buildx bake --file docker/docker-bake-rust-all.hcl $BUILD_TARGET --load
 fi

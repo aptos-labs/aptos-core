@@ -12,7 +12,10 @@ use super::{
     token_ownerships::{CurrentTokenOwnership, TokenOwnership},
     token_utils::{TokenResource, TokenWriteSet},
 };
-use crate::{models::move_resources::MoveResource, schema::tokens, util::ensure_not_negative};
+use crate::{
+    database::PgPoolConnection, models::move_resources::MoveResource, schema::tokens,
+    util::ensure_not_negative,
+};
 use aptos_api_types::{
     DeleteTableItem as APIDeleteTableItem, Transaction as APITransaction,
     WriteResource as APIWriteResource, WriteSetChange as APIWriteSetChange,
@@ -64,6 +67,7 @@ impl Token {
     /// state at the last transaction will be tracked, hence using hashmap to dedupe)
     pub fn from_transaction(
         transaction: &APITransaction,
+        conn: &mut PgPoolConnection,
     ) -> (
         Vec<Self>,
         Vec<TokenOwnership>,
@@ -123,6 +127,7 @@ impl Token {
                             write_table_item,
                             txn_version,
                             &table_handle_to_owner,
+                            conn,
                         )
                         .unwrap(),
                     ),

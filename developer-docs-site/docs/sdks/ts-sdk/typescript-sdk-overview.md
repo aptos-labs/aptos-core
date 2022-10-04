@@ -111,7 +111,7 @@ The Aptos SDK validates the Transaction Builder and BCS in two ways:
 
 :::tip
 
-An example of unit tests for the BCS serializer can be found [here](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/transaction_builder/bcs/serializer.test.ts).
+An example of unit tests for the BCS serializer can be found [here](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/bcs/serializer.test.ts).
 
 An example of an e2e test for submitting a BCS transaction can be found [here](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/aptos_client.test.ts#L88).
 

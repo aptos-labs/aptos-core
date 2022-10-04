@@ -73,7 +73,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
         let account = if let Some(account) = self.account {
             account
         } else if let Some(Some(account)) = CliConfig::load_profile(
-            &self.profile_options.profile,
+            self.profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?
         .map(|p| p.account)
@@ -85,7 +85,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
             ));
         };
 
-        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let client = self.rest_options.client(&self.profile_options)?;
         let response = match self.query {
             ListQuery::Balance => vec![
                 client

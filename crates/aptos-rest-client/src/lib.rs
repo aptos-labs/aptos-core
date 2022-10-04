@@ -30,7 +30,7 @@ use aptos_api_types::{
     TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, info, sample, sample::SampleRate, sample::Sampling};
+use aptos_logger::{debug, info, sample, sample::SampleRate};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},

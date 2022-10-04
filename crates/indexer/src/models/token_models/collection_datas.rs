@@ -5,18 +5,23 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use crate::schema::{collection_datas, current_collection_datas};
-use anyhow::Context;
-use aptos_api_types::WriteTableItem as APIWriteTableItem;
-use bigdecimal::BigDecimal;
-use field_count::FieldCount;
-use serde::{Deserialize, Serialize};
-
 use super::{
     token_utils::{CollectionDataIdType, TokenWriteSet},
     tokens::{TableHandleToOwner, TableMetadataForToken},
 };
+use crate::{
+    database::PgPoolConnection,
+    schema::{collection_datas, current_collection_datas},
+};
+use anyhow::Context;
+use aptos_api_types::WriteTableItem as APIWriteTableItem;
+use bigdecimal::BigDecimal;
+use diesel::{prelude::*, ExpressionMethods};
+use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 
+const QUERY_RETRIES: u32 = 5;
+const QUERY_RETRY_DELAY_MS: u64 = 500;
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
 #[diesel(primary_key(collection_data_id_hash, transaction_version))]
 #[diesel(table_name = collection_datas)]
@@ -34,6 +39,7 @@ pub struct CollectionData {
     pub description_mutable: bool,
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
+    pub table_handle: String,
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
@@ -53,6 +59,7 @@ pub struct CurrentCollectionData {
     pub last_transaction_version: i64,
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
+    pub table_handle: String,
 }
 
 impl CollectionData {
@@ -60,6 +67,7 @@ impl CollectionData {
         table_item: &APIWriteTableItem,
         txn_version: i64,
         table_handle_to_owner: &TableHandleToOwner,
+        conn: &mut PgPoolConnection,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionData)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
@@ -73,13 +81,16 @@ impl CollectionData {
         };
         if let Some(collection_data) = maybe_collection_data {
             let table_handle = table_item.handle.to_string();
-            let creator_address = table_handle_to_owner
-                            .get(&TableMetadataForToken::standardize_handle(&table_handle))
-                            .map(|table_metadata| table_metadata.owner_address.clone())
-                            .context(format!(
-                                "version {} failed! collection creator resource was missing, table handle {} not in map {:?}",
-                                txn_version, TableMetadataForToken::standardize_handle(&table_handle), table_handle_to_owner,
-                            ))?;
+            let maybe_creator_address = table_handle_to_owner
+                .get(&TableMetadataForToken::standardize_handle(&table_handle))
+                .map(|table_metadata| table_metadata.owner_address.clone());
+            let creator_address = match maybe_creator_address {
+                Some(ca) => ca,
+                None => Self::get_collection_creator(conn, &table_handle).context(format!(
+                    "Failed to get collection creator for table handle {}, txn version {}",
+                    table_handle, txn_version
+                ))?,
+            };
             let collection_data_id =
                 CollectionDataIdType::new(creator_address, collection_data.get_name().to_string());
             let collection_data_id_hash = collection_data_id.to_hash();
@@ -100,6 +111,7 @@ impl CollectionData {
                     uri_mutable: collection_data.mutability_config.uri,
                     description_mutable: collection_data.mutability_config.description,
                     inserted_at: chrono::Utc::now().naive_utc(),
+                    table_handle: table_handle.clone(),
                 },
                 CurrentCollectionData {
                     collection_data_id_hash,
@@ -114,10 +126,44 @@ impl CollectionData {
                     description_mutable: collection_data.mutability_config.description,
                     last_transaction_version: txn_version,
                     inserted_at: chrono::Utc::now().naive_utc(),
+                    table_handle,
                 },
             )))
         } else {
             Ok(None)
         }
+    }
+
+    /// If collection data is not in resources of the same transaction, then try looking for it in the database. Since collection owner
+    /// cannot change, we can just look in the current_collection_datas table.
+    /// Retrying a few times since this collection could've been written in a separate thread.
+    /// Note, there's an edge case where this could still break. If the collection is written in the same thread in an earlier transaction, we won't be able to process.
+    /// TODO: Fast follow with a fix for above problem.
+    pub fn get_collection_creator(
+        conn: &mut PgPoolConnection,
+        table_handle: &str,
+    ) -> anyhow::Result<String> {
+        let mut retried = 0;
+        while retried < QUERY_RETRIES {
+            retried += 1;
+            match CurrentCollectionData::get_by_table_handle(conn, table_handle) {
+                Ok(current_collection_data) => return Ok(current_collection_data.creator_address),
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                }
+            }
+        }
+        Err(anyhow::anyhow!("Failed to get collection creator"))
+    }
+}
+
+impl CurrentCollectionData {
+    pub fn get_by_table_handle(
+        conn: &mut PgPoolConnection,
+        table_handle: &str,
+    ) -> diesel::QueryResult<Self> {
+        current_collection_datas::table
+            .filter(current_collection_datas::table_handle.eq(table_handle))
+            .first::<Self>(conn)
     }
 }

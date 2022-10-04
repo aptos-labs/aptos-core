@@ -63,7 +63,7 @@ impl std::fmt::Display for Response {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct MintParams {
     pub amount: u64,
     pub auth_key: Option<String>,
@@ -129,10 +129,30 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         faucet_account.sequence_number()
     };
 
+    let mut set_outstanding = false;
     // We shouldn't have too many outstanding txns
     for _ in 0..60 {
         if our_faucet_seq < faucet_seq + 50 {
-            break;
+            // Enforce a stronger ordering of priorities based upon the MintParams that arrived
+            // first. Then put the other folks to sleep to try again until the queue fills up.
+            if !set_outstanding {
+                let mut requests = service.outstanding_requests.write().unwrap();
+                requests.push(params.clone());
+                set_outstanding = true;
+            }
+
+            if service.outstanding_requests.read().unwrap().first() == Some(&params) {
+                // There might have been two requests with the same parameters, so we ensure that
+                // we only pop off one of them. We do a read lock first since that is cheap,
+                // followed by a write lock.
+                let mut requests = service.outstanding_requests.write().unwrap();
+                if requests.first() == Some(&params) {
+                    requests.remove(0);
+                    break;
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+            continue;
         }
         warn!(
             "We have too many outstanding transactions: {}. Sleeping to let the system catchup.",

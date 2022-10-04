@@ -10,7 +10,6 @@ use anyhow::{anyhow, format_err, Context, Result};
 use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_infallible::Mutex;
-use aptos_logger::sample::Sampling;
 use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosError, Client as RestClient};
 use aptos_sdk::{
