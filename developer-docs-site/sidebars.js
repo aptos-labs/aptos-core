@@ -77,6 +77,7 @@ const sidebars = {
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
+        "guides/indexing",
         "guides/local-testnet-dev-flow",
         "guides/running-a-local-multi-node-network",
         "guides/handle-aptos-errors",
