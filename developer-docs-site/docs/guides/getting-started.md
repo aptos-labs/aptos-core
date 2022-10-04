@@ -31,6 +31,9 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     ```
     ./scripts/dev_setup.sh
     ```
+    :::tip
+    You can see the available options for the script by running `./scripts/dev_setup.sh --help`
+    :::
 
 4. Update your current shell environment to run `cargo build` and other Aptos-related commands:
 
