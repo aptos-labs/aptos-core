@@ -27,15 +27,15 @@ These instructions have been tested on macOS Monterey (12.6)
 
 1. Go to the [Aptos CLI Release](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true) list.
 1. Click the **Assets** expandable menu for the latest release. 
-1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings
+1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings.
 1. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder. For example, on macOS it is the `~/Downloads` folder.
 1. Move this extracted `aptos` binary file into your preferred local folder. For example, place it in the `~/bin/aptos` folder on macOS to make it accessible from the command line.
 
-:::tip Upgrading? Remember to look in the default download folder
-When you update the CLI binary with the latest version, note that the newer version binary will be downloaded to your default Downloads folder. Remember to move this newer version binary from the Downloads folder to the `~/bin/aptos` folder to update and overwrite the older version.
+   :::tip Upgrading? Remember to look in the default download folder
+   When you update the CLI binary with the latest version, note that the newer version binary will be downloaded to your default Downloads folder. Remember to move this newer version binary from the Downloads folder to the `~/bin/aptos` folder to update and overwrite the older version.
 :::
 
-1. Make this `~/bin/aptos` as an executable by running this command: 
+1. Make this `~/bin/aptos` an executable by running this command: 
    - `chmod +x ~/bin/aptos`.
    - On macOS when you attempt to run the `aptos` tool for the first time, you will be blocked by the macOS that this app is from an "unknown developer". This is normal. Follow the simple steps recommended by the Apple support in [Open a Mac app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) to remove this blocker.
 1. Type `~/bin/aptos help` to read help instructions.
@@ -53,7 +53,7 @@ These instructions have been tested on Ubuntu 20.04.
 
 1. Go to the [Aptos CLI release page](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
 1. Click the **Assets** expandable menu for the latest release. 
-1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings
+1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings.
 1. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder. 
 1. Move this extracted `aptos` binary file into your preferred local folder. 
 
@@ -61,7 +61,7 @@ These instructions have been tested on Ubuntu 20.04.
    When you update the CLI binary with the latest version, note that the newer version binary will be downloaded to your default Downloads folder. Remember to move this newer version binary from the Downloads folder to `~/bin/aptos` folder (overwriting the older version).
    :::
 
-1. Make this `~/bin/aptos` as an executable by running this command:
+1. Make this `~/bin/aptos` an executable by running this command:
     - `chmod +x ~/bin/aptos`.
 1. Type `~/bin/aptos help` to read help instructions.
 1. Add `~/bin` to your path in your `.bashrc` or `.zshrc` file for future use.
@@ -79,8 +79,7 @@ These instructions have been tested on Windows 11 and Windows Server 2022. Windo
 
 1. Go to the [Aptos CLI release page](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
 1. Click the **Assets** expandable menu for the latest release. 
-1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings
-1. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder. 
+1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings.
 1. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder. For example, on Windows it is the `\Users\user\Downloads` folder.
 1. Move this extracted `aptos` binary file into your preferred local folder.
    :::tip Upgrading? Remember to look in the default download folder
@@ -96,7 +95,7 @@ These instructions have been tested on Windows 11 and Windows Server 2022. Windo
 If you want to use the Move Prover, install the dependencies by following the below steps:
 
 :::tip
-Currently Windows is not supported for the prover.
+Currently, Windows is not supported by the Move Prover.
 :::
 
 <details>
@@ -109,18 +108,18 @@ These instructions have been tested on macOS Monterey (12.6)
 :::
 
 1. Ensure you have `brew` installed https://brew.sh/.
-2. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
-3. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
-4. Change directory into the `aptos-core` directory: `cd aptos-core`.
-5. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh -yp`.
-6. Source the profile file: `source ~/.profile`.
+1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
+1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
+1. Change directory into `aptos-core`: `cd aptos-core`
+1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh -yp`
+1. Source the profile file: `source ~/.profile`.
 
    :::info
    Note that you have to include environment variable definitions in `~/.profile` into your shell. Depending on your setup, the  `~/.profile` may be already automatically loaded for each login shell, or it may not. If not, you may
    need to add `. ~/.profile` to your `~/.bash_profile` or other shell configuration manually.
    :::
 
-7. You can now run the Move Prover to prove an example:
+1. You can now run the Move Prover to prove an example:
     ```bash
     aptos move prove --package-dir aptos-move/move-examples/hello_prover/
     ```
@@ -137,17 +136,17 @@ Some Linux distributions are not supported. Currently, OpenSUSE and Amazon Linux
 :::
 
 1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
-2. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
-3. Change directory into the `aptos-core` directory: `cd aptos-core`.
-4. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh -yp`.
-5. Source the profile file: `source ~/.profile`.
+1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
+1. Change directory into `aptos-core`: `cd aptos-core`
+1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh -yp`
+1. Source the profile file: `source ~/.profile`.
 
    :::info
    Note that you have to include environment variable definitions in `~/.profile` into your shell. Depending on your setup, the  `~/.profile` may be already automatically loaded for each login shell, or it may not. If not, you may
    need to add `. ~/.profile` to your `~/.bash_profile` or other shell configuration manually.
    :::
 
-6. You can now run the Move Prover to prove an example:
+1. You can now run the Move Prover to prove an example:
     ```bash
     aptos move prove --package-dir aptos-move/move-examples/hello_prover/
     ```
@@ -167,20 +166,20 @@ If you are an advanced user and would like to build the CLI binary by downloadin
 **> Using the automated script**
 
 1. If on Mac, ensure you have `brew` installed https://brew.sh/
-2. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
-3. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
-4. Change directory into the `aptos-core` directory: `cd aptos-core`.
-5. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh`.
-6. Update your current shell environment: `source ~/.cargo/env`.
+1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
+1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
+1. Change directory into `aptos-core`: `cd aptos-core`
+1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh`
+1. Update your current shell environment: `source ~/.cargo/env`.
 
 **> Manual installation of dependencies**
 
 If the script above doesn't work for you, you can install these manually, but it's **not recommended**.
 
 1. Install [Rust](https://www.rust-lang.org/tools/install)
-2. Install [Git](https://git-scm.com/download)
-3. Install [CMake](https://cmake.org/download/)
-4. Install [LLVM](https://releases.llvm.org/)
+1. Install [Git](https://git-scm.com/download)
+1. Install [CMake](https://cmake.org/download/)
+1. Install [LLVM](https://releases.llvm.org/)
 
 #### Building the Aptos CLI
 
@@ -188,11 +187,11 @@ If the script above doesn't work for you, you can install these manually, but it
     - `devnet` for building on the Aptos devnet.
     - `testnet` for building on the Aptos testnet.
     - `main` for the current development branch.
-2. Build the CLI tool: `cargo build --package aptos --release`.
-3. The binary will be available in at
+1. Build the CLI tool: `cargo build --package aptos --release`.
+1. The binary will be available in at
     - `target/release/aptos`
-4. (Optional) Move this executable to a place on your path e.g. `~/bin/aptos`.
-5. You can now get help instructions by running `~/bin/aptos help`
+1. (Optional) Move this executable to a place on your path e.g. `~/bin/aptos`.
+1. You can now get help instructions by running `~/bin/aptos help`
 
 </details>
 
@@ -205,20 +204,20 @@ If the script above doesn't work for you, you can install these manually, but it
 **> Using the automated script**
 
 1. If on Mac, ensure you have `brew` installed https://brew.sh/
-2. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
-3. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
-4. Change directory into the `aptos-core` directory: `cd aptos-core`.
-5. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh`.
-6. Update your current shell environment: `source ~/.cargo/env`.
+1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
+1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
+1. Change directory into `aptos-core`: `cd aptos-core`
+1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh`
+1. Update your current shell environment: `source ~/.cargo/env`
 
 **> Manual installation of dependencies**
 
-If the script above does not work for you, you can install these manually, but it is **not recommended**.
+If the script above does not work for you, you can install these manually, but it is **not recommended**:
 
-1. Install [Rust](https://www.rust-lang.org/tools/install).
-2. Install [Git](https://git-scm.com/download).
-3. Install [CMake](https://cmake.org/download/).
-4. Install [LLVM](https://releases.llvm.org/).
+1. [Rust](https://www.rust-lang.org/tools/install).
+1. [Git](https://git-scm.com/download).
+1. [CMake](https://cmake.org/download/).
+1. [LLVM](https://releases.llvm.org/).
 
 #### Building the Aptos CLI
 
@@ -226,11 +225,11 @@ If the script above does not work for you, you can install these manually, but i
     - `devnet` for building on the Aptos devnet.
     - `testnet` for building on the Aptos testnet.
     - `main` for the current development branch.
-2. Build the CLI tool: `cargo build --package aptos --release`.
-3. The binary will be available in at
+1. Build the CLI tool: `cargo build --package aptos --release`.
+1. The binary will be available in at
    - `target/release/aptos`
-4. (Optional) Move this executable to a place on your path e.g. `~/bin/aptos`.
-5. You can now get help instructions by running `~/bin/aptos help`
+1. (Optional) Move this executable to a place on your path e.g. `~/bin/aptos`.
+1. You can now get help instructions by running `~/bin/aptos help`
 
 </details>
 
@@ -249,11 +248,11 @@ Windows.  All dependencies must be manually installed.
 **> Manual installation of dependencies**
 
 1. Install [Rust](https://www.rust-lang.org/tools/install).
-2. Install [Git](https://git-scm.com/download).
-3. Install [CMake](https://cmake.org/download/).
-4. If on Windows ARM, install [Visual Studio Preview](https://visualstudio.microsoft.com/vs/preview/).
-5. Install [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022).
-6. Install [LLVM](https://releases.llvm.org/).
+1. Install [Git](https://git-scm.com/download).
+1. Install [CMake](https://cmake.org/download/).
+1. If on Windows ARM, install [Visual Studio Preview](https://visualstudio.microsoft.com/vs/preview/).
+1. Install [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022).
+1. Install [LLVM](https://releases.llvm.org/).
 
 #### Building aptos-core
 
@@ -261,9 +260,8 @@ Windows.  All dependencies must be manually installed.
     - `devnet` for building on the Aptos devnet.
     - `testnet` for building on the Aptos testnet.
     - `main` for the current development branch.
-2. Build the CLI tool: `cargo build --package aptos --release`.
-3. The binary will be available in at
-   - `target\release\aptos.exe`
-4. You can now get help instructions by running `target\release\aptos.exe` in a Powershell window.
+1. Build the CLI tool: `cargo build --package aptos --release`.
+1. The binary will be available at - `target\release\aptos.exe`
+1. You can now get help instructions by running `target\release\aptos.exe` in a Powershell window.
 
 </details>
