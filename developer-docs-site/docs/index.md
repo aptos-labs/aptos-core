@@ -10,7 +10,7 @@ hide_table_of_contents: true
 
 Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
-## Set up the Aptos environment and take the tutorials
+## Set up the Aptos environment and start with the tutorials
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-3a g-4">
@@ -114,8 +114,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 
 ## Connect to Aptos networks
 
-Aptos offers a local testnet and online devnet and testnet, with mainnet on the way. See the [System Integrators Guide](guides/system-integrators-guide.md#networks) for a summary of the available networks and the means to connect to them.
-
+Aptos offers running a local testnet, as well as using the shared devnet and testnet, with mainnet on the way. See the [System Integrators Guide](guides/system-integrators-guide.md#networks) for a summary of the available networks and the means to connect to them.
 
 :::tip Aptos Devnet Resets
 The Aptos devnet is reset every Thursday. See the latest updates in Aptos [Discord][discord].
@@ -145,5 +144,6 @@ We are excited that you are here, and we look forward to getting to know you. We
 
 * [AptosLabs.com](https://www.aptoslabs.com/developers)
 * [Discord](https://discord.gg/aptoslabs)
-* [Telegram](https://t.me/aptos_official)
 * [Medium](https://medium.com/aptoslabs)
+* [Telegram](https://t.me/aptos_official)
+* [Twitter](https://twitter.com/AptosLabs)
