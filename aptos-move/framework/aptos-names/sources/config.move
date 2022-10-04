@@ -106,8 +106,9 @@ module aptos_names::config {
     /// We will be using a multi-sig account to intervene when necessary. The multi-sig account will be controlled by well-known
     /// and regarded members of the Aptos Ecosystem, and will be used to manage names that are being used in a way that is
     /// harmful to others.
+    /// Alternatively, the on-chain governance can be used to get the 0x4 signer
     public fun signer_is_admin(sign: &signer): bool acquires ConfigurationV1 {
-        signer::address_of(sign) == admin_multisig_address()
+        signer::address_of(sign) == admin_multisig_address() || signer::address_of(sign) == @aptos_names
     }
 
     public fun assert_signer_is_admin(sign: &signer) acquires ConfigurationV1 {
