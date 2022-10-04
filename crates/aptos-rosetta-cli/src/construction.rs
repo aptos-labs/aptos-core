@@ -95,10 +95,9 @@ impl CreateAccountCommand {
         info!("Create account: {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .create_account(
@@ -148,10 +147,9 @@ impl TransferCommand {
         info!("Transfer {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .transfer(
@@ -202,10 +200,9 @@ impl SetOperatorCommand {
         info!("Set operator {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .set_operator(
@@ -256,10 +253,9 @@ impl SetVoterCommand {
         info!("Set voter {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .set_voter(
@@ -313,10 +309,9 @@ impl CreateStakePoolCommand {
         info!("CreateStakePool {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .create_stake_pool(

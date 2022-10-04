@@ -273,7 +273,7 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
 
     async fn execute(mut self) -> CliTypedResult<Vec<StakePoolResult>> {
         let owner_address = self.owner_address;
-        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let client = self.rest_options.client(&self.profile_options)?;
 
         let mut stake_pool_results: Vec<StakePoolResult> = vec![];
         // Add direct stake pool if any.
@@ -521,7 +521,7 @@ impl CliCommand<serde_json::Value> for ShowValidatorStake {
     }
 
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
-        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let client = self.rest_options.client(&self.profile_options)?;
         let address = self
             .operator_args
             .address_fallback_to_profile(&self.profile_options)?;
@@ -550,7 +550,7 @@ impl CliCommand<ValidatorConfigSummary> for ShowValidatorConfig {
     }
 
     async fn execute(mut self) -> CliTypedResult<ValidatorConfigSummary> {
-        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let client = self.rest_options.client(&self.profile_options)?;
         let address = self
             .operator_args
             .address_fallback_to_profile(&self.profile_options)?;
@@ -580,7 +580,7 @@ impl CliCommand<ValidatorSetSummary> for ShowValidatorSet {
     }
 
     async fn execute(mut self) -> CliTypedResult<ValidatorSetSummary> {
-        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let client = self.rest_options.client(&self.profile_options)?;
         let validator_set: ValidatorSet = client
             .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
             .await?
@@ -1031,7 +1031,7 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
     }
 
     async fn execute(mut self) -> CliTypedResult<()> {
-        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let client = self.rest_options.client(&self.profile_options)?;
 
         let epochs =
             FetchMetadata::fetch_new_block_events(&client, Some(self.start_epoch), self.end_epoch)
