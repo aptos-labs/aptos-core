@@ -98,7 +98,7 @@ module aptos_names::domains {
     }
 
     /// This is only callable during genesis or framework upgrades
-    public entry fun initialize(framework: &signer, funds_address: address, admin_multisig_address: address) {
+    public entry fun initialize(framework: &signer, funds_address: address, admin_address: address) {
         use aptos_framework::aptos_account;
 
         assert!(signer::address_of(framework) == @0x4, error::permission_denied(ENOT_AUTHORIZED));
@@ -107,11 +107,11 @@ module aptos_names::domains {
             aptos_account::create_account(funds_address);
         };
 
-        if (!account::exists_at(admin_multisig_address)) {
-            aptos_account::create_account(admin_multisig_address);
+        if (!account::exists_at(admin_address)) {
+            aptos_account::create_account(admin_address);
         };
 
-        config::initialize_v1(framework, admin_multisig_address, funds_address);
+        config::initialize_v1(framework, admin_address, funds_address);
 
         move_to(
             framework,
@@ -227,7 +227,7 @@ module aptos_names::domains {
     }
 
     /// Forcefully set the name of a domain.
-    /// This is a privileged operation, used via multisig governance, to forcefully set a domain address
+    /// This is a privileged operation, used via governance, to forcefully set a domain address
     /// This can be used, for example, to forcefully set the domain for a system address domain
     public entry fun force_set_domain_address(sign: &signer, domain_name: String, new_owner: address) acquires NameRegistryV1, SetNameAddressEventsV1 {
         force_set_name_address(sign, option::none(), domain_name, new_owner);
@@ -242,7 +242,7 @@ module aptos_names::domains {
         set_name_address_internal(subdomain_name, domain_name, new_owner);
     }
 
-    /// Forcefully create or seize a domain name. This is a privileged operation, used via multisig governance.
+    /// Forcefully create or seize a domain name. This is a privileged operation, used via governance.
     /// This can be used, for example, to forcefully create a domain for a system address domain, or to seize a domain from a malicious user.
     /// The `registration_duration_secs` parameter is the number of seconds to register the domain for, but is not limited to the maximum set in the config for domains registered normally.
     /// This allows, for example, to create a domain for the system address for 100 years so we don't need to worry about expiry
@@ -471,8 +471,8 @@ module aptos_names::domains {
     }
 
     #[test_only]
-    public fun init_module_for_test(framework: &signer, funds_address: address, admin_multisig_address: address) {
-        initialize(framework, funds_address, admin_multisig_address)
+    public fun init_module_for_test(framework: &signer, funds_address: address, admin_address: address) {
+        initialize(framework, funds_address, admin_address)
     }
 
     #[test_only]

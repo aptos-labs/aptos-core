@@ -75,25 +75,24 @@ This fee is sent to an account controlled by the `Aptos Foundation`, and will be
 Shorter names are more expensive than longer names, as they are rarer, and thus more valuable.
 The price per year also increases as the number of years registered increases, to help disincentivize long-term domain
 squatting and more quickly return 'lost' names to those who will use them.
-The maximum number of years that a domain can be registered for (excluding renewals) is 10. Names can however be renewed
-indefinitely.
+The maximum number of years that a domain can be registered for (excluding renewals) is 2: we will be extending this as
+pricing models are upgraded. Names will be renewable indefinitely.
 
 ### Governance
 
 We are strongly against domain squatting, scams, impersonation, harassment, and other nefarious activities.
 
-There is a capability for a multi-sig account to intervene when necessary. This capability includes:
+There is a capability for an admin account to intervene when necessary. This capability includes:
 
 - Forcefully registering, or expiring a name. This is meant to be used in the case of a name being used for malicious
   purposes, such as racism, harassment, impersonation, or scams. This makes it possible to remove a name from the
-  registerable pool, and prevent it from being registered again. This is not a power taken lightly, and is a large
-  responsibility for all members of the multi-sig.
+  registerable pool, and prevent it from being registered again.
+- Adjust pricing
 
-The multi-sig account will be controlled by well-known and regarded members of the Aptos Ecosystem, and will be used to
-manage names that are being used in a way that is harmful to others. Current signers will use their own judgement to
-decide whether to accept new candidates into the multi-sig signers.
+These privileges will be used to manage names that are being used in a way that is harmful to others.
+Additionally, the `0x4` signer, available via governance proposals, is able to perform all admin actions as well.
 
-Our goal is to both increase the number of signers and move more governance on-chain over time.
+Our goal is to move more governance on-chain over time.
 
 ### Conventions
 

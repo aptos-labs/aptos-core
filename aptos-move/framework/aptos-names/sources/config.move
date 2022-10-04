@@ -17,7 +17,7 @@ module aptos_names::config {
     use std::string::{Self, String};
 
     const CONFIG_KEY_ENABLED: vector<u8> = b"enabled";
-    const CONFIG_KEY_ADMIN_MULTISIG_ADDRESS: vector<u8> = b"admin_multisig_address";
+    const CONFIG_KEY_ADMIN_ADDRESS: vector<u8> = b"admin_address";
     const CONFIG_KEY_FOUNDATION_FUND_ADDRESS: vector<u8> = b"foundation_fund_address";
     const CONFIG_KEY_TYPE: vector<u8> = b"type";
     const CONFIG_KEY_CREATION_TIME_SEC: vector<u8> = b"creation_time_sec";
@@ -43,13 +43,13 @@ module aptos_names::config {
         config: PropertyMap,
     }
 
-    public(friend) fun initialize_v1(framework: &signer, admin_multisig_address: address, foundation_fund_address: address) acquires ConfigurationV1 {
+    public(friend) fun initialize_v1(framework: &signer, admin_address: address, foundation_fund_address: address) acquires ConfigurationV1 {
         move_to(framework, ConfigurationV1 {
             config: property_map::empty(),
         });
 
         // Temporarily set this to framework to allow othet methods below to be set with framework signer
-        set_v1(@aptos_names, config_key_admin_multisig_address(), &signer::address_of(framework));
+        set_v1(@aptos_names, config_key_admin_address(), &signer::address_of(framework));
 
         set_is_enabled(framework, true);
 
@@ -71,7 +71,7 @@ module aptos_names::config {
 
         // We set it directly here to allow boostrapping the other values
         set_v1(@aptos_names, config_key_foundation_fund_address(), &foundation_fund_address);
-        set_v1(@aptos_names, config_key_admin_multisig_address(), &admin_multisig_address);
+        set_v1(@aptos_names, config_key_admin_address(), &admin_address);
     }
 
 
@@ -91,8 +91,8 @@ module aptos_names::config {
         read_address_v1(@aptos_names, &config_key_foundation_fund_address())
     }
 
-    public fun admin_multisig_address(): address acquires ConfigurationV1 {
-        read_address_v1(@aptos_names, &config_key_admin_multisig_address())
+    public fun admin_address(): address acquires ConfigurationV1 {
+        read_address_v1(@aptos_names, &config_key_admin_address())
     }
 
     public fun max_number_of_years_registered(): u8 acquires ConfigurationV1 {
@@ -103,12 +103,11 @@ module aptos_names::config {
         read_u64_v1(@aptos_names, &config_key_max_domain_length())
     }
 
-    /// We will be using a multi-sig account to intervene when necessary. The multi-sig account will be controlled by well-known
-    /// and regarded members of the Aptos Ecosystem, and will be used to manage names that are being used in a way that is
-    /// harmful to others.
-    /// Alternatively, the on-chain governance can be used to get the 0x4 signer
+    /// Admins will be able to intervene when necessary.
+    /// The account will be used to manage names that are being used in a way that is harmful to others.
+    /// Alternatively, the on-chain governance can be used to get the 0x4 signer, and perform admin actions.
     public fun signer_is_admin(sign: &signer): bool acquires ConfigurationV1 {
-        signer::address_of(sign) == admin_multisig_address() || signer::address_of(sign) == @aptos_names
+        signer::address_of(sign) == admin_address() || signer::address_of(sign) == @aptos_names
     }
 
     public fun assert_signer_is_admin(sign: &signer) acquires ConfigurationV1 {
@@ -160,10 +159,10 @@ module aptos_names::config {
         set_v1(@aptos_names, config_key_foundation_fund_address(), &addr)
     }
 
-    public entry fun set_admin_multisig_address(sign: &signer, addr: address) acquires ConfigurationV1 {
+    public entry fun set_admin_address(sign: &signer, addr: address) acquires ConfigurationV1 {
         assert_signer_is_admin(sign);
         assert!(account::exists_at(addr), error::invalid_argument(EINVALID_VALUE));
-        set_v1(@aptos_names, config_key_admin_multisig_address(), &addr)
+        set_v1(@aptos_names, config_key_admin_address(), &addr)
     }
 
     public entry fun set_max_number_of_years_registered(sign: &signer, max_years_registered: u8) acquires ConfigurationV1 {
@@ -209,8 +208,8 @@ module aptos_names::config {
         string::utf8(CONFIG_KEY_ENABLED)
     }
 
-    public fun config_key_admin_multisig_address(): String {
-        string::utf8(CONFIG_KEY_ADMIN_MULTISIG_ADDRESS)
+    public fun config_key_admin_address(): String {
+        string::utf8(CONFIG_KEY_ADMIN_ADDRESS)
     }
 
     public fun config_key_foundation_fund_address(): String {
@@ -317,8 +316,8 @@ module aptos_names::config {
     }
 
     #[test_only]
-    public fun set_admin_multisig_address_test_only(addr: address) acquires ConfigurationV1 {
-        set_v1(@aptos_names, config_key_admin_multisig_address(), &addr)
+    public fun set_admin_address_test_only(addr: address) acquires ConfigurationV1 {
+        set_v1(@aptos_names, config_key_admin_address(), &addr)
     }
 
     #[test_only]
@@ -326,7 +325,7 @@ module aptos_names::config {
         timestamp::set_time_has_started_for_testing(aptos);
         initialize_aptoscoin_for(aptos);
         initialize_v1(aptos_names, @aptos_names, @aptos_names);
-        set_admin_multisig_address_test_only(signer::address_of(aptos_names));
+        set_admin_address_test_only(signer::address_of(aptos_names));
     }
 
     #[test(myself = @aptos_names)]
@@ -334,7 +333,7 @@ module aptos_names::config {
         account::create_account_for_test(signer::address_of(&myself));
 
         initialize_v1(&myself, @aptos_names, @aptos_names);
-        set_v1(@aptos_names, config_key_admin_multisig_address(), &@aptos_names);
+        set_v1(@aptos_names, config_key_admin_address(), &@aptos_names);
 
         set_tokendata_description(&myself, string::utf8(b"test description"));
         assert!(tokendata_description() == string::utf8(b"test description"), 1);
@@ -348,7 +347,7 @@ module aptos_names::config {
         account::create_account_for_test(signer::address_of(&myself));
 
         initialize_v1(&myself, @aptos_names, @aptos_names);
-        set_v1(@aptos_names, config_key_admin_multisig_address(), &@aptos_names);
+        set_v1(@aptos_names, config_key_admin_address(), &@aptos_names);
 
         set_tokendata_description(&myself, string::utf8(b"test description"));
         assert!(tokendata_description() == string::utf8(b"test description"), 1);
@@ -388,9 +387,9 @@ module aptos_names::config {
         set_foundation_fund_address(myself, signer::address_of(rando));
         assert!(foundation_fund_address() == signer::address_of(rando), 5);
 
-        assert!(admin_multisig_address() == signer::address_of(myself), 6);
-        set_admin_multisig_address(myself, signer::address_of(rando));
-        assert!(admin_multisig_address() == signer::address_of(rando), 6);
+        assert!(admin_address() == signer::address_of(myself), 6);
+        set_admin_address(myself, signer::address_of(rando));
+        assert!(admin_address() == signer::address_of(rando), 6);
     }
 
 
@@ -434,9 +433,9 @@ module aptos_names::config {
         initialize_for_test(myself, aptos);
         coin::register<AptosCoin>(myself);
 
-        assert!(admin_multisig_address() == signer::address_of(myself), 6);
-        assert!(admin_multisig_address() != signer::address_of(rando), 7);
+        assert!(admin_address() == signer::address_of(myself), 6);
+        assert!(admin_address() != signer::address_of(rando), 7);
 
-        set_admin_multisig_address(rando, signer::address_of(rando));
+        set_admin_address(rando, signer::address_of(rando));
     }
 }
