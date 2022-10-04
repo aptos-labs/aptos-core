@@ -215,52 +215,57 @@ fn test_new_genesis() {
 
     // New genesis transaction: set validator set, bump epoch and overwrite account1 balance.
     let configuration = get_configuration(&db);
-    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
-        WriteSetMut::new(vec![
-            (
-                StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
-                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
-            ),
-            (
-                StateKey::AccessPath(AccessPath::new(
-                    CORE_CODE_ADDRESS,
-                    ConfigurationResource::resource_path(),
-                )),
-                WriteOp::Modification(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
-            ),
-            (
-                StateKey::AccessPath(AccessPath::new(
-                    account1,
-                    CoinStoreResource::resource_path(),
-                )),
-                WriteOp::Modification(
-                    bcs::to_bytes(&CoinStoreResource::new(
-                        1_000_000,
-                        false,
-                        EventHandle::random(0),
-                        EventHandle::random(0),
-                    ))
-                    .unwrap(),
+    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(
+        ChangeSet::new(
+            WriteSetMut::new(vec![
+                (
+                    StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
+                    WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
                 ),
-            ),
-        ])
-        .freeze()
+                (
+                    StateKey::AccessPath(AccessPath::new(
+                        CORE_CODE_ADDRESS,
+                        ConfigurationResource::resource_path(),
+                    )),
+                    WriteOp::Modification(
+                        bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap(),
+                    ),
+                ),
+                (
+                    StateKey::AccessPath(AccessPath::new(
+                        account1,
+                        CoinStoreResource::resource_path(),
+                    )),
+                    WriteOp::Modification(
+                        bcs::to_bytes(&CoinStoreResource::new(
+                            1_000_000,
+                            false,
+                            EventHandle::random(0),
+                            EventHandle::random(0),
+                        ))
+                        .unwrap(),
+                    ),
+                ),
+            ])
+            .freeze()
+            .unwrap(),
+            vec![
+                ContractEvent::new(
+                    *configuration.events().key(),
+                    0,
+                    TypeTag::Struct(Box::new(ConfigurationResource::struct_tag())),
+                    vec![],
+                ),
+                ContractEvent::new(
+                    new_block_event_key(),
+                    0,
+                    TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
+                    vec![],
+                ),
+            ],
+        )
         .unwrap(),
-        vec![
-            ContractEvent::new(
-                *configuration.events().key(),
-                0,
-                TypeTag::Struct(Box::new(ConfigurationResource::struct_tag())),
-                vec![],
-            ),
-            ContractEvent::new(
-                new_block_event_key(),
-                0,
-                TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
-                vec![],
-            ),
-        ],
-    )));
+    ));
 
     // Bootstrap DB into new genesis.
     let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();
