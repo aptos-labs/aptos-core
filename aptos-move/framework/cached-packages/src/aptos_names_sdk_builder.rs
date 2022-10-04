@@ -34,7 +34,7 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
-    ConfigSetAdminMultisigAddress {
+    ConfigSetAdminAddress {
         addr: AccountAddress,
     },
 
@@ -59,6 +59,10 @@ pub enum EntryFunctionCall {
         max_years_registered: u8,
     },
 
+    ConfigSetSubdomainPrice {
+        price: u64,
+    },
+
     ConfigSetTokendataDescription {
         description: Vec<u8>,
     },
@@ -76,7 +80,7 @@ pub enum EntryFunctionCall {
         domain_name: Vec<u8>,
     },
 
-    /// Forcefully create or seize a domain name. This is a privileged operation, used via multisig governance.
+    /// Forcefully create or seize a domain name. This is a privileged operation, used via governance.
     /// This can be used, for example, to forcefully create a domain for a system address domain, or to seize a domain from a malicious user.
     /// The `registration_duration_secs` parameter is the number of seconds to register the domain for, but is not limited to the maximum set in the config for domains registered normally.
     /// This allows, for example, to create a domain for the system address for 100 years so we don't need to worry about expiry
@@ -93,7 +97,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Forcefully set the name of a domain.
-    /// This is a privileged operation, used via multisig governance, to forcefully set a domain address
+    /// This is a privileged operation, used via governance, to forcefully set a domain address
     /// This can be used, for example, to forcefully set the domain for a system address domain
     DomainsForceSetDomainAddress {
         domain_name: Vec<u8>,
@@ -109,7 +113,7 @@ pub enum EntryFunctionCall {
     /// This is only callable during genesis or framework upgrades
     DomainsInitialize {
         funds_address: AccountAddress,
-        admin_multisig_address: AccountAddress,
+        admin_address: AccountAddress,
     },
 
     /// A wrapper around `register_name` as an entry function.
@@ -144,7 +148,7 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
-            ConfigSetAdminMultisigAddress { addr } => config_set_admin_multisig_address(addr),
+            ConfigSetAdminAddress { addr } => config_set_admin_address(addr),
             ConfigSetDomainPriceForLength { price, length } => {
                 config_set_domain_price_for_length(price, length)
             }
@@ -156,6 +160,7 @@ impl EntryFunctionCall {
             ConfigSetMaxNumberOfYearsRegistered {
                 max_years_registered,
             } => config_set_max_number_of_years_registered(max_years_registered),
+            ConfigSetSubdomainPrice { price } => config_set_subdomain_price(price),
             ConfigSetTokendataDescription { description } => {
                 config_set_tokendata_description(description)
             }
@@ -191,8 +196,8 @@ impl EntryFunctionCall {
             } => domains_force_set_subdomain_address(subdomain_name, domain_name, new_owner),
             DomainsInitialize {
                 funds_address,
-                admin_multisig_address,
-            } => domains_initialize(funds_address, admin_multisig_address),
+                admin_address,
+            } => domains_initialize(funds_address, admin_address),
             DomainsRegisterDomain {
                 domain_name,
                 num_years,
@@ -233,7 +238,7 @@ impl EntryFunctionCall {
     }
 }
 
-pub fn config_set_admin_multisig_address(addr: AccountAddress) -> TransactionPayload {
+pub fn config_set_admin_address(addr: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -242,7 +247,7 @@ pub fn config_set_admin_multisig_address(addr: AccountAddress) -> TransactionPay
             ]),
             ident_str!("config").to_owned(),
         ),
-        ident_str!("set_admin_multisig_address").to_owned(),
+        ident_str!("set_admin_address").to_owned(),
         vec![],
         vec![bcs::to_bytes(&addr).unwrap()],
     ))
@@ -326,6 +331,21 @@ pub fn config_set_max_number_of_years_registered(max_years_registered: u8) -> Tr
     ))
 }
 
+pub fn config_set_subdomain_price(price: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 4,
+            ]),
+            ident_str!("config").to_owned(),
+        ),
+        ident_str!("set_subdomain_price").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&price).unwrap()],
+    ))
+}
+
 pub fn config_set_tokendata_description(description: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -392,7 +412,7 @@ pub fn domains_clear_subdomain_address(
     ))
 }
 
-/// Forcefully create or seize a domain name. This is a privileged operation, used via multisig governance.
+/// Forcefully create or seize a domain name. This is a privileged operation, used via governance.
 /// This can be used, for example, to forcefully create a domain for a system address domain, or to seize a domain from a malicious user.
 /// The `registration_duration_secs` parameter is the number of seconds to register the domain for, but is not limited to the maximum set in the config for domains registered normally.
 /// This allows, for example, to create a domain for the system address for 100 years so we don't need to worry about expiry
@@ -442,7 +462,7 @@ pub fn domains_force_create_or_seize_subdomain_name(
 }
 
 /// Forcefully set the name of a domain.
-/// This is a privileged operation, used via multisig governance, to forcefully set a domain address
+/// This is a privileged operation, used via governance, to forcefully set a domain address
 /// This can be used, for example, to forcefully set the domain for a system address domain
 pub fn domains_force_set_domain_address(
     domain_name: Vec<u8>,
@@ -491,7 +511,7 @@ pub fn domains_force_set_subdomain_address(
 /// This is only callable during genesis or framework upgrades
 pub fn domains_initialize(
     funds_address: AccountAddress,
-    admin_multisig_address: AccountAddress,
+    admin_address: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -505,7 +525,7 @@ pub fn domains_initialize(
         vec![],
         vec![
             bcs::to_bytes(&funds_address).unwrap(),
-            bcs::to_bytes(&admin_multisig_address).unwrap(),
+            bcs::to_bytes(&admin_address).unwrap(),
         ],
     ))
 }
@@ -600,11 +620,9 @@ pub fn domains_set_subdomain_address(
 }
 mod decoder {
     use super::*;
-    pub fn config_set_admin_multisig_address(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
+    pub fn config_set_admin_address(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::ConfigSetAdminMultisigAddress {
+            Some(EntryFunctionCall::ConfigSetAdminAddress {
                 addr: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -663,6 +681,16 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ConfigSetMaxNumberOfYearsRegistered {
                 max_years_registered: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn config_set_subdomain_price(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ConfigSetSubdomainPrice {
+                price: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -774,7 +802,7 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DomainsInitialize {
                 funds_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                admin_multisig_address: bcs::from_bytes(script.args().get(1)?).ok()?,
+                admin_address: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -843,8 +871,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
-            "config_set_admin_multisig_address".to_string(),
-            Box::new(decoder::config_set_admin_multisig_address),
+            "config_set_admin_address".to_string(),
+            Box::new(decoder::config_set_admin_address),
         );
         map.insert(
             "config_set_domain_price_for_length".to_string(),
@@ -865,6 +893,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "config_set_max_number_of_years_registered".to_string(),
             Box::new(decoder::config_set_max_number_of_years_registered),
+        );
+        map.insert(
+            "config_set_subdomain_price".to_string(),
+            Box::new(decoder::config_set_subdomain_price),
         );
         map.insert(
             "config_set_tokendata_description".to_string(),
