@@ -5,6 +5,7 @@ pub mod git;
 pub mod keys;
 #[cfg(test)]
 mod tests;
+pub mod tools;
 
 use crate::common::utils::dir_default_to_current;
 use crate::genesis::git::{OPERATOR_FILE, OWNER_FILE};
@@ -55,6 +56,7 @@ pub enum GenesisTool {
     GenerateAdminWriteSet(keys::GenerateAdminWriteSet),
     SetupGit(git::SetupGit),
     SetValidatorConfiguration(keys::SetValidatorConfiguration),
+    GetPoolAddresses(tools::PoolAddresses),
 }
 
 impl GenesisTool {
@@ -66,6 +68,7 @@ impl GenesisTool {
             GenesisTool::GenerateAdminWriteSet(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetupGit(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetValidatorConfiguration(tool) => tool.execute_serialized_success().await,
+            GenesisTool::GetPoolAddresses(tool) => tool.execute_serialized().await,
         }
     }
 }

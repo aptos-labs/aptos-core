@@ -134,7 +134,10 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
         }
-        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(conn_pool.clone())),
+        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
+            conn_pool.clone(),
+            config.ans_contract_address,
+        )),
     };
 
     let options =
@@ -148,6 +151,11 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         tailer.run_migrations();
     }
 
+    info!(
+        processor_name = processor_name,
+        lookback_versions = lookback_versions,
+        "Fetching starting version from db..."
+    );
     let starting_version_from_db = tailer
         .get_start_version(&processor_name, lookback_versions)
         .unwrap_or_else(|| {

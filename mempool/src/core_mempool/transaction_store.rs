@@ -4,11 +4,12 @@
 use crate::counters::{
     BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL, LOCAL_LABEL,
 };
+use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     core_mempool::{
         index::{
-            AccountTransactions, ParkingLotIndex, PriorityIndex, PriorityQueueIter, TTLIndex,
-            TimelineIndex,
+            AccountTransactions, MultiBucketTimelineIndex, ParkingLotIndex, PriorityIndex,
+            PriorityQueueIter, TTLIndex,
         },
         transaction::{MempoolTransaction, TimelineState},
     },
@@ -54,7 +55,7 @@ pub struct TransactionStore {
     // we keep it separate from `expiration_time_index` so Mempool can't be clogged
     //  by old transactions even if it hasn't received commit callbacks for a while
     system_ttl_index: TTLIndex,
-    timeline_index: TimelineIndex,
+    timeline_index: MultiBucketTimelineIndex,
     // keeps track of "non-ready" txns (transactions that can't be included in next block)
     parking_lot_index: ParkingLotIndex,
 
@@ -88,7 +89,8 @@ impl TransactionStore {
                 Duration::from_secs(t.txn.expiration_timestamp_secs())
             })),
             priority_index: PriorityIndex::new(),
-            timeline_index: TimelineIndex::new(),
+            timeline_index: MultiBucketTimelineIndex::new(config.broadcast_buckets.clone())
+                .unwrap(),
             parking_lot_index: ParkingLotIndex::new(),
             hash_index: HashMap::new(),
 
@@ -297,6 +299,7 @@ impl TransactionStore {
             counters::TIMELINE_INDEX_LABEL,
             self.timeline_index.size(),
         );
+        counters::core_mempool_timeline_index_size(&self.timeline_index.get_sizes());
         counters::core_mempool_index_size(
             counters::TRANSACTION_HASH_INDEX_LABEL,
             self.hash_index.len(),
@@ -538,46 +541,54 @@ impl TransactionStore {
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
-        timeline_id: u64,
+        timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-    ) -> (Vec<SignedTransaction>, u64) {
+    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
-        let mut last_timeline_id = timeline_id;
+        let mut last_timeline_id = timeline_id.id_per_bucket.clone();
 
         // Add as many transactions to the batch as possible
-        for (address, sequence_number) in self.timeline_index.read_timeline(timeline_id, count) {
-            if let Some(txn) = self
-                .transactions
-                .get(&address)
-                .and_then(|txns| txns.get(&sequence_number))
-            {
-                let transaction_bytes = txn.txn.raw_txn_bytes_len() as u64;
-                if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
-                    break; // The batch is full
-                } else {
-                    batch.push(txn.txn.clone());
-                    batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
-                    if let TimelineState::Ready(timeline_id) = txn.timeline_state {
-                        last_timeline_id = timeline_id;
-                    }
-                    if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time) {
-                        counters::core_mempool_txn_commit_latency(
-                            BROADCAST_BATCHED_LABEL,
-                            E2E_LABEL,
-                            time_delta,
-                        );
+        for (i, bucket) in self
+            .timeline_index
+            .read_timeline(timeline_id, count)
+            .iter()
+            .enumerate()
+            .rev()
+        {
+            for (address, sequence_number) in bucket {
+                if let Some(txn) = self.get_mempool_txn(address, *sequence_number) {
+                    let transaction_bytes = txn.txn.raw_txn_bytes_len() as u64;
+                    if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
+                        break; // The batch is full
+                    } else {
+                        batch.push(txn.txn.clone());
+                        batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
+                        if let TimelineState::Ready(timeline_id) = txn.timeline_state {
+                            last_timeline_id[i] = timeline_id;
+                        }
+                        if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time)
+                        {
+                            counters::core_mempool_txn_commit_latency(
+                                BROADCAST_BATCHED_LABEL,
+                                E2E_LABEL,
+                                time_delta,
+                            );
+                        }
                     }
                 }
             }
         }
 
-        (batch, last_timeline_id)
+        (batch, last_timeline_id.into())
     }
 
-    pub(crate) fn timeline_range(&self, start_id: u64, end_id: u64) -> Vec<SignedTransaction> {
+    pub(crate) fn timeline_range(
+        &self,
+        start_end_pairs: &Vec<(u64, u64)>,
+    ) -> Vec<SignedTransaction> {
         self.timeline_index
-            .timeline_range(start_id, end_id)
+            .timeline_range(start_end_pairs)
             .iter()
             .filter_map(|(account, sequence_number)| {
                 self.transactions

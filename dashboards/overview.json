@@ -3,7 +3,7 @@
   "slug": "",
   "title": "Overview",
   "originalTitle": "",
-  "tags": [],
+  "tags": ["aptos-core"],
   "style": "dark",
   "timezone": "",
   "editable": true,
@@ -28,7 +28,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 5, "w": 3, "x": 0, "y": 1 },
+      "gridPos": { "h": 5, "w": 3, "x": 1, "y": 1 },
       "id": 46,
       "isNew": false,
       "span": 0,
@@ -73,11 +73,11 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 5, "w": 3, "x": 3, "y": 1 },
+      "gridPos": { "h": 5, "w": 3, "x": 4, "y": 1 },
       "id": 2,
       "isNew": false,
       "span": 0,
-      "title": "Down nodes",
+      "title": "Connected validators",
       "transparent": false,
       "type": "stat",
       "colors": null,
@@ -92,7 +92,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}) -  quantile(0.67, sum by (kubernetes_pod_name)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\".*\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}))",
+          "expr": "quantile(0.67, sum by (kubernetes_pod_name)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\".*\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"})) + 1",
           "intervalFactor": 1,
           "instant": true,
           "format": "table"
@@ -118,7 +118,123 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 5, "w": 3, "x": 6, "y": 1 },
+      "gridPos": { "h": 5, "w": 4, "x": 7, "y": 1 },
+      "id": 74,
+      "isNew": false,
+      "span": 0,
+      "title": "Participating Stake ",
+      "transparent": false,
+      "type": "gauge",
+      "id": 74,
+      "links": [],
+      "maxDataPoints": 100,
+      "title": "Participating Stake ",
+      "gridPos": { "h": 5, "w": 4, "x": 7, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "match": "null", "result": { "text": "N/A" } }, "type": "special" }],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "red", "value": 67 },
+              { "color": "#EAB839", "value": 75 },
+              { "color": "orange", "value": 80 },
+              { "color": "green", "value": 90 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
+          "interval": "10s",
+          "intervalFactor": 1,
+          "range": true,
+          "refId": "A",
+          "step": 10
+        }
+      ],
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 5, "w": 4, "x": 11, "y": 1 },
+      "id": 75,
+      "isNew": false,
+      "span": 0,
+      "title": "Participating Validators ",
+      "transparent": false,
+      "type": "gauge",
+      "maxDataPoints": 100,
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "gridPos": { "h": 5, "w": 4, "x": 11, "y": 1 },
+      "id": 75,
+      "links": [],
+      "title": "Participating Validators ",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "match": "null", "result": { "text": "N/A" } }, "type": "special" }],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "red", "value": 67 },
+              { "color": "#EAB839", "value": 75 },
+              { "color": "orange", "value": 80 },
+              { "color": "green", "value": 90 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
+          "interval": "10s",
+          "intervalFactor": 1,
+          "range": true,
+          "refId": "A",
+          "step": 10
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 5, "w": 3, "x": 15, "y": 1 },
       "id": 66,
       "isNew": false,
       "span": 0,
@@ -163,7 +279,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 5, "w": 3, "x": 9, "y": 1 },
+      "gridPos": { "h": 5, "w": 3, "x": 18, "y": 1 },
       "id": 70,
       "isNew": false,
       "span": 0,
@@ -208,11 +324,11 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 5, "w": 3, "x": 12, "y": 1 },
-      "id": 65,
+      "gridPos": { "h": 5, "w": 3, "x": 1, "y": 6 },
+      "id": 71,
       "isNew": false,
       "span": 0,
-      "title": "Participating Stake %",
+      "title": "Sync lagging validator",
       "transparent": false,
       "type": "stat",
       "colors": null,
@@ -227,7 +343,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "quantile(0.5, aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
+          "expr": "count(clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*\", role=~\"validator\", data_type=\"transactions\"} - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*\", role=~\"validator\", type=\"synced\"}, 0) \u003e 50000) OR on() vector(0)",
           "intervalFactor": 1,
           "instant": true,
           "format": "table"
@@ -246,63 +362,43 @@
         "displayMode": "",
         "content": "",
         "mode": "",
-        "reduceOptions": { "values": false, "fields": "", "calcs": ["mean"] }
+        "reduceOptions": { "values": false, "fields": "", "calcs": ["lastNotNull"] }
       }
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 5, "w": 3, "x": 15, "y": 1 },
-      "id": 69,
+      "gridPos": { "h": 5, "w": 9, "x": 4, "y": 6 },
+      "id": 72,
       "isNew": false,
       "span": 0,
-      "title": "Participating validator %",
+      "title": "Sync lagging validators",
       "transparent": false,
-      "type": "stat",
-      "colors": null,
-      "colorValue": false,
-      "colorBackground": false,
-      "decimals": 0,
-      "format": "",
-      "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
-      "nullPointMode": "",
-      "sparkline": {},
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
-          "intervalFactor": 1,
+          "expr": "clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*\", role=~\"validator\", data_type=\"transactions\"} - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*\", role=~\"validator\", type=\"synced\"}, 0) \u003e 50000 ",
           "instant": true,
           "format": "table"
         }
       ],
-      "thresholds": "",
-      "valueFontSize": "",
-      "valueMaps": null,
-      "valueName": "",
-      "options": {
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "displayMode": "",
-        "content": "",
-        "mode": "",
-        "reduceOptions": { "values": false, "fields": "", "calcs": ["mean"] }
-      }
+      "scroll": false
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "gridPos": { "h": 5, "w": 9, "x": 13, "y": 6 },
       "id": 28,
       "isNew": false,
       "span": 0,
-      "title": "Not Participating Consensus",
+      "title": "Connected but not Participating in Consensus",
       "transparent": false,
       "type": "table",
       "columns": null,
@@ -323,7 +419,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
       "id": 62,
       "isNew": false,
       "span": 0,
@@ -337,7 +433,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 7 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 12 },
       "id": 10,
       "isNew": false,
       "renderer": "flot",
@@ -417,7 +513,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 7 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 12 },
       "id": 67,
       "isNew": false,
       "renderer": "flot",
@@ -497,7 +593,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 7 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 12 },
       "id": 68,
       "isNew": false,
       "renderer": "flot",
@@ -588,7 +684,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
       "id": 22,
       "isNew": false,
       "span": 0,
@@ -602,7 +698,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 17 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 22 },
       "id": 26,
       "isNew": false,
       "renderer": "flot",
@@ -682,7 +778,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 17 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 22 },
       "id": 45,
       "isNew": false,
       "renderer": "flot",
@@ -767,10 +863,68 @@
       }
     },
     {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 22 },
+      "id": 76,
+      "isNew": false,
+      "span": 0,
+      "title": "Validators lagging behind %",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "count(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*\", role=~\"validator\", data_type=\"transactions\"}  - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"telemetry-service\", kubernetes_pod_name=~\".*\", role=~\"validator\", type=\"synced\"} \u003e 30000)  OR on() vector(0) * 100 / count(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*\", role=~\"validator\", data_type=\"transactions\"})",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-committed",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 10 },
+              { "color": "red", "value": 20 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "area" }
+          }
+        }
+      }
+    },
+    {
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
       "id": 42,
       "isNew": false,
       "span": 0,
@@ -784,7 +938,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 27 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 32 },
       "id": 20,
       "isNew": false,
       "renderer": "flot",
@@ -863,7 +1017,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 27 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 32 },
       "id": 48,
       "isNew": false,
       "renderer": "flot",
@@ -903,7 +1057,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_state_sync_active_upstream_peers{role=\"fullnode\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}",
+          "expr": "aptos_mempool_active_upstream_peers_count{kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=\"validator_fullnode\"}",
           "legendFormat": "{{kubernetes_pod_name}}"
         }
       ],
@@ -942,12 +1096,12 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 27 },
-      "id": 47,
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 32 },
+      "id": 77,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "State synced version",
+      "title": "Fullnodes lagging behind %",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -981,16 +1135,20 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_state_sync_version{type=\"synced\", role=\"fullnode\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}",
+          "expr": "count(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*\",  role=\"validator_fullnode\", data_type=\"transactions\"}  - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"telemetry-service\", kubernetes_pod_name=~\".*\", role=\"validator_fullnode\", type=\"synced\"} \u003e 50000)  OR on() vector(0) * 100 / count(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*\", role=\"validator_fullnode\", data_type=\"transactions\"})",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-committed",
           "format": "time_series"
         }
+      ],
+      "thresholds": [
+        { "value": 20, "colorMode": "critical", "op": "gt", "fill": true, "line": false, "yaxis": "left" },
+        { "value": 10, "colorMode": "warning", "op": "gt", "fill": true, "line": false, "yaxis": "left" }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "locale", "logBase": 1, "min": 0, "show": true },
+        { "format": "percent", "logBase": 1, "min": 0, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1022,7 +1180,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
       "id": 53,
       "isNew": false,
       "span": 0,
@@ -1036,7 +1194,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 37 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 42 },
       "id": 50,
       "isNew": false,
       "renderer": "flot",
@@ -1115,7 +1273,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 37 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 42 },
       "id": 51,
       "isNew": false,
       "renderer": "flot",
@@ -1193,7 +1351,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 37 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 42 },
       "id": 54,
       "isNew": false,
       "renderer": "flot",
@@ -1271,7 +1429,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
       "id": 40,
       "isNew": false,
       "span": 0,
@@ -1285,7 +1443,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 46 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 51 },
       "id": 30,
       "isNew": false,
       "renderer": "flot",
@@ -1365,12 +1523,12 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 46 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 51 },
       "id": 32,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Avg e2e latency",
+      "title": "e2e latency",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1387,7 +1545,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -1404,10 +1562,22 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[1m])",
+          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "p50",
           "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "legendFormat": "p90"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "legendFormat": "p99"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
@@ -1445,7 +1615,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 46 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 51 },
       "id": 44,
       "isNew": false,
       "renderer": "flot",
@@ -1662,15 +1832,19 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 25,
+  "version": 56,
   "links": [
     {
-      "title": "Other Dashboards",
+      "title": "aptos-core",
       "type": "dashboards",
       "asDropdown": true,
       "icon": "external link",
       "includeVars": true,
-      "keepTime": true
+      "keepTime": true,
+      "tags": ["aptos-core"],
+      "targetBlank": true,
+      "tooltip": "",
+      "url": ""
     }
   ],
   "time": { "from": "now-1h", "to": "now" },

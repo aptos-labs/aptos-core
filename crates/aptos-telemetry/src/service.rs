@@ -9,7 +9,7 @@ use aptos_logger::{
     LoggerFilterUpdater,
 };
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
-use aptos_types::chain_id::ChainId;
+use aptos_types::chain_id::{ChainId, NamedChain};
 use futures::channel::mpsc::{self, Receiver};
 use once_cell::sync::Lazy;
 use rand::Rng;
@@ -149,8 +149,13 @@ async fn spawn_telemetry_service(
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) {
-    let telemetry_svc_url =
-        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
+    let telemetry_svc_url = env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| {
+        if chain_id == ChainId::mainnet() || chain_id == ChainId::new(NamedChain::PREMAINNET.id()) {
+            MAINNET_TELEMETRY_SERVICE_URL.into()
+        } else {
+            TELEMETRY_SERVICE_URL.into()
+        }
+    });
 
     let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
 

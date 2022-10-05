@@ -31,9 +31,9 @@ tiny-keccak = { version = "2.0.2", default-features = false, features = ["sha3"]
 aptos-bitvec = { path = "../crates/aptos-bitvec" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "0155b47808de249f4030e84354fde154a1500a82", features = ["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426", features = ["address32"] }
 
-move-table-extension = { git = "https://github.com/move-language/move", rev = "0155b47808de249f4030e84354fde154a1500a82" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426" }
 
 [dev-dependencies]
 claims = "0.7"
@@ -44,7 +44,7 @@ serde_json = "1.0.81"
 
 aptos-crypto = { path = "../crates/aptos-crypto", features = ["fuzzing"] }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "0155b47808de249f4030e84354fde154a1500a82", features = ["address32", "fuzzing"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426", features = ["address32", "fuzzing"] }
 
 [features]
 default = []

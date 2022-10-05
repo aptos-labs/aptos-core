@@ -172,13 +172,4 @@ impl MockSharedMempool {
         let mut pool = self.mempool.lock();
         pool.commit_transaction(&txn.sender(), txn.sequence_number())
     }
-
-    /// True if all the given txns are in mempool, else false.
-    pub fn read_timeline(&self, timeline_id: u64, count: usize) -> Vec<SignedTransaction> {
-        let pool = self.mempool.lock();
-        pool.read_timeline(timeline_id, count)
-            .0
-            .into_iter()
-            .collect()
-    }
 }

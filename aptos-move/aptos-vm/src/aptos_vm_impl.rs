@@ -115,6 +115,7 @@ impl AptosVMImpl {
         let inner = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
+            gas_feature_version,
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");

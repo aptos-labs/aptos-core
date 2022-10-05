@@ -470,7 +470,7 @@ impl MockDbReader {
             ContractEvent::new(
                 new_block_event_key(),
                 *idx,
-                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 bcs::to_bytes(&NewBlockEvent::new(
                     AccountAddress::random(),
                     epoch,
