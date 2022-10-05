@@ -68,7 +68,7 @@ resource "helm_release" "fullnode" {
         "eks.amazonaws.com/nodegroup" = "fullnode"
       }
       storage = {
-        class = "gp2"
+        class = var.fullnode_storage_class
       }
       backup = {
         enable = count.index == 0 ? var.enable_backup : false
