@@ -164,6 +164,7 @@ pub fn create_stake_pool_address(
     full_seed.extend(bcs::to_bytes(&operator).unwrap());
     full_seed.extend(SALT);
     full_seed.extend(seed);
+    full_seed.push(255);
     create_resource_address(owner, &full_seed)
 }
 
@@ -177,6 +178,7 @@ pub fn create_vesting_contract_address(
     full_seed.extend(bcs::to_bytes(&nonce).unwrap());
     full_seed.extend(VESTING_POOL_SALT);
     full_seed.extend(seed);
+    full_seed.push(255);
     create_resource_address(admin, &full_seed)
 }
 
