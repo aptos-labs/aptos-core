@@ -65,3 +65,39 @@ fn clone_large_vectors() {
         TransactionStatus::Keep(ExecutionStatus::ExecutionFailure { .. })
     ));
 }
+
+#[test]
+fn add_vec_to_table() {
+    let mut h = MoveHarness::new();
+
+    // Load the code
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    assert_success!(h.publish_package(
+        &acc,
+        &common::test_dir_path("memory_quota.data/table_and_vec"),
+    ));
+
+    let result = h.run_entry_function(
+        &acc,
+        str::parse("0xbeef::test::just_under_quota").unwrap(),
+        vec![],
+        vec![],
+    );
+    // Should fail when trying to destroy a non-empty table.
+    assert!(matches!(
+        result,
+        TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
+    ));
+
+    let result = h.run_entry_function(
+        &acc,
+        str::parse("0xbeef::test::just_above_quota").unwrap(),
+        vec![],
+        vec![],
+    );
+    // Should run out of memory before trying to destroy a non-empty table.
+    assert!(matches!(
+        result,
+        TransactionStatus::Keep(ExecutionStatus::ExecutionFailure { .. })
+    ));
+}
