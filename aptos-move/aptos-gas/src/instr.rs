@@ -15,182 +15,182 @@ crate::params::define_gas_parameters!(
     "instr",
     [
         // nop
-        [nop: InternalGas, "nop", 10],
+        [nop: InternalGas, "nop", 100],
         // control flow
-        [ret: InternalGas, "ret", 60],
-        [abort: InternalGas, "abort", 60],
-        [br_true: InternalGas, "br_true", 60],
-        [br_false: InternalGas, "br_false", 60],
-        [branch: InternalGas, "branch", 20],
+        [ret: InternalGas, "ret", 600],
+        [abort: InternalGas, "abort", 600],
+        [br_true: InternalGas, "br_true", 600],
+        [br_false: InternalGas, "br_false", 600],
+        [branch: InternalGas, "branch", 200],
         // stack
-        [pop: InternalGas, "pop", 40],
-        [ld_u8: InternalGas, "ld_u8", 60],
-        [ld_u64: InternalGas, "ld_u64", 60],
-        [ld_u128: InternalGas, "ld_u128", 80],
-        [ld_true: InternalGas, "ld_true", 60],
-        [ld_false: InternalGas, "ld_false", 60],
-        [ld_const_base: InternalGas, "ld_const.base", 650],
+        [pop: InternalGas, "pop", 400],
+        [ld_u8: InternalGas, "ld_u8", 600],
+        [ld_u64: InternalGas, "ld_u64", 600],
+        [ld_u128: InternalGas, "ld_u128", 800],
+        [ld_true: InternalGas, "ld_true", 600],
+        [ld_false: InternalGas, "ld_false", 600],
+        [ld_const_base: InternalGas, "ld_const.base", 6500],
         [
             ld_const_per_byte: InternalGasPerByte,
             "ld_const.per_byte",
-            35
+            350
         ],
         // borrow
-        [imm_borrow_loc: InternalGas, "imm_borrow_loc", 60],
-        [mut_borrow_loc: InternalGas, "mut_borrow_loc", 60],
-        [imm_borrow_field: InternalGas, "imm_borrow_field", 200],
-        [mut_borrow_field: InternalGas, "mut_borrow_field", 200],
+        [imm_borrow_loc: InternalGas, "imm_borrow_loc", 600],
+        [mut_borrow_loc: InternalGas, "mut_borrow_loc", 600],
+        [imm_borrow_field: InternalGas, "imm_borrow_field", 2000],
+        [mut_borrow_field: InternalGas, "mut_borrow_field", 2000],
         [
             imm_borrow_field_generic: InternalGas,
             "imm_borrow_field_generic",
-            200
+            2000
         ],
         [
             mut_borrow_field_generic: InternalGas,
             "mut_borrow_field_generic",
-            200
+            2000
         ],
         // locals
-        [copy_loc_base: InternalGas, "copy_loc.base", 80],
+        [copy_loc_base: InternalGas, "copy_loc.base", 800],
         [
             copy_loc_per_abs_val_unit: InternalGasPerAbstractValueUnit,
             "copy_loc.per_abs_val_unit",
-            4
+            40
         ],
-        [move_loc_base: InternalGas, "move_loc.base", 120],
-        [st_loc_base: InternalGas, "st_loc.base", 120],
+        [move_loc_base: InternalGas, "move_loc.base", 1200],
+        [st_loc_base: InternalGas, "st_loc.base", 1200],
         // call
-        [call_base: InternalGas, "call.base", 1000],
-        [call_per_arg: InternalGasPerArg, "call.per_arg", 100],
-        [call_per_local: InternalGasPerArg, optional "call.per_local", 100],
-        [call_generic_base: InternalGas, "call_generic.base", 1000],
+        [call_base: InternalGas, "call.base", 10000],
+        [call_per_arg: InternalGasPerArg, "call.per_arg", 1000],
+        [call_per_local: InternalGasPerArg, optional "call.per_local", 1000],
+        [call_generic_base: InternalGas, "call_generic.base", 10000],
         [
             call_generic_per_ty_arg: InternalGasPerArg,
             "call_generic.per_ty_arg",
-            100
+            1000
         ],
         [
             call_generic_per_arg: InternalGasPerArg,
             "call_generic.per_arg",
-            100
+            1000
         ],
-        [call_generic_per_local: InternalGasPerArg, optional "call_generic.per_local", 100],
+        [call_generic_per_local: InternalGasPerArg, optional "call_generic.per_local", 1000],
         // struct
-        [pack_base: InternalGas, "pack.base", 220],
-        [pack_per_field: InternalGasPerArg, "pack.per_field", 40],
-        [pack_generic_base: InternalGas, "pack_generic.base", 220],
+        [pack_base: InternalGas, "pack.base", 2200],
+        [pack_per_field: InternalGasPerArg, "pack.per_field", 400],
+        [pack_generic_base: InternalGas, "pack_generic.base", 2200],
         [
             pack_generic_per_field: InternalGasPerArg,
             "pack_generic.per_field",
-            40
+            400
         ],
-        [unpack_base: InternalGas, "unpack.base", 220],
-        [unpack_per_field: InternalGasPerArg, "unpack.per_field", 40],
-        [unpack_generic_base: InternalGas, "unpack_generic.base", 220],
+        [unpack_base: InternalGas, "unpack.base", 2200],
+        [unpack_per_field: InternalGasPerArg, "unpack.per_field", 400],
+        [unpack_generic_base: InternalGas, "unpack_generic.base", 2200],
         [
             unpack_generic_per_field: InternalGasPerArg,
             "unpack_generic.per_field",
-            40
+            400
         ],
         // ref
-        [read_ref_base: InternalGas, "read_ref.base", 200],
+        [read_ref_base: InternalGas, "read_ref.base", 2000],
         [
             read_ref_per_abs_val_unit: InternalGasPerAbstractValueUnit,
             "read_ref.per_abs_val_unit",
-            4
+            40
         ],
-        [write_ref_base: InternalGas, "write_ref.base", 200],
-        [freeze_ref: InternalGas, "freeze_ref", 10],
+        [write_ref_base: InternalGas, "write_ref.base", 2000],
+        [freeze_ref: InternalGas, "freeze_ref", 100],
         // casting
-        [cast_u8: InternalGas, "cast_u8", 120],
-        [cast_u64: InternalGas, "cast_u64", 120],
-        [cast_u128: InternalGas, "cast_u128", 120],
+        [cast_u8: InternalGas, "cast_u8", 1200],
+        [cast_u64: InternalGas, "cast_u64", 1200],
+        [cast_u128: InternalGas, "cast_u128", 1200],
         // arithmetic
-        [add: InternalGas, "add", 160],
-        [sub: InternalGas, "sub", 160],
-        [mul: InternalGas, "mul", 160],
-        [mod_: InternalGas, "mod", 160],
-        [div: InternalGas, "div", 160],
+        [add: InternalGas, "add", 1600],
+        [sub: InternalGas, "sub", 1600],
+        [mul: InternalGas, "mul", 1600],
+        [mod_: InternalGas, "mod", 1600],
+        [div: InternalGas, "div", 1600],
         // bitwise
-        [bit_or: InternalGas, "bit_or", 160],
-        [bit_and: InternalGas, "bit_and", 160],
-        [xor: InternalGas, "bit_xor", 160],
-        [shl: InternalGas, "bit_shl", 160],
-        [shr: InternalGas, "bit_shr", 160],
+        [bit_or: InternalGas, "bit_or", 1600],
+        [bit_and: InternalGas, "bit_and", 1600],
+        [xor: InternalGas, "bit_xor", 1600],
+        [shl: InternalGas, "bit_shl", 1600],
+        [shr: InternalGas, "bit_shr", 1600],
         // boolean
-        [or: InternalGas, "or", 160],
-        [and: InternalGas, "and", 160],
-        [not: InternalGas, "not", 160],
+        [or: InternalGas, "or", 1600],
+        [and: InternalGas, "and", 1600],
+        [not: InternalGas, "not", 1600],
         // comparison
-        [lt: InternalGas, "lt", 160],
-        [gt: InternalGas, "gt", 160],
-        [le: InternalGas, "le", 160],
-        [ge: InternalGas, "ge", 160],
-        [eq_base: InternalGas, "eq.base", 100],
+        [lt: InternalGas, "lt", 1600],
+        [gt: InternalGas, "gt", 1600],
+        [le: InternalGas, "le", 1600],
+        [ge: InternalGas, "ge", 1600],
+        [eq_base: InternalGas, "eq.base", 1000],
         [
             eq_per_abs_val_unit: InternalGasPerAbstractValueUnit,
             "eq.per_abs_val_unit",
-            4
+            40
         ],
-        [neq_base: InternalGas, "neq.base", 100],
+        [neq_base: InternalGas, "neq.base", 1000],
         [
             neq_per_abs_val_unit: InternalGasPerAbstractValueUnit,
             "neq.per_abs_val_unit",
-            4
+            40
         ],
         // global
         [
             imm_borrow_global_base: InternalGas,
             "imm_borrow_global.base",
-            500
+            5000
         ],
         [
             imm_borrow_global_generic_base: InternalGas,
             "imm_borrow_global_generic.base",
-            500
+            5000
         ],
         [
             mut_borrow_global_base: InternalGas,
             "mut_borrow_global.base",
-            500
+            5000
         ],
         [
             mut_borrow_global_generic_base: InternalGas,
             "mut_borrow_global_generic.base",
-            500
+            5000
         ],
-        [exists_base: InternalGas, "exists.base", 250],
-        [exists_generic_base: InternalGas, "exists_generic.base", 250],
-        [move_from_base: InternalGas, "move_from.base", 350],
+        [exists_base: InternalGas, "exists.base", 2500],
+        [exists_generic_base: InternalGas, "exists_generic.base", 2500],
+        [move_from_base: InternalGas, "move_from.base", 3500],
         [
             move_from_generic_base: InternalGas,
             "move_from_generic.base",
-            350
+            3500
         ],
-        [move_to_base: InternalGas, "move_to.base", 500],
+        [move_to_base: InternalGas, "move_to.base", 5000],
         [
             move_to_generic_base: InternalGas,
             "move_to_generic.base",
-            500
+            5000
         ],
         // vec
-        [vec_len_base: InternalGas, "vec_len.base", 220],
-        [vec_imm_borrow_base: InternalGas, "vec_imm_borrow.base", 330],
-        [vec_mut_borrow_base: InternalGas, "vec_mut_borrow.base", 330],
-        [vec_push_back_base: InternalGas, "vec_push_back.base", 380],
-        [vec_pop_back_base: InternalGas, "vec_pop_back.base", 260],
-        [vec_swap_base: InternalGas, "vec_swap.base", 300],
-        [vec_pack_base: InternalGas, "vec_pack.base", 600],
+        [vec_len_base: InternalGas, "vec_len.base", 2200],
+        [vec_imm_borrow_base: InternalGas, "vec_imm_borrow.base", 3300],
+        [vec_mut_borrow_base: InternalGas, "vec_mut_borrow.base", 3300],
+        [vec_push_back_base: InternalGas, "vec_push_back.base", 3800],
+        [vec_pop_back_base: InternalGas, "vec_pop_back.base", 2600],
+        [vec_swap_base: InternalGas, "vec_swap.base", 3000],
+        [vec_pack_base: InternalGas, "vec_pack.base", 6000],
         [
             vec_pack_per_elem: InternalGasPerArg,
             "vec_pack.per_elem",
-            40
+            400
         ],
-        [vec_unpack_base: InternalGas, "vec_unpack.base", 500],
+        [vec_unpack_base: InternalGas, "vec_unpack.base", 5000],
         [
             vec_unpack_per_expected_elem: InternalGasPerArg,
             "vec_unpack.per_expected_elem",
-            40
+            400
         ],
     ]
 );
