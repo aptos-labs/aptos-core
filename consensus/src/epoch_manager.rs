@@ -456,12 +456,14 @@ impl EpochManager {
             self.config.mempool_txn_pull_timeout_ms,
         );
         // TODO: do we need to destroy the async thread with explicit shutdown?
-        if let Err(e) = spawn_named!(
-            &("QuorumStore epoch ".to_owned() + &self.epoch().to_string()),
-            quorum_store.start(consensus_to_quorum_store_rx)
-        ) {
-            debug!("QS: spawn_named quorum store error {:?}", e);
-        }
+        tokio::spawn(quorum_store.start(consensus_to_quorum_store_rx));
+
+        // if let Err(e) = spawn_named!(
+        //     &("QuorumStore epoch ".to_owned() + &self.epoch().to_string()),
+        //     quorum_store.start(consensus_to_quorum_store_rx)
+        // ) {
+        //     debug!("QS: spawn_named quorum store error {:?}", e);
+        // }
     }
 
     fn spawn_quorum_store(
@@ -537,12 +539,14 @@ impl EpochManager {
                 }
             });
         }
-        if let Err(e) = spawn_named!(
-            &("QuorumStore epoch ".to_owned() + &self.epoch().to_string()),
-            metrics_monitor.instrument(quorum_store.start())
-        ) {
-            debug!("QS: spawn_named QuorumStore error {:?}", e);
-        }
+        tokio::spawn(quorum_store.start());
+
+        // if let Err(e) = spawn_named!(
+        //     &("QuorumStore epoch ".to_owned() + &self.epoch().to_string()),
+        //     metrics_monitor.instrument(quorum_store.start())
+        // ) {
+        //     debug!("QS: spawn_named QuorumStore error {:?}", e);
+        // }
         batch_reader
     }
 
@@ -588,15 +592,22 @@ impl EpochManager {
             });
         }
 
-        _ = spawn_named!(
-            &("QuorumStoreWrapper epoch ".to_owned() + &self.epoch().to_string()),
-            metrics_monitor.instrument(quorum_store_wrapper.start(
-                network_sender,
-                consensus_to_quorum_store_rx,
-                wrapper_shutdown_rx,
-                wrapper_quorum_store_msg_rx,
-            ))
-        );
+        tokio::spawn(quorum_store_wrapper.start(
+            network_sender,
+            consensus_to_quorum_store_rx,
+            wrapper_shutdown_rx,
+            wrapper_quorum_store_msg_rx,
+        ));
+
+        // _ = spawn_named!(
+        //     &("QuorumStoreWrapper epoch ".to_owned() + &self.epoch().to_string()),
+        //     metrics_monitor.instrument(quorum_store_wrapper.start(
+        //         network_sender,
+        //         consensus_to_quorum_store_rx,
+        //         wrapper_shutdown_rx,
+        //         wrapper_quorum_store_msg_rx,
+        //     ))
+        // );
     }
 
     fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
