@@ -50,7 +50,7 @@ fn test_names_end_to_end() {
         &ans_account,
         aptos_names_sdk_builder::domains_initialize(
             get_test_ans_funds_address(),
-            get_test_ans_admin_multisig_auth_key().derived_address(),
+            get_test_ans_admin_address(),
         ),
     ));
 
