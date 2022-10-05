@@ -30,9 +30,10 @@ use aptos_types::chain_id::ChainId;
 use aptos_types::network_address::NetworkAddress;
 use aptos_types::on_chain_config::{ConfigurationResource, ConsensusScheme, ValidatorSet};
 use aptos_types::stake_pool::StakePool;
-use aptos_types::staking_conttract::StakingContractStore;
+use aptos_types::staking_contract::StakingContractStore;
 use aptos_types::validator_config::ValidatorConfig;
 use aptos_types::validator_info::ValidatorInfo;
+use aptos_types::validator_performances::ValidatorPerformances;
 use aptos_types::vesting::VestingAdminStore;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
@@ -43,7 +44,7 @@ use backup_cli::utils::{
     ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
 };
 use cached_packages::aptos_stdlib;
-use chrono::Utc;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use hex::FromHex;
 use rand::rngs::StdRng;
@@ -56,6 +57,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{path::PathBuf, thread, time::Duration};
 use tokio::time::Instant;
+use aptos_rest_client::aptos_api_types::VersionedEvent;
 
 /// Tool for operations related to nodes
 ///
@@ -63,6 +65,7 @@ use tokio::time::Instant;
 /// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
+    GetPerformance(GetPerformance),
     GetStakePool(GetStakePool),
     InitializeValidator(InitializeValidator),
     JoinValidatorSet(JoinValidatorSet),
@@ -82,6 +85,7 @@ impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
         match self {
+            GetPerformance(tool) => tool.execute_serialized().await,
             GetStakePool(tool) => tool.execute_serialized().await,
             InitializeValidator(tool) => tool.execute_serialized().await,
             JoinValidatorSet(tool) => tool.execute_serialized().await,
@@ -248,12 +252,29 @@ pub enum StakePoolType {
     Vesting,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+pub enum StakePoolState {
+    Active,
+    Inactive,
+    PendingActive,
+    PendingInactive,
+}
+
 #[derive(Debug, Serialize)]
 pub struct StakePoolResult {
+    state: StakePoolState,
     pool_address: AccountAddress,
     operator_address: AccountAddress,
     voter_address: AccountAddress,
     pool_type: StakePoolType,
+    total_stake: u64,
+    commission_percentage: u64,
+    commission_not_yet_unlocked: u64,
+    lockup_expiration_local_time: String,
+    consensus_public_key: bls12381::PublicKey,
+    validator_network_addresses: Vec<NetworkAddress>,
+    fullnode_network_addresses: Vec<NetworkAddress>,
+    epoch_info: EpochInfo,
 }
 
 #[derive(Parser)]
@@ -277,19 +298,24 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
 
     async fn execute(mut self) -> CliTypedResult<Vec<StakePoolResult>> {
         let owner_address = self.owner_address;
-        let client = self.rest_options.client(&self.profile_options)?;
+        let client = &self.rest_options.client(&self.profile_options)?;
 
+        let epoch_info = get_epoch_info(client).await?;
+        let validator_set = &client
+            .get_account_resource_bcs::<ValidatorSet>(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
+            .await?
+            .into_inner();
         let mut stake_pool_results: Vec<StakePoolResult> = vec![];
         // Add direct stake pool if any.
         let direct_stake_pool =
-            get_stake_pool_info(&client, owner_address, StakePoolType::Direct).await;
+            get_stake_pool_info(client, owner_address, StakePoolType::Direct, 0, 0, epoch_info.clone(), validator_set).await;
         if let Ok(direct_stake_pool) = direct_stake_pool {
             stake_pool_results.push(direct_stake_pool);
         };
 
         // Fetch all stake pools managed via staking contracts.
         let staking_contract_pools =
-            get_staking_contract_pools(&client, owner_address, StakePoolType::StakingContract)
+            get_staking_contract_pools(client, owner_address, StakePoolType::StakingContract, epoch_info.clone(), validator_set)
                 .await;
         if let Ok(mut staking_contract_pools) = staking_contract_pools {
             stake_pool_results.append(&mut staking_contract_pools);
@@ -306,7 +332,7 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
             let vesting_contracts = vesting_admin_store.into_inner().vesting_contracts;
             for vesting_contract in vesting_contracts {
                 let mut staking_contract_pools =
-                    get_staking_contract_pools(&client, vesting_contract, StakePoolType::Vesting)
+                    get_staking_contract_pools(client, vesting_contract, StakePoolType::Vesting, epoch_info.clone(), validator_set)
                         .await
                         .unwrap();
                 stake_pool_results.append(&mut staking_contract_pools);
@@ -317,10 +343,88 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct StakePoolPerformance {
+    current_epoch_successful_proposals: u64,
+    current_epoch_failed_proposals: u64,
+    previous_epoch_rewards: Vec<u64>,
+    epoch_info: EpochInfo,
+}
+
+#[derive(Parser)]
+pub struct GetPerformance {
+    // The stake pool's address.
+    #[clap(long)]
+    pub(crate) pool_address: AccountAddress,
+    // Configurations for where queries will be sent to.
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    // Configurations for CLI profile to use.
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+}
+
+#[async_trait]
+impl CliCommand<StakePoolPerformance> for GetPerformance {
+    fn command_name(&self) -> &'static str {
+        "GetPerformance"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<StakePoolPerformance> {
+        let client = &self.rest_options.client(&self.profile_options)?;
+        let pool_address = self.pool_address;
+        let validator_set = &client
+            .get_account_resource_bcs::<ValidatorSet>(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
+            .await?
+            .into_inner();
+
+        let mut current_epoch_successful_proposals = 0;
+        let mut current_epoch_failed_proposals = 0;
+        let state = get_stake_pool_state(validator_set, &pool_address);
+        if state == StakePoolState::Active || state == StakePoolState::PendingInactive {
+            let validator_config = client
+                .get_account_resource_bcs::<ValidatorConfig>(pool_address, "0x1::stake::ValidatorConfig")
+                .await?
+                .into_inner();
+            let validator_performances = &client
+                .get_account_resource_bcs::<ValidatorPerformances>(CORE_CODE_ADDRESS, "0x1::stake::ValidatorPerformance")
+                .await?
+                .into_inner();
+            let validator_index = validator_config.validator_index as usize;
+            current_epoch_successful_proposals = validator_performances.validators[validator_index].successful_proposals;
+            current_epoch_failed_proposals = validator_performances.validators[validator_index].failed_proposals;
+        };
+
+        let previous_epoch_rewards = client
+            .get_account_events(
+                pool_address,
+                "0x1::stake::StakePool",
+                "distribute_rewards_events",
+                Some(0),
+                Some(10),
+            )
+            .await
+            .unwrap()
+            .into_inner()
+            .into_iter()
+            .map(|e: VersionedEvent| e.data.get("rewards_amount").unwrap().as_u64().unwrap())
+            .collect();
+
+        Ok(StakePoolPerformance {
+            current_epoch_successful_proposals,
+            current_epoch_failed_proposals,
+            previous_epoch_rewards,
+            epoch_info: get_epoch_info(client).await?,
+        })
+    }
+}
+
 pub async fn get_staking_contract_pools(
     client: &Client,
     staker_address: AccountAddress,
     pool_type: StakePoolType,
+    epoch_info: EpochInfo,
+    validator_set: &ValidatorSet,
 ) -> CliTypedResult<Vec<StakePoolResult>> {
     let mut stake_pool_results: Vec<StakePoolResult> = vec![];
     let staking_contract_store = client
@@ -331,10 +435,16 @@ pub async fn get_staking_contract_pools(
         .await?;
     let staking_contracts = staking_contract_store.into_inner().staking_contracts;
     for staking_contract in staking_contracts {
-        let stake_pool_address =
-            get_stake_pool_info(client, staking_contract.value.pool_address, pool_type)
-                .await
-                .unwrap();
+        let stake_pool_address = get_stake_pool_info(
+            client,
+            staking_contract.value.pool_address,
+            pool_type,
+            staking_contract.value.principal,
+            staking_contract.value.commission_percentage,
+            epoch_info.clone(),
+            validator_set,
+        ).await
+        .unwrap();
         stake_pool_results.push(stake_pool_address);
     }
     Ok(stake_pool_results)
@@ -344,17 +454,53 @@ pub async fn get_stake_pool_info(
     client: &Client,
     pool_address: AccountAddress,
     pool_type: StakePoolType,
+    principal: u64,
+    commission_percentage: u64,
+    epoch_info: EpochInfo,
+    validator_set: &ValidatorSet,
 ) -> CliTypedResult<StakePoolResult> {
     let stake_pool = client
         .get_account_resource_bcs::<StakePool>(pool_address, "0x1::stake::StakePool")
         .await?
         .into_inner();
+    let validator_config = client
+        .get_account_resource_bcs::<ValidatorConfig>(pool_address, "0x1::stake::ValidatorConfig")
+        .await?
+        .into_inner();
+    let total_stake = stake_pool.get_total_staked_amount();
+    let commission_not_yet_unlocked = (total_stake - principal) * commission_percentage / 100;
+    let state = get_stake_pool_state(validator_set, &pool_address);
+
     Ok(StakePoolResult {
+        state,
         pool_address,
         operator_address: stake_pool.operator_address,
         voter_address: stake_pool.delegated_voter,
         pool_type,
+        total_stake,
+        commission_percentage,
+        commission_not_yet_unlocked,
+        lockup_expiration_local_time: Time::new_seconds(stake_pool.locked_until_secs).local_time,
+        consensus_public_key: validator_config.consensus_public_key.clone(),
+        validator_network_addresses: validator_config.validator_network_addresses().unwrap(),
+        fullnode_network_addresses: validator_config.fullnode_network_addresses().unwrap(),
+        epoch_info,
     })
+}
+
+fn get_stake_pool_state(
+    validator_set: &ValidatorSet,
+    pool_address: &AccountAddress,
+) -> StakePoolState {
+    if validator_set.active_validators().contains(pool_address) {
+        StakePoolState::Active
+    } else if validator_set.pending_active_validators().contains(pool_address) {
+        StakePoolState::PendingActive
+    } else if validator_set.pending_inactive_validators().contains(pool_address) {
+        StakePoolState::PendingInactive
+    } else {
+        StakePoolState::Inactive
+    }
 }
 
 /// Register the current account as a validator node operator of it's own owned stake.
@@ -1199,33 +1345,36 @@ impl CliCommand<EpochInfo> for ShowEpochInfo {
     }
 
     async fn execute(self) -> CliTypedResult<EpochInfo> {
-        let client = self.rest_options.client(&self.profile_options)?;
-        let (block_resource, state): (BlockResource, State) = client
-            .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::block::BlockResource")
-            .await?
-            .into_parts();
-        let reconfig_resource: ConfigurationResource = client
-            .get_account_resource_at_version_bcs(
-                CORE_CODE_ADDRESS,
-                "0x1::reconfiguration::Configuration",
-                state.version,
-            )
-            .await?
-            .into_inner();
-
-        let epoch_interval = block_resource.epoch_interval();
-        let last_reconfig = reconfig_resource.last_reconfiguration_time();
-
-        Ok(EpochInfo {
-            epoch: reconfig_resource.epoch(),
-            epoch_interval,
-            last_reconfiguration_time: Time::new(last_reconfig),
-            estimated_next_reconfiguration_time: Time::new(last_reconfig + epoch_interval),
-        })
+        let client = &self.rest_options.client(&self.profile_options)?;
+        get_epoch_info(client).await
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+async fn get_epoch_info(client: &Client) -> CliTypedResult<EpochInfo> {
+    let (block_resource, state): (BlockResource, State) = client
+        .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::block::BlockResource")
+        .await?
+        .into_parts();
+    let reconfig_resource: ConfigurationResource = client
+        .get_account_resource_at_version_bcs(
+            CORE_CODE_ADDRESS,
+            "0x1::reconfiguration::Configuration",
+            state.version,
+        )
+        .await?
+        .into_inner();
+
+    let epoch_interval = block_resource.epoch_interval();
+    let last_reconfig = reconfig_resource.last_reconfiguration_time();
+    Ok(EpochInfo {
+        epoch: reconfig_resource.epoch(),
+        epoch_interval,
+        last_reconfiguration_time: Time::new(last_reconfig),
+        estimated_next_reconfiguration_time: Time::new(last_reconfig + epoch_interval),
+    })
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EpochInfo {
     epoch: u64,
     epoch_interval: u64,
@@ -1233,23 +1382,28 @@ pub struct EpochInfo {
     estimated_next_reconfiguration_time: Time,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Time {
     unix_time: u64,
-    utc_time: chrono::DateTime<chrono::Utc>,
+    utc_time: DateTime<Utc>,
+    local_time: String,
 }
 
 impl Time {
     pub fn new(unix_time: u64) -> Self {
         let duration = Duration::from_micros(unix_time);
-        let date_time = chrono::NaiveDateTime::from_timestamp(
-            duration.as_secs() as i64,
-            duration.subsec_nanos(),
-        );
+        let date_time =
+            NaiveDateTime::from_timestamp(duration.as_secs() as i64, duration.subsec_nanos());
+        let utc_time = DateTime::from_utc(date_time, Utc);
         // TODO: Allow configurable time
         Self {
             unix_time,
-            utc_time: chrono::DateTime::from_utc(date_time, Utc),
+            utc_time,
+            local_time: date_time.format("%a %b %e %T %Y").to_string(),
         }
+    }
+
+    pub fn new_seconds(seconds: u64) -> Self {
+        Time::new(seconds * 1_000_000)
     }
 }

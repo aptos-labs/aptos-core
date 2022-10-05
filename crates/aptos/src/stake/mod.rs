@@ -8,6 +8,7 @@ use crate::common::utils::prompt_yes_with_override;
 use aptos_types::account_address::{
     create_vesting_contract_address, default_stake_pool_address, AccountAddress,
 };
+use aptos_types::vesting::VestingAdminStore;
 use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
@@ -361,6 +362,52 @@ impl CliCommand<TransactionSummary> for UnlockVestedCoins {
         let vesting_contract_address = create_vesting_contract_address(self.admin_address, 0, &[]);
         self.txn_options
             .submit_transaction(aptos_stdlib::vesting_vest(vesting_contract_address))
+            .await
+            .map(|inner| inner.into())
+    }
+}
+
+/// Allows operators to request commission from running a stake pool (only if there's a staking
+/// contract set up with the staker).
+#[derive(Parser)]
+pub struct RequestCommission {
+    #[clap(long)]
+    pub owner_address: AccountAddress,
+
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub operator_address: AccountAddress,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for RequestCommission {
+    fn command_name(&self) -> &'static str {
+        "RequestCommission"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let client = self
+            .txn_options
+            .rest_options
+            .client(&self.txn_options.profile_options)?;
+        let vesting_admin_store = client
+            .get_account_resource_bcs::<VestingAdminStore>(
+                self.owner_address,
+                "0x1::vesting::AdminStore",
+            )
+            .await;
+        let staker_address = if let Ok(vesting_admin_store) = vesting_admin_store {
+            vesting_admin_store.into_inner().vesting_contracts[0]
+        } else {
+            self.owner_address
+        };
+        self.txn_options
+            .submit_transaction(aptos_stdlib::staking_contract_request_commission(
+                staker_address,
+                self.operator_address,
+            ))
             .await
             .map(|inner| inner.into())
     }
