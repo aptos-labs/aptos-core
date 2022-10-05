@@ -595,6 +595,13 @@ pub enum GenesisOptions {
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
+    generate_genesis_change_set_for_testing_with_count(genesis_options, 1)
+}
+
+pub fn generate_genesis_change_set_for_testing_with_count(
+    genesis_options: GenesisOptions,
+    count: u64,
+) -> ChangeSet {
     let framework = match genesis_options {
         GenesisOptions::Head => cached_packages::head_release_bundle(),
         GenesisOptions::Testnet => framework::testnet_release_bundle(),
@@ -604,7 +611,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         }
     };
 
-    generate_test_genesis(framework, Some(1)).0
+    generate_test_genesis(framework, Some(count as usize)).0
 }
 
 /// Generate a genesis `ChangeSet` for mainnet
