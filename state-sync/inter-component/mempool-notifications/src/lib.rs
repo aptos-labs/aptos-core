@@ -388,6 +388,7 @@ mod tests {
                     .freeze()
                     .expect("freeze cannot fail"),
                 vec![],
+                3,
             )
             .unwrap(),
         ))
