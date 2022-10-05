@@ -11,7 +11,9 @@ use crate::{
     transaction::StorageGasParameters,
     transaction::TransactionGasParameters,
 };
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_types::{
+    account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOp,
+};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     gas_algebra::{InternalGas, NumArgs, NumBytes},
@@ -169,6 +171,8 @@ pub struct AptosGasMeter {
     storage_gas_params: Option<StorageGasParameters>,
     balance: InternalGas,
     memory_quota: AbstractValueSize,
+
+    is_call_table: bool,
 }
 
 impl AptosGasMeter {
@@ -193,6 +197,7 @@ impl AptosGasMeter {
             storage_gas_params,
             balance,
             memory_quota,
+            is_call_table: false,
         }
     }
 
@@ -258,6 +263,16 @@ impl GasMeter for AptosGasMeter {
         _ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
+        // TODO(Gas): The table extension maintains its own memory space and currently it's hard
+        //            for us to track when values are created or dropped there.
+        //            Therefore as a temporary hack, we do not consider the memory released when
+        //            values enter the table module, "leaking them" conceptually.
+        //            This special handling should be removed once we build proper memory tracking
+        //            into the table extension itself.
+        if self.is_call_table {
+            return Ok(());
+        }
+
         self.release_heap_memory(args.fold(AbstractValueSize::zero(), |acc, val| {
             acc + self
                 .gas_params
@@ -360,12 +375,16 @@ impl GasMeter for AptosGasMeter {
     #[inline]
     fn charge_call_generic(
         &mut self,
-        _module_id: &ModuleId,
+        module_id: &ModuleId,
         _func_name: &str,
         ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         args: impl ExactSizeIterator<Item = impl ValueView>,
         num_locals: NumArgs,
     ) -> PartialVMResult<()> {
+        // Save the info for charge_native_function_before_execution.
+        self.is_call_table =
+            *module_id.address() == CORE_CODE_ADDRESS && module_id.name().as_str() == "table";
+
         let params = &self.gas_params.instr;
 
         let mut cost = params.call_generic_base
