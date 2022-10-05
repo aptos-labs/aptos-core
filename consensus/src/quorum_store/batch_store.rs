@@ -165,9 +165,9 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 debug!("QS: sign digest");
                 if needs_db {
                     // TODO: Consider an async call to DB, but it could be a race with clean.
-                    // self.db
-                    //     .save_batch(persist_request.digest, persist_request.value)
-                    //     .expect("Could not write to DB");
+                    self.db
+                        .save_batch(persist_request.digest, persist_request.value)
+                        .expect("Could not write to DB");
                 }
                 Some(SignedDigest::new(
                     self.epoch,
