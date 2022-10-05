@@ -193,6 +193,7 @@ pub fn create_vesting_pool_address(
 pub fn create_resource_address(address: AccountAddress, seed: &[u8]) -> AccountAddress {
     let mut input = bcs::to_bytes(&address).unwrap();
     input.extend(seed);
+    input.push(255);
     let hash = HashValue::sha3_256_of(&input);
     AccountAddress::from_bytes(&hash.as_ref()).unwrap()
 }

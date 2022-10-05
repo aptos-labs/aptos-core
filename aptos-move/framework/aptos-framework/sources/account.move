@@ -83,8 +83,16 @@ module aptos_framework::account {
     const MAX_U64: u128 = 18446744073709551615;
     const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
+    /// Scheme identifier for Ed25519 signatures used to derive authentication keys for Ed25519 public keys.
     const ED25519_SCHEME: u8 = 0;
+    /// Scheme identifier for MultiEd25519 signatures used to derive authentication keys for MultiEd25519 public keys.
     const MULTI_ED25519_SCHEME: u8 = 1;
+    /// Scheme identifier used when hashing an account's address together with a seed to derive the address (not the
+    /// authentication key) of a resource account. This is an abuse of the notion of a scheme identifier which, for now,
+    /// serves to domain separate hashes used to derive resource account addresses from hashes used to derive
+    /// authentication keys. Without such separation, an adversary could create (and get a signer for) a resource account
+    /// whose address matches an existing address of a MultiEd25519 wallet.
+    const DERIVE_RESOURCE_ACCOUNT_SCHEME: u8 = 255;
 
     /// Account already exists
     const EACCOUNT_ALREADY_EXISTS: u64 = 1;
@@ -390,6 +398,7 @@ module aptos_framework::account {
     public fun create_resource_address(source: &address, seed: vector<u8>): address {
         let bytes = bcs::to_bytes(source);
         vector::append(&mut bytes, seed);
+        vector::push_back(&mut bytes, DERIVE_RESOURCE_ACCOUNT_SCHEME);
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
