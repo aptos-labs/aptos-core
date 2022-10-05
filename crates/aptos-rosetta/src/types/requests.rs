@@ -330,12 +330,16 @@ pub struct PreprocessMetadata {
     /// Expiry time of the transaction in unix epoch seconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry_time_secs: Option<U64>,
+    /// Sequence number to use for this transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sequence_number: Option<U64>,
+    /// Max gas amount for this transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_gas_amount: Option<U64>,
+    /// Gas unit price for this transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_price: Option<U64>,
+    /// Public keys used for this transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_keys: Option<Vec<PublicKey>>,
 }
