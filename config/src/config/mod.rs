@@ -336,11 +336,18 @@ impl NodeConfig {
 
         self.indexer.starting_version = match std::env::var("STARTING_VERSION").ok() {
             None => self.indexer.starting_version,
-            Some(s) => Some(s.parse().map_err(|_| {
-                Error::InvariantViolation(
-                    "Could not parse 'STARTING_VERSION' env var as u64".to_string(),
-                )
-            })?),
+            Some(s) => match s.parse::<u64>() {
+                Ok(version) => Some(version),
+                Err(_) => {
+                    // Doing this instead of failing. This will allow a processor to have STARTING_VERSION: undefined when deploying
+                    aptos_logger::warn!(
+                        "Invalid STARTING_VERSION: {}, using {:?} instead",
+                        s,
+                        self.indexer.starting_version
+                    );
+                    self.indexer.starting_version
+                }
+            },
         };
 
         self.indexer.skip_migrations = self.indexer.skip_migrations.or(Some(false));
@@ -358,6 +365,11 @@ impl NodeConfig {
         self.indexer.processor_tasks =
             default_if_zero_u8(self.indexer.processor_tasks, DEFAULT_PROCESSOR_TASKS);
         self.indexer.emit_every = self.indexer.emit_every.or(Some(0));
+        self.indexer.gap_lookback_versions = env_or_default(
+            "GAP_LOOKBACK_VERSIONS",
+            self.indexer.gap_lookback_versions.or(Some(1_500_000)),
+            None,
+        );
 
         Ok(self)
     }

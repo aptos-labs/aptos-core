@@ -189,11 +189,11 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
                 .try_into()?,
         );
         Ok(ValidatorConfiguration {
-            owner_account_address: private_identity.account_address,
+            owner_account_address: private_identity.account_address.into(),
             owner_account_public_key: private_identity.account_private_key.public_key(),
-            operator_account_address: private_identity.account_address,
+            operator_account_address: private_identity.account_address.into(),
             operator_account_public_key: private_identity.account_private_key.public_key(),
-            voter_account_address: private_identity.account_address,
+            voter_account_address: private_identity.account_address.into(),
             voter_account_public_key: private_identity.account_private_key.public_key(),
             consensus_public_key: Some(private_identity.consensus_private_key.public_key()),
             proof_of_possession: Some(bls12381::ProofOfPossession::create(
@@ -399,6 +399,8 @@ pub struct GenesisConfiguration {
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voting_power_increase_limit: u64,
+    pub employee_vesting_start: Option<u64>,
+    pub employee_vesting_period_duration: Option<u64>,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
@@ -594,6 +596,8 @@ impl Builder {
             rewards_apy_percentage: 10,
             voting_duration_secs: ONE_DAY / 24,
             voting_power_increase_limit: 50,
+            employee_vesting_start: None,
+            employee_vesting_period_duration: None,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);

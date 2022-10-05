@@ -351,10 +351,9 @@ fn encode_transaction(sender: AccountAddress, program: Script) -> Transaction {
 }
 
 pub fn encode_reconfiguration_transaction() -> Transaction {
-    Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
-        WriteSet::default(),
-        vec![],
-    )))
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(
+        ChangeSet::new(WriteSet::default(), vec![]).unwrap(),
+    ))
 }
 
 fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {

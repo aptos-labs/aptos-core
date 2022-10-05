@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_vm::natives;
 use move_deps::move_unit_test::UnitTestingConfig;
@@ -48,6 +48,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
     natives::aptos_natives(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
     )
 }
 
@@ -81,7 +82,13 @@ fn test_message_board() {
 #[test]
 fn test_minter() {
     let named_address = BTreeMap::new();
-    run_tests_for_pkg("minter_script", named_address);
+    run_tests_for_pkg("scripts/minter", named_address);
+}
+
+#[test]
+fn test_two_by_two_transfer() {
+    let named_address = BTreeMap::new();
+    run_tests_for_pkg("scripts/two_by_two_transfer", named_address);
 }
 
 #[test]

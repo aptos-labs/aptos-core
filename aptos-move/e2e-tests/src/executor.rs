@@ -21,7 +21,7 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
@@ -465,6 +465,11 @@ impl FakeExecutor {
         StateView::get_state_value(&self.data_store, state_key).unwrap()
     }
 
+    /// Set the blob for the associated AccessPath
+    pub fn write_state_value(&mut self, state_key: StateKey, data_blob: Vec<u8>) {
+        self.data_store.set(state_key, data_blob);
+    }
+
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let vm = AptosVM::new(self.get_state_view());
@@ -549,6 +554,7 @@ impl FakeExecutor {
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
+                LATEST_GAS_FEATURE_VERSION,
                 self.features
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             )
@@ -574,7 +580,7 @@ impl FakeExecutor {
             let session_out = session.finish().expect("Failed to generate txn effects");
             // TODO: Support deltas in fake executor.
             let (_, change_set) = session_out
-                .into_change_set(&mut ())
+                .into_change_set(&mut (), false)
                 .expect("Failed to generate writeset")
                 .into_inner();
             let (write_set, _events) = change_set.into_inner();
@@ -594,6 +600,7 @@ impl FakeExecutor {
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
+            LATEST_GAS_FEATURE_VERSION,
             self.features
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
         )
@@ -612,7 +619,7 @@ impl FakeExecutor {
         let session_out = session.finish().expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (_, change_set) = session_out
-            .into_change_set(&mut ())
+            .into_change_set(&mut (), false)
             .expect("Failed to generate writeset")
             .into_inner();
         let (writeset, _events) = change_set.into_inner();

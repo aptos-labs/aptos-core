@@ -10,6 +10,13 @@ genesis:
   chain_id:
 
 waypoint:
+  image:
+    # -- Image repo to use for serving waypoint and genesis
+    repo: joseluisq/static-web-server
+    # -- Image tag to use for serving waypoint and genesis
+    tag: 2.12@sha256:a3b147754be4c38ce96189c4dbaa708c36f39dfcc043c470812c33dd53fea7d0
+    # -- Image pull policy to use for waypoint image
+    pullPolicy: IfNotPresent
   nodeSelector: {}
   tolerations: []
   affinity: {}

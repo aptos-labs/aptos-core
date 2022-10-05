@@ -38,7 +38,6 @@ The Aptos Move adapter features include:
 The Aptos framework ships with many useful libraries:
 * A [Token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) that makes it possible to create NFTs and other rich tokens without publishing a smart contract
 * A [Coin standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) that makes it possible to create type-safe Coins by publishing a trivial module
-* An [iterable Table](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/iterable_table.move) that allows for traversing all the entries within a table
 * A staking and delegation framework
 * A [`type_of`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/type_info.move) service to identify at run-time the address, module, and struct name of a given type
 * Multi-signer framework that allows multiple `signer` entities
@@ -115,7 +114,7 @@ public fun deposit<T>(account: address, coin: Coin<T>)
 ### Type-safety
 
 In Move, given a specific struct, say `A`, different instances can be made distinct in two fashions:
-* Internal identifiers, such as [GUID](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/guid.move)s
+* Internal identifiers, such as [GUID](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/guid.move)s
 * Generics such as `A<T>`, where `T` is another struct
 
 Internal identifiers can be convenient due to their simplicity and easier programmability. Generics, however, provide much higher guarantees including explicit compile or validation time checks though with some costs.

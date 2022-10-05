@@ -7,7 +7,6 @@ use crate::metrics::{HISTOGRAM, RESPONSE_STATUS};
 use aptos_logger::{
     debug, error, info,
     prelude::{sample, SampleRate},
-    sample::Sampling,
     Schema,
 };
 use poem::{http::header, Endpoint, Request, Response, Result};

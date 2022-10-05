@@ -1,26 +1,25 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import { TokenClient } from "./token_client";
 
-import { FAUCET_URL, NODE_URL } from "./utils/test_helper.test";
+import { getFaucetClient, NODE_URL } from "./utils/test_helper.test";
 
 test(
   "full tutorial nft token flow",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
     const tokenClient = new TokenClient(client);
 
     const alice = new AptosAccount();
     const bob = new AptosAccount();
 
     // Fund both Alice's and Bob's Account
-    await faucetClient.fundAccount(alice.address(), 10000000);
-    await faucetClient.fundAccount(bob.address(), 10000000);
+    await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(bob.address(), 100000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";

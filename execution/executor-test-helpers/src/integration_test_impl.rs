@@ -496,7 +496,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 }
 
 fn approx_eq(a: u64, b: u64) -> bool {
-    const M: u64 = 1_000_000;
+    const M: u64 = 10_000_000;
     a + M > b && b + M > a
 }
 

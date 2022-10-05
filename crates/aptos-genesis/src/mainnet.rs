@@ -50,6 +50,10 @@ pub struct MainnetGenesisInfo {
     employee_vesting_accounts: Vec<EmployeePool>,
     /// Set of configurations for validators who will be joining the genesis validator set.
     validators: Vec<ValidatorWithCommissionRate>,
+    /// Timestamp (in seconds) when employee vesting starts.
+    employee_vesting_start: u64,
+    /// Duration of each vesting period (in seconds).
+    employee_vesting_period_duration: u64,
 }
 
 impl MainnetGenesisInfo {
@@ -61,6 +65,13 @@ impl MainnetGenesisInfo {
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<MainnetGenesisInfo> {
+        let employee_vesting_start = genesis_config
+            .employee_vesting_start
+            .expect("Employee vesting start time (in secs) needs to be provided");
+        let employee_vesting_period_duration = genesis_config
+            .employee_vesting_period_duration
+            .expect("Employee vesting period duration (in secs) needs to be provided");
+
         Ok(MainnetGenesisInfo {
             chain_id,
             accounts,
@@ -80,6 +91,8 @@ impl MainnetGenesisInfo {
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
+            employee_vesting_start,
+            employee_vesting_period_duration,
         })
     }
 
@@ -111,6 +124,8 @@ impl MainnetGenesisInfo {
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
                 voting_power_increase_limit: self.voting_power_increase_limit,
+                employee_vesting_start: self.employee_vesting_start,
+                employee_vesting_period_duration: self.employee_vesting_period_duration,
             },
         )
     }
