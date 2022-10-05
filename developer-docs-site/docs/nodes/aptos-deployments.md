@@ -14,21 +14,22 @@ Make sure to see the row describing [**What not to do**](#what-not-to-do).
 
 :::
 
-|Description | Mainnet | Devnet | Long-lived Testnet | Local Testnet | Aptos Incentivized Testnet (AIT)|
-|---|---|---|---|---|---|
-|**Network runs where**| Validators run on Aptos Labs servers. Fullnodes are run by both Aptos Labs and you (i.e., the Aptos community). |Validators run on Aptos Labs servers. Fullnodes are run by both Aptos Labs and you (i.e., the Aptos community).|Validators run on Aptos Labs servers. Fullnodes are run by both Aptos Labs and you (i.e., the Aptos community). | Validators and fullnodes run locally on your computer, entirely independent from devnet. | Some Validators run on Aptos servers, others are run by the Aptos community. Fullnodes are run by Aptos Labs and the community.|
-|**Who is responsible for the network**| Managed by Aptos Team. |Managed by Aptos Team. | Managed by Aptos Team. |Deployed, managed and upgraded by you.| Managed by Aptos Labs and the community.|
-|**Update release cadence EDIT**| Monthly |Weekly |Every 2 weeks |Controlled by you.| Managed by Aptos Labs and the community.|
-|**How often wiped EDIT**| Not wiped |Weekly | Not wiped |Controlled by you.| Wiped permanently after AIT progra concludes.|
-|**REST API URL EDIT**| m |Managed by Aptos Team. | lltn |Deployed, managed and upgraded by you.| Managed by Aptos Labs and the community.|
-|**Genesis blob EDIT**| m |Managed by Aptos Team. | lltn |Deployed, managed and upgraded by you.| Managed by Aptos Labs and the community.|
-|**Waypoint EDIT**| m |Managed by Aptos Team. | lltn |Deployed, managed and upgraded by you.| Managed by Aptos Labs and the community.|
-|**Faucet EDIT**| m |Managed by Aptos Team. | lltn |Deployed, managed and upgraded by you.| Managed by Aptos Labs and the community.|
-|**Purpose of the network**| m |The devnet is built to experiment with new ideas, improve performance and enhance the user experience.|lltn | The local testnet is for your development purposes and runs on your local computer.| For executing the Aptos Incentivized Testnet programs for the community.|
-|**Network status**| m |Mostly live, with brief interruptions during regular updates. |lltn | On your local computer. | **Live only during Incentivized Testnet drives**. |
-|**Type of nodes** |m |Validators and fullnodes. |lltn | Validators and fullnodes. | Validators and fullnodes.|
-|**How to run a node**| m |N/A, run by Aptos Labs team. |lltn | See the [tutorial](local-testnet/using-cli-to-run-a-local-testnet.md). | See the node deployment guides (ADD-LINK).|
-|**How to connect to the network**|m |<ul><li> You can transact directly with devnet without a local testnet. See, for example, [Your first transaction](../tutorials/first-transaction.md).</li><li> You can run fullnodes locally on your computer and synchronize with devnet. See [Run a Fullnode](/nodes/full-node/public-fullnode).</li></ul>|lltn | You can start a Validator and fullnode locally and connect with your local testnet for development purposes. | You must start both a local AIT validator node locally to connect to the AIT. Optionally, fullnodes can also be run locally and connected to AIT.|
-|**TypeScript / JavaScript SDK to use EDIT**|m |The latest version of the [aptos](https://www.npmjs.com/package/aptos) package. The package on npmjs is tested and released with devnet. | lltn |Use the TS / JS SDK built from the same commit as the local testnet. See [this document](../guides/local-testnet-dev-flow) for an end-to-end guide explaining this flow. | N/A, do not develop against AIT. |
-|<span id="what-not-to-do">**What not to do**</span>| m |Do not attempt to sync your local AIT fullnode or AIT validator node with devnet. |lltn | Do not attempt to sync your local testnet validator node with AIT. | Make sure you deploy your local AIT fullnode, AIT validator node and AIT validator fullnode in the test mode, and follow the instructions in the node deployment guides (ADD LINK).|
+|Description | Mainnet | Devnet | Long-lived Testnet | Aptos Incentivized Testnet (AIT)|
+|---|---|---|---|---|
+|**REST API URL EDIT**| m |https://fullnode.devnet.aptoslabs.com/v1 | https://fullnode.testnet.aptoslabs.com/v1 | Available during AIT program.|
+|**Genesis blob EDIT**| m |https://devnet.aptoslabs.com/genesis.blob | https://testnet.aptoslabs.com/genesis.blob| Available during AIT program. |
+|**Waypoint EDIT**| m |https://devnet.aptoslabs.com/waypoint.txt |https://github.com/aptos-labs/aptos-genesis-waypoint/tree/main/testnet| Available during AIT program.|
+|**Faucet EDIT**| m |https://faucet.devnet.aptoslabs.com/ | https://faucet.testnet.aptoslabs.com/ |Available during AIT program.|
+|**How to connect to the network**|You must run both a validator node and a validator fullnode to connect to the mainnet. See [Validators](/nodes/validator-node/validators) and [Public Fullnode](/nodes/full-node/public-fullnode) sections.  |You can transact directly with devnet without a local testnet. See, for example, [Your first transaction](../tutorials/first-transaction.md). You can run fullnodes locally on your computer and synchronize with devnet. See [Run a Fullnode](/nodes/full-node/public-fullnode).|See [Validators](/nodes/validator-node/validators) and [Public Fullnode](/nodes/full-node/public-fullnode) sections. | You must start both a local AIT validator node locally to connect to the AIT. Optionally, fullnodes can also be run locally and connected to AIT.|
+|***Description*** | ***Mainnet*** | ***Devnet*** | ***Long-lived Testnet*** | ***AIT***|
+|**Network runs where**| Validators, validator fullnodes and public fullnodes are run by you (i.e., the Aptos community) and Aptos Labs. |Validators run on Aptos Labs servers. Fullnodes are run by both Aptos Labs and you (i.e., the Aptos community).|Validators run on Aptos Labs servers. Fullnodes are run by both Aptos Labs and you (i.e., the Aptos community). | Some Validators run on Aptos servers, others are run by the Aptos community. Fullnodes are run by Aptos Labs and the community.|
+|**Who is responsible for the network**| Managed by Aptos Team. |Managed by Aptos Team. | Managed by Aptos Team. | Managed by Aptos Labs and the community.|
+|**Update release cadence**| Every month. |Every week. |Every 2 weeks. | Managed by Aptos Labs and the community.|
+|**How often wiped**| Not wiped. |Every week.| Not wiped. | Wiped permanently after AIT program concludes.|
+|***Description*** | ***Mainnet*** | ***Devnet*** | ***Long-lived Testnet*** |  ***AIT***|
+|**Purpose of the network**| The main Aptos network. |The devnet is built to experiment with new ideas, improve performance and enhance the user experience.| | For executing the Aptos Incentivized Testnet programs for the community.|
+|**Network status**| Always live. |Mostly live, with brief interruptions during regular updates. |Mostly live, with brief interruptions during regular updates. | Live only during Incentivized Testnet drives. |
+|**Type of nodes** |Validators and validator fullnodes. |Validators and public fullnodes. | Validators and public fullnodes. | Validators and validator fullnodes.|
+|**How to run a node**| See [Validators](/nodes/validator-node/validators) and [Public Fullnode](/nodes/full-node/public-fullnode) sections.  |N/A, run by Aptos Labs team. |See [Validators](/nodes/validator-node/validators) and [Public Fullnode](/nodes/full-node/public-fullnode) sections. | See the node deployment guides published during AIT program.|
+|<span id="what-not-to-do">**What not to do**</span>||Do not attempt to sync your local AIT fullnode or AIT validator node with devnet. | Make sure you deploy your local AIT fullnode, AIT validator node and AIT validator fullnode in the test mode, and follow the instructions in the node deployment guides published during AIT program.|
 
