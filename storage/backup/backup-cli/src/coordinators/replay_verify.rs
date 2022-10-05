@@ -14,6 +14,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
+use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
 use std::sync::Arc;
 
@@ -22,6 +23,7 @@ pub struct ReplayVerifyCoordinator {
     metadata_cache_opt: MetadataCacheOpt,
     trusted_waypoints_opt: TrustedWaypointOpt,
     concurrent_downloads: usize,
+    replay_concurrency_level: usize,
     restore_handler: RestoreHandler,
     start_version: Version,
     end_version: Version,
@@ -33,6 +35,7 @@ impl ReplayVerifyCoordinator {
         metadata_cache_opt: MetadataCacheOpt,
         trusted_waypoints_opt: TrustedWaypointOpt,
         concurrent_downloads: usize,
+        replay_concurrency_level: usize,
         restore_handler: RestoreHandler,
         start_version: Version,
         end_version: Version,
@@ -42,6 +45,7 @@ impl ReplayVerifyCoordinator {
             metadata_cache_opt,
             trusted_waypoints_opt,
             concurrent_downloads,
+            replay_concurrency_level,
             restore_handler,
             start_version,
             end_version,
@@ -66,6 +70,8 @@ impl ReplayVerifyCoordinator {
     }
 
     async fn run_impl(self) -> Result<()> {
+        AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+
         let metadata_view = metadata::cache::sync_and_load(
             &self.metadata_cache_opt,
             Arc::clone(&self.storage),
