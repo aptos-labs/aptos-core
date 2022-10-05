@@ -616,6 +616,12 @@ pub fn setup_environment(
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
     );
+    if node_config
+        .execution
+        .processed_transactions_detailed_counters
+    {
+        AptosVM::set_processed_transactions_detailed_counters();
+    }
 
     debug!(
         "Storage service started in {} ms",
