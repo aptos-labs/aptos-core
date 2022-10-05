@@ -120,7 +120,7 @@ locals {
     validator = {
       name = var.validator_name
       storage = {
-        class = kubernetes_storage_class.gp3.metadata[0].name
+        class = var.validator_storage_class
       }
       nodeSelector = {
         "eks.amazonaws.com/nodegroup" = "validators"
@@ -134,7 +134,7 @@ locals {
     }
     fullnode = {
       storage = {
-        class = kubernetes_storage_class.gp3.metadata[0].name
+        class = var.fullnode_storage_class
       }
       nodeSelector = {
         "eks.amazonaws.com/nodegroup" = "validators"

@@ -247,3 +247,21 @@ variable "helm_release_name_override" {
   description = "If set, overrides the name of the aptos-node helm chart"
   default     = ""
 }
+
+variable "validator_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default = "gp3"
+  validation {
+      condition     = contains(["gp3", "io1"], var.validator_storage_class)
+      error_message = "Supported storage classes are gp3, io1"
+  }
+}
+
+variable "fullnode_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default = "gp3"
+  validation {
+      condition     = contains(["gp3", "io1"], var.fullnode_storage_class)
+      error_message = "Supported storage classes are gp3, io1"
+  }
+}
