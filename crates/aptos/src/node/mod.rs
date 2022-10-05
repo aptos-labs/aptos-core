@@ -24,10 +24,11 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
-use aptos_rest_client::Client;
+use aptos_rest_client::{Client, State};
+use aptos_types::account_config::BlockResource;
 use aptos_types::chain_id::ChainId;
 use aptos_types::network_address::NetworkAddress;
-use aptos_types::on_chain_config::{ConsensusScheme, ValidatorSet};
+use aptos_types::on_chain_config::{ConfigurationResource, ConsensusScheme, ValidatorSet};
 use aptos_types::stake_pool::StakePool;
 use aptos_types::staking_conttract::StakingContractStore;
 use aptos_types::validator_config::ValidatorConfig;
@@ -42,12 +43,13 @@ use backup_cli::utils::{
     ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
 };
 use cached_packages::aptos_stdlib;
+use chrono::Utc;
 use clap::Parser;
 use hex::FromHex;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Url;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -65,6 +67,7 @@ pub enum NodeTool {
     InitializeValidator(InitializeValidator),
     JoinValidatorSet(JoinValidatorSet),
     LeaveValidatorSet(LeaveValidatorSet),
+    ShowEpochInfo(ShowEpochInfo),
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
@@ -83,6 +86,7 @@ impl NodeTool {
             InitializeValidator(tool) => tool.execute_serialized().await,
             JoinValidatorSet(tool) => tool.execute_serialized().await,
             LeaveValidatorSet(tool) => tool.execute_serialized().await,
+            ShowEpochInfo(tool) => tool.execute_serialized().await,
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
@@ -313,7 +317,7 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
     }
 }
 
-async fn get_staking_contract_pools(
+pub async fn get_staking_contract_pools(
     client: &Client,
     staker_address: AccountAddress,
     pool_type: StakePoolType,
@@ -336,7 +340,7 @@ async fn get_staking_contract_pools(
     Ok(stake_pool_results)
 }
 
-async fn get_stake_pool_info(
+pub async fn get_stake_pool_info(
     client: &Client,
     pool_address: AccountAddress,
     pool_type: StakePoolType,
@@ -1176,5 +1180,76 @@ impl CliCommand<()> for BootstrapDbFromBackup {
         .await
         .unwrap()?;
         Ok(())
+    }
+}
+
+/// Tool to get Epoch information
+#[derive(Parser)]
+pub struct ShowEpochInfo {
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+}
+
+#[async_trait]
+impl CliCommand<EpochInfo> for ShowEpochInfo {
+    fn command_name(&self) -> &'static str {
+        "ShowEpochInfo"
+    }
+
+    async fn execute(self) -> CliTypedResult<EpochInfo> {
+        let client = self.rest_options.client(&self.profile_options)?;
+        let (block_resource, state): (BlockResource, State) = client
+            .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::block::BlockResource")
+            .await?
+            .into_parts();
+        let reconfig_resource: ConfigurationResource = client
+            .get_account_resource_at_version_bcs(
+                CORE_CODE_ADDRESS,
+                "0x1::reconfiguration::Configuration",
+                state.version,
+            )
+            .await?
+            .into_inner();
+
+        let epoch_interval = block_resource.epoch_interval();
+        let last_reconfig = reconfig_resource.last_reconfiguration_time();
+
+        Ok(EpochInfo {
+            epoch: reconfig_resource.epoch(),
+            epoch_interval,
+            last_reconfiguration_time: Time::new(last_reconfig),
+            estimated_next_reconfiguration_time: Time::new(last_reconfig + epoch_interval),
+        })
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EpochInfo {
+    epoch: u64,
+    epoch_interval: u64,
+    last_reconfiguration_time: Time,
+    estimated_next_reconfiguration_time: Time,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Time {
+    unix_time: u64,
+    utc_time: chrono::DateTime<chrono::Utc>,
+}
+
+impl Time {
+    pub fn new(unix_time: u64) -> Self {
+        let duration = Duration::from_micros(unix_time);
+        let date_time = chrono::NaiveDateTime::from_timestamp(
+            duration.as_secs() as i64,
+            duration.subsec_nanos(),
+        );
+        // TODO: Allow configurable time
+        Self {
+            unix_time,
+            utc_time: chrono::DateTime::from_utc(date_time, Utc),
+        }
     }
 }
