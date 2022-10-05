@@ -11,10 +11,23 @@
   "sharedCrosshair": false,
   "panels": [
     {
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 15,
+      "isNew": false,
+      "span": 0,
+      "title": "General",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": false
+    },
+    {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
       "id": 4,
       "isNew": false,
       "span": 0,
@@ -69,7 +82,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
       "id": 6,
       "isNew": false,
       "span": 0,
@@ -124,11 +137,12 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "id": 10,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
+      "id": 64,
       "isNew": false,
+      "repeat": "Datasource",
       "span": 0,
-      "title": "Endpoints Latency",
+      "title": "Latency grouped by method",
       "description": "Aggregated endpoints latency per $interval, can be filtered by $endpoint",
       "transparent": false,
       "type": "timeseries",
@@ -136,21 +150,44 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.90, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
-          "legendFormat": "p90",
+          "expr": "histogram_quantile(0.50, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
+          "legendFormat": "{{method}}-p50",
           "format": "time_series"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
-          "legendFormat": "p99"
+          "expr": "histogram_quantile(0.90, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
+          "legendFormat": "{{method}}-p90",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "histogram_quantile(0.99, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
+          "legendFormat": "{{method}}-p99",
+          "format": "time_series"
         },
         {
           "refId": "C",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(1, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
-          "legendFormat": "p100"
+          "expr": "histogram_quantile(0.50, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
+          "legendFormat": "{{method}}-p50",
+          "format": "time_series"
+        },
+        {
+          "refId": "E",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "histogram_quantile(0.90, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
+          "legendFormat": "{{method}}-p90",
+          "format": "time_series"
+        },
+        {
+          "refId": "F",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "histogram_quantile(0.99, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
+          "legendFormat": "{{method}}-p99",
+          "format": "time_series"
         }
       ],
       "options": {
@@ -159,7 +196,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "",
+          "unit": "s",
+          "min": 0,
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
@@ -180,7 +218,7 @@
             "showPoints": "auto",
             "spanNulls": false,
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
+            "lineStyle": { "fill": "solid" },
             "scaleDistribution": { "type": "linear" },
             "stacking": { "group": "A", "mode": "none" },
             "thresholdsStyle": { "mode": "off" }
@@ -192,7 +230,113 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "id": 109,
+      "isNew": false,
+      "span": 0,
+      "title": "Counts by method",
+      "description": "Aggregated endpoints latency per $interval, can be filtered by $endpoint",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"GET\"}[$interval]))",
+          "legendFormat": "{{method}}-Total",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"POST\"}[$interval]))",
+          "legendFormat": "{{method}}-Total",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"GET\", status=~\"2.*\"}[$interval]))",
+          "legendFormat": "{{method}}-200s",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"POST\", status=~\"2.*\"}[$interval]))",
+          "legendFormat": "{{method}}-200s",
+          "format": "time_series"
+        },
+        {
+          "refId": "E",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"GET\", status=~\"4.*\"}[$interval]))",
+          "legendFormat": "{{method}}-400s",
+          "format": "time_series"
+        },
+        {
+          "refId": "F",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"POST\", status=~\"4.*\"}[$interval]))",
+          "legendFormat": "{{method}}-400s",
+          "format": "time_series"
+        },
+        {
+          "refId": "G",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"GET\", status=~\"5.*\"}[$interval]))",
+          "legendFormat": "{{method}}-500s",
+          "format": "time_series"
+        },
+        {
+          "refId": "H",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", method=\"POST\", status=~\"5.*\"}[$interval]))",
+          "legendFormat": "{{method}}-500s",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "solid" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
       "id": 12,
       "isNew": false,
       "span": 0,
@@ -235,6 +379,162 @@
             "spanNulls": false,
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
             "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 17,
+      "isNew": false,
+      "span": 0,
+      "title": "Per API",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 26 },
+      "id": 10,
+      "isNew": false,
+      "repeat": "operation_id",
+      "span": 0,
+      "title": "$operation_id Latency",
+      "description": "Aggregated endpoints latency per $interval, can be filtered by $endpoint",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "histogram_quantile(0.50, sum by (operation_id, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
+          "legendFormat": "p50",
+          "format": "time_series"
+        },
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "histogram_quantile(0.90, sum by (operation_id, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
+          "legendFormat": "p90",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "histogram_quantile(0.99, sum by (operation_id, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "solid" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 74 },
+      "id": 18,
+      "isNew": false,
+      "repeat": "operation_id",
+      "span": 0,
+      "title": "$operation_id Call Volume",
+      "description": "Aggregated endpoints call volume per $interval, can be filtered by $endpoint",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (operation_id, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval]))",
+          "legendFormat": "total",
+          "format": "time_series"
+        },
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (operation_id, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$operation_id\", status=~\"2.*\"}[$interval]))",
+          "legendFormat": "success",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (operation_id, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$operation_id\", status!~\"2.*\"}[$interval]))",
+          "legendFormat": "error",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "solid" },
             "scaleDistribution": { "type": "linear" },
             "stacking": { "group": "A", "mode": "none" },
             "thresholdsStyle": { "mode": "off" }
@@ -357,14 +657,16 @@
       {
         "name": "interval",
         "type": "interval",
+        "auto": true,
         "auto_count": 30,
         "datasource": null,
         "refresh": 2,
         "options": [
-          { "text": "1m", "value": "1m", "selected": true },
+          { "text": "auto", "value": "$__auto_interval_interval", "selected": false },
+          { "text": "1m", "value": "1m", "selected": false },
           { "text": "10m", "value": "10m", "selected": false },
           { "text": "30m", "value": "30m", "selected": false },
-          { "text": "1h", "value": "1h", "selected": false },
+          { "text": "1h", "value": "1h", "selected": true },
           { "text": "6h", "value": "6h", "selected": false },
           { "text": "12h", "value": "12h", "selected": false },
           { "text": "1d", "value": "1d", "selected": false },
@@ -401,6 +703,24 @@
         "label": "",
         "hide": 0,
         "sort": 0
+      },
+      {
+        "name": "operation_id",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": "",
+        "multi": true,
+        "multiFormat": "",
+        "query": { "query": "label_values(operation_id)", "refId": "StandardVariableQuery" },
+        "regex": "",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "API",
+        "hide": 0,
+        "sort": 1
       }
     ]
   },
@@ -447,7 +767,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 3,
+  "version": 7,
   "links": [],
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }

@@ -103,6 +103,24 @@ pub fn core_mempool_index_size(label: &'static str, size: usize) {
         .set(size as i64)
 }
 
+/// Counter tracking size of each bucket in timeline index
+static CORE_MEMPOOL_TIMELINE_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_core_mempool_timeline_index_size",
+        "Size of each bucket in core mempool timeline index",
+        &["bucket"]
+    )
+    .unwrap()
+});
+
+pub fn core_mempool_timeline_index_size(bucket_min_size_pairs: &Vec<(&str, usize)>) {
+    for &(bucket_min, size) in bucket_min_size_pairs {
+        CORE_MEMPOOL_TIMELINE_INDEX_SIZE
+            .with_label_values(&[bucket_min])
+            .set(size as i64)
+    }
+}
+
 /// Counter tracking number of txns removed from core mempool
 pub static CORE_MEMPOOL_REMOVED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

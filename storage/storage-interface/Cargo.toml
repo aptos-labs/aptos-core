@@ -20,7 +20,7 @@ serde = { version = "1.0.137", default-features = false }
 thiserror = "1.0.31"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-logger = {path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-secure-net = { path = "../../secure/net" }
 aptos-state-view = { path = "../state-view" }
@@ -29,7 +29,7 @@ aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
 scratchpad = { path = "../scratchpad" }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "0155b47808de249f4030e84354fde154a1500a82", features = ["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426", features = ["address32"] }
 
 [dev-dependencies]
 assert_unordered = "0.1.1"

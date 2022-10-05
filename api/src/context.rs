@@ -5,7 +5,7 @@ use crate::accept_type::AcceptType;
 use crate::response::{
     bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
     block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
-    InternalError, ServiceUnavailableError, StdApiError,
+    InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
 };
 use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{AptosErrorCode, AsConverter, BcsBlock, LedgerInfo, TransactionOnChainData};
@@ -15,6 +15,7 @@ use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
 use aptos_types::account_config::NewBlockEvent;
+use aptos_types::account_view::AccountView;
 use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
 use aptos_types::transaction::Transaction;
 use aptos_types::{
@@ -473,14 +474,48 @@ impl Context {
             .collect()
     }
 
-    pub fn get_account_transactions<E: InternalError>(
+    pub fn get_account_transactions<E: NotFoundError + InternalError>(
         &self,
         address: AccountAddress,
-        start_seq_number: u64,
+        start_seq_number: Option<u64>,
         limit: u16,
         ledger_version: u64,
         ledger_info: &LedgerInfo,
     ) -> Result<Vec<TransactionOnChainData>, E> {
+        let start_seq_number = if let Some(start_seq_number) = start_seq_number {
+            start_seq_number
+        } else {
+            // Get the current account state, and get the sequence number to get the limit most
+            // recent transactions
+            let account_state = self
+                .get_account_state(address, ledger_info.version(), ledger_info)?
+                .ok_or_else(|| {
+                    E::not_found_with_code(
+                        "Account not found",
+                        AptosErrorCode::AccountNotFound,
+                        ledger_info,
+                    )
+                })?;
+            let resource = account_state
+                .get_account_resource()
+                .map_err(|err| {
+                    E::internal_with_code(
+                        format!("Failed to get account resource {}", err),
+                        AptosErrorCode::InternalError,
+                        ledger_info,
+                    )
+                })?
+                .ok_or_else(|| {
+                    E::not_found_with_code(
+                        "Account not found",
+                        AptosErrorCode::AccountNotFound,
+                        ledger_info,
+                    )
+                })?;
+
+            resource.sequence_number().saturating_sub(limit as u64)
+        };
+
         let txns = self
             .db
             .get_account_transactions(

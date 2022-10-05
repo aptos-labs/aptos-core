@@ -8,8 +8,8 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     network::{BroadcastError, MempoolSyncMsg},
     shared_mempool::types::{
-        notify_subscribers, BatchId, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
-        SubmissionStatusBundle,
+        notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
+        SharedMempoolNotification, SubmissionStatusBundle,
     },
     thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
@@ -155,7 +155,7 @@ pub(crate) async fn process_client_get_transaction<V>(
 pub(crate) async fn process_transaction_broadcast<V>(
     smp: SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
-    request_id: BatchId,
+    request_id: MultiBatchId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
     timer: HistogramTimer,
@@ -187,7 +187,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
 
 /// If `MempoolIsFull` on any of the transactions, provide backpressure to the downstream peer.
 fn gen_ack_response(
-    request_id: BatchId,
+    request_id: MultiBatchId,
     results: Vec<SubmissionStatusBundle>,
     peer: &PeerNetworkId,
 ) -> MempoolSyncMsg {
