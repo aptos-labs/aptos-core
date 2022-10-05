@@ -1254,6 +1254,18 @@ module aptos_token::token {
         token_data.uri
     }
 
+    public fun get_tokendata_mutability_config(
+        creator: address,
+        token_data_id: TokenDataId
+    ): TokenMutabilityConfig acquires Collections {
+        assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_token_data = &borrow_global<Collections>(creator).token_data;
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+
+        let token_data = table::borrow(all_token_data, token_data_id);
+        token_data.mutability_config
+    }
+
     //
     // Private functions
     //
