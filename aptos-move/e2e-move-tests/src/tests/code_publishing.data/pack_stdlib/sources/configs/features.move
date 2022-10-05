@@ -47,6 +47,15 @@ module std::features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
 
+    // --------------------------------------------------------------------------------------------
+    // Vectors
+
+    const NO_LEGACY_VECTOR: u64 = 3;
+    public fun support_legacy_vector_enabled(): bool acquires Features {
+        is_enabled(NO_LEGACY_VECTOR)
+    }
+
+
     // ============================================================================================
     // Feature Flag Implementation
 

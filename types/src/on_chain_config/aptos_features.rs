@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use better_any::{Tid, TidAble};
 use serde::{Deserialize, Serialize};
 
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
@@ -10,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
     TREAT_FRIEND_AS_PRIVATE = 2,
+    NO_LEGACY_VECTOR = 3,
 }
 
 /// Representation of features on chain as a bitset.
@@ -17,6 +19,12 @@ pub enum FeatureFlag {
 pub struct Features {
     #[serde(with = "serde_bytes")]
     pub features: Vec<u8>,
+}
+
+/// A native context which allows native function implementations to access features.
+#[derive(Tid)]
+pub struct NativeFeatureContext {
+    pub features: Features,
 }
 
 impl OnChainConfig for Features {

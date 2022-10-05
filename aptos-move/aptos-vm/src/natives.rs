@@ -3,8 +3,10 @@
 
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::account_config::CORE_CODE_ADDRESS;
+use move_core_types::identifier::Identifier;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
+use framework::natives::vector;
 #[cfg(feature = "testing")]
 use {
     framework::natives::{
@@ -25,9 +27,21 @@ pub fn aptos_natives(
     abs_val_size_gas_params: AbstractValueSizeGasParameters,
     feature_version: u64,
 ) -> NativeFunctionTable {
-    move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
+    move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib.clone())
         .into_iter()
+        // Filter out vector natives from Move
         .filter(|(_, name, _, _)| name.as_str() != "vector")
+        // Add our own version of vector natives
+        .chain(
+            vector::make_all(gas_params.move_stdlib.vector).map(|(name, fun)| {
+                (
+                    CORE_CODE_ADDRESS,
+                    Identifier::new("vector").unwrap(),
+                    Identifier::new(name).unwrap(),
+                    fun,
+                )
+            }),
+        )
         .chain(framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             gas_params.aptos_framework,

@@ -13,6 +13,7 @@ pub mod state_storage;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
+pub mod vector;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};

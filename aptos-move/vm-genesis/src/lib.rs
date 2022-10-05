@@ -16,7 +16,7 @@ use aptos_gas::{
     ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::account_config::aptos_test_root_address;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::Features;
 use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -100,7 +100,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        Features::default(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -192,7 +192,7 @@ pub fn encode_genesis_change_set(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        Features::default(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -808,8 +808,7 @@ pub fn test_genesis_module_publishing() {
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
-        LATEST_GAS_FEATURE_VERSION,
-        false,
+        Features::default(),
     )
     .unwrap();
     let id1 = HashValue::zero();

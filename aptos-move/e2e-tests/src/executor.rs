@@ -24,7 +24,7 @@ use aptos_crypto::HashValue;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::Features;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -555,8 +555,7 @@ impl FakeExecutor {
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
-                self.features
-                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                self.features.clone(),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -601,8 +600,7 @@ impl FakeExecutor {
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
-            self.features
-                .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            self.features.clone(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
