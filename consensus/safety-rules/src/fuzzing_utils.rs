@@ -66,7 +66,7 @@ prop_compose! {
         let signature = if include_signature {
             let mut rng = StdRng::from_seed(TEST_SEED);
             let private_key = bls12381::PrivateKey::generate(&mut rng);
-            let signature = private_key.sign(&block_data);
+            let signature = private_key.sign(&block_data).unwrap();
             Some(signature)
         } else {
             None

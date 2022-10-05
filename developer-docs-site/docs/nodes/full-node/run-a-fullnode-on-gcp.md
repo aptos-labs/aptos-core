@@ -33,7 +33,7 @@ Google Cloud offers a [90 day $300 free trial for every new user](https://cloud.
 [Sign up for the $300 in credits here.](https://cloud.google.com/free)
 
 #### Create a new GCP Project
-You will also need to create a new project on the GCP Console or using the glcoud command from the Google Cloud CLI. Before you do that, however, it may be helpful to familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
+You will also need to create a new project on the GCP Console or using the gcloud command from the Google Cloud CLI. Before you do that, however, it may be helpful to familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
 
 [Follow these instructions to setup a new project.](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project)
 
@@ -148,7 +148,7 @@ Once Terraform apply finished, you can follow this section to validate your depl
   # Example command syntax: curl http://104.198.36.142/v1
   ```
 
-5. To verify the correctness of your fullnode, as outlined in the [fullnode documentation](https://aptos.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal and test it in another ssh terminal
+5. To verify the correctness of your fullnode, as outlined in the [fullnode documentation](https://aptos.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the Aptos pod in one SSH terminal and test it in another ssh terminal
 
    * Set up the port-forwarding to the aptos-fullnode pod.  Use `kubectl get pods -n aptos` to get the name of the pod
       ```
@@ -354,28 +354,3 @@ Click the `View in Cloud Monitoring` link at the top to view the built-in GKE [d
 
 
 Google Cloud [Monitoring](https://cloud.google.com/monitoring) has many other features to easily monitor the cluster and pods.  You can configure [uptime checks](https://cloud.google.com/monitoring/uptime-checks/introduction) for the services and configure [alerts](https://cloud.google.com/monitoring/alerts/using-alerting-ui) for when the metrics reach a certain [threshold](https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/sli-metrics/overview).  
-
-
-## Troubleshooting
-
-Common troubleshooting solutions.
-
-### Terraform "Connection Refused" Error Message
-
-When running terraform, the command errors out with a connection refused error message.
-
-  ```
-  Error: Get "http://localhost/api/v1/namespaces/aptos": dial tcp 127.0.0.1:80: connect: connection refused
-  ```
-
-This likely means that the state of the install is out of sync with the saved terraform state file located in the storage bucket.  (configured during `terraform init` statement).  This could happen if the cluster or other components were deleted outside of terraform.  Or if terraform had an error and did not finish.  Use the following commands to check the state.  Delete the state that is related to the error message.  You will likely need to run terraform destroy, clean up the environment, and run the terraform script again.  
-
-  ```
-  terraform state list
-
-  terraform state rm <state>
-  ```
-
-### Fullnode "NoAvailablePeers" Error message
-
-If your node cannot state sync, and the logs are showing "NoAvailablePeers", it's likely due to network congestion. You can try add some extra upstream peers for your fullnode to state sync from. See the guide [Add upstream seed peers](#add-upstream-seed-peers).

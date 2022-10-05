@@ -14,15 +14,14 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize,
 )]
-#[diesel(table_name = "write_set_changes")]
-#[belongs_to(Transaction, foreign_key = "transaction_version")]
-#[primary_key(transaction_version, index)]
+#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[diesel(primary_key(transaction_version, index))]
+#[diesel(table_name = write_set_changes)]
 pub struct WriteSetChange {
     pub transaction_version: i64,
     pub index: i64,
     pub hash: String,
     transaction_block_height: i64,
-    #[diesel(column_name = type)]
     pub type_: String,
     pub address: String,
     // Default time columns

@@ -1,0 +1,20 @@
+name: Twin Validator Test
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+jobs:
+  run-forge-twin-validator-test:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-twin-validator
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: twin_validator_test
+      POST_TO_SLACK: true

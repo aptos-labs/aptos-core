@@ -38,13 +38,31 @@ proptest! {
             .collect();
         prop_assert_eq!(expected.len() as u64, cur_ver);
 
-        let actual = db
-            .get_backup_handler()
+        let bh = db.get_backup_handler();
+
+        let actual = bh
             .get_transaction_iter(0, cur_ver as usize)
             .unwrap()
             .map(|res| Ok(res?.0))
             .collect::<Result<Vec<_>>>()
             .unwrap();
-        prop_assert_eq!(actual, expected);
+        prop_assert_eq!(&actual, &expected);
+
+        // try to overfetch, still expect the same result.
+        let overfetched = bh
+            .get_transaction_iter(0, cur_ver as usize + 10)
+            .unwrap()
+            .map(|res| Ok(res?.0))
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        prop_assert_eq!(&overfetched, &expected);
+
+        let non_existent = bh
+            .get_transaction_iter(100000, 100)
+            .unwrap()
+            .map(|res| Ok(res?.0))
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        prop_assert_eq!(&non_existent, &[]);
     }
 }

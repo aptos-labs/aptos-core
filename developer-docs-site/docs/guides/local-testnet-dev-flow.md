@@ -68,14 +68,14 @@ Now you're set up! You should see in `package.json` that your project targets yo
 }
 ```
 
-This way your local testnet and the SDK you're using match, meaning you won't see any compatability issues.
+This way your local testnet and the SDK you're using match, meaning you won't see any compatibility issues.
 
-Now you can use the aptos module like this in your code:
+Now you can use the Aptos module like this in your code:
 ```ts
 import { AptosClient, AptosAccount, FaucetClient } from "aptos";
 
-const NODE_URL = "https://127.0.0.1:8080/v1";
-const FAUCET_URL = "https://127.0.0.1:8081";
+const NODE_URL = "http://127.0.0.1:8080/v1";
+const FAUCET_URL = "http://127.0.0.1:8081";
 
 (async () => {
   const client = new AptosClient(NODE_URL);

@@ -153,6 +153,15 @@ impl Client {
         match self {
             Client::Local(local_repository_path) => {
                 let path = local_repository_path.join(path);
+
+                if !path.exists() {
+                    return Err(CliError::UnableToReadFile(
+                        path.display().to_string(),
+                        "File not found".to_string(),
+                    ));
+                }
+
+                eprintln!("Reading {}", path.display());
                 let mut file = std::fs::File::open(path.as_path())
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
 
@@ -213,9 +222,16 @@ impl Client {
     /// Retrieve framework release bundle.
     pub fn get_framework(&self) -> CliTypedResult<ReleaseBundle> {
         match self {
-            Client::Local(local_repository_path) => Ok(ReleaseBundle::read(
-                local_repository_path.join(FRAMEWORK_NAME),
-            )?),
+            Client::Local(local_repository_path) => {
+                let path = local_repository_path.join(FRAMEWORK_NAME);
+                if !path.exists() {
+                    return Err(CliError::UnableToReadFile(
+                        path.display().to_string(),
+                        "File not found".to_string(),
+                    ));
+                }
+                Ok(ReleaseBundle::read(path)?)
+            }
             Client::Github(client) => {
                 let bytes = base64::decode(client.get_file(FRAMEWORK_NAME)?)?;
                 Ok(bcs::from_bytes::<ReleaseBundle>(&bytes)?)

@@ -23,9 +23,7 @@ VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.0
 CVC5_VERSION=0.0.3
 DOTNET_VERSION=6.0
-BOOGIE_VERSION=2.15.7
-PYRE_CHECK_VERSION=0.0.59
-NUMPY_VERSION=1.20.1
+BOOGIE_VERSION=2.15.8
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
@@ -42,7 +40,6 @@ function usage {
   echo "-t install build tools"
   echo "-o install operations tooling as well: helm, terraform, yamllint, vault, docker, kubectl, python3"
   echo "-y installs or updates Move prover tools: z3, cvc5, dotnet, boogie"
-  echo "-s installs or updates requirements to test code-generation for Move SDKs"
   echo "-a install tools for build and test api"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
@@ -92,14 +89,6 @@ function update_path_and_profile {
     add_to_profile "export Z3_EXE=\"${BIN_DIR}/z3\""
     add_to_profile "export CVC5_EXE=\"${BIN_DIR}/cvc5\""
     add_to_profile "export BOOGIE_EXE=\"${DOTNET_ROOT}/tools/boogie\""
-  fi
-  if [[ "$INSTALL_CODEGEN" == "true" ]] && [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    add_to_profile "export PATH=\$PATH:${INSTALL_DIR}swift/usr/bin"
-    if [[ -n "${GOBIN}" ]]; then
-      add_to_profile "export PATH=\$PATH:/usr/lib/golang/bin"
-    else
-      add_to_profile "export PATH=\$PATH:$GOBIN"
-    fi
   fi
 }
 
@@ -703,18 +692,6 @@ Move prover tools (since -y was provided):
 EOF
   fi
 
-  if [[ "$INSTALL_CODEGEN" == "true" ]]; then
-cat <<EOF
-Codegen tools (since -s was provided):
-  * Clang
-  * Python3 (numpy, pyre-check)
-  * Golang
-  * Java
-  * Deno
-  * Swift
-EOF
-  fi
-
   if [[ "$INSTALL_PROTOC" == "true" ]]; then
 cat <<EOF
 protoc and related plugins (since -r was provided):
@@ -748,7 +725,6 @@ OPERATIONS=false;
 INSTALL_PROFILE=false;
 INSTALL_PROVER=false;
 INSTALL_PROTOC=false;
-INSTALL_CODEGEN=false;
 INSTALL_API_BUILD_TOOLS=false;
 INSTALL_INDIVIDUAL=false;
 INSTALL_PACKAGES=();
@@ -779,9 +755,6 @@ while getopts "btoprvysah:i:n" arg; do
     y)
       INSTALL_PROVER="true"
       ;;
-    s)
-      INSTALL_CODEGEN="true"
-      ;;
     a)
       INSTALL_API_BUILD_TOOLS="true"
       ;;
@@ -808,7 +781,6 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    [[ "$OPERATIONS" == "false" ]] && \
    [[ "$INSTALL_PROFILE" == "false" ]] && \
    [[ "$INSTALL_PROVER" == "false" ]] && \
-   [[ "$INSTALL_CODEGEN" == "false" ]] && \
    [[ "$INSTALL_API_BUILD_TOOLS" == "false" ]] && \
    [[ "$INSTALL_INDIVIDUAL" == "false" ]]; then
    INSTALL_BUILD_TOOLS="true"
@@ -884,7 +856,7 @@ if [[ "$INSTALL_PROFILE" == "true" ]]; then
 fi
 
 install_pkg curl "$PACKAGE_MANAGER"
-
+install_pkg unzip "$PACKAGE_MANAGER"
 
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
@@ -908,11 +880,13 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
   install_nodejs "$PACKAGE_MANAGER"
+  install_pkg unzip "$PACKAGE_MANAGER"
   install_protoc
 fi
 
 if [[ "$INSTALL_PROTOC" == "true" ]]; then
   if [[ "$INSTALL_BUILD_TOOLS" == "false" ]]; then
+    install_pkg unzip "$PACKAGE_MANAGER"
     install_protoc
   fi
 fi
@@ -961,28 +935,6 @@ if [[ "$INSTALL_PROVER" == "true" ]]; then
   install_cvc5
   install_dotnet
   install_boogie
-fi
-
-if [[ "$INSTALL_CODEGEN" == "true" ]]; then
-  install_pkg clang "$PACKAGE_MANAGER"
-  install_pkg llvm "$PACKAGE_MANAGER"
-  install_python3
-  install_deno
-  install_java
-  install_golang
-  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    # Only looked at this for a little while, but depends on glibc so alpine
-    # support isn't easily added. On Mac it requires XCode to be installed,
-    # which is quite largs, so probably something we don't want to download in
-    # this script.
-    install_swift
-  fi
-  if [[ "$PACKAGE_MANAGER" != "apk" ]]; then
-    # depends on wheels which needs glibc which doesn't work on alpine's python.
-    # Only invested a hour or so in this, a work around may exist.
-    "${PRE_COMMAND[@]}" python3 -m pip install pyre-check=="${PYRE_CHECK_VERSION}"
-  fi
-  "${PRE_COMMAND[@]}" python3 -m pip install numpy=="${NUMPY_VERSION}"
 fi
 
 if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then

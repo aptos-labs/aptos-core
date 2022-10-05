@@ -5,11 +5,16 @@ slug: "rust-sdk"
 
 # Aptos Rust SDK
 
-Aptos provides an official Rust SDK. The Rust SDK is tested carefully, though it isn't as popular as the [Typescript SDK](/sdks/typescript-sdk).
+### Installing Rust SDK
 
-For now the best way to use the Rust SDK is to add a dependency on the git repo directly, like this:
+Aptos provides an official Rust SDK. To use the Rust SDK, add the following dependency on the git repo directly, like this:
+
 ```toml
 aptos-sdk = { git = "https://github.com/aptos-labs/aptos-core", branch = "devnet" }
 ```
 
-The source code is available in the [aptos-core GitHub repository](https://github.com/aptos-labs/aptos-core/tree/main/sdk).
+The source code for the official Rust SDK is available in the [aptos-core GitHub repository](https://github.com/aptos-labs/aptos-core/tree/main/sdk).
+
+## Using Rust SDK
+
+See the [Developer Tutorials](/tutorials/index.md) for code examples showing how to use the Rust SDK.

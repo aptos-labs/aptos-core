@@ -12,7 +12,7 @@ use warp::{http::StatusCode, reply::Reply};
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ApiError {
     TransactionIsPending,
     NetworkIdentifierMismatch,
@@ -21,7 +21,7 @@ pub enum ApiError {
     InvalidTransferOperations(Option<&'static str>),
     InvalidSignatureType,
     InvalidMaxGasFees,
-    MaxGasFeeTooLow,
+    MaxGasFeeTooLow(Option<String>),
     InvalidGasMultiplier,
     GasEstimationFailed(Option<String>),
     InvalidOperations(Option<String>),
@@ -70,7 +70,7 @@ impl ApiError {
             InvalidTransferOperations(None),
             InvalidSignatureType,
             InvalidMaxGasFees,
-            MaxGasFeeTooLow,
+            MaxGasFeeTooLow(None),
             InvalidGasMultiplier,
             GasEstimationFailed(None),
             InvalidOperations(None),
@@ -109,7 +109,7 @@ impl ApiError {
             InvalidTransferOperations(_) => 5,
             InvalidSignatureType => 6,
             InvalidMaxGasFees => 7,
-            MaxGasFeeTooLow => 8,
+            MaxGasFeeTooLow(_) => 8,
             InvalidGasMultiplier => 9,
             InvalidOperations(_) => 10,
             MissingPayloadMetadata => 11,
@@ -166,7 +166,7 @@ impl ApiError {
             ApiError::AccountNotFound(_) => "Account not found",
             ApiError::InvalidSignatureType => "Invalid signature type",
             ApiError::InvalidMaxGasFees => "Invalid max gas fee",
-            ApiError::MaxGasFeeTooLow => "Max fee is lower than the estimated cost of the transaction",
+            ApiError::MaxGasFeeTooLow(_) => "Max fee is lower than the estimated cost of the transaction",
             ApiError::InvalidGasMultiplier => "Invalid gas multiplier",
             ApiError::InvalidOperations(_) => "Invalid operations",
             ApiError::MissingPayloadMetadata => "Payload metadata is missing",
@@ -220,6 +220,7 @@ impl ApiError {
             ApiError::VmError(inner) => inner,
             ApiError::MempoolIsFull(inner) => inner,
             ApiError::GasEstimationFailed(inner) => inner,
+            ApiError::MaxGasFeeTooLow(inner) => inner,
             _ => None,
         }
         .map(|details| ErrorDetails { details })

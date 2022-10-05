@@ -40,6 +40,7 @@ module aptos_framework::genesis {
         validator: ValidatorConfigurationWithCommission,
         vesting_schedule_numerator: vector<u64>,
         vesting_schedule_denominator: u64,
+        beneficiary_resetter: address,
     }
 
     struct ValidatorConfiguration has copy, drop {
@@ -56,6 +57,7 @@ module aptos_framework::genesis {
     struct ValidatorConfigurationWithCommission has copy, drop {
         validator_config: ValidatorConfiguration,
         commission_percentage: u64,
+        join_during_genesis: bool,
     }
 
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
@@ -93,12 +95,10 @@ module aptos_framework::genesis {
 
         // put reserved framework reserved accounts under aptos governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
-        let i = 0;
-        while (!vector::is_empty(&framework_reserved_addresses)){
+        while (!vector::is_empty(&framework_reserved_addresses)) {
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
             let (aptos_account, framework_signer_cap) = account::create_framework_reserved_account(address);
             aptos_governance::store_signer_cap(&aptos_account, address, framework_signer_cap);
-            i = i + 1;
         };
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
@@ -189,7 +189,11 @@ module aptos_framework::genesis {
         }
     }
 
-    fun create_employee_validators(employees: vector<EmployeeAccountMap>) {
+    fun create_employee_validators(
+        employee_vesting_start: u64,
+        employee_vesting_period_duration: u64,
+        employees: vector<EmployeeAccountMap>,
+    ) {
         let i = 0;
         let num_employee_groups = vector::length(&employees);
         let unique_accounts = vector::empty();
@@ -231,13 +235,14 @@ module aptos_framework::genesis {
 
             let vesting_schedule = vesting::create_vesting_schedule(
                 schedule,
-                1663456089, // Update before mainnet or pass in by config
-                30 * 24 * 60 * 60, // 30 days
+                employee_vesting_start,
+                employee_vesting_period_duration,
             );
 
             let admin = employee_group.validator.validator_config.owner_address;
+            let admin_signer = &create_signer(admin);
             let contract_address = vesting::create_vesting_contract(
-                &create_signer(admin),
+                admin_signer,
                 &employee_group.accounts,
                 buy_ins,
                 vesting_schedule,
@@ -248,6 +253,10 @@ module aptos_framework::genesis {
                 x"",
             );
             let pool_address = vesting::stake_pool_address(contract_address);
+
+            if (employee_group.beneficiary_resetter != @0x0) {
+                vesting::set_beneficiary_resetter(admin_signer, contract_address, employee_group.beneficiary_resetter);
+            };
 
             let validator = &employee_group.validator.validator_config;
             assert!(
@@ -262,7 +271,9 @@ module aptos_framework::genesis {
                 account::exists_at(validator.voter_address),
                 error::not_found(EACCOUNT_DOES_NOT_EXIST),
             );
-            initialize_validator(pool_address, validator);
+            if (employee_group.validator.join_during_genesis) {
+                initialize_validator(pool_address, validator);
+            };
 
             i = i + 1;
         }
@@ -270,21 +281,14 @@ module aptos_framework::genesis {
 
     fun create_initialize_validators_with_commission(
         aptos_framework: &signer,
+        use_staking_contract: bool,
         validators: vector<ValidatorConfigurationWithCommission>,
     ) {
         let i = 0;
         let num_validators = vector::length(&validators);
-        let unique_accounts = vector::empty();
-
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
-
-            assert!(
-                !vector::contains(&unique_accounts, &validator.validator_config.owner_address),
-                error::already_exists(EDUPLICATE_ACCOUNT),
-            );
-            vector::push_back(&mut unique_accounts, validator.validator_config.owner_address);
-            create_initialize_validator(aptos_framework, validator);
+            create_initialize_validator(aptos_framework, validator, use_staking_contract);
 
             i = i + 1;
         };
@@ -316,18 +320,20 @@ module aptos_framework::genesis {
             let validator_with_commission = ValidatorConfigurationWithCommission {
                 validator_config: vector::pop_back(&mut validators),
                 commission_percentage: 0,
+                join_during_genesis: true,
             };
             vector::push_back(&mut validators_with_commission, validator_with_commission);
 
             i = i + 1;
         };
 
-        create_initialize_validators_with_commission(aptos_framework, validators_with_commission);
+        create_initialize_validators_with_commission(aptos_framework, false, validators_with_commission);
     }
 
     fun create_initialize_validator(
         aptos_framework: &signer,
         commission_config: &ValidatorConfigurationWithCommission,
+        use_staking_contract: bool,
     ) {
         let validator = &commission_config.validator_config;
 
@@ -336,15 +342,7 @@ module aptos_framework::genesis {
         create_account(aptos_framework, validator.voter_address, 0);
 
         // Initialize the stake pool and join the validator set.
-        let pool_address = if (commission_config.commission_percentage == 0) {
-            stake::initialize_stake_owner(
-                owner,
-                validator.stake_amount,
-                validator.operator_address,
-                validator.voter_address,
-            );
-            validator.owner_address
-        } else {
+        let pool_address = if (use_staking_contract) {
             staking_contract::create_staking_contract(
                 owner,
                 validator.operator_address,
@@ -354,9 +352,19 @@ module aptos_framework::genesis {
                 x"",
             );
             staking_contract::stake_pool_address(validator.owner_address, validator.operator_address)
+        } else {
+            stake::initialize_stake_owner(
+                owner,
+                validator.stake_amount,
+                validator.operator_address,
+                validator.voter_address,
+            );
+            validator.owner_address
         };
 
-        initialize_validator(pool_address, validator);
+        if (commission_config.join_during_genesis) {
+            initialize_validator(pool_address, validator);
+        };
     }
 
     fun initialize_validator(pool_address: address, validator: &ValidatorConfiguration) {
@@ -398,11 +406,8 @@ module aptos_framework::genesis {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
-
         aptos_framework: &signer,
-
         validators: vector<ValidatorConfiguration>,
-
         min_voting_threshold: u128,
         required_proposer_stake: u64,
         voting_duration_secs: u64,

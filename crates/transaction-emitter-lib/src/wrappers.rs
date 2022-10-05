@@ -35,11 +35,11 @@ pub async fn emit_transactions_with_cluster(
 
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();
-    let mut root_account = cluster.load_aptos_root_account(&client).await?;
+    let mut coin_source_account = cluster.load_coin_source_account(&client).await?;
     let mut emitter = TxnEmitter::new(
         TransactionFactory::new(cluster.chain_id)
-            .with_gas_unit_price(1)
-            .with_transaction_expiration_time(args.txn_expiration_time_secs),
+            .with_transaction_expiration_time(args.txn_expiration_time_secs)
+            .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
         StdRng::from_seed(OsRng.gen()),
     );
 
@@ -64,13 +64,22 @@ pub async fn emit_transactions_with_cluster(
             .invalid_transaction_ratio(args.invalid_tx)
             .transaction_mix(transaction_mix)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
-            .gas_price(1);
+            .gas_price(aptos_global_constants::GAS_UNIT_PRICE);
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
     }
+    if let Some(expected_max_txns) = args.expected_max_txns {
+        emit_job_request = emit_job_request.expected_max_txns(expected_max_txns);
+    }
+    if let Some(expected_gas_per_txn) = args.expected_gas_per_txn {
+        emit_job_request = emit_job_request.expected_gas_per_txn(expected_gas_per_txn);
+    }
+    if !cluster.coin_source_is_root {
+        emit_job_request = emit_job_request.promt_before_spending();
+    }
     let stats = emitter
         .emit_txn_for_with_stats(
-            &mut root_account,
+            &mut coin_source_account,
             emit_job_request,
             duration,
             min(10, max(args.duration / 5, 1)),

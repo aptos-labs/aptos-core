@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::smoke_test_environment::SwarmBuilder;
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
         transfer_and_reconfig, transfer_coins,
@@ -35,7 +35,8 @@ async fn test_db_restore() {
     workspace_builder::get_bin("db-backup-verify");
     info!("---------- 1. pre-building finished.");
 
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = SwarmBuilder::new_local(4).with_aptos().build().await;
+    info!("---------- 1.1 swarm built, sending some transactions.");
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let client_1 = swarm
         .validator(validator_peer_ids[1])
@@ -47,12 +48,14 @@ async fn test_db_restore() {
     let mut account_0 = create_and_fund_account(&mut swarm, 1000000).await;
     let account_1 = create_and_fund_account(&mut swarm, 1000000).await;
 
+    info!("---------- 1.2 wait for nodes to catch up.");
     // we need to wait for all nodes to see it, as client_1 is different node from the
     // one creating accounts above
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
+    info!("---------- 1.3 caught up.");
 
     assert_balance(&client_1, &account_0, 1000000).await;
     assert_balance(&client_1, &account_1, 1000000).await;
@@ -235,10 +238,17 @@ fn wait_for_backups(
         if state.latest_epoch_ending_epoch.is_some()
             && state.latest_transaction_version.is_some()
             && state.latest_state_snapshot_epoch.is_some()
+            && state.latest_state_snapshot_epoch.is_some()
             && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
             && state.latest_transaction_version.unwrap() >= target_version
+            && state.latest_transaction_version.unwrap()
+                >= state.latest_state_snapshot_version.unwrap()
         {
-            info!("Backup created in {} seconds.", now.elapsed().as_secs());
+            info!(
+                "Backup created in {} seconds. backup storage state: {}",
+                now.elapsed().as_secs(),
+                state
+            );
             return Ok(());
         }
         info!("Backup storage state: {}", state);

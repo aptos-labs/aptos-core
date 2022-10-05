@@ -220,7 +220,9 @@ module aptos_std::pool_u64 {
     public fun amount_to_shares_with_total_coins(pool: &Pool, coins_amount: u64, total_coins: u64): u64 {
         // No shares yet so amount is worth the same number of shares.
         if (pool.total_coins == 0 || pool.total_shares == 0) {
-            coins_amount
+            // Multiply by scaling factor to minimize rounding errors during internal calculations for buy ins/redeems.
+            // This can overflow but scaling factor is expected to be chosen carefully so this would not overflow.
+            coins_amount * pool.scaling_factor
         } else {
             // Shares price = total_coins / total existing shares.
             // New number of shares = new_amount / shares_price = new_amount * existing_shares / total_amount.
@@ -249,10 +251,8 @@ module aptos_std::pool_u64 {
         }
     }
 
-    public fun multiply_then_divide(pool: &Pool, x: u64, y: u64, z: u64): u64 {
-        // Multiply first and with scaling factor to minimize rounding error.
-        let scaling_factor = to_u128(pool.scaling_factor);
-        let result = (to_u128(x) * to_u128(y) * scaling_factor) / (to_u128(z) * scaling_factor);
+    public fun multiply_then_divide(_pool: &Pool, x: u64, y: u64, z: u64): u64 {
+        let result = (to_u128(x) * to_u128(y)) / to_u128(z);
         (result as u64)
     }
 
@@ -351,11 +351,13 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_buy_in_and_redeem_large_numbers_with_scaling_factor() {
-        let pool = create_with_scaling_factor(2, 100);
-        let shares = buy_in(&mut pool, @1, MAX_U64 / 100);
-        assert!(total_shares(&pool) == MAX_U64 / 100, 0);
-        assert!(total_coins(&pool) == MAX_U64 / 100, 1);
-        assert!(redeem_shares(&mut pool, @1, shares) == MAX_U64 / 100, 2);
+        let scaling_factor = 100;
+        let pool = create_with_scaling_factor(2, scaling_factor);
+        let coins_amount = MAX_U64 / 100;
+        let shares = buy_in(&mut pool, @1, coins_amount);
+        assert!(total_shares(&pool) == coins_amount * scaling_factor, 0);
+        assert!(total_coins(&pool) == coins_amount, 1);
+        assert!(redeem_shares(&mut pool, @1, shares) == coins_amount, 2);
         destroy_empty(pool);
     }
 

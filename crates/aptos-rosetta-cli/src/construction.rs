@@ -17,7 +17,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub enum ConstructionCommand {
     CreateAccount(CreateAccountCommand),
     SetOperator(SetOperatorCommand),
+    SetVoter(SetVoterCommand),
     Transfer(TransferCommand),
+    CreateStakePool(CreateStakePoolCommand),
 }
 
 impl ConstructionCommand {
@@ -26,7 +28,9 @@ impl ConstructionCommand {
         match self {
             CreateAccount(inner) => format_output(inner.execute().await),
             SetOperator(inner) => format_output(inner.execute().await),
+            SetVoter(inner) => format_output(inner.execute().await),
             Transfer(inner) => format_output(inner.execute().await),
+            CreateStakePool(inner) => format_output(inner.execute().await),
         }
     }
 }
@@ -91,10 +95,9 @@ impl CreateAccountCommand {
         info!("Create account: {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .create_account(
@@ -144,10 +147,9 @@ impl TransferCommand {
         info!("Transfer {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .transfer(
@@ -187,6 +189,9 @@ pub struct SetOperatorCommand {
     sender: Option<AccountAddress>,
     /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    old_operator: Option<AccountAddress>,
+    /// The receiving account
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_operator: AccountAddress,
 }
 
@@ -195,16 +200,126 @@ impl SetOperatorCommand {
         info!("Set operator {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .set_operator(
                 &network_identifier,
                 &private_key,
+                self.old_operator,
                 self.new_operator,
+                self.txn_args.expiry_time()?,
+                self.txn_args.sequence_number,
+                self.txn_args.max_gas,
+                self.txn_args.gas_price,
+            )
+            .await
+    }
+}
+
+/// Set voter
+///
+///
+#[derive(Debug, Parser)]
+pub struct SetVoterCommand {
+    #[clap(flatten)]
+    network_args: NetworkArgs,
+    #[clap(flatten)]
+    url_args: UrlArgs,
+    #[clap(flatten)]
+    encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    profile_options: ProfileOptions,
+    #[clap(flatten)]
+    private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    txn_args: TransactionArgs,
+    /// The sending account, since the private key doesn't always match the
+    /// AccountAddress if it rotates
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    sender: Option<AccountAddress>,
+    /// The receiving account
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    operator: Option<AccountAddress>,
+    /// The receiving account
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    new_voter: AccountAddress,
+}
+
+impl SetVoterCommand {
+    pub async fn execute(self) -> anyhow::Result<TransactionIdentifier> {
+        info!("Set voter {:?}", self);
+        let client = self.url_args.client();
+        let network_identifier = self.network_args.network_identifier();
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
+
+        client
+            .set_voter(
+                &network_identifier,
+                &private_key,
+                self.operator,
+                self.new_voter,
+                self.txn_args.expiry_time()?,
+                self.txn_args.sequence_number,
+                self.txn_args.max_gas,
+                self.txn_args.gas_price,
+            )
+            .await
+    }
+}
+
+/// Initialize stake amount
+///
+///
+#[derive(Debug, Parser)]
+pub struct CreateStakePoolCommand {
+    #[clap(flatten)]
+    network_args: NetworkArgs,
+    #[clap(flatten)]
+    url_args: UrlArgs,
+    #[clap(flatten)]
+    encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    profile_options: ProfileOptions,
+    #[clap(flatten)]
+    private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    txn_args: TransactionArgs,
+    /// The sending account, since the private key doesn't always match the
+    /// AccountAddress if it rotates
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    sender: Option<AccountAddress>,
+    /// Operator
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    operator: Option<AccountAddress>,
+    /// Voter
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    voter: Option<AccountAddress>,
+    /// Amount
+    #[clap(long)]
+    amount: Option<u64>,
+}
+
+impl CreateStakePoolCommand {
+    pub async fn execute(self) -> anyhow::Result<TransactionIdentifier> {
+        info!("CreateStakePool {:?}", self);
+        let client = self.url_args.client();
+        let network_identifier = self.network_args.network_identifier();
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
+
+        client
+            .create_stake_pool(
+                &network_identifier,
+                &private_key,
+                self.operator,
+                self.voter,
+                self.amount,
                 self.txn_args.expiry_time()?,
                 self.txn_args.sequence_number,
                 self.txn_args.max_gas,

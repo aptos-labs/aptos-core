@@ -26,7 +26,7 @@ jobs:
         uses: lewagon/wait-on-check-action@v1.0.0
         with:
           ref: ${{ github.ref }}
-          check-regexp: "rust-images.*"
+          check-name: "rust-images / rust-all" # only copy the release images to dockerhub
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 30 # wait 30 seconds between making polling API calls, default is 10 but we ran in the past into rate-limiting issues with too frequent polling
 

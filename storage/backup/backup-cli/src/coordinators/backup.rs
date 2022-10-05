@@ -114,11 +114,11 @@ impl BackupCoordinator {
             self.concurrent_downloads,
         )
         .await?
-        .get_storage_state();
+        .get_storage_state()?;
 
         // On new DbState retrieved:
         // `watch_db_state` informs `backup_epoch_endings` via channel 1,
-        // and the the latter informs the other backup type workers via channel 2, after epoch
+        // and the latter informs the other backup type workers via channel 2, after epoch
         // ending is properly backed up, if necessary. This way, the epoch ending LedgerInfo needed
         // for proof verification is always available in the same backup storage.
         let (tx1, rx1) = watch::channel::<Option<DbState>>(None);

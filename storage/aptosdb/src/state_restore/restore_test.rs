@@ -108,8 +108,8 @@ where
         self.tree_store.get_node_option(node_key)
     }
 
-    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<K>)>> {
-        self.tree_store.get_rightmost_leaf()
+    fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode<K>)>> {
+        self.tree_store.get_rightmost_leaf(version)
     }
 }
 

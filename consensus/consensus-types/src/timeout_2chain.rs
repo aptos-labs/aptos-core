@@ -3,7 +3,7 @@
 
 use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::ensure;
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, CryptoMaterialError};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::account_address::AccountAddress;
 use aptos_types::aggregate_signature::{AggregateSignature, PartialSignatures};
@@ -53,7 +53,10 @@ impl TwoChainTimeout {
         &self.quorum_cert
     }
 
-    pub fn sign(&self, signer: &ValidatorSigner) -> bls12381::Signature {
+    pub fn sign(
+        &self,
+        signer: &ValidatorSigner,
+    ) -> Result<bls12381::Signature, CryptoMaterialError> {
         signer.sign(&self.signing_format())
     }
 
@@ -409,7 +412,7 @@ mod tests {
                 PartialSignatures::empty(),
             );
             for signer in &signers[0..num_of_signature] {
-                let signature = signer.sign(ledger_info.ledger_info());
+                let signature = signer.sign(ledger_info.ledger_info()).unwrap();
                 ledger_info.add_signature(signer.author(), signature);
             }
             QuorumCert::new(
@@ -428,7 +431,11 @@ mod tests {
         let mut tc_with_partial_sig =
             TwoChainTimeoutWithPartialSignatures::new(timeouts[0].clone());
         for (timeout, signer) in timeouts.iter().zip(&signers) {
-            tc_with_partial_sig.add(signer.author(), timeout.clone(), timeout.sign(signer));
+            tc_with_partial_sig.add(
+                signer.author(),
+                timeout.clone(),
+                timeout.sign(signer).unwrap(),
+            );
         }
 
         let tc_with_sig = tc_with_partial_sig

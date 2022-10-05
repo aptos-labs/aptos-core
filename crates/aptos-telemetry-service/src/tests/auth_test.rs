@@ -11,9 +11,10 @@ use aptos_types::{
     network_address::{DnsName, NetworkAddress},
     PeerId,
 };
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+
 use serde_json::json;
 
+use crate::context::JsonWebTokenService;
 use crate::types::common::NodeType;
 use crate::{
     tests::test_context::new_test_context,
@@ -83,6 +84,7 @@ fn init_handshake(
 }
 
 fn finish_handshake(
+    jwt_service: &JsonWebTokenService,
     initiator: &NoiseConfig,
     initiator_state: InitiatorHandshakeState,
     resp: serde_json::Value,
@@ -95,12 +97,7 @@ fn finish_handshake(
 
     let jwt = String::from_utf8(response_payload).unwrap();
 
-    decode::<Claims>(
-        &jwt,
-        &DecodingKey::from_secret(b"jwt_signing_key"),
-        &Validation::new(Algorithm::HS512),
-    )
-    .unwrap()
+    jwt_service.decode(&jwt).unwrap()
 }
 
 #[tokio::test]
@@ -112,7 +109,8 @@ async fn test_auth_validator() {
 
     context
         .inner
-        .validator_cache()
+        .peers()
+        .validators()
         .write()
         .insert(chain_id, (1, peer_set));
 
@@ -128,7 +126,12 @@ async fn test_auth_validator() {
     });
     let resp = context.post("/auth", req).await;
 
-    let decoded = finish_handshake(&initiator, initiator_state, resp);
+    let decoded = finish_handshake(
+        context.inner.jwt_service(),
+        &initiator,
+        initiator_state,
+        resp,
+    );
 
     assert_eq!(
         decoded.claims,
@@ -152,7 +155,8 @@ async fn test_auth_validatorfullnode() {
 
     context
         .inner
-        .vfn_cache()
+        .peers()
+        .validator_fullnodes()
         .write()
         .insert(chain_id, (1, peer_set));
 
@@ -168,7 +172,12 @@ async fn test_auth_validatorfullnode() {
     });
     let resp = context.post("/auth", req).await;
 
-    let decoded = finish_handshake(&initiator, initiator_state, resp);
+    let decoded = finish_handshake(
+        context.inner.jwt_service(),
+        &initiator,
+        initiator_state,
+        resp,
+    );
 
     assert_eq!(
         decoded.claims,
@@ -209,7 +218,8 @@ async fn test_auth_wrong_key() {
 
     context
         .inner
-        .validator_cache()
+        .peers()
+        .validators()
         .write()
         .insert(chain_id, (1, peer_set));
 
@@ -225,7 +235,12 @@ async fn test_auth_wrong_key() {
     });
     let resp = context.post("/auth", req).await;
 
-    finish_handshake(&initiator, initiator_state, resp);
+    finish_handshake(
+        context.inner.jwt_service(),
+        &initiator,
+        initiator_state,
+        resp,
+    );
 }
 
 #[tokio::test]
@@ -233,10 +248,7 @@ async fn test_chain_access() {
     let mut context = new_test_context().await;
     let present_chain_id = ChainId::new(24);
     let missing_chain_id = ChainId::new(32);
-    context
-        .inner
-        .configured_chains_mut()
-        .insert(present_chain_id);
+    context.inner.chain_set_mut().insert(present_chain_id);
 
     let resp = context
         .get(&format!("/chain-access/{}", present_chain_id))

@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosAccount } from "./aptos_account";
-import { AptosClient } from "./aptos_client";
+import { AptosClient, OptionalTransactionArgs } from "./aptos_client";
 import { HexString } from "./hex_string";
 import { TransactionBuilderABI } from "./transaction_builder";
 import { COIN_ABIS } from "./abis";
-import { Uint64 } from "./bcs";
-
-export const APTOS_COIN = "0x1::aptos_coin::AptosCoin";
+import { APTOS_COIN } from "./utils";
 
 /**
  * Class for working with the coin module, such as transferring coins and
@@ -33,7 +31,7 @@ export class CoinClient {
    * transfer AptosCoin from one account to another.
    *
    * @param from Account sending the coins
-   * @param from Account to receive the coins
+   * @param to Account to receive the coins
    * @param amount Number of coins to transfer
    * @param extraArgs Extra args for building the transaction or configuring how
    * the client should submit and wait for the transaction
@@ -44,12 +42,9 @@ export class CoinClient {
     from: AptosAccount,
     to: AptosAccount,
     amount: number | bigint,
-    extraArgs?: {
+    extraArgs?: OptionalTransactionArgs & {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
       coinType?: string;
-      maxGasAmount?: Uint64;
-      gasUnitPrice?: Uint64;
-      expireTimestamp?: Uint64;
     },
   ): Promise<string> {
     const coinTypeToTransfer = extraArgs?.coinType ?? APTOS_COIN;

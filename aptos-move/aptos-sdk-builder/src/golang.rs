@@ -5,7 +5,7 @@ use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
-use move_deps::move_core_types::{
+use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, TypeTag},
 };
@@ -16,7 +16,7 @@ use serde_generate::{
 };
 
 use heck::CamelCase;
-use move_deps::move_core_types::language_storage::StructTag;
+use move_core_types::language_storage::StructTag;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 use std::{
@@ -724,7 +724,7 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                 format!("[]{}", Self::quote_type(type_tag))
             }
             Struct(struct_tag) => match struct_tag {
-                tag if tag == Lazy::force(&str_tag) => "Bytes".into(),
+                tag if &**tag == Lazy::force(&str_tag) => "[]uint8".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Signer => common::type_not_allowed(type_tag),
@@ -778,7 +778,7 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                 type_tag => Self::bcs_primitive_type_name(type_tag).and(None),
             },
             Struct(struct_tag) => match struct_tag {
-                tag if tag == Lazy::force(&str_tag) => Some("Bytes"),
+                tag if &**tag == Lazy::force(&str_tag) => Some("Bytes"),
                 _ => common::type_not_allowed(type_tag),
             },
             Signer => common::type_not_allowed(type_tag),

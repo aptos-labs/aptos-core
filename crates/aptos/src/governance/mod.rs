@@ -8,7 +8,7 @@ use crate::common::types::{
 use crate::common::utils::prompt_yes_with_override;
 #[cfg(feature = "no-upload-proposal")]
 use crate::common::utils::read_from_file;
-use crate::move_tool::{init_move_dir, IncludedArtifacts};
+use crate::move_tool::{FrameworkPackageArgs, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
@@ -84,7 +84,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
         let (_bytecode, script_hash) = self
             .compile_proposal_args
-            .compile(self.txn_options.prompt_options)?;
+            .compile("SubmitProposal", self.txn_options.prompt_options)?;
 
         // Validate the proposal metadata
         let (metadata, metadata_hash) = self.get_metadata().await?;
@@ -284,8 +284,9 @@ impl std::fmt::Display for ProposalMetadata {
 }
 
 fn compile_in_temp_dir(
+    script_name: &str,
     script_path: &Path,
-    framework_rev: Option<String>,
+    framework_package_args: &FrameworkPackageArgs,
     prompt_options: PromptOptions,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     // Make a temporary directory for compilation
@@ -295,13 +296,11 @@ fn compile_in_temp_dir(
 
     // Initialize a move directory
     let package_dir = temp_dir.path();
-    init_move_dir(
+    framework_package_args.init_move_dir(
         package_dir,
-        "Proposal",
-        framework_rev,
+        script_name,
         BTreeMap::new(),
         prompt_options,
-        None,
     )?;
 
     // Insert the new script
@@ -376,7 +375,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let (bytecode, _script_hash) = self
             .compile_proposal_args
-            .compile(self.txn_options.prompt_options)?;
+            .compile("ExecuteProposal", self.txn_options.prompt_options)?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
         let args = vec![TransactionArgument::U64(self.proposal_id)];
@@ -393,31 +392,47 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
 #[derive(Parser)]
 pub struct CompileScriptFunction {
     /// Path to the Move script for the proposal
-    #[clap(long, parse(from_os_str))]
-    pub script_path: PathBuf,
+    #[clap(long, group = "script", parse(from_os_str))]
+    pub script_path: Option<PathBuf>,
 
-    /// Git revision or branch for the Aptos framework
-    ///
-    /// If not provided, it won't be using the AptosFramework.  Keep in mind that this
-    /// will only build correctly without the framework git revision when doing a full
-    /// framework upgrade
-    #[clap(long)]
-    pub(crate) framework_git_rev: Option<String>,
+    /// Path to the Move script for the proposal
+    #[clap(long, group = "script", parse(from_os_str))]
+    pub compiled_script_path: Option<PathBuf>,
+
+    #[clap(flatten)]
+    pub(crate) framework_package_args: FrameworkPackageArgs,
 }
 
 impl CompileScriptFunction {
     pub(crate) fn compile(
         &self,
+        script_name: &str,
         prompt_options: PromptOptions,
     ) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        if let Some(compiled_script_path) = &self.compiled_script_path {
+            let bytes = std::fs::read(compiled_script_path).map_err(|e| {
+                CliError::IO(format!("Unable to read {:?}", self.compiled_script_path), e)
+            })?;
+            let hash = HashValue::sha3_256_of(bytes.as_slice());
+            return Ok((bytes, hash));
+        }
+
         // Check script file
-        let script_path = self.script_path.as_path();
-        if !self.script_path.exists() {
+        let script_path = self
+            .script_path
+            .as_ref()
+            .ok_or_else(|| {
+                CliError::CommandArgumentError(
+                    "Must choose either --compiled-script-path or --script-path".to_string(),
+                )
+            })?
+            .as_path();
+        if !script_path.exists() {
             return Err(CliError::CommandArgumentError(format!(
                 "{} does not exist",
                 script_path.display()
             )));
-        } else if self.script_path.is_dir() {
+        } else if script_path.is_dir() {
             return Err(CliError::CommandArgumentError(format!(
                 "{} is a directory",
                 script_path.display()
@@ -425,7 +440,12 @@ impl CompileScriptFunction {
         }
 
         // Compile script
-        compile_in_temp_dir(script_path, self.framework_git_rev.clone(), prompt_options)
+        compile_in_temp_dir(
+            script_name,
+            script_path,
+            &self.framework_package_args,
+            prompt_options,
+        )
     }
 }
 

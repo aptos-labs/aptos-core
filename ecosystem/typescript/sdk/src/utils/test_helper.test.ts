@@ -1,5 +1,22 @@
-export const NODE_URL = process.env.APTOS_NODE_URL;
-export const FAUCET_URL = process.env.APTOS_FAUCET_URL;
+import { FaucetClient } from "../faucet_client";
+import { OpenAPIConfig } from "../generated";
+
+export const NODE_URL = process.env.APTOS_NODE_URL!;
+export const FAUCET_URL = process.env.APTOS_FAUCET_URL!;
+
+/**
+ * Returns an instance of a FaucetClient with NODE_URL and FAUCET_URL from the
+ * environment. If the FAUCET_AUTH_TOKEN environment variable is set, it will
+ * pass that along in the header in the format the faucet expects.
+ */
+export function getFaucetClient(): FaucetClient {
+  let config: Partial<OpenAPIConfig> = {};
+  if (process.env.FAUCET_AUTH_TOKEN) {
+    config.HEADERS = { Authorization: `Bearer ${process.env.FAUCET_AUTH_TOKEN}` };
+  }
+  return new FaucetClient(NODE_URL, FAUCET_URL, config);
+}
+
 test("noop", () => {
   // All TS files are compiled by default into the npm package
   // Adding this empty test allows us to:

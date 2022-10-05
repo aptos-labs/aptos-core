@@ -10,10 +10,6 @@ hide_table_of_contents: true
 
 Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
-:::tip Looking for the AIT-3 docs?
-  Click [here for Aptos Incentivized Testnet-3 docs](/nodes/ait/ait-3).
-:::
-
 ## Start here
 
 <div class="docs-card-container">
@@ -62,17 +58,23 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 ## Nodes
 
 <div class="docs-card-container">
-<div class="row row-cols-1 row-cols-md-3a g-4">
+<div class="row row-cols-1 row-cols-md-2a g-4">
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column" >
-    <a href="nodes/nodes-index" class="card-title card-link stretched-link"> <h2>Run a validator or a fullnode</h2></a>
-    <p class="card-text">Install and run a Validator or a Fullnode.</p>
+    <a href="/nodes/validator-node/validators" class="card-title card-link stretched-link"> <h2>Run a validator node</h2></a>
+    <p class="card-text">Install and run a validator or a fullnode.</p>
 </div>
 </div>
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column"  >
-    <a href="nodes/nodes-index#for-a-local-testnet" class="card-title card-link stretched-link"> <h2>Run a local testnet</h2></a>
-    <p class="card-text">Run a Validator node on your local testnet.</p>
+    <a href="/nodes/local-testnet/local-testnet-index" class="card-title card-link stretched-link"> <h2>Run a local testnet</h2></a>
+    <p class="card-text">Run a validator node on your local testnet.</p>
+</div>
+  </div>
+  <div class="col">
+    <div class="card card-body h-100 d-flex flex-column"  >
+    <a href="nodes/full-node/public-fullnode" class="card-title card-link stretched-link"> <h2>Run a public fullnode</h2></a>
+    <p class="card-text">Run a public fullnode and connect to devnet.</p>
 </div>
   </div>
   
@@ -82,12 +84,20 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 ## SDKs and APIs
 
 <div class="docs-card-container">
-<div class="row row-cols-1 row-cols-md-3a g-4">
+<div class="row row-cols-1 row-cols-md-2a g-4">
+<div class="col">
+    <div class="card h-100" >
+    <div class="card-body d-flex flex-column" >
+    <a href="/cli-tools/aptos-cli-tool/aptos-cli-index" class="card-title card-link stretched-link"> <h2>CLI</h2></a>
+    <p class="card-text">CLI for developing and deploying on the Aptos blockchain.</p>
+</div>
+</div>
+</div>
   <div class="col">
     <div class="card h-100" >
     <div class="card-body d-flex flex-column" >
-    <a href="https://aptos-labs.github.io/ts-sdk-doc/" class="card-title card-link stretched-link"> <h2>Typescript SDK</h2></a>
-    <p class="card-text">API reference for transacting with the Aptos blockchain.</p>
+    <a href="/sdks/index" class="card-title card-link stretched-link"> <h2>SDKs</h2></a>
+    <p class="card-text">SDKs for building on the Aptos blockchain.</p>
 </div>
 </div>
 </div>
@@ -104,7 +114,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 
 ## Aptos devnet
 
-:::info Aptos Devnet Resets
+:::tip Aptos Devnet Resets
 The Aptos devnet is reset every Thursday Morning (PST). See the latest updates in [Aptos Discord][discord].
 :::info
 

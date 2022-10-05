@@ -25,14 +25,14 @@ use serde::{Deserialize, Serialize};
     Queryable,
     Serialize,
 )]
-#[diesel(table_name = "signatures")]
-#[belongs_to(Transaction, foreign_key = "transaction_version")]
-#[primary_key(
+#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[diesel(primary_key(
     transaction_version,
     multi_agent_index,
     multi_sig_index,
     is_sender_primary
-)]
+))]
+#[diesel(table_name = signatures)]
 pub struct Signature {
     pub transaction_version: i64,
     pub multi_agent_index: i64,
@@ -40,7 +40,6 @@ pub struct Signature {
     pub transaction_block_height: i64,
     pub signer: String,
     pub is_sender_primary: bool,
-    #[diesel(column_name = type)]
     pub type_: String,
     pub public_key: String,
     pub signature: String,

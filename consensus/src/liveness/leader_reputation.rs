@@ -54,7 +54,7 @@ impl AptosDBBackend {
     fn refresh_db_result(
         &self,
         mut locked: MutexGuard<'_, (Vec<NewBlockEvent>, u64, bool)>,
-        lastest_db_version: u64,
+        latest_db_version: u64,
     ) -> Result<(Vec<NewBlockEvent>, u64, bool)> {
         // assumes target round is not too far from latest commit
         let limit = self.window_size + self.seek_len;
@@ -72,7 +72,7 @@ impl AptosDBBackend {
             u64::max_value(),
             Order::Descending,
             limit as u64,
-            lastest_db_version,
+            latest_db_version,
         )?;
 
         let max_returned_version = events.first().map_or(0, |first| first.transaction_version);
@@ -86,7 +86,7 @@ impl AptosDBBackend {
 
         let result = (
             new_block_events,
-            std::cmp::max(lastest_db_version, max_returned_version),
+            std::cmp::max(latest_db_version, max_returned_version),
             hit_end,
         );
         *locked = result.clone();
@@ -143,10 +143,10 @@ impl MetadataBackend for AptosDBBackend {
         let has_larger = events.first().map_or(false, |e| {
             (e.epoch(), e.round()) >= (target_epoch, target_round)
         });
-        let lastest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
+        let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
-        if !has_larger && version < lastest_db_version {
-            let fresh_db_result = self.refresh_db_result(locked, lastest_db_version);
+        if !has_larger && version < latest_db_version {
+            let fresh_db_result = self.refresh_db_result(locked, latest_db_version);
             match fresh_db_result {
                 Ok((events, _version, hit_end)) => {
                     self.get_from_db_result(target_epoch, target_round, &events, hit_end)

@@ -81,7 +81,9 @@ impl SafetyRules {
         message: &T,
     ) -> Result<bls12381::Signature, Error> {
         let signer = self.signer()?;
-        Ok(signer.sign(message))
+        signer
+            .sign(message)
+            .map_err(|err| Error::SerializationError(err.to_string()))
     }
 
     pub(crate) fn signer(&self) -> Result<&ValidatorSigner, Error> {

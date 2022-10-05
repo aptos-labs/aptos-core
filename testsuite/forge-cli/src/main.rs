@@ -13,7 +13,6 @@ use std::sync::Arc;
 use std::{env, num::NonZeroUsize, process, thread, time::Duration};
 use structopt::StructOpt;
 use testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
-use testcases::continuous_progress_test::ContinuousProgressTest;
 use testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
 use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
@@ -21,6 +20,8 @@ use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::state_sync_performance::StateSyncValidatorPerformance;
 use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
+use testcases::twin_validator_test::TwinValidatorTest;
+use testcases::validator_join_leave_test::ValidatorJoinLeaveTest;
 use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
@@ -437,6 +438,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             state_sync_perf_fullnodes_execute_transactions(config)
         }
         "state_sync_perf_validators" => state_sync_perf_validators(config),
+        "validators_join_and_leave" => validators_join_and_leave(config),
         "compat" => config
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_network_tests(vec![&SimpleValidatorUpgrade])
@@ -516,19 +518,23 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 None,
                 None,
             )),
-        "account_creation_state_sync" => config
+        "account_creation" | "nft_mint" => config
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_initial_fullnode_count(3)
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["chain"]["epoch_duration_secs"] = 1200.into();
+                helm_values["chain"]["epoch_duration_secs"] = 600.into();
             }))
             .with_emit_job(
                 EmitJobRequest::default()
                     .mode(EmitJobMode::MaxLoad {
                         mempool_backlog: 30000,
                     })
-                    .transaction_type(TransactionType::AccountGeneration),
+                    .transaction_type(if test_name == "account_creation" {
+                        TransactionType::AccountGeneration
+                    } else {
+                        TransactionType::NftMintAndTransfer
+                    }),
             )
             .with_success_criteria(SuccessCriteria::new(
                 4000,
@@ -538,6 +544,35 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 None,
                 None,
             )),
+        // TODO: Add tracing latency of high-gas-fee transactions
+        "graceful_overload" => config
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
+            // if we have smaller number of full nodes, TPS drops.
+            // Validators without VFN are proposing almost empty blocks,
+            // as no useful transaction reach their mempool.
+            // something to potentially improve upon.
+            .with_initial_fullnode_count(8)
+            .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 15000 }))
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            }))
+            .with_success_criteria(SuccessCriteria::new(
+                6500,
+                50000,
+                true,
+                Some(Duration::from_secs(120)),
+                Some(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
+                Some(StateProgressThreshold {
+                    max_no_progress_secs: 30.0,
+                    max_round_gap: 10,
+                }),
+            )),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => config
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
@@ -545,7 +580,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_network_tests(vec![&LoadVsPerfBenchmark {
                 test: &PerformanceBenchmarkWithFN,
                 tps: &[
-                    200, 1000, 3000, 5000, 6000, 6300, 6600, 7000, 7500, 8000, 10000, 12000,
+                    200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
                 ],
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -562,40 +597,32 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             )),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
-        "consensus_stress_test" => config
-            .with_network_tests(vec![&ContinuousProgressTest { target_tps: 100 }])
-            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
-            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["chain"]["epoch_duration_secs"] = 60.into();
-            }))
-            .with_node_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 50.into();
-                helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
-                    500.into();
-                helm_values["validator"]["config"]["consensus"]
-                    ["round_timeout_backoff_exponent_base"] = 1.0.into();
-                helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] =
-                    1.into();
-            }))
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-            .with_success_criteria(SuccessCriteria::new(
-                80,
-                10000,
-                true,
-                Some(Duration::from_secs(30)),
-                None,
-                Some(StateProgressThreshold {
-                    max_no_progress_secs: 3.0,
-                    max_round_gap: 4,
-                }),
-            )),
+        // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
+        "consensus_stress_test" => changing_working_quorum_test(
+            10,
+            60,
+            100,
+            80,
+            &ChangingWorkingQuorumTest {
+                min_tps: 50,
+                always_healthy_nodes: 10,
+                max_down_nodes: 0,
+                num_large_validators: 0,
+                add_execution_delay: false,
+                // Check that every 27s all nodes make progress,
+                // without any failures.
+                // (make epoch length (120s) and this duration (27s) not be multiples of one another,
+                // to test different timings)
+                check_period_s: 27,
+            },
+        ),
         "changing_working_quorum_test" => changing_working_quorum_test(
             20,
             120,
             100,
             70,
             &ChangingWorkingQuorumTest {
-                min_tps: 30,
+                min_tps: 15,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
@@ -606,7 +633,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 // to test different timings)
                 check_period_s: 27,
             },
-            false,
         ),
         "changing_working_quorum_test_high_load" => changing_working_quorum_test(
             20,
@@ -614,7 +640,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             500,
             300,
             &ChangingWorkingQuorumTest {
-                min_tps: 20,
+                min_tps: 50,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
@@ -625,9 +651,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 // to test different timings)
                 check_period_s: 27,
             },
-            // Max load cannot be sustained without gaps in progress.
-            // Using high load instead.
-            false,
         ),
         // not scheduled on continuous
         "large_test_only_few_nodes_down" => changing_working_quorum_test(
@@ -643,7 +666,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 add_execution_delay: false,
                 check_period_s: 27,
             },
-            false,
         ),
         "different_node_speed_and_reliability_test" => changing_working_quorum_test(
             20,
@@ -658,8 +680,58 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 add_execution_delay: true,
                 check_period_s: 27,
             },
-            false,
         ),
+        "slow_processing_catching_up" => changing_working_quorum_test(
+            10,
+            300,
+            3000,
+            2500,
+            &ChangingWorkingQuorumTest {
+                min_tps: 1500,
+                always_healthy_nodes: 2,
+                max_down_nodes: 0,
+                num_large_validators: 2,
+                add_execution_delay: true,
+                check_period_s: 57,
+            },
+        ),
+        "failures_catching_up" => changing_working_quorum_test(
+            10,
+            300,
+            3000,
+            2500,
+            &ChangingWorkingQuorumTest {
+                min_tps: 1500,
+                always_healthy_nodes: 2,
+                max_down_nodes: 1,
+                num_large_validators: 2,
+                add_execution_delay: false,
+                check_period_s: 27,
+            },
+        ),
+        "twin_validator_test" => config
+            .with_network_tests(vec![&TwinValidatorTest])
+            .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+            .with_initial_fullnode_count(5)
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            }))
+            .with_success_criteria(SuccessCriteria::new(
+                6000,
+                10000,
+                true,
+                Some(Duration::from_secs(60)),
+                Some(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
+                Some(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+            )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -725,6 +797,33 @@ fn state_sync_perf_validators(forge_config: ForgeConfig<'static>) -> ForgeConfig
         }))
         .with_network_tests(vec![&StateSyncValidatorPerformance])
         .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None, None))
+}
+
+/// The config for running a validator join and leave test.
+fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    forge_config
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 60.into();
+            helm_values["chain"]["allow_new_validators"] = true.into();
+        }))
+        .with_network_tests(vec![&ValidatorJoinLeaveTest])
+        .with_success_criteria(SuccessCriteria::new(
+            5000,
+            10000,
+            true,
+            Some(Duration::from_secs(240)),
+            Some(SystemMetricsThreshold::new(
+                // Check that we don't use more than 12 CPU cores for 30% of the time.
+                MetricsThreshold::new(12, 30),
+                // Check that we don't use more than 10 GB of memory for 30% of the time.
+                MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+            )),
+            Some(StateProgressThreshold {
+                max_no_progress_secs: 10.0,
+                max_round_gap: 4,
+            }),
+        ))
 }
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
@@ -801,13 +900,16 @@ fn changing_working_quorum_test(
     target_tps: usize,
     min_avg_tps: usize,
     test: &'static ChangingWorkingQuorumTest,
-    max_load: bool,
 ) -> ForgeConfig<'static> {
     let config = ForgeConfig::default();
     let num_large_validators = test.num_large_validators;
     config
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(std::cmp::max(2, target_tps / 1000))
+        .with_initial_fullnode_count(if test.max_down_nodes == 0 {
+            0
+        } else {
+            std::cmp::max(2, target_tps / 1000)
+        })
         .with_network_tests(vec![test])
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();
@@ -816,7 +918,9 @@ fn changing_working_quorum_test(
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
-            helm_values["validator"]["config"]["consensus"]["max_block_txns"] =
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                (target_tps / 4).into();
+            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
                 (target_tps / 4).into();
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
@@ -826,17 +930,10 @@ fn changing_working_quorum_test(
         }))
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(if max_load {
-                    EmitJobMode::MaxLoad {
-                        mempool_backlog: 20000,
-                    }
-                } else {
-                    EmitJobMode::ConstTps { tps: target_tps }
-                })
+                .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 75),
+                    (TransactionType::P2P, 80),
                     (TransactionType::AccountGeneration, 20),
-                    (TransactionType::NftMint, 5),
                 ]),
         )
         .with_success_criteria(SuccessCriteria::new(
@@ -846,7 +943,19 @@ fn changing_working_quorum_test(
             Some(Duration::from_secs(30)),
             None,
             Some(StateProgressThreshold {
-                max_no_progress_secs: 20.0,
+                max_no_progress_secs: if test.max_down_nodes == 0 {
+                    // very aggressive if no nodes are expected to be down
+                    3.0
+                } else if test.max_down_nodes * 3 + 1 + 2 < num_validators {
+                    // number of down nodes is at least 2 below the quorum limit, so
+                    // we can still be reasonably aggressive
+                    15.0
+                } else {
+                    // number of down nodes is close to the quorum limit, so
+                    // make a check a bit looser, as state sync might be required
+                    // to get the quorum back.
+                    30.0
+                },
                 max_round_gap: 6,
             }),
         ))
@@ -1008,7 +1117,13 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration, 1).unwrap();
+        let stats = generate_traffic(
+            ctx,
+            &all_validators,
+            duration,
+            aptos_global_constants::GAS_UNIT_PRICE,
+        )
+        .unwrap();
         ctx.report
             .report_txn_stats(self.name().to_string(), &stats, duration);
 

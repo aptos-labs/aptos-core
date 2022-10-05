@@ -40,8 +40,8 @@ pub struct MetadataCacheOpt {
         parse(from_os_str),
         help = "Metadata cache dir. If specified and shared across runs, \
         metadata files in cache won't be downloaded again from backup source, speeding up tool \
-        boot up significantly. Cache content can be messed up if used across the devnet, the testnet\
-        and the mainnet, hence it [Defaults to temporary dir]."
+        boot up significantly. Cache content can be messed up if used across the devnet, \
+        the testnet and the mainnet, hence it [Defaults to temporary dir]."
     )]
     dir: Option<PathBuf>,
 }
@@ -106,8 +106,8 @@ pub async fn sync_and_load(
     for h in stale_local_hashes {
         let file = cache_dir.join(h);
         remove_file(&file).await.err_notes(&file)?;
+        info!("Deleted stale metadata files in cache.");
     }
-    info!("Deleted stale metadata files in cache.");
 
     let num_new_files = new_remote_hashes.len();
     NUM_META_MISS.set(num_new_files as i64);

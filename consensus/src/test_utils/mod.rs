@@ -177,6 +177,7 @@ impl TreeInserter {
             &self.signer,
             failed_authors,
         )
+        .unwrap()
     }
 }
 

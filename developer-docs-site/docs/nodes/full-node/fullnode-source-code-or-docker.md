@@ -155,7 +155,7 @@ This will build a release binary: `aptos-core/target/release/aptos-node`. The re
 
 This section describes how to configure and run your fullnode using Docker.
 
-:::caution Running Aptos-core via Docker is currently only suported on x86-64 CPUs and not on ARM64 CPUs (which includes M1/M2 Macs).
+:::caution Running Aptos-core via Docker is currently only supported on x86-64 CPUs and not on ARM64 CPUs (which includes M1/M2 Macs).
 
 We currently only publish docker images compatible with x86-64 CPUs.
 If you have an M1/M2 (ARM64) Mac, use the Aptos-core source approach.

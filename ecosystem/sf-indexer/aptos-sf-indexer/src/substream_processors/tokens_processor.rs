@@ -47,7 +47,7 @@ impl Debug for TokensSubstreamProcessor {
 
 /// This function handles tokens in a block
 fn handle_tokens_in_block(
-    conn: &PgPoolConnection,
+    conn: &mut PgPoolConnection,
     substream_name: &'static str,
     block_height: u64,
     tokens: Vec<Token>,
@@ -67,7 +67,7 @@ fn handle_tokens_in_block(
         })
 }
 
-fn insert_tokens(conn: &PgPoolConnection, tokens_to_insert: &[Token]) {
+fn insert_tokens(conn: &mut PgPoolConnection, tokens_to_insert: &[Token]) {
     use schema::tokens::dsl::*;
 
     let chunks = get_chunks(tokens_to_insert.len(), Token::field_count());
@@ -89,7 +89,7 @@ fn insert_tokens(conn: &PgPoolConnection, tokens_to_insert: &[Token]) {
     }
 }
 
-fn insert_token_datas(conn: &PgPoolConnection, token_datas_to_insert: &[TokenData]) {
+fn insert_token_datas(conn: &mut PgPoolConnection, token_datas_to_insert: &[TokenData]) {
     use schema::token_datas::dsl::*;
 
     let chunks = get_chunks(token_datas_to_insert.len(), TokenData::field_count());
@@ -105,7 +105,10 @@ fn insert_token_datas(conn: &PgPoolConnection, token_datas_to_insert: &[TokenDat
     }
 }
 
-fn insert_token_ownerships(conn: &PgPoolConnection, token_ownerships_to_insert: &[TokenOwnership]) {
+fn insert_token_ownerships(
+    conn: &mut PgPoolConnection,
+    token_ownerships_to_insert: &[TokenOwnership],
+) {
     use schema::token_ownerships::dsl::*;
 
     let chunks = get_chunks(
@@ -131,7 +134,10 @@ fn insert_token_ownerships(conn: &PgPoolConnection, token_ownerships_to_insert: 
     }
 }
 
-fn insert_collection_datas(conn: &PgPoolConnection, collection_datas_to_insert: &[CollectionData]) {
+fn insert_collection_datas(
+    conn: &mut PgPoolConnection,
+    collection_datas_to_insert: &[CollectionData],
+) {
     use schema::collection_datas::dsl::*;
 
     let chunks = get_chunks(

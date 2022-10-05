@@ -15,7 +15,7 @@ module aptos_std::table {
 
     /// Create a new Table.
     public fun new<K: copy + drop, V: store>(): Table<K, V> {
-        Table{
+        Table {
             handle: new_table_handle<K, V>(),
         }
     }
@@ -24,7 +24,7 @@ module aptos_std::table {
     /// key already exists. The entry itself is not stored in the
     /// table, and cannot be discovered from it.
     public fun add<K: copy + drop, V>(table: &mut Table<K, V>, key: K, val: V) {
-        add_box<K, V, Box<V>>(table, key, Box{val})
+        add_box<K, V, Box<V>>(table, key, Box { val })
     }
 
     /// Acquire an immutable reference to the value which `key` maps to.
@@ -62,7 +62,7 @@ module aptos_std::table {
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(table: &mut Table<K, V>, key: K): V {
-        let Box{ val } = remove_box<K, V, Box<V>>(table, key);
+        let Box { val } = remove_box<K, V, Box<V>>(table, key);
         val
     }
 
@@ -83,7 +83,7 @@ module aptos_std::table {
     }
 
     #[test_only]
-    struct TableHolder<phantom K: copy + drop, phantom V: drop> has key{
+    struct TableHolder<phantom K: copy + drop, phantom V: drop> has key {
         t: Table<K, V>
     }
 
@@ -98,7 +98,7 @@ module aptos_std::table {
         upsert(&mut t, key, 23);
         assert!(*borrow(&t, key) == 23, error_code);
 
-        move_to(&account, TableHolder{ t });
+        move_to(&account, TableHolder { t });
     }
 
     // ======================================================================================================
@@ -112,11 +112,18 @@ module aptos_std::table {
     // Primitives which take as an additional type parameter `Box<V>`, so the implementation
     // can use this to determine serialization layout.
     native fun new_table_handle<K, V>(): address;
+
     native fun add_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>);
+
     native fun borrow_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K): &Box<V>;
+
     native fun borrow_box_mut<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K): &mut Box<V>;
+
     native fun contains_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K): bool;
+
     native fun remove_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K): Box<V>;
+
     native fun destroy_empty_box<K: copy + drop, V, B>(table: &Table<K, V>);
+
     native fun drop_unchecked_box<K: copy + drop, V, B>(table: Table<K, V>);
 }

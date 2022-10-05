@@ -23,7 +23,7 @@ module aptos_framework::aptos_account {
     }
 
     public entry fun transfer(source: &signer, to: address, amount: u64) {
-        if(!account::exists_at(to)) {
+        if (!account::exists_at(to)) {
             create_account(to)
         };
         coin::transfer<AptosCoin>(source, to, amount)

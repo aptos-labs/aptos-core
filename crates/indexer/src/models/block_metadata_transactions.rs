@@ -22,9 +22,9 @@ use serde::{Deserialize, Serialize};
     Queryable,
     Serialize,
 )]
-#[belongs_to(Transaction, foreign_key = "version")]
-#[primary_key("version")]
-#[diesel(table_name = "block_metadata_transactions")]
+#[diesel(belongs_to(Transaction, foreign_key = version))]
+#[diesel(primary_key(version))]
+#[diesel(table_name = block_metadata_transactions)]
 pub struct BlockMetadataTransaction {
     pub version: i64,
     pub block_height: i64,
@@ -53,7 +53,7 @@ impl BlockMetadataTransaction {
             previous_block_votes_bitvec: serde_json::to_value(&txn.previous_block_votes_bitvec)
                 .unwrap(),
             // time is in microseconds
-            timestamp: parse_timestamp(txn.timestamp, txn_version),
+            timestamp: parse_timestamp(txn.timestamp.0, txn_version),
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }

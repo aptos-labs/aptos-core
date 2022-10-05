@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{format_output, BlockArgs, NetworkArgs, UrlArgs};
+use aptos_rosetta::types::AccountIdentifier;
 use aptos_rosetta::{
     common::native_coin,
     types::{AccountBalanceRequest, AccountBalanceResponse},
@@ -44,15 +45,24 @@ pub struct AccountBalanceCommand {
     /// Account to list the balance
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     account: AccountAddress,
+
+    #[clap(long)]
+    stake_amount: bool,
 }
 
 impl AccountBalanceCommand {
     pub async fn execute(self) -> anyhow::Result<AccountBalanceResponse> {
+        let account_identifier = if self.stake_amount {
+            AccountIdentifier::total_stake_account(self.account)
+        } else {
+            AccountIdentifier::base_account(self.account)
+        };
+
         let client = self.url_args.client();
         client
             .account_balance(&AccountBalanceRequest {
                 network_identifier: self.network_args.network_identifier(),
-                account_identifier: self.account.into(),
+                account_identifier,
                 block_identifier: self.block_args.into(),
                 currencies: if self.filter_currency {
                     Some(vec![native_coin()])

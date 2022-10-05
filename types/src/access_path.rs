@@ -38,9 +38,7 @@
 use crate::{account_address::AccountAddress, state_store::state_key::StateKey};
 use anyhow::{Error, Result};
 use aptos_crypto::hash::HashValue;
-use move_deps::move_core_types::language_storage::{
-    ModuleId, ResourceKey, StructTag, CODE_TAG, RESOURCE_TAG,
-};
+use move_core_types::language_storage::{ModuleId, ResourceKey, StructTag, CODE_TAG, RESOURCE_TAG};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};

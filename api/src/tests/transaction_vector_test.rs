@@ -26,7 +26,7 @@ use aptos_crypto::{
     SigningKey, Uniform,
 };
 use aptos_proptest_helpers::ValueGenerator;
-use move_deps::move_core_types::{
+use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
 };
@@ -94,12 +94,12 @@ fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
                 identifier_strategy(),
                 identifier_strategy()).prop_map(|(t_vec, addr, module, name)| {
 
-                TypeTag::Struct(StructTag {
+                TypeTag::Struct(Box::new(StructTag {
                     address: addr,
                     module: Identifier::new(module).unwrap(),
                     name: Identifier::new(name).unwrap(),
                     type_params: t_vec,
-                })}),
+                }))}),
         ]
     })
 }
@@ -210,7 +210,7 @@ fn sign_transaction(raw_txn: RawTransaction) -> serde_json::Value {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = Ed25519PublicKey::from(&private_key);
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
     let txn = SignedTransaction::new(raw_txn.clone(), public_key, signature);
 
     let mut raw_txn_json_out = Vec::new();

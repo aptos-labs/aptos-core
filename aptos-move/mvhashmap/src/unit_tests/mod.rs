@@ -64,14 +64,14 @@ fn create_write_read_placeholder_struct() {
 
     let mvtbl = MVHashMap::new();
 
-    // Reads that should go the the DB return Err(NotFound)
+    // Reads that should go the DB return Err(NotFound)
     let r_db = mvtbl.read(&ap1, 5);
     assert_eq!(Err(NotFound), r_db);
 
     // Write by txn 10.
     mvtbl.add_write(&ap1, (10, 1), value_for(10, 1));
 
-    // Reads that should go the the DB return Err(NotFound)
+    // Reads that should go the DB return Err(NotFound)
     let r_db = mvtbl.read(&ap1, 9);
     assert_eq!(Err(NotFound), r_db);
     // Reads return entries from smaller txns, not txn 10.

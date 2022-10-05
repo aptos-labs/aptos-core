@@ -30,8 +30,13 @@ module aptos_token::token {
 
     const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
     const MAX_NFT_NAME_LENGTH: u64 = 128;
-    // URI lengths: Mean: 76.97, StdDev: 37.41, 95th%: 157, 99th%: 199 (http://www.supermind.org/blog/740/average-length-of-a-url-part-2)
     const MAX_URI_LENGTH: u64 = 512;
+
+    // Property key stored in default_properties controlling who can burn the token.
+    // the corresponding property value is BCS serialized bool.
+    const BURNABLE_BY_CREATOR: vector<u8> = b"TOKEN_BURNABLE_BY_CREATOR";
+    const BURNABLE_BY_OWNER: vector<u8> = b"TOKEN_BURNABLE_BY_OWNER";
+    const TOKEN_PROPERTY_MUTABLE: vector<u8> = b"TOKEN_PROPERTY_MUTATBLE";
 
     //
     // Errors
@@ -73,7 +78,7 @@ module aptos_token::token {
     const ETOKEN_STORE_NOT_PUBLISHED: u64 = 11;
 
     /// Cannot split token to an amount larger than its amount
-    const ETOKEN_SPLIT_AMOUNT_LARGER_THAN_TOKEN_AMOUNT: u64 = 12;
+    const ETOKEN_SPLIT_AMOUNT_LARGER_OR_EQUAL_TO_TOKEN_AMOUNT: u64 = 12;
 
     /// The field is not mutable
     const EFIELD_NOT_MUTABLE: u64 = 13;
@@ -113,6 +118,19 @@ module aptos_token::token {
 
     /// Withdraw proof expires
     const EWITHDRAW_PROOF_EXPIRES: u64 = 29;
+
+    /// Token is not burnable by owner
+    const EOWNER_CANNOT_BURN_TOKEN: u64 = 30;
+
+    /// Token is not burnable by creator
+    const ECREATOR_CANNOT_BURN_TOKEN: u64 = 31;
+
+    /// Reserved fields for token contract
+    /// Cannot be updated by user
+    const ECANNOT_UPDATE_RESERVED_PROPERTY: u64 = 32;
+
+    /// TOKEN with 0 amount is not allowed
+    const ETOKEN_CANNOT_HAVE_ZERO_AMOUNT: u64 = 33;
 
     //
     // Core data structures for holding tokens
@@ -326,6 +344,48 @@ module aptos_token::token {
         );
     }
 
+    /// create token with raw inputs
+    public entry fun create_token_script(
+        account: &signer,
+        collection: String,
+        name: String,
+        description: String,
+        balance: u64,
+        maximum: u64,
+        uri: String,
+        royalty_payee_address: address,
+        royalty_points_denominator: u64,
+        royalty_points_numerator: u64,
+        mutate_setting: vector<bool>,
+        property_keys: vector<String>,
+        property_values: vector<vector<u8>>,
+        property_types: vector<String>
+    ) acquires Collections, TokenStore {
+        let token_mut_config = create_token_mutability_config(&mutate_setting);
+
+        let tokendata_id = create_tokendata(
+            account,
+            collection,
+            name,
+            description,
+            maximum,
+            uri,
+            royalty_payee_address,
+            royalty_points_denominator,
+            royalty_points_numerator,
+            token_mut_config,
+            property_keys,
+            property_values,
+            property_types
+        );
+
+        mint_token(
+            account,
+            tokendata_id,
+            balance,
+        );
+    }
+
     /// Mint more token from an existing token_data. Mint only adds more token to property_version 0
     public entry fun mint_script(
         account: &signer,
@@ -340,12 +400,42 @@ module aptos_token::token {
             name,
         );
         // only creator of the tokendata can mint more tokens for now
-        assert!(token_data_id.creator == signer::address_of(account),  error::permission_denied(ENO_MINT_CAPABILITY));
+        assert!(token_data_id.creator == signer::address_of(account), error::permission_denied(ENO_MINT_CAPABILITY));
         mint_token(
             account,
             token_data_id,
             amount,
         );
+    }
+
+    /// mutate the token property and save the new property in TokenStore
+    /// if the token property_version is 0, we will create a new property_version per token to generate a new token_id per token
+    /// if the token property_version is not 0, we will just update the propertyMap and use the existing token_id (property_version)
+    public entry fun mutate_token_properties(
+        account: &signer,
+        token_owner: address,
+        creator: address,
+        collection_name: String,
+        token_name: String,
+        token_property_version: u64,
+        amount: u64,
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        types: vector<String>,
+    ) acquires Collections, TokenStore {
+        assert!(signer::address_of(account) == creator, error::not_found(ENO_MUTATE_CAPABILITY));
+        let i = 0;
+        let token_id = create_token_id_raw(
+            creator,
+            collection_name,
+            token_name,
+            token_property_version,
+        );
+        // give a new property_version for each token
+        while (i < amount) {
+            mutate_one_token(account, token_owner, token_id, keys, values, types);
+            i = i + 1;
+        };
     }
 
     //
@@ -365,10 +455,6 @@ module aptos_token::token {
         direct_transfer(sender, receiver, token_id, amount);
     }
 
-    public entry fun initialize_token_script(account: &signer) {
-        initialize_token_store(account);
-    }
-
     public entry fun opt_in_direct_transfer(account: &signer, opt_in: bool) acquires TokenStore {
         let addr = signer::address_of(account);
         initialize_token_store(account);
@@ -376,7 +462,169 @@ module aptos_token::token {
         *opt_in_flag = opt_in;
     }
 
-    public fun  mutate_one_token(
+    /// Burn a token by creator when the token's BURNABLE_BY_CREATOR is true
+    /// The token is owned at address owner
+    public entry fun burn_by_creator(
+        creator: &signer,
+        owner: address,
+        collection: String,
+        name: String,
+        property_version: u64,
+        amount: u64,
+    ) acquires Collections, TokenStore {
+        let creator_address = signer::address_of(creator);
+        assert!(amount > 0, error::invalid_argument(ENO_BURN_TOKEN_WITH_ZERO_AMOUNT));
+        let token_id = create_token_id_raw(creator_address, collection, name, property_version);
+        let creator_addr = token_id.token_data_id.creator;
+        assert!(
+            exists<Collections>(creator_addr),
+            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
+        );
+
+        let collections = borrow_global_mut<Collections>(creator_address);
+        assert!(
+            table::contains(&collections.token_data, token_id.token_data_id),
+            error::not_found(ETOKEN_DATA_NOT_PUBLISHED),
+        );
+
+        let token_data = table::borrow_mut(
+            &mut collections.token_data,
+            token_id.token_data_id,
+        );
+
+        // The property should be explicitly set in the property_map for creator to burn the token
+        assert!(
+            property_map::contains_key(&token_data.default_properties, &string::utf8(BURNABLE_BY_CREATOR)),
+            error::permission_denied(ECREATOR_CANNOT_BURN_TOKEN)
+        );
+
+        let burn_by_creator_flag = property_map::read_bool(&token_data.default_properties, &string::utf8(BURNABLE_BY_CREATOR));
+        assert!(burn_by_creator_flag, error::permission_denied(ECREATOR_CANNOT_BURN_TOKEN));
+
+        // Burn the tokens.
+        let Token { id: _, amount: burned_amount, token_properties: _ } = withdraw_with_event_internal(owner, token_id, amount);
+        let token_store = borrow_global_mut<TokenStore>(owner);
+        event::emit_event<BurnTokenEvent>(
+            &mut token_store.burn_events,
+            BurnTokenEvent { id: token_id, amount: burned_amount },
+        );
+
+        if (token_data.maximum > 0) {
+            token_data.supply = token_data.supply - burned_amount;
+
+            // Delete the token_data if supply drops to 0.
+            if (token_data.supply == 0) {
+                destroy_token_data(table::remove(&mut collections.token_data, token_id.token_data_id));
+
+                // update the collection supply
+                let collection_data = table::borrow_mut(
+                    &mut collections.collection_data,
+                    token_id.token_data_id.collection
+                );
+                collection_data.supply = collection_data.supply - 1;
+                // delete the collection data if the collection supply equals 0
+                if (collection_data.supply == 0) {
+                    destroy_collection_data(table::remove(&mut collections.collection_data, collection_data.name));
+                };
+            };
+        };
+    }
+
+    /// Burn a token by the token owner
+    public entry fun burn(
+        owner: &signer,
+        creators_address: address,
+        collection: String,
+        name: String,
+        property_version: u64,
+        amount: u64
+    ) acquires Collections, TokenStore {
+        assert!(amount > 0, error::invalid_argument(ENO_BURN_TOKEN_WITH_ZERO_AMOUNT));
+        let token_id = create_token_id_raw(creators_address, collection, name, property_version);
+        let creator_addr = token_id.token_data_id.creator;
+        assert!(
+            exists<Collections>(creator_addr),
+            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
+        );
+
+        let collections = borrow_global_mut<Collections>(creator_addr);
+        assert!(
+            table::contains(&collections.token_data, token_id.token_data_id),
+            error::not_found(ETOKEN_DATA_NOT_PUBLISHED),
+        );
+
+        let token_data = table::borrow_mut(
+            &mut collections.token_data,
+            token_id.token_data_id,
+        );
+
+        assert!(
+            property_map::contains_key(&token_data.default_properties, &string::utf8(BURNABLE_BY_OWNER)),
+            error::permission_denied(EOWNER_CANNOT_BURN_TOKEN)
+        );
+        let burn_by_owner_flag = property_map::read_bool(&token_data.default_properties, &string::utf8(BURNABLE_BY_OWNER));
+        assert!(burn_by_owner_flag, error::permission_denied(EOWNER_CANNOT_BURN_TOKEN));
+
+        // Burn the tokens.
+        let Token { id: _, amount: burned_amount, token_properties: _ } = withdraw_token(owner, token_id, amount);
+        let token_store = borrow_global_mut<TokenStore>(signer::address_of(owner));
+        event::emit_event<BurnTokenEvent>(
+            &mut token_store.burn_events,
+            BurnTokenEvent { id: token_id, amount: burned_amount },
+        );
+
+        // Decrease the supply correspondingly by the amount of tokens burned.
+        let token_data = table::borrow_mut(
+            &mut collections.token_data,
+            token_id.token_data_id,
+        );
+
+        // only update the supply if we tracking the supply and maximal
+        // maximal == 0 is reserved for unlimited token and collection with no tracking info.
+        if (token_data.maximum > 0) {
+            token_data.supply = token_data.supply - burned_amount;
+
+            // Delete the token_data if supply drops to 0.
+            if (token_data.supply == 0) {
+                destroy_token_data(table::remove(&mut collections.token_data, token_id.token_data_id));
+
+                // update the collection supply
+                let collection_data = table::borrow_mut(
+                    &mut collections.collection_data,
+                    token_id.token_data_id.collection
+                );
+                collection_data.supply = collection_data.supply - 1;
+                // delete the collection data if the collection supply equals 0
+                if (collection_data.supply == 0) {
+                    destroy_collection_data(table::remove(&mut collections.collection_data, collection_data.name));
+                };
+            };
+        };
+    }
+
+    /// Allow creator to mutate the default properties in TokenData
+    public fun mutate_tokendata_property(
+        creator: &signer,
+        token_data_id: TokenDataId,
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        types: vector<String>,
+    ) acquires Collections {
+        let creator_addr = token_data_id.creator;
+        assert!(signer::address_of(creator) == creator_addr, ENO_MUTATE_CAPABILITY);
+        // validate if the properties is mutable
+        assert!(exists<Collections>(creator_addr), ECOLLECTIONS_NOT_PUBLISHED);
+        let all_token_data = &mut borrow_global_mut<Collections>(
+            creator_addr
+        ).token_data;
+
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+        let token_data = table::borrow_mut(all_token_data, token_data_id);
+        assert!(token_data.mutability_config.properties, error::permission_denied(EFIELD_NOT_MUTABLE));
+        property_map::update_property_map(&mut token_data.default_properties, keys, values, types);
+    }
+
+    public fun mutate_one_token(
         account: &signer,
         token_owner: address,
         token_id: TokenId,
@@ -395,7 +643,18 @@ module aptos_token::token {
         assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
-        assert!(token_data.mutability_config.properties, EFIELD_NOT_MUTABLE);
+        // if default property is mutatable, token property is alwasy mutable
+        // we only need to check TOKEN_PROPERTY_MUTABLE when default property is immutable
+        if (!token_data.mutability_config.properties) {
+            assert!(
+                property_map::contains_key(&token_data.default_properties, &string::utf8(TOKEN_PROPERTY_MUTABLE)),
+                error::permission_denied(EFIELD_NOT_MUTABLE)
+            );
+
+            let token_prop_mutable = property_map::read_bool(&token_data.default_properties, &string::utf8(TOKEN_PROPERTY_MUTABLE));
+            assert!(token_prop_mutable, error::permission_denied(EFIELD_NOT_MUTABLE));
+        };
+
         // check if the property_version is 0 to determine if we need to update the property_version
         if (token_id.property_version == 0) {
             let token = withdraw_with_event_internal(token_owner, token_id, 1);
@@ -422,7 +681,7 @@ module aptos_token::token {
 
             token_data.largest_property_version = cur_property_version;
             // burn the orignial property_version 0 token after mutation
-            let Token {id: _, amount: _, token_properties: _} = token;
+            let Token { id: _, amount: _, token_properties: _ } = token;
             new_token_id
         } else {
             // only 1 copy for the token with property verion bigger than 0
@@ -441,65 +700,30 @@ module aptos_token::token {
         }
     }
 
-    /// mutate the token property and save the new property in TokenStore
-    /// if the token property_version is 0, we will create a new property_version per token to generate a new token_id per token
-    /// if the token property_version is not 0, we will just update the propertyMap and use the existing token_id (property_version)
-    public entry fun mutate_token_properties(
-        account: &signer,
-        token_owner: address,
-        creator: address,
-        collection_name: String,
-        token_name: String,
-        token_property_version: u64,
-        amount: u64,
-        keys: vector<String>,
-        values: vector<vector<u8>>,
-        types: vector<String>,
-    ) acquires Collections, TokenStore {
-        assert!(signer::address_of(account) == creator, error::not_found(ENO_MUTATE_CAPABILITY));
+    public fun mutate_tokendata_uri(
+        creator: &signer,
+        token_data_id: TokenDataId,
+        uri: String
+    ) acquires Collections {
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+        let creator_addr = token_data_id.creator;
+        assert!(signer::address_of(creator) == creator_addr, ENO_MUTATE_CAPABILITY);
         // validate if the properties is mutable
-        assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        assert!(exists<Collections>(creator_addr), ECOLLECTIONS_NOT_PUBLISHED);
         let all_token_data = &mut borrow_global_mut<Collections>(
-            creator
+            creator_addr
         ).token_data;
 
-        let token_id: TokenId = create_token_id_raw(creator, collection_name, token_name, token_property_version);
-        assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
-        let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
-        assert!(token_data.mutability_config.properties, error::permission_denied(EFIELD_NOT_MUTABLE));
-        // check if the property_version is 0 to determine if we need to update the property_version
-        let i = 0;
-        // give a new property_version for each token
-        while (i < amount) {
-            mutate_one_token(account, token_owner, token_id, keys, values, types);
-            i = i + 1;
-        };
-    }
-
-    fun update_token_property_internal(
-        token_owner: address,
-        token_id: TokenId,
-        keys: vector<String>,
-        values: vector<vector<u8>>,
-        types: vector<String>,
-    ) acquires TokenStore {
-        let tokens = &mut borrow_global_mut<TokenStore>(token_owner).tokens;
-        assert!(table::contains(tokens, token_id), error::not_found(ENO_TOKEN_IN_TOKEN_STORE));
-        let value = &mut table::borrow_mut(tokens, token_id).token_properties;
-
-        property_map::update_property_map(value, keys, values, types);
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+        let token_data = table::borrow_mut(all_token_data, token_data_id);
+        assert!(token_data.mutability_config.uri, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_data.uri = uri;
     }
 
     /// Deposit the token balance into the owner's account and emit an event.
     public fun deposit_token(account: &signer, token: Token) acquires TokenStore {
-        assert!(get_token_amount(&token) > 0, error::invalid_argument(ENO_DEPOSIT_TOKEN_WITH_ZERO_AMOUNT));
         let account_addr = signer::address_of(account);
         initialize_token_store(account);
-        let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
-        if (!table::contains(tokens, token.id)) {
-            initialize_token(account, token.id);
-        };
-
         direct_deposit(account_addr, token)
     }
 
@@ -510,28 +734,6 @@ module aptos_token::token {
         direct_deposit(account_addr, token);
     }
 
-    /// Deposit the token balance into the recipients account and emit an event.
-    fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
-        let token_store = borrow_global_mut<TokenStore>(account_addr);
-
-        event::emit_event<DepositEvent>(
-            &mut token_store.deposit_events,
-            DepositEvent { id: token.id, amount: token.amount },
-        );
-
-        assert!(
-            exists<TokenStore>(account_addr),
-            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
-        );
-
-        if (!table::contains(&token_store.tokens, token.id)) {
-            table::add(&mut token_store.tokens, token.id, token);
-        } else {
-            let recipient_token = table::borrow_mut(&mut token_store.tokens, token.id);
-            merge(recipient_token, token);
-        };
-    }
-
     public fun direct_transfer(
         sender: &signer,
         receiver: &signer,
@@ -540,18 +742,6 @@ module aptos_token::token {
     ) acquires TokenStore {
         let token = withdraw_token(sender, token_id, amount);
         deposit_token(receiver, token);
-    }
-
-    public fun initialize_token(account: &signer, token_id: TokenId) acquires TokenStore {
-        let account_addr = signer::address_of(account);
-        initialize_token_store(account);
-        let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
-
-        assert!(
-            !table::contains(tokens, token_id),
-            error::already_exists(EALREADY_HAS_BALANCE),
-        );
-        table::add(tokens, token_id, Token { amount: 0, id: token_id, token_properties: property_map::empty() });
     }
 
     public fun initialize_token_store(account: &signer) {
@@ -578,7 +768,8 @@ module aptos_token::token {
 
     public fun split(dst_token: &mut Token, amount: u64): Token {
         assert!(dst_token.id.property_version == 0, error::invalid_state(ENFT_NOT_SPLITABLE));
-        assert!(dst_token.amount > amount,  error::invalid_argument(ETOKEN_SPLIT_AMOUNT_LARGER_THAN_TOKEN_AMOUNT));
+        assert!(dst_token.amount > amount, error::invalid_argument(ETOKEN_SPLIT_AMOUNT_LARGER_OR_EQUAL_TO_TOKEN_AMOUNT));
+        assert!(amount > 0, error::invalid_argument(ETOKEN_CANNOT_HAVE_ZERO_AMOUNT));
         dst_token.amount = dst_token.amount - amount;
         Token {
             id: dst_token.id,
@@ -643,41 +834,6 @@ module aptos_token::token {
         withdraw_with_event_internal(account_addr, id, amount)
     }
 
-    fun withdraw_with_event_internal(
-        account_addr: address,
-        id: TokenId,
-        amount: u64,
-    ): Token acquires TokenStore {
-        // It does not make sense to withdraw 0 tokens.
-        assert!(amount > 0, error::invalid_argument(EWITHDRAW_ZERO));
-        // Make sure the account has sufficient tokens to withdraw.
-        assert!(balance_of(account_addr, id) >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
-
-        assert!(
-            exists<TokenStore>(account_addr),
-            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
-        );
-
-        let token_store = borrow_global_mut<TokenStore>(account_addr);
-        event::emit_event<WithdrawEvent>(
-            &mut token_store.withdraw_events,
-            WithdrawEvent{ id, amount },
-        );
-        let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
-        assert!(
-            table::contains(tokens, id),
-            error::not_found(ENO_TOKEN_IN_TOKEN_STORE),
-        );
-        // balance > amount and amount > 0 indirectly asserted that balance > 0.
-        let balance = &mut table::borrow_mut(tokens, id).amount;
-        if (*balance > amount) {
-            *balance = *balance - amount;
-            Token{ id, amount, token_properties: property_map::empty() }
-        } else {
-            table::remove(tokens, id)
-        }
-    }
-
     //
     // Public functions for creating and maintaining tokens
     //
@@ -697,7 +853,7 @@ module aptos_token::token {
         if (!exists<Collections>(account_addr)) {
             move_to(
                 creator,
-                Collections{
+                Collections {
                     collection_data: table::new(),
                     token_data: table::new(),
                     create_collection_events: account::new_event_handle<CreateCollectionEvent>(creator),
@@ -715,7 +871,7 @@ module aptos_token::token {
         );
 
         let mutability_config = create_collection_mutability_config(&mutate_setting);
-        let collection = CollectionData{
+        let collection = CollectionData {
             description,
             name: *&name,
             uri,
@@ -788,7 +944,7 @@ module aptos_token::token {
 
         assert!(
             table::contains(&collections.collection_data, token_data_id.collection),
-            error::already_exists(ECOLLECTION_NOT_PUBLISHED),
+            error::not_found(ECOLLECTION_NOT_PUBLISHED),
         );
         assert!(
             !table::contains(&collections.token_data, token_data_id),
@@ -812,7 +968,7 @@ module aptos_token::token {
             largest_property_version: 0,
             supply: 0,
             uri,
-            royalty: Royalty{
+            royalty: Royalty {
                 royalty_points_denominator,
                 royalty_points_numerator,
                 payee_address: royalty_payee_address,
@@ -859,22 +1015,35 @@ module aptos_token::token {
         }
     }
 
-    /// return the number of distinct token_id created under this collection
+    /// return the number of distinct token_id created under this TokenData
     public fun get_token_supply(creator_address: address, token_data_id: TokenDataId): Option<u64> acquires Collections {
         assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
         let all_token_data = &borrow_global<Collections>(creator_address).token_data;
         assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow(all_token_data, token_data_id);
 
-        if (token_data.maximum > 0 ) {
+        if (token_data.maximum > 0) {
             option::some(token_data.supply)
         } else {
             option::none<u64>()
         }
     }
 
+    /// return the largest_property_version of this TokenData
+    public fun get_tokendata_largest_property_version(creator_address: address, token_data_id: TokenDataId): u64 acquires Collections {
+        assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_token_data = &borrow_global<Collections>(creator_address).token_data;
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+        table::borrow(all_token_data, token_data_id).largest_property_version
+    }
+
+    /// return the TokenId for a given Token
+    public fun get_token_id(token: &Token): TokenId {
+        token.id
+    }
+
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
-        TokenMutabilityConfig{
+        TokenMutabilityConfig {
             maximum: *vector::borrow(mutate_setting, TOKEN_MAX_MUTABLE_IND),
             uri: *vector::borrow(mutate_setting, TOKEN_URI_MUTABLE_IND),
             royalty: *vector::borrow(mutate_setting, TOKEN_ROYALTY_MUTABLE_IND),
@@ -884,53 +1053,11 @@ module aptos_token::token {
     }
 
     public fun create_collection_mutability_config(mutate_setting: &vector<bool>): CollectionMutabilityConfig {
-        CollectionMutabilityConfig{
+        CollectionMutabilityConfig {
             description: *vector::borrow(mutate_setting, COLLECTION_DESCRIPTION_MUTABLE_IND),
             uri: *vector::borrow(mutate_setting, COLLECTION_URI_MUTABLE_IND),
             maximum: *vector::borrow(mutate_setting, COLLECTION_MAX_MUTABLE_IND),
         }
-    }
-
-    /// create token with raw inputs
-    public entry fun create_token_script(
-        account: &signer,
-        collection: String,
-        name: String,
-        description: String,
-        balance: u64,
-        maximum: u64,
-        uri: String,
-        royalty_payee_address: address,
-        royalty_points_denominator: u64,
-        royalty_points_numerator: u64,
-        mutate_setting: vector<bool>,
-        property_keys: vector<String>,
-        property_values: vector<vector<u8>>,
-        property_types: vector<String>
-    ) acquires Collections, TokenStore {
-        let token_mut_config = create_token_mutability_config(&mutate_setting);
-
-        let tokendata_id = create_tokendata(
-            account,
-            collection,
-            name,
-            description,
-            maximum,
-            uri,
-            royalty_payee_address,
-            royalty_points_denominator,
-            royalty_points_numerator,
-            token_mut_config,
-            property_keys,
-            property_values,
-            property_types
-        );
-
-        mint_token(
-            account,
-            tokendata_id,
-            balance,
-        );
     }
 
     public fun mint_token(
@@ -944,7 +1071,7 @@ module aptos_token::token {
         assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_data_id);
 
-        if (token_data.maximum > 0 ) {
+        if (token_data.maximum > 0) {
             assert!(token_data.supply + amount <= token_data.maximum, error::invalid_argument(EMINT_WOULD_EXCEED_TOKEN_MAXIMUM));
             token_data.supply = token_data.supply + amount;
         };
@@ -952,7 +1079,7 @@ module aptos_token::token {
         // we add more tokens with property_version 0
         let token_id = create_token_id(token_data_id, 0);
         deposit_token(account,
-            Token{
+            Token {
                 id: token_id,
                 amount,
                 token_properties: property_map::empty(), // same as default properties no need to store
@@ -968,7 +1095,6 @@ module aptos_token::token {
 
         token_id
     }
-
 
     /// create tokens and directly deposite to receiver's address. The receiver should opt-in direct transfer
     public fun mint_token_to(
@@ -987,7 +1113,7 @@ module aptos_token::token {
         assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_data_id);
 
-        if (token_data.maximum > 0 ) {
+        if (token_data.maximum > 0) {
             assert!(token_data.supply + amount <= token_data.maximum, error::invalid_argument(EMINT_WOULD_EXCEED_TOKEN_MAXIMUM));
             token_data.supply = token_data.supply + amount;
         };
@@ -995,7 +1121,7 @@ module aptos_token::token {
         // we add more tokens with property_version 0
         let token_id = create_token_id(token_data_id, 0);
         direct_deposit(receiver,
-            Token{
+            Token {
                 id: token_id,
                 amount,
                 token_properties: property_map::empty(), // same as default properties no need to store
@@ -1011,61 +1137,8 @@ module aptos_token::token {
         );
     }
 
-    public entry fun burn(
-        owner: &signer,
-        creators_address: address,
-        collection: String,
-        name: String,
-        property_version: u64,
-        amount: u64
-    ) acquires Collections, TokenStore {
-        assert!(amount > 0, error::invalid_argument(ENO_BURN_TOKEN_WITH_ZERO_AMOUNT));
-        let token_id = create_token_id_raw(creators_address, collection, name, property_version);
-        let creator_addr = token_id.token_data_id.creator;
-        assert!(
-            exists<Collections>(creator_addr),
-            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
-        );
-
-        let collections = borrow_global_mut<Collections>(creator_addr);
-        assert!(
-            table::contains(&collections.token_data, token_id.token_data_id),
-            error::not_found(ETOKEN_DATA_NOT_PUBLISHED),
-        );
-
-        // Burn the tokens.
-        let Token { id: _, amount: burned_amount, token_properties: _ } = withdraw_token(owner, token_id, amount);
-        let token_store = borrow_global_mut<TokenStore>(signer::address_of(owner));
-        event::emit_event<BurnTokenEvent>(
-            &mut token_store.burn_events,
-            BurnTokenEvent { id: token_id, amount: burned_amount},
-        );
-
-        // Decrease the supply correspondingly by the amount of tokens burned.
-        let token_data = table::borrow_mut(
-            &mut collections.token_data,
-            token_id.token_data_id,
-        );
-        token_data.supply = token_data.supply - burned_amount;
-
-        // Delete the token_data if supply drops to 0.
-        if (token_data.supply == 0) {
-            let TokenData {
-                maximum: _,
-                largest_property_version: _,
-                supply: _,
-                uri: _,
-                royalty: _,
-                name: _,
-                description: _,
-                default_properties: _,
-                mutability_config: _,
-            } = table::remove(&mut collections.token_data, token_id.token_data_id);
-        };
-    }
-
     public fun create_token_id(token_data_id: TokenDataId, property_version: u64): TokenId {
-        TokenId{
+        TokenId {
             token_data_id,
             property_version,
         }
@@ -1087,19 +1160,26 @@ module aptos_token::token {
         name: String,
         property_version: u64,
     ): TokenId {
-        TokenId{
+        TokenId {
             token_data_id: create_token_data_id(creator, collection, name),
             property_version,
         }
     }
 
     public fun balance_of(owner: address, id: TokenId): u64 acquires TokenStore {
+        if (!exists<TokenStore>(owner)) {
+            return 0
+        };
         let token_store = borrow_global<TokenStore>(owner);
         if (table::contains(&token_store.tokens, id)) {
             table::borrow(&token_store.tokens, id).amount
         } else {
             0
         }
+    }
+
+    public fun has_token_store(owner: address): bool {
+        exists<TokenStore>(owner)
     }
 
     public fun get_royalty(token_id: TokenId): Royalty acquires Collections {
@@ -1165,6 +1245,116 @@ module aptos_token::token {
         }
     }
 
+    public fun get_tokendata_uri(creator: address, token_data_id: TokenDataId): String acquires Collections {
+        assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_token_data = &borrow_global<Collections>(creator).token_data;
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+
+        let token_data = table::borrow(all_token_data, token_data_id);
+        token_data.uri
+    }
+
+    //
+    // Private functions
+    //
+    fun destroy_token_data(token_data: TokenData) {
+        let TokenData {
+            maximum: _,
+            largest_property_version: _,
+            supply: _,
+            uri: _,
+            royalty: _,
+            name: _,
+            description: _,
+            default_properties: _,
+            mutability_config: _,
+        } = token_data;
+    }
+
+    fun destroy_collection_data(collection_data: CollectionData) {
+        let CollectionData {
+            description: _,
+            name: _,
+            uri: _,
+            supply: _,
+            maximum: _,
+            mutability_config: _,
+        } = collection_data;
+    }
+
+    fun withdraw_with_event_internal(
+        account_addr: address,
+        id: TokenId,
+        amount: u64,
+    ): Token acquires TokenStore {
+        // It does not make sense to withdraw 0 tokens.
+        assert!(amount > 0, error::invalid_argument(EWITHDRAW_ZERO));
+        // Make sure the account has sufficient tokens to withdraw.
+        assert!(balance_of(account_addr, id) >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
+
+        assert!(
+            exists<TokenStore>(account_addr),
+            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
+        );
+
+        let token_store = borrow_global_mut<TokenStore>(account_addr);
+        event::emit_event<WithdrawEvent>(
+            &mut token_store.withdraw_events,
+            WithdrawEvent { id, amount },
+        );
+        let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
+        assert!(
+            table::contains(tokens, id),
+            error::not_found(ENO_TOKEN_IN_TOKEN_STORE),
+        );
+        // balance > amount and amount > 0 indirectly asserted that balance > 0.
+        let balance = &mut table::borrow_mut(tokens, id).amount;
+        if (*balance > amount) {
+            *balance = *balance - amount;
+            Token { id, amount, token_properties: property_map::empty() }
+        } else {
+            table::remove(tokens, id)
+        }
+    }
+
+    fun update_token_property_internal(
+        token_owner: address,
+        token_id: TokenId,
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        types: vector<String>,
+    ) acquires TokenStore {
+        let tokens = &mut borrow_global_mut<TokenStore>(token_owner).tokens;
+        assert!(table::contains(tokens, token_id), error::not_found(ENO_TOKEN_IN_TOKEN_STORE));
+
+        let value = &mut table::borrow_mut(tokens, token_id).token_properties;
+
+        property_map::update_property_map(value, keys, values, types);
+    }
+
+    /// Deposit the token balance into the recipients account and emit an event.
+    fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
+        assert!(token.amount > 0, error::invalid_argument(ETOKEN_CANNOT_HAVE_ZERO_AMOUNT));
+        let token_store = borrow_global_mut<TokenStore>(account_addr);
+
+        event::emit_event<DepositEvent>(
+            &mut token_store.deposit_events,
+            DepositEvent { id: token.id, amount: token.amount },
+        );
+
+        assert!(
+            exists<TokenStore>(account_addr),
+            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
+        );
+
+        if (!table::contains(&token_store.tokens, token.id)) {
+            table::add(&mut token_store.tokens, token.id, token);
+        } else {
+            let recipient_token = table::borrow_mut(&mut token_store.tokens, token.id);
+            merge(recipient_token, token);
+        };
+    }
+
     // ****************** TEST-ONLY FUNCTIONS **************
 
     #[test(creator = @0x1, owner = @0x2)]
@@ -1174,7 +1364,17 @@ module aptos_token::token {
     ) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(&creator));
         account::create_account_for_test(signer::address_of(&owner));
-        let token_id = create_collection_and_token(&creator, 1, 1, 1);
+        let token_id = create_collection_and_token(
+            &creator,
+            1,
+            1,
+            1,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
 
         let token = withdraw_token(&creator, token_id, 1);
         deposit_token(&owner, token);
@@ -1187,7 +1387,17 @@ module aptos_token::token {
     ) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(&creator));
         account::create_account_for_test(signer::address_of(&owner));
-        let token_id = create_collection_and_token(&creator, 2, 5, 5);
+        let token_id = create_collection_and_token(
+            &creator,
+            2,
+            5,
+            5,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
 
         let token_0 = withdraw_token(&creator, token_id, 1);
         let token_1 = withdraw_token(&creator, token_id, 1);
@@ -1202,7 +1412,17 @@ module aptos_token::token {
     public entry fun test_collection_maximum(creator: signer) acquires Collections, TokenStore {
         use std::bcs;
         account::create_account_for_test(signer::address_of(&creator));
-        let token_id = create_collection_and_token(&creator, 2, 2, 1);
+        let token_id = create_collection_and_token(
+            &creator,
+            2,
+            2,
+            1,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
         let default_keys = vector<String>[ string::utf8(b"attack"), string::utf8(b"num_of_use") ];
         let default_vals = vector<vector<u8>>[ bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5) ];
         let default_types = vector<String>[ string::utf8(b"u64"), string::utf8(b"u64") ];
@@ -1233,7 +1453,19 @@ module aptos_token::token {
     ) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(&creator));
         account::create_account_for_test(signer::address_of(&owner));
-        let token_id = create_collection_and_token(&creator, 2, 2, 2);
+        let token_id = create_collection_and_token(
+            &creator,
+            2,
+            2,
+            2,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        assert!(balance_of(signer::address_of(&owner), token_id) == 0, 1);
+
         direct_transfer(&creator, &owner, token_id, 1);
         let token = withdraw_token(&owner, token_id, 1);
         deposit_token(&creator, token);
@@ -1256,11 +1488,16 @@ module aptos_token::token {
         creator: &signer,
         amount: u64,
         collection_max: u64,
-        token_max: u64
+        token_max: u64,
+        property_keys: vector<String>,
+        property_values: vector<vector<u8>>,
+        property_types: vector<String>,
+        collection_mutate_setting: vector<bool>,
+        token_mutate_setting: vector<bool>,
     ): TokenId acquires Collections, TokenStore {
         use std::string;
         use std::bcs;
-        let mutate_setting = vector<bool>[false, false, false];
+        let mutate_setting = collection_mutate_setting;
 
         create_collection(
             creator,
@@ -1271,10 +1508,10 @@ module aptos_token::token {
             mutate_setting
         );
 
-        let default_keys = vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")];
-        let default_vals = vector<vector<u8>>[bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5)];
-        let default_types = vector<String>[string::utf8(b"u64"), string::utf8(b"u64")];
-        let mutate_setting = vector<bool>[false, false, false, false, true];
+        let default_keys = if (vector::length<String>(&property_keys) == 0) { vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")] } else { property_keys };
+        let default_vals = if (vector::length<vector<u8>>(&property_values) == 0) { vector<vector<u8>>[bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5)] } else { property_values };
+        let default_types = if (vector::length<String>(&property_types) == 0) { vector<String>[string::utf8(b"u64"), string::utf8(b"u64")] } else { property_types };
+        let mutate_setting = token_mutate_setting;
         create_token_script(
             creator,
             get_collection_name(),
@@ -1297,16 +1534,36 @@ module aptos_token::token {
     #[test(creator = @0xFF)]
     fun test_create_events_generation(creator: signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(&creator));
-        create_collection_and_token(&creator, 1, 2, 1);
+        create_collection_and_token(
+            &creator,
+            1,
+            2,
+            1,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
         let collections = borrow_global<Collections>(signer::address_of(&creator));
         assert!(event::counter(&collections.create_collection_events) == 1, 1);
     }
 
     #[test(creator = @0xAF)]
-    fun test_create_token_from_tokendata(creator: &signer) acquires Collections, TokenStore {
+    fun test_mint_token_from_tokendata(creator: &signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(creator));
 
-        create_collection_and_token(creator, 2, 4, 4);
+        create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
         let token_data_id = create_token_data_id(
             signer::address_of(creator),
             get_collection_name(),
@@ -1328,7 +1585,17 @@ module aptos_token::token {
         account::create_account_for_test(signer::address_of(owner));
 
         // token owner mutate the token property
-        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
         assert!(token_id.property_version == 0, 1);
         let new_keys = vector<String>[
             string::utf8(b"attack"), string::utf8(b"num_of_use")
@@ -1352,7 +1619,11 @@ module aptos_token::token {
             new_vals,
             new_types,
         );
+
         // should have two new property_version from the orignal two tokens
+        let largest_property_version = get_tokendata_largest_property_version(signer::address_of(creator), token_id.token_data_id);
+        assert!(largest_property_version == 2, largest_property_version);
+
         let new_id_1 = create_token_id(token_id.token_data_id, 1);
         let new_id_2 = create_token_id(token_id.token_data_id, 2);
         let new_id_3 = create_token_id(token_id.token_data_id, 3);
@@ -1380,9 +1651,7 @@ module aptos_token::token {
         );
         assert!(balance_of(signer::address_of(creator), new_id_3) == 0, 1);
         // transfer token with property_version > 0 also transfer the token properties
-        initialize_token_store(owner);
-        opt_in_direct_transfer(owner, true);
-        transfer(creator, new_id_1, signer::address_of(owner), 1);
+        direct_transfer(creator, owner, new_id_1, 1);
 
         let props = &borrow_global<TokenStore>(signer::address_of(owner)).tokens;
         assert!(table::contains(props, new_id_1), 1);
@@ -1391,17 +1660,26 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xAF, owner = @0xBB)]
-    #[expected_failure(abort_code = 393219)]
-    fun test_mutate_token_property_fail(creator: &signer) acquires Collections, TokenStore {
+    fun test_mutate_token_property_upsert(creator: &signer) acquires Collections, TokenStore {
         use std::bcs;
         account::create_account_for_test(signer::address_of(creator));
 
         // token owner mutate the token property
-        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[string::utf8(TOKEN_PROPERTY_MUTABLE)],
+            vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
+            vector<String>[string::utf8(b"bool")],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
         assert!(token_id.property_version == 0, 1);
         // only be able to mutate the attributed defined when creating the token
         let new_keys = vector<String>[
-            string::utf8(b"attack"), string::utf8(b"num_of_use"), string::utf8(b"wrong_attribute")
+            string::utf8(b"attack"), string::utf8(b"num_of_use"), string::utf8(b"new_attribute")
         ];
         let new_vals = vector<vector<u8>>[
             bcs::to_bytes<u64>(&1), bcs::to_bytes<u64>(&1), bcs::to_bytes<u64>(&1)
@@ -1430,7 +1708,17 @@ module aptos_token::token {
         account::create_account_for_test(signer::address_of(creator));
 
         // token owner mutate the token property
-        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
         assert!(token_id.property_version == 0, 1);
         // only be able to mutate the attributed defined when creating the token
         let new_keys = vector<String>[
@@ -1465,16 +1753,26 @@ module aptos_token::token {
         assert!(property_map::read_u64(&og_pm, &string::utf8(b"attack")) == 1, 1);
     }
 
-    #[test(framework = @0x1, creator=@0xcafe)]
+    #[test(framework = @0x1, creator = @0xcafe)]
     fun test_withdraw_with_proof(creator: &signer, framework: &signer): Token acquires TokenStore, Collections {
         timestamp::set_time_has_started_for_testing(framework);
         account::create_account_for_test(signer::address_of(creator));
-        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
 
         timestamp::update_global_time_for_test(1000000);
 
         // provide the proof to the account
-        let cap =  create_withdraw_capability(
+        let cap = create_withdraw_capability(
             creator, // ask user to provide address to avoid ambiguity from rotated keys
             token_id,
             1,
@@ -1482,5 +1780,335 @@ module aptos_token::token {
         );
 
         withdraw_with_capability(cap)
+    }
+
+    #[test(creator = @0xcafe, another_creator = @0xde)]
+    fun test_burn_token_from_both_limited_and_unlimited(
+        creator: &signer,
+        another_creator: &signer,
+    )acquires Collections, TokenStore {
+        // create limited token and collection
+        use std::bcs;
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(another_creator));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[string::utf8(BURNABLE_BY_CREATOR)],
+            vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
+            vector<String>[string::utf8(b"bool")],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        // burn token from limited token
+        let creator_addr = signer::address_of(creator);
+        let pre_amount = &mut get_token_supply(creator_addr, token_id.token_data_id);
+        burn_by_creator(creator, creator_addr, get_collection_name(), get_token_name(), 0, 1);
+        let aft_amount = &mut get_token_supply(creator_addr, token_id.token_data_id);
+        assert!((option::extract<u64>(pre_amount) - option::extract<u64>(aft_amount)) == 1, 1);
+
+        // create unlimited token and collection
+        let new_addr = signer::address_of(another_creator);
+        let new_token_id = create_collection_and_token(
+            another_creator,
+            2,
+            0,
+            0,
+            vector<String>[string::utf8(BURNABLE_BY_OWNER)],
+            vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
+            vector<String>[string::utf8(b"bool")],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        let pre = balance_of(new_addr, new_token_id);
+        // burn token from unlimited token and collection
+        burn(another_creator, new_addr, get_collection_name(), get_token_name(), 0, 1);
+        let aft = balance_of(new_addr, new_token_id);
+        assert!(pre - aft == 1, 1);
+    }
+
+    #[test(creator = @0xcafe, owner = @0xafe)]
+    fun test_mint_token_to_different_address(
+        creator: &signer,
+        owner: &signer,
+    )acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        let owner_addr = signer::address_of(owner);
+        opt_in_direct_transfer(owner, true);
+        mint_token_to(creator, owner_addr, token_id.token_data_id, 1);
+        assert!(balance_of(owner_addr, token_id) == 1, 1);
+    }
+
+    #[test(creator = @0xcafe, owner = @0xafe)]
+    #[expected_failure(abort_code = 327696)]
+    fun test_opt_in_direct_transfer_fail(
+        creator: &signer,
+        owner: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        let owner_addr = signer::address_of(owner);
+        initialize_token_store(owner);
+        transfer(creator, token_id, owner_addr, 1);
+    }
+
+    #[test(creator = @0xcafe, owner = @0xafe)]
+    #[expected_failure(abort_code = 327696)]
+    fun test_opt_in_direct_deposit_fail(
+        creator: &signer,
+        owner: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        let owner_addr = signer::address_of(owner);
+        let token = withdraw_token(creator, token_id, 2);
+        initialize_token_store(owner);
+        direct_deposit_with_opt_in(owner_addr, token);
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        opt_in_direct_transfer(owner, true);
+        initialize_token_store(owner);
+        transfer(creator, token_id, signer::address_of(owner), 2);
+        burn_by_creator(creator, signer::address_of(owner), get_collection_name(), get_token_name(), 0, 1);
+    }
+
+    #[test(creator = @0xcafe, owner = @0x456)]
+    #[expected_failure(abort_code = 327710)]
+    fun test_burn_token_by_owner_without_burnable_config(
+        creator: &signer,
+        owner: &signer,
+    )acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        opt_in_direct_transfer(owner, true);
+        initialize_token_store(owner);
+        transfer(creator, token_id, signer::address_of(owner), 2);
+
+        burn(owner, signer::address_of(creator), get_collection_name(), get_token_name(), 0, 1);
+    }
+
+    #[test(creator = @0xcafe, owner = @0x456)]
+    fun test_burn_token_by_owner_and_creator(
+        creator: &signer,
+        owner: &signer,
+    ) acquires TokenStore, Collections {
+        use std::bcs;
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[string::utf8(BURNABLE_BY_CREATOR), string::utf8(BURNABLE_BY_OWNER)],
+            vector<vector<u8>>[bcs::to_bytes<bool>(&true), bcs::to_bytes<bool>(&true)],
+            vector<String>[string::utf8(b"bool"), string::utf8(b"bool")],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        opt_in_direct_transfer(owner, true);
+        initialize_token_store(owner);
+        transfer(creator, token_id, signer::address_of(owner), 2);
+        burn_by_creator(creator, signer::address_of(owner), get_collection_name(), get_token_name(), 0, 1);
+        burn(owner, signer::address_of(creator), get_collection_name(), get_token_name(), 0, 1);
+        assert!(balance_of(signer::address_of(owner), token_id) == 0, 1);
+
+        // The corresponding token_data and collection_data should be deleted
+        let collections = borrow_global<Collections>(signer::address_of(creator));
+        assert!(!table::contains(&collections.collection_data, token_id.token_data_id.name), 1);
+        assert!(!table::contains(&collections.token_data, token_id.token_data_id), 1);
+
+    }
+
+    #[test(creator = @0xcafe, owner = @0x456)]
+    fun test_mutate_default_token_properties(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        use std::bcs;
+        account::create_account_for_test(signer::address_of(creator));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
+        assert!(token_id.property_version == 0, 1);
+        let new_keys = vector<String>[
+            string::utf8(b"attack"), string::utf8(b"num_of_use")
+        ];
+        let new_vals = vector<vector<u8>>[
+            bcs::to_bytes<u64>(&1), bcs::to_bytes<u64>(&1)
+        ];
+        let new_types = vector<String>[
+            string::utf8(b"u64"), string::utf8(b"u64")
+        ];
+
+        mutate_tokendata_property(
+            creator,
+            token_id.token_data_id,
+            new_keys,
+            new_vals,
+            new_types,
+        );
+
+        let all_token_data = &borrow_global<Collections>(signer::address_of(creator)).token_data;
+        assert!(table::contains(all_token_data, token_id.token_data_id), 1);
+        let props = &table::borrow(all_token_data, token_id.token_data_id).default_properties;
+        assert!(property_map::read_u64(props, &string::utf8(b"attack")) == 1, 1);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_mutate_token_uri(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, true, false, false, false],
+        );
+        mutate_tokendata_uri(creator, token_id.token_data_id, string::utf8(b""));
+        assert!(get_tokendata_uri(signer::address_of(creator), token_id.token_data_id) == string::utf8(b""), 1);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 65569)]
+    fun test_no_zero_balance_token_deposit(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        // token owner mutate the token property
+        create_collection_and_token(
+            creator,
+            0,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, true, false, false, false],
+        );
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 65548)]
+    fun test_split_out_zero_token(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            1,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, true, false, false, false],
+        );
+        let token = withdraw_token(creator, token_id, 1);
+        let split_token = split(&mut token, 1);
+        let Token {
+            id: _,
+            amount: _,
+            token_properties: _,
+        } = split_token;
+        let Token {
+            id: _,
+            amount: _,
+            token_properties: _,
+        } = token;
+    }
+
+    //
+    // Deprecated functions
+    //
+
+    public entry fun initialize_token_script(_account: &signer) {
+        abort 0
+    }
+
+    public fun initialize_token(_account: &signer, _token_id: TokenId) {
+        abort 0
     }
 }

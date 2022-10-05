@@ -121,7 +121,7 @@ pub struct Scheduler {
     /// in particular, after aborts and executions that write outside of the write set of the
     /// same transaction's previous incarnation.
     validation_idx: AtomicUsize,
-    /// The the number of times execution_idx and validation_idx are decreased.
+    /// The number of times execution_idx and validation_idx are decreased.
     decrease_cnt: AtomicUsize,
 
     /// Number of tasks used to track when transactions can be committed, incremented / decremented

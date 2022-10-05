@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::MempoolError;
-use crate::monitor;
+use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::TransactionStatus;
-use consensus_types::{block::Block, common::TransactionSummary};
+use consensus_types::{block::Block, common::RejectedTransactionSummary};
 use executor_types::StateComputeResult;
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
@@ -66,6 +65,10 @@ impl TxnNotifier for MempoolNotifier {
         }
         let compute_status = compute_results.compute_status();
         if txns.len() + 2 != compute_status.len() {
+            // reconfiguration suffix blocks don't have any transactions
+            if compute_status.is_empty() {
+                return Ok(());
+            }
             return Err(format_err!(
                 "Block meta and state checkpoint txns are expected. txns len: {}, compute status len: {}",
                 txns.len(),
@@ -75,9 +78,10 @@ impl TxnNotifier for MempoolNotifier {
         let user_txn_status = &compute_status[1..txns.len() + 1];
         for (txn, status) in txns.iter().zip_eq(user_txn_status) {
             if let TransactionStatus::Discard(_) = status {
-                rejected_txns.push(TransactionSummary {
+                rejected_txns.push(RejectedTransactionSummary {
                     sender: txn.sender(),
                     sequence_number: txn.sequence_number(),
+                    hash: txn.clone().committed_hash(),
                 });
             }
         }

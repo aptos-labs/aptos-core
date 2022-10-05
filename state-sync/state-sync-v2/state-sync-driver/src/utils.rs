@@ -271,38 +271,11 @@ pub async fn handle_committed_transactions<M: MempoolNotificationSender>(
 }
 
 /// Updates the metrics to handle an epoch change event
-pub fn update_new_epoch_metrics(storage: Arc<dyn DbReader>) {
+pub fn update_new_epoch_metrics() {
     // Increment the epoch
     metrics::increment_gauge(
         &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
         metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
         1,
     );
-
-    // Update the validator set accounts in the epoch
-    match fetch_latest_epoch_state(storage) {
-        Ok(latest_epoch_state) => {
-            let epoch = metrics::read_gauge(
-                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
-            );
-            let validator_verifier = latest_epoch_state.verifier;
-            for validator_address in validator_verifier.get_ordered_account_addresses_iter() {
-                let validator_weight = validator_verifier
-                    .get_voting_power(&validator_address)
-                    .unwrap_or(0);
-                metrics::set_epoch_state_gauge(
-                    &epoch.to_string(),
-                    &validator_address.to_string(),
-                    &validator_weight.to_string(),
-                );
-            }
-        }
-        Err(error) => {
-            error!(LogSchema::new(LogEntry::Driver).message(&format!(
-                "Failed to get the latest epoch state from storage! Error: {:?}",
-                error
-            )));
-        }
-    }
 }

@@ -86,7 +86,7 @@ pub(crate) struct StateStore {
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
     buffered_state: Mutex<BufferedState>,
-    target_snapshot_size: usize,
+    buffered_state_target_items: usize,
 }
 
 impl Deref for StateStore {
@@ -98,8 +98,8 @@ impl Deref for StateStore {
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
-// want another trait, `StateReader`, which is a subset of `DbReaer` here but Rust does not support trait
-// upcasting coercion for now. Should change it to a different trait once upcasting is stablized.
+// want another trait, `StateReader`, which is a subset of `DbReader` here but Rust does not support trait
+// upcasting coercion for now. Should change it to a different trait once upcasting is stabilized.
 // ref: https://github.com/rust-lang/rust/issues/65991
 impl DbReader for StateDb {
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -269,7 +269,7 @@ impl StateStore {
         state_merkle_db: Arc<DB>,
         state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
-        target_snapshot_size: usize,
+        buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
@@ -286,7 +286,7 @@ impl StateStore {
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(
                 &state_db,
-                target_snapshot_size,
+                buffered_state_target_items,
                 hack_for_tests,
             )
             .expect("buffered state creation failed."),
@@ -294,13 +294,13 @@ impl StateStore {
         Self {
             state_db,
             buffered_state,
-            target_snapshot_size,
+            buffered_state_target_items,
         }
     }
 
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
-        target_snapshot_size: usize,
+        buffered_state_target_items: usize,
         hack_for_tests: bool,
     ) -> Result<BufferedState> {
         let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
@@ -329,7 +329,7 @@ impl StateStore {
                 usage,
                 latest_snapshot_version,
             ),
-            target_snapshot_size,
+            buffered_state_target_items,
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
@@ -405,7 +405,7 @@ impl StateStore {
     pub fn reset(&self) {
         *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
-            self.target_snapshot_size,
+            self.buffered_state_target_items,
             false,
         )
         .expect("buffered state creation failed.");
@@ -710,16 +710,19 @@ impl StateStore {
         })
     }
 
+    // state sync doesn't query for the progress, but keeps its record by itself.
+    // TODO: change to async comment once it does like https://github.com/aptos-labs/aptos-core/blob/159b00f3d53e4327523052c1b99dd9889bf13b03/storage/backup/backup-cli/src/backup_types/state_snapshot/restore.rs#L147 or overlap at least two chunks.
     pub fn get_snapshot_receiver(
         self: &Arc<Self>,
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
-        Ok(Box::new(StateSnapshotRestore::new_overwrite(
+        Ok(Box::new(StateSnapshotRestore::new(
             &self.state_merkle_db,
             self,
             version,
             expected_root_hash,
+            false, /* async_commit */
         )?))
     }
 

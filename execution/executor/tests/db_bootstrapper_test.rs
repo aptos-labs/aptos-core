@@ -36,7 +36,7 @@ use executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use executor_types::BlockExecutorTrait;
-use move_deps::move_core_types::{
+use move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };
@@ -250,13 +250,13 @@ fn test_new_genesis() {
             ContractEvent::new(
                 *configuration.events().key(),
                 0,
-                TypeTag::Struct(ConfigurationResource::struct_tag()),
+                TypeTag::Struct(Box::new(ConfigurationResource::struct_tag())),
                 vec![],
             ),
             ContractEvent::new(
                 new_block_event_key(),
                 0,
-                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 vec![],
             ),
         ],

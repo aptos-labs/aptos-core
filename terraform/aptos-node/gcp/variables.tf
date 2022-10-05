@@ -82,7 +82,7 @@ variable "node_pool_sizes" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
-  default     = "e2-custom-4-4096"
+  default     = "n2-standard-8"
 }
 
 variable "utility_instance_num" {

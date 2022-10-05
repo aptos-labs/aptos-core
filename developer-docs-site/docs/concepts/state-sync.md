@@ -89,7 +89,7 @@ node configuration file:
 While your node is syncing, you'll be able to see the
 `aptos_state_sync_version{type="synced_states"}` metric gradually increase.
 However, `aptos_state_sync_version{type="synced"}` will only increase once
-the node has boostrapped. This may take several hours depending on the 
+the node has bootstrapped. This may take several hours depending on the 
 amount of data, network bandwidth and node resources available.
 
 ## State sync architecture

@@ -17,9 +17,9 @@ use serde::{Deserialize, Serialize};
     Queryable,
     Serialize,
 )]
-#[belongs_to(Transaction, foreign_key = "transaction_version")]
-#[primary_key(transaction_version, write_set_change_index)]
-#[diesel(table_name = "move_modules")]
+#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[diesel(primary_key(transaction_version, write_set_change_index))]
+#[diesel(table_name = move_modules)]
 pub struct MoveModule {
     pub transaction_version: i64,
     pub write_set_change_index: i64,

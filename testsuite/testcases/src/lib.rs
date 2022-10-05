@@ -3,7 +3,6 @@
 
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
-pub mod continuous_progress_test;
 pub mod forge_setup_test;
 pub mod fullnode_reboot_stress_test;
 pub mod gas_price_test;
@@ -17,9 +16,11 @@ pub mod performance_with_fullnode_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod three_region_simulation_test;
+pub mod twin_validator_test;
+pub mod validator_join_leave_test;
 pub mod validator_reboot_stress_test;
 
-use anyhow::{anyhow, ensure};
+use anyhow::{anyhow, ensure, Context};
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{
@@ -30,9 +31,10 @@ use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Builder;
+use tokio::runtime::Runtime;
 
-const WARMUP_DURATION_FRACTION: f32 = 0.05;
-const COOLDOWN_DURATION_FRACTION: f32 = 0.05;
+const WARMUP_DURATION_FRACTION: f32 = 0.07;
+const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
 
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,
@@ -69,7 +71,8 @@ pub fn create_emitter_and_request(
     let client_timeout = Duration::from_secs(30);
 
     let chain_info = swarm.chain_info();
-    let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
+    let transaction_factory = TransactionFactory::new(chain_info.chain_id)
+        .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE);
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
@@ -115,7 +118,7 @@ pub trait NetworkLoadTest: Test {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
         Ok(LoadDestination::AllNodes)
     }
-    // Load is started before this funciton is called, and stops after this function returns.
+    // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
     // time to finish. How long this function takes will dictate how long the actual test lasts.
     fn test(&self, _swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
@@ -130,16 +133,14 @@ pub trait NetworkLoadTest: Test {
 
 impl NetworkTest for dyn NetworkLoadTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let one_client = ctx.swarm().aptos_public_info().client().clone();
-        let start_version = ctx
-            .runtime
-            .block_on(one_client.get_ledger_information())?
-            .into_inner()
-            .version;
+        let (start_version, _) = runtime
+            .block_on(ctx.swarm().get_client_with_newest_ledger_version())
+            .context("no clients replied for start version")?;
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
@@ -158,13 +159,12 @@ impl NetworkTest for dyn NetworkLoadTest {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let end_version = ctx
-            .runtime
-            .block_on(one_client.get_ledger_information())?
-            .into_inner()
-            .version;
+        let (end_version, _) = runtime
+            .block_on(ctx.swarm().get_client_with_newest_ledger_version())
+            .context("no clients replied for end version")?;
 
-        self.finish(ctx.swarm())?;
+        self.finish(ctx.swarm())
+            .context("finish NetworkLoadTest ")?;
 
         ctx.check_for_success(
             &txn_stat,
@@ -173,7 +173,8 @@ impl NetworkTest for dyn NetworkLoadTest {
             end_timestamp as i64,
             start_version,
             end_version,
-        )?;
+        )
+        .context("check for success")?;
 
         Ok(())
     }
@@ -201,7 +202,7 @@ impl dyn NetworkLoadTest {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
 
-        let nodes_to_send_load_to = match self.setup(ctx)? {
+        let nodes_to_send_load_to = match self.setup(ctx).context("setup NetworkLoadTest")? {
             LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
             LoadDestination::AllValidators => all_validators,
             LoadDestination::AllFullnodes => all_fullnodes,
@@ -214,9 +215,10 @@ impl dyn NetworkLoadTest {
             ctx.swarm(),
             emit_job_request,
             &nodes_to_send_load_to,
-            1,
+            aptos_global_constants::GAS_UNIT_PRICE,
             rng,
-        )?;
+        )
+        .context("create emitter")?;
 
         let mut runtime_builder = Builder::new_multi_thread();
         runtime_builder.disable_lifo_slot().enable_all();
@@ -229,23 +231,9 @@ impl dyn NetworkLoadTest {
             .swarm()
             .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
 
-        // Read first
-        for client in &clients {
-            let start = Instant::now();
-            let _v = rt.block_on(client.get_ledger_information())?;
-            let duration = start.elapsed();
-            info!(
-                "Fetch from {:?} took {}ms",
-                client.path_prefix_string(),
-                duration.as_millis(),
-            );
-        }
-
-        let job = rt.block_on(emitter.start_job(
-            ctx.swarm().chain_info().root_account,
-            emit_job_request,
-            3,
-        ))?;
+        let job = rt
+            .block_on(emitter.start_job(ctx.swarm().chain_info().root_account, emit_job_request, 3))
+            .context("start emitter job")?;
 
         let warmup_duration = duration.mul_f32(warmup_duration_fraction);
         let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
@@ -268,7 +256,8 @@ impl dyn NetworkLoadTest {
         job.start_next_phase();
 
         let test_start = Instant::now();
-        self.test(ctx.swarm(), test_duration)?;
+        self.test(ctx.swarm(), test_duration)
+            .context("test NetworkLoadTest")?;
         let actual_test_duration = test_start.elapsed();
         info!(
             "{}s test finished after {}s",

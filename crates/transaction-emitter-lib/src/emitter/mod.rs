@@ -7,9 +7,9 @@ pub mod submission_worker;
 
 use again::RetryPolicy;
 use anyhow::{anyhow, format_err, Result};
+use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_infallible::RwLock;
-use aptos_logger::sample::Sampling;
-use aptos_logger::{info, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -40,7 +40,8 @@ use crate::{
         submission_worker::SubmissionWorker,
     },
     transaction_generator::{
-        account_generator::AccountGeneratorCreator, nft_mint::NFTMintGeneratorCreator,
+        account_generator::AccountGeneratorCreator,
+        nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
         transaction_mix_generator::TxnMixGeneratorCreator, TransactionGeneratorCreator,
     },
@@ -51,7 +52,6 @@ use rand::rngs::StdRng;
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 100_000_000_000;
 const SEND_AMOUNT: u64 = 1;
-const GAS_AMOUNT: u64 = 1000;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -105,6 +105,8 @@ impl EmitJobMode {
     }
 }
 
+/// total coins consumed are less than 2 * max_txns * expected_gas_per_txn,
+/// which is by default 100000000000 * 100000, but can be overriden.
 #[derive(Clone, Debug)]
 pub struct EmitJobRequest {
     rest_clients: Vec<RestClient>,
@@ -121,6 +123,9 @@ pub struct EmitJobRequest {
     max_account_working_set: usize,
 
     txn_expiration_time_secs: u64,
+    expected_max_txns: u64,
+    expected_gas_per_txn: u64,
+    promt_before_spending: bool,
 }
 
 impl Default for EmitJobRequest {
@@ -130,7 +135,7 @@ impl Default for EmitJobRequest {
             mode: EmitJobMode::MaxLoad {
                 mempool_backlog: 3000,
             },
-            gas_price: 0,
+            gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             invalid_transaction_ratio: 0,
             reuse_accounts: false,
             mint_to_root: false,
@@ -138,6 +143,9 @@ impl Default for EmitJobRequest {
             add_created_accounts_to_pool: true,
             max_account_working_set: 1_000_000,
             txn_expiration_time_secs: 60,
+            expected_max_txns: MAX_TXNS,
+            expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
+            promt_before_spending: false,
         }
     }
 }
@@ -154,6 +162,21 @@ impl EmitJobRequest {
 
     pub fn gas_price(mut self, gas_price: u64) -> Self {
         self.gas_price = gas_price;
+        self
+    }
+
+    pub fn expected_max_txns(mut self, expected_max_txns: u64) -> Self {
+        self.expected_max_txns = expected_max_txns;
+        self
+    }
+
+    pub fn expected_gas_per_txn(mut self, expected_gas_per_txn: u64) -> Self {
+        self.expected_gas_per_txn = expected_gas_per_txn;
+        self
+    }
+
+    pub fn promt_before_spending(mut self) -> Self {
+        self.promt_before_spending = true;
         self
     }
 
@@ -224,8 +247,9 @@ impl EmitJobRequest {
                 EmitModeParams {
                     wait_millis: 0,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
-                    transactions_per_account,
-                    max_submit_batch_size: 100,
+                    transactions_per_account: transactions_per_account
+                        .min(num_workers_per_endpoint * clients_count),
+                    max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     start_offset_multiplier_millis: 0.0,
                     start_jitter_millis: 5000,
                     accounts_per_worker: 1,
@@ -254,7 +278,7 @@ impl EmitJobRequest {
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
-                let transactions_per_account = min(100, tps);
+                let transactions_per_account = min(20, tps);
                 assert!(
                     transactions_per_account > 0,
                     "TPS ({}) needs to be larger than 0",
@@ -298,7 +322,7 @@ impl EmitJobRequest {
                     wait_millis: wait_seconds * 1000,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
                     transactions_per_account,
-                    max_submit_batch_size: 100,
+                    max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     start_offset_multiplier_millis: (wait_seconds * 1000) as f64
                         / (num_workers_per_endpoint * clients_count) as f64,
                     // Using jitter here doesn't make TPS vary enough, as we have many workers.
@@ -419,8 +443,8 @@ impl TxnEmitter {
                     req.max_account_working_set,
                     req.gas_price,
                 )),
-                TransactionType::NftMint => Box::new(
-                    NFTMintGeneratorCreator::new(
+                TransactionType::NftMintAndTransfer => Box::new(
+                    NFTMintAndTransferGeneratorCreator::new(
                         self.from_rng(),
                         txn_factory.clone(),
                         root_account,
@@ -460,9 +484,10 @@ impl TxnEmitter {
             for client in &req.rest_clients {
                 let accounts = (&mut all_accounts)
                     .take(mode_params.accounts_per_worker)
-                    .collect();
+                    .collect::<Vec<_>>();
                 let stop = stop.clone();
                 let stats = Arc::clone(&stats);
+                let txn_generator = txn_generator_creator.create_transaction_generator().await;
 
                 let worker = SubmissionWorker::new(
                     accounts,
@@ -470,7 +495,7 @@ impl TxnEmitter {
                     stop,
                     mode_params.clone(),
                     stats,
-                    txn_generator_creator.create_transaction_generator(),
+                    txn_generator,
                     workers.len(),
                     check_account_sequence_only_once_for.contains(&workers.len()),
                     self.from_rng(),
@@ -525,11 +550,11 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for(
         &mut self,
-        root_account: &mut LocalAccount,
+        source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
-        let job = self.start_job(root_account, emit_job_request, 1).await?;
+        let job = self.start_job(source_account, emit_job_request, 1).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         time::sleep(duration).await;
         info!("Ran for {} secs, stopping job...", duration.as_secs());
@@ -540,13 +565,13 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for_with_stats(
         &mut self,
-        root_account: &mut LocalAccount,
+        source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         interval_secs: u64,
     ) -> Result<TxnStats> {
         info!("Starting emitting txns for {} secs", duration.as_secs());
-        let job = self.start_job(root_account, emit_job_request, 1).await?;
+        let job = self.start_job(source_account, emit_job_request, 1).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
         info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
@@ -561,7 +586,7 @@ impl TxnEmitter {
         receiver: &AccountAddress,
         num_coins: u64,
     ) -> Result<Instant> {
-        let txn = gen_transfer_txn_request(sender, receiver, num_coins, &self.txn_factory, 1);
+        let txn = gen_transfer_txn_request(sender, receiver, num_coins, &self.txn_factory);
         client.submit(&txn).await?;
         let deadline = Instant::now() + Duration::from_secs(txn.expiration_timestamp_secs() + 30);
         Ok(deadline)
@@ -613,8 +638,7 @@ async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
     transactions_per_account: usize,
-    wait_timeout: Duration,
-    fetch_only_once: bool,
+    txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
 ) -> (usize, u128) {
     let mut pending_addresses: HashSet<_> = accounts.iter().map(|d| d.address()).collect();
@@ -623,7 +647,7 @@ async fn wait_for_accounts_sequence(
     let mut sum_of_completion_timestamps_millis = 0u128;
     loop {
         match query_sequence_numbers(client, pending_addresses.iter()).await {
-            Ok(sequence_numbers) => {
+            Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();
                 for (account, sequence_number) in zip(accounts.iter_mut(), &sequence_numbers) {
                     let prev_sequence_number = latest_fetched_counts
@@ -633,7 +657,7 @@ async fn wait_for_accounts_sequence(
                     sum_of_completion_timestamps_millis +=
                         millis_elapsed * (*sequence_number - prev_sequence_number) as u128;
 
-                    if account.sequence_number() == *sequence_number || fetch_only_once {
+                    if account.sequence_number() == *sequence_number {
                         pending_addresses.remove(&account.address());
                     }
                 }
@@ -641,19 +665,46 @@ async fn wait_for_accounts_sequence(
                 if pending_addresses.is_empty() {
                     break;
                 }
+
+                if ledger_timestamp_secs > txn_expiration_ts_secs {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(60)),
+                        warn!(
+                            "[{}] Ledger timestamp {} exceeded txn expiration timestamp {} for {:?}",
+                            client.path_prefix_string(),
+                            ledger_timestamp_secs,
+                            txn_expiration_ts_secs,
+                            accounts
+                                .iter()
+                                .map(|a| a.address().to_hex_literal())
+                                .collect::<Vec<_>>(),
+                        )
+                    );
+                    break;
+                }
             }
             Err(e) => {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(60)),
                     warn!(
-                        "Failed to query ledger info on accounts {:?} for instance {:?} : {:?}",
-                        pending_addresses, client, e
+                        "[{}] Failed to query ledger info on accounts {:?}: {:?}",
+                        client.path_prefix_string(),
+                        pending_addresses,
+                        e
                     )
                 );
             }
         }
 
-        if start_time.elapsed() >= wait_timeout {
+        if aptos_infallible::duration_since_epoch().as_secs() >= txn_expiration_ts_secs + 240 {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(15)),
+                error!(
+                    "[{}] Client cannot catch up to needed timestamp ({}), after additional 240s, aborting",
+                    client.path_prefix_string(),
+                    txn_expiration_ts_secs,
+                )
+            );
             break;
         }
 
@@ -686,6 +737,12 @@ fn update_seq_num_and_get_num_expired(
                             account.sequence_number() <= count + transactions_per_account as u64
                         );
                         let diff = (account.sequence_number() - count) as usize;
+                        debug!(
+                            "Stale sequence_number for {}, expected {}, setting to {}",
+                            account.address(),
+                            account.sequence_number(),
+                            count
+                        );
                         *account.sequence_number_mut() = *count;
                         Some(diff)
                     } else {
@@ -693,6 +750,12 @@ fn update_seq_num_and_get_num_expired(
                     }
                 }
                 None => {
+                    debug!(
+                        "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
+                        account.address(),
+                        account.sequence_number(),
+                        account.sequence_number() - transactions_per_account as u64
+                    );
                     *account.sequence_number_mut() -= transactions_per_account as u64;
                     Some(transactions_per_account)
                 }
@@ -702,21 +765,35 @@ fn update_seq_num_and_get_num_expired(
 }
 
 pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
-    Ok(query_sequence_numbers(client, [address].iter()).await?[0])
+    Ok(query_sequence_numbers(client, [address].iter()).await?.0[0])
 }
 
-pub async fn query_sequence_numbers<'a, I>(client: &RestClient, addresses: I) -> Result<Vec<u64>>
+// Return a pair of (list of sequence numbers, ledger timestamp)
+pub async fn query_sequence_numbers<'a, I>(
+    client: &RestClient,
+    addresses: I,
+) -> Result<(Vec<u64>, u64)>
 where
     I: Iterator<Item = &'a AccountAddress>,
 {
-    Ok(try_join_all(
+    let (seq_nums, timestamps): (Vec<_>, Vec<_>) = try_join_all(
         addresses.map(|address| RETRY_POLICY.retry(move || client.get_account_bcs(*address))),
     )
     .await
     .map_err(|e| format_err!("Get accounts failed: {:?}", e))?
     .into_iter()
-    .map(|resp| resp.into_inner().sequence_number())
-    .collect())
+    .map(|resp| {
+        let (account, state) = resp.into_parts();
+        (
+            account.sequence_number(),
+            Duration::from_micros(state.timestamp_usecs).as_secs(),
+        )
+    })
+    .unzip();
+
+    // return min for the timestamp, to make sure
+    // all sequence numbers were <= to return values at that timestamp
+    Ok((seq_nums, timestamps.into_iter().min().unwrap()))
 }
 
 pub fn gen_transfer_txn_request(
@@ -724,11 +801,8 @@ pub fn gen_transfer_txn_request(
     receiver: &AccountAddress,
     num_coins: u64,
     txn_factory: &TransactionFactory,
-    gas_price: u64,
 ) -> SignedTransaction {
     sender.sign_with_transaction_builder(
-        txn_factory
-            .payload(aptos_stdlib::aptos_coin_transfer(*receiver, num_coins))
-            .gas_unit_price(gas_price),
+        txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*receiver, num_coins)),
     )
 }

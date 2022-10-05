@@ -4,7 +4,7 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::algebra::{FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
+use crate::algebra::{AbstractValueSize, FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
 use aptos_types::{
     on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
 };
@@ -125,14 +125,14 @@ crate::params::define_gas_parameters!(
         [
             maximum_number_of_gas_units: Gas,
             "maximum_number_of_gas_units",
-            4_000_000
+            10_000_000
         ],
         // The minimum gas price that a transaction can be submitted with.
         // TODO(Gas): should probably change this to something > 0
         [
             min_price_per_gas_unit: FeePerGasUnit,
             "min_price_per_gas_unit",
-            0
+            aptos_global_constants::GAS_UNIT_PRICE
         ],
         // The maximum gas unit price that a transaction can be submitted with.
         [
@@ -179,6 +179,7 @@ crate::params::define_gas_parameters!(
             "write_data.per_byte_in_val",
             10_000
         ],
+        [memory_quota: AbstractValueSize, optional "memory_quota", 10_000_000],
     ]
 );
 

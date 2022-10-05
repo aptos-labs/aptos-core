@@ -173,7 +173,7 @@ pub fn generate_ledger_info_with_sig(
     let partial_sig = PartialSignatures::new(
         validators
             .iter()
-            .map(|signer| (signer.author(), signer.sign(&ledger_info)))
+            .map(|signer| (signer.author(), signer.sign(&ledger_info).unwrap()))
             .collect(),
     );
 
@@ -409,7 +409,7 @@ mod tests {
                 validator.public_key(),
                 1,
             ));
-            partial_sig.add_signature(validator.author(), validator.sign(&ledger_info));
+            partial_sig.add_signature(validator.author(), validator.sign(&ledger_info).unwrap());
         }
 
         // Let's assume our verifier needs to satisfy at least 5 quorum voting power
@@ -427,7 +427,7 @@ mod tests {
         // Add the signatures in reverse order and ensure the serialization matches
         partial_sig = PartialSignatures::empty();
         for validator in validator_signers.iter().rev() {
-            partial_sig.add_signature(validator.author(), validator.sign(&ledger_info));
+            partial_sig.add_signature(validator.author(), validator.sign(&ledger_info).unwrap());
         }
 
         aggregated_signature = validator_verifier

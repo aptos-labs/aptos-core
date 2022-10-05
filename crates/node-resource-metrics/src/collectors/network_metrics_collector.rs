@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::common::NAMESPACE;
+use crate::collectors::common::MeasureLatency;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
@@ -117,6 +118,8 @@ impl Collector for NetworkMetricsCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
+        let _measure = MeasureLatency::new("network".into());
+
         let mut system = self.system.lock();
         system.refresh_networks_list();
         system.refresh_networks();

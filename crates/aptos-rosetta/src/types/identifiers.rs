@@ -25,34 +25,120 @@ use std::{
 pub struct AccountIdentifier {
     /// Hex encoded AccountAddress beginning with 0x
     pub address: String,
+    /// Sub account only used for staking
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_account: Option<SubAccountIdentifier>,
 }
 
 impl AccountIdentifier {
     /// Convert [`AccountIdentifier`] to an [`AccountAddress`]
     pub fn account_address(&self) -> ApiResult<AccountAddress> {
-        self.try_into()
+        str_to_account_address(self.address.as_str())
     }
-}
 
-impl TryFrom<&AccountIdentifier> for AccountAddress {
-    type Error = ApiError;
-
-    fn try_from(account: &AccountIdentifier) -> Result<Self, Self::Error> {
-        // Allow 0x in front of account address
-        if let Ok(address) = AccountAddress::from_hex_literal(&account.address) {
-            Ok(address)
-        } else {
-            Ok(AccountAddress::from_str(&account.address)
-                .map_err(|_| ApiError::InvalidInput(Some("Invalid account address".to_string())))?)
-        }
-    }
-}
-
-impl From<AccountAddress> for AccountIdentifier {
-    fn from(address: AccountAddress) -> Self {
+    pub fn base_account(address: AccountAddress) -> Self {
         AccountIdentifier {
             address: to_hex_lower(&address),
+            sub_account: None,
         }
+    }
+
+    pub fn total_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_total_stake()),
+        }
+    }
+
+    pub fn operator_stake_account(
+        address: AccountAddress,
+        operator_address: AccountAddress,
+    ) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_operator_stake(operator_address)),
+        }
+    }
+
+    pub fn is_base_account(&self) -> bool {
+        self.sub_account.is_none()
+    }
+    pub fn is_total_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_total_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_operator_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            !inner.is_total_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn operator_address(&self) -> ApiResult<AccountAddress> {
+        if let Some(ref inner) = self.sub_account {
+            inner.operator_address()
+        } else {
+            Err(ApiError::InternalError(Some(
+                "Can't get operator address of a non-operator stake account".to_string(),
+            )))
+        }
+    }
+}
+
+fn str_to_account_address(address: &str) -> Result<AccountAddress, ApiError> {
+    AccountAddress::from_str(address)
+        .map_err(|_| ApiError::InvalidInput(Some("Invalid account address".to_string())))
+}
+
+/// There are two types of SubAccountIdentifiers
+/// 1. "stake" which is the total stake
+/// 2. "stake-<operator>" which is the stake on the operator
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SubAccountIdentifier {
+    /// Hex encoded AccountAddress beginning with 0x
+    pub address: String,
+}
+
+const STAKE: &str = "stake";
+const ACCOUNT_SEPARATOR: char = '-';
+
+impl SubAccountIdentifier {
+    pub fn new_total_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: STAKE.to_string(),
+        }
+    }
+
+    pub fn new_operator_stake(operator: AccountAddress) -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: format!("{}-{}", STAKE, to_hex_lower(&operator)),
+        }
+    }
+
+    pub fn is_total_stake(&self) -> bool {
+        self.address.as_str() == STAKE
+    }
+
+    pub fn operator_address(&self) -> ApiResult<AccountAddress> {
+        let mut parts = self.address.split(ACCOUNT_SEPARATOR);
+
+        if let Some(stake) = parts.next() {
+            if stake == STAKE {
+                if let Some(operator) = parts.next() {
+                    return str_to_account_address(operator);
+                }
+            }
+        }
+
+        Err(ApiError::InvalidInput(Some(format!(
+            "Sub account isn't an operator address {:?}",
+            self
+        ))))
     }
 }
 
@@ -185,5 +271,53 @@ impl From<aptos_crypto::HashValue> for TransactionIdentifier {
         TransactionIdentifier {
             hash: to_hex_lower(&hash),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_account_id() {
+        let account = AccountAddress::ONE;
+        let operator = AccountAddress::ZERO;
+
+        let base_account = AccountIdentifier::base_account(account);
+        let total_stake_account = AccountIdentifier::total_stake_account(account);
+        let operator_stake_account = AccountIdentifier::operator_stake_account(account, operator);
+
+        assert!(base_account.is_base_account());
+        assert!(!operator_stake_account.is_base_account());
+        assert!(!total_stake_account.is_base_account());
+
+        assert!(!base_account.is_operator_stake());
+        assert!(operator_stake_account.is_operator_stake());
+        assert!(!total_stake_account.is_operator_stake());
+
+        assert!(!base_account.is_total_stake());
+        assert!(!operator_stake_account.is_total_stake());
+        assert!(total_stake_account.is_total_stake());
+
+        assert_eq!(Ok(account), base_account.account_address());
+        assert_eq!(Ok(account), operator_stake_account.account_address());
+        assert_eq!(Ok(account), total_stake_account.account_address());
+
+        assert!(base_account.operator_address().is_err());
+        assert_eq!(Ok(operator), operator_stake_account.operator_address());
+        assert!(total_stake_account.operator_address().is_err());
+    }
+
+    #[test]
+    fn test_sub_account_id() {
+        let stake = SubAccountIdentifier::new_total_stake();
+        assert!(stake.is_total_stake());
+
+        let operator_address = AccountAddress::ZERO;
+        let operator = SubAccountIdentifier::new_operator_stake(operator_address);
+        assert!(!operator.is_total_stake());
+        assert_eq!(Ok(operator_address), operator.operator_address());
+
+        assert!(stake.operator_address().is_err());
     }
 }

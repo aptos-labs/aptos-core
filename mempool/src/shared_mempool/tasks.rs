@@ -8,8 +8,8 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     network::{BroadcastError, MempoolSyncMsg},
     shared_mempool::types::{
-        notify_subscribers, BatchId, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
-        SubmissionStatusBundle,
+        notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
+        SharedMempoolNotification, SubmissionStatusBundle,
     },
     thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
@@ -26,7 +26,7 @@ use aptos_types::{
     transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
 };
-use consensus_types::common::TransactionSummary;
+use consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use network::application::interface::NetworkInterface;
 use rayon::prelude::*;
@@ -155,7 +155,7 @@ pub(crate) async fn process_client_get_transaction<V>(
 pub(crate) async fn process_transaction_broadcast<V>(
     smp: SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
-    request_id: BatchId,
+    request_id: MultiBatchId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
     timer: HistogramTimer,
@@ -187,7 +187,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
 
 /// If `MempoolIsFull` on any of the transactions, provide backpressure to the downstream peer.
 fn gen_ack_response(
-    request_id: BatchId,
+    request_id: MultiBatchId,
     results: Vec<SubmissionStatusBundle>,
     peer: &PeerNetworkId,
 ) -> MempoolSyncMsg {
@@ -412,7 +412,8 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 let max_txns = cmp::max(max_txns, 1);
                 txns = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
             }
-            counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, txns.len());
+
+            // mempool_service_transactions is logged inside get_batch
 
             (
                 QuorumStoreResponse::GetBatchResponse(txns),
@@ -425,7 +426,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 counters::COMMIT_CONSENSUS_LABEL,
                 transactions.len(),
             );
-            process_committed_transactions(&smp.mempool, transactions, 0, true);
+            process_rejected_transactions(&smp.mempool, transactions);
             (
                 QuorumStoreResponse::CommitResponse(),
                 callback,
@@ -452,20 +453,30 @@ pub(crate) fn process_committed_transactions(
     mempool: &Mutex<CoreMempool>,
     transactions: Vec<TransactionSummary>,
     block_timestamp_usecs: u64,
-    is_rejected: bool,
 ) {
     let mut pool = mempool.lock();
 
     for transaction in transactions {
-        pool.remove_transaction(
-            &transaction.sender,
-            transaction.sequence_number,
-            is_rejected,
-        );
+        pool.commit_transaction(&transaction.sender, transaction.sequence_number);
     }
 
     if block_timestamp_usecs > 0 {
         pool.gc_by_expiration_time(Duration::from_micros(block_timestamp_usecs));
+    }
+}
+
+pub(crate) fn process_rejected_transactions(
+    mempool: &Mutex<CoreMempool>,
+    transactions: Vec<RejectedTransactionSummary>,
+) {
+    let mut pool = mempool.lock();
+
+    for transaction in transactions {
+        pool.reject_transaction(
+            &transaction.sender,
+            transaction.sequence_number,
+            &transaction.hash,
+        );
     }
 }
 

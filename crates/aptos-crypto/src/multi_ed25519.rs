@@ -142,36 +142,40 @@ impl SigningKey for MultiEd25519PrivateKey {
 
     /// Uses the first `threshold` private keys to create a MultiEd25519 signature on `message`.
     /// (Used for testing only.)
-    fn sign<T: CryptoHash + Serialize>(&self, message: &T) -> MultiEd25519Signature {
+    fn sign<T: CryptoHash + Serialize>(
+        &self,
+        message: &T,
+    ) -> Result<MultiEd25519Signature, CryptoMaterialError> {
         let mut bitmap = [0u8; BITMAP_NUM_OF_BYTES];
-        let signatures: Vec<Ed25519Signature> = self
+        let mut signatures: Vec<Ed25519Signature> = vec![];
+
+        for (i, private_key) in self
             .private_keys
             .iter()
             .take(self.threshold as usize)
             .enumerate()
-            .map(|(i, item)| {
-                bitmap_set_bit(&mut bitmap, i);
-                item.sign(message)
-            })
-            .collect();
+        {
+            bitmap_set_bit(&mut bitmap, i);
+            signatures.push(private_key.sign(message)?);
+        }
 
-        MultiEd25519Signature { signatures, bitmap }
+        Ok(MultiEd25519Signature { signatures, bitmap })
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     fn sign_arbitrary_message(&self, message: &[u8]) -> MultiEd25519Signature {
         let mut signatures: Vec<Ed25519Signature> = Vec::with_capacity(self.threshold as usize);
         let mut bitmap = [0u8; BITMAP_NUM_OF_BYTES];
-        signatures.extend(
-            self.private_keys
-                .iter()
-                .take(self.threshold as usize)
-                .enumerate()
-                .map(|(i, item)| {
-                    bitmap_set_bit(&mut bitmap, i);
-                    item.sign_arbitrary_message(message)
-                }),
-        );
+        for (i, private_key) in self
+            .private_keys
+            .iter()
+            .take(self.threshold as usize)
+            .enumerate()
+        {
+            bitmap_set_bit(&mut bitmap, i);
+            signatures.push(private_key.sign_arbitrary_message(message));
+        }
+
         MultiEd25519Signature { signatures, bitmap }
     }
 }

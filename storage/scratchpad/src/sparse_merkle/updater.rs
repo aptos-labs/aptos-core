@@ -4,7 +4,7 @@
 use crate::{
     sparse_merkle::{
         node::{InternalNode, Node, NodeHandle, NodeInner},
-        utils::{partition, swap_if, Either},
+        utils::{partition, swap_if},
         UpdateError,
     },
     ProofRead,
@@ -305,8 +305,8 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
         let generation = self.generation;
         let depth = self.depth;
         match self.maybe_end_recursion()? {
-            Either::A(ended) => Ok(ended),
-            Either::B(myself) => {
+            MaybeEndRecursion::End(ended) => Ok(ended),
+            MaybeEndRecursion::Continue(myself) => {
                 let (left, right) = myself.into_children(proof_reader)?;
                 let (left_ret, right_ret) = if depth <= MAX_PARALLELIZABLE_DEPTH
                     && left.updates.len() >= MIN_PARALLELIZABLE_SIZE
@@ -322,22 +322,24 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
         }
     }
 
-    fn maybe_end_recursion(self) -> Result<Either<InMemSubTreeInfo<V>, Self>> {
+    fn maybe_end_recursion(self) -> Result<MaybeEndRecursion<InMemSubTreeInfo<V>, Self>> {
         Ok(match self.updates.len() {
-            0 => Either::A(self.info.materialize(self.generation)),
+            0 => MaybeEndRecursion::End(self.info.materialize(self.generation)),
             1 => {
                 let (key_to_update, update) = &self.updates[0];
                 match &self.info {
                     SubTreeInfo::InMem(in_mem_info) => match in_mem_info {
                         InMemSubTreeInfo::Empty => match update {
-                            Some(value) => Either::A(InMemSubTreeInfo::create_leaf_with_update(
-                                (*key_to_update, value),
-                                self.generation,
-                            )),
-                            None => Either::A(self.info.materialize(self.generation)),
+                            Some(value) => {
+                                MaybeEndRecursion::End(InMemSubTreeInfo::create_leaf_with_update(
+                                    (*key_to_update, value),
+                                    self.generation,
+                                ))
+                            }
+                            None => MaybeEndRecursion::End(self.info.materialize(self.generation)),
                         },
                         InMemSubTreeInfo::Leaf { key, .. } => match update {
-                            Some(value) => Either::or(
+                            Some(value) => MaybeEndRecursion::or(
                                 key == key_to_update,
                                 InMemSubTreeInfo::create_leaf_with_update(
                                     (*key_to_update, value),
@@ -347,16 +349,16 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                             ),
                             None => {
                                 if key == key_to_update {
-                                    Either::A(InMemSubTreeInfo::Empty)
+                                    MaybeEndRecursion::End(InMemSubTreeInfo::Empty)
                                 } else {
-                                    Either::A(self.info.materialize(self.generation))
+                                    MaybeEndRecursion::End(self.info.materialize(self.generation))
                                 }
                             }
                         },
-                        _ => Either::B(self),
+                        _ => MaybeEndRecursion::Continue(self),
                     },
                     SubTreeInfo::Persisted(PersistedSubTreeInfo::Leaf { leaf }) => match update {
-                        Some(value) => Either::or(
+                        Some(value) => MaybeEndRecursion::or(
                             leaf.key() == *key_to_update,
                             InMemSubTreeInfo::create_leaf_with_update(
                                 (*key_to_update, value),
@@ -366,16 +368,16 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                         ),
                         None => {
                             if leaf.key() == *key_to_update {
-                                Either::A(InMemSubTreeInfo::Empty)
+                                MaybeEndRecursion::End(InMemSubTreeInfo::Empty)
                             } else {
-                                Either::A(self.info.materialize(self.generation))
+                                MaybeEndRecursion::End(self.info.materialize(self.generation))
                             }
                         }
                     },
-                    _ => Either::B(self),
+                    _ => MaybeEndRecursion::Continue(self),
                 }
             }
-            _ => Either::B(self),
+            _ => MaybeEndRecursion::Continue(self),
         })
     }
 
@@ -401,5 +403,20 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                 generation,
             },
         ))
+    }
+}
+
+pub(crate) enum MaybeEndRecursion<A, B> {
+    End(A),
+    Continue(B),
+}
+
+impl<A, B> MaybeEndRecursion<A, B> {
+    pub fn or(cond: bool, a: A, b: B) -> Self {
+        if cond {
+            MaybeEndRecursion::End(a)
+        } else {
+            MaybeEndRecursion::Continue(b)
+        }
     }
 }

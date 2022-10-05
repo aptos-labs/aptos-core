@@ -7,7 +7,6 @@ spec aptos_framework::reconfiguration {
     }
 
     spec reconfigure {
-        requires chain_status::is_operating();
         aborts_if false;
     }
 }

@@ -27,13 +27,11 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use aptos_vm::data_cache::{AsMoveResolver, StorageAdapter};
-use move_deps::{
-    move_core_types::{
-        identifier::IdentStr,
-        language_storage::{StructTag, TypeTag},
-    },
-    move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator},
+use move_core_types::{
+    identifier::IdentStr,
+    language_storage::{StructTag, TypeTag},
 };
+use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use schemadb::{SchemaBatch, DB};
 use std::{
     collections::HashMap,
@@ -182,7 +180,7 @@ impl<'a> TableInfoParser<'a> {
         self.parse_move_value(
             &self
                 .annotator
-                .view_value(&TypeTag::Struct(struct_tag), bytes)?,
+                .view_value(&TypeTag::Struct(Box::new(struct_tag)), bytes)?,
         )
     }
 

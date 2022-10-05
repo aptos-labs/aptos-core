@@ -12,7 +12,7 @@ module aptos_framework::version {
         major: u64,
     }
 
-    struct SetVersionCapability has key { }
+    struct SetVersionCapability has key {}
 
     /// Specified major version number must be greater than current version number.
     const EINVALID_MAJOR_VERSION_NUMBER: u64 = 1;

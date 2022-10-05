@@ -26,7 +26,7 @@
 //! let mut rng = OsRng;
 //! let kp = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut rng);
 //!
-//! let signature = kp.private_key.sign(&message);
+//! let signature = kp.private_key.sign(&message).unwrap();
 //! assert!(signature.verify(&message, &kp.public_key).is_ok());
 //! ```
 

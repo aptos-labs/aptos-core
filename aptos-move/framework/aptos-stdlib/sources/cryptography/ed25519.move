@@ -12,10 +12,10 @@ module aptos_std::ed25519 {
     //
 
     /// Wrong number of bytes were given as input when deserializing an Ed25519 public key.
-    const E_WRONG_PUBKEY_SIZE : u64 = 1;
+    const E_WRONG_PUBKEY_SIZE: u64 = 1;
 
     /// Wrong number of bytes were given as input when deserializing an Ed25519 signature.
-    const E_WRONG_SIGNATURE_SIZE : u64 = 2;
+    const E_WRONG_SIGNATURE_SIZE: u64 = 2;
 
     //
     // Constants
@@ -23,13 +23,13 @@ module aptos_std::ed25519 {
 
     /// The identifier of the Ed25519 signature scheme, which is used when deriving Aptos authentication keys by hashing
     /// it together with an Ed25519 public key.
-    const SIGNATURE_SCHEME_ID : u8 = 0;
+    const SIGNATURE_SCHEME_ID: u8 = 0;
 
     /// The size of a serialized public key, in bytes.
-    const PUBLIC_KEY_NUM_BYTES : u64 = 32;
+    const PUBLIC_KEY_NUM_BYTES: u64 = 32;
 
     /// The size of a serialized signature, in bytes.
-    const SIGNATURE_NUM_BYTES : u64 = 64;
+    const SIGNATURE_NUM_BYTES: u64 = 64;
 
     //
     // Structs
@@ -71,7 +71,7 @@ module aptos_std::ed25519 {
 
     /// Parses the input 32 bytes as a *validated* Ed25519 public key.
     public fun new_validated_public_key_from_bytes(bytes: vector<u8>): Option<ValidatedPublicKey> {
-        if(public_key_validate_internal(bytes)) {
+        if (public_key_validate_internal(bytes)) {
             option::some(ValidatedPublicKey {
                 bytes
             })

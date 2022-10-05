@@ -61,8 +61,7 @@ pub async fn handle_metrics_ingest(
     let extra_labels = claims_to_extra_labels(&claims);
 
     let res = context
-        .victoria_metrics_client
-        .unwrap()
+        .metrics_client()
         .post_prometheus_metrics(metrics_body, extra_labels, encoding.unwrap_or_default())
         .await;
 

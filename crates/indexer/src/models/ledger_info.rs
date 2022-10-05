@@ -4,8 +4,8 @@
 use crate::schema::ledger_infos;
 
 #[derive(Debug, Identifiable, Insertable, Queryable)]
-#[diesel(table_name = "ledger_infos")]
-#[primary_key(chain_id)]
+#[diesel(table_name = ledger_infos)]
+#[diesel(primary_key(chain_id))]
 pub struct LedgerInfo {
     pub chain_id: i64,
 }

@@ -113,13 +113,13 @@ module aptos_framework::coin {
     }
 
     /// Capability required to mint coins.
-    struct MintCapability<phantom CoinType> has copy, store { }
+    struct MintCapability<phantom CoinType> has copy, store {}
 
     /// Capability required to freeze a coin store.
-    struct FreezeCapability<phantom CoinType> has copy, store { }
+    struct FreezeCapability<phantom CoinType> has copy, store {}
 
     /// Capability required to burn coins.
-    struct BurnCapability<phantom CoinType> has copy, store { }
+    struct BurnCapability<phantom CoinType> has copy, store {}
 
     //
     // Total supply config
@@ -284,7 +284,16 @@ module aptos_framework::coin {
         _freeze_cap: &FreezeCapability<CoinType>,
     ) acquires CoinStore {
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
-        coin_store.frozen = true
+        coin_store.frozen = true;
+    }
+
+    /// Unfreeze a CoinStore to allow transfers
+    public entry fun unfreeze_coin_store<CoinType>(
+        account_addr: address,
+        _freeze_cap: &FreezeCapability<CoinType>,
+    ) acquires CoinStore {
+        let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        coin_store.frozen = false;
     }
 
     /// Upgrade total supply to use a parallelizable implementation if it is
@@ -371,7 +380,7 @@ module aptos_framework::coin {
         };
         move_to(account, coin_info);
 
-        (BurnCapability<CoinType>{ }, FreezeCapability<CoinType>{ }, MintCapability<CoinType>{ })
+        (BurnCapability<CoinType> {}, FreezeCapability<CoinType> {}, MintCapability<CoinType> {})
     }
 
     /// "Merges" the two given coins.  The coin passed in as `dst_coin` will have a value equal
@@ -470,24 +479,24 @@ module aptos_framework::coin {
 
     /// Destroy a freeze capability. Freeze capability is dangerous and therefore should be destroyed if not used.
     public fun destroy_freeze_cap<CoinType>(freeze_cap: FreezeCapability<CoinType>) {
-        let FreezeCapability<CoinType> { } = freeze_cap;
+        let FreezeCapability<CoinType> {} = freeze_cap;
     }
 
     /// Destroy a mint capability.
     public fun destroy_mint_cap<CoinType>(mint_cap: MintCapability<CoinType>) {
-        let MintCapability<CoinType> { } = mint_cap;
+        let MintCapability<CoinType> {} = mint_cap;
     }
 
     /// Destroy a burn capability.
     public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
-        let BurnCapability<CoinType> { } = burn_cap;
+        let BurnCapability<CoinType> {} = burn_cap;
     }
 
     #[test_only]
     use aptos_framework::aggregator_factory;
 
     #[test_only]
-    struct FakeMoney { }
+    struct FakeMoney {}
 
     #[test_only]
     struct FakeMoneyCapabilities has key {
@@ -689,7 +698,7 @@ module aptos_framework::coin {
         assert!(balance<FakeMoney>(source_addr) == 90, 2);
         assert!(*option::borrow(&supply<FakeMoney>()) == 90, 3);
 
-        move_to(&source, FakeMoneyCapabilities{
+        move_to(&source, FakeMoneyCapabilities {
             burn_cap,
             freeze_cap,
             mint_cap,
@@ -703,7 +712,7 @@ module aptos_framework::coin {
     ) acquires CoinInfo {
         account::create_account_for_test(signer::address_of(&source));
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&source, 1, true);
-        let coins_minted = mint<FakeMoney>( 100, &mint_cap);
+        let coins_minted = mint<FakeMoney>(100, &mint_cap);
         destroy_zero(coins_minted);
 
         move_to(&source, FakeMoneyCapabilities {
@@ -781,14 +790,14 @@ module aptos_framework::coin {
 
     #[test(account = @0x1)]
     #[expected_failure(abort_code = 0x5000A)]
-    public entry fun withdraw_frozen(account: signer) acquires CoinStore {
+    public entry fun withdraw_frozen(account: signer) acquires CoinInfo, CoinStore {
         let account_addr = signer::address_of(&account);
         account::create_account_for_test(account_addr);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&account, 18, true);
 
         freeze_coin_store(account_addr, &freeze_cap);
         let coin = withdraw<FakeMoney>(&account, 10);
-        deposit(account_addr, coin);
+        burn(coin, &burn_cap);
 
         move_to(&account, FakeMoneyCapabilities {
             burn_cap,
@@ -807,6 +816,29 @@ module aptos_framework::coin {
         let coins_minted = mint<FakeMoney>(100, &mint_cap);
         freeze_coin_store(account_addr, &freeze_cap);
         deposit(account_addr, coins_minted);
+
+        move_to(&account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(account = @0x1)]
+    public entry fun deposit_widthdraw_unfrozen(account: signer) acquires CoinInfo, CoinStore {
+        let account_addr = signer::address_of(&account);
+        account::create_account_for_test(account_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&account, 18, true);
+
+        let coins_minted = mint<FakeMoney>(100, &mint_cap);
+        freeze_coin_store(account_addr, &freeze_cap);
+        unfreeze_coin_store(account_addr, &freeze_cap);
+        deposit(account_addr, coins_minted);
+
+        freeze_coin_store(account_addr, &freeze_cap);
+        unfreeze_coin_store(account_addr, &freeze_cap);
+        let coin = withdraw<FakeMoney>(&account, 10);
+        burn(coin, &burn_cap);
 
         move_to(&account, FakeMoneyCapabilities {
             burn_cap,

@@ -266,7 +266,7 @@ impl LedgerStore {
         Accumulator::get_consistency_proof(self, ledger_num_leaves, client_known_num_leaves)
     }
 
-    /// Write `txn_infos` to `batch`. Assigned `first_version` to the the version number of the
+    /// Write `txn_infos` to `batch`. Assigned `first_version` to the version number of the
     /// first transaction, and so on.
     pub fn put_transaction_infos(
         &self,
@@ -294,7 +294,7 @@ impl LedgerStore {
         Ok(root_hash)
     }
 
-    /// Write `ledger_info` to `batch`.
+    /// Write `ledger_info_with_sigs` to `batch`.
     pub fn put_ledger_info(
         &self,
         ledger_info_with_sigs: &LedgerInfoWithSignatures,

@@ -6,10 +6,11 @@ use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
-use aptos_types::on_chain_config::{FeatureFlag, GasSchedule};
+use aptos_types::on_chain_config::{FeatureFlag, GasScheduleV2};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
+    account_config::AccountResource,
     state_store::state_key::StateKey,
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
@@ -21,6 +22,7 @@ use language_e2e_tests::{
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_core_types::move_resource::MoveStructType;
 use move_deps::move_core_types::value::MoveValue;
 use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
@@ -28,7 +30,7 @@ use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -50,7 +52,7 @@ use std::path::Path;
 pub struct MoveHarness {
     /// The executor being used.
     pub executor: FakeExecutor,
-    /// The current transaction sequence number, by account address.
+    /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 }
 
@@ -145,9 +147,10 @@ impl MoveHarness {
         account: &Account,
         payload: TransactionPayload,
     ) -> SignedTransaction {
+        let on_chain_seq_no = self.sequence_number(account.address());
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
-        let seq_no = *seq_no_ref;
-        *seq_no_ref += 1;
+        let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
+        *seq_no_ref = seq_no + 1;
         account
             .transaction()
             .sequence_number(seq_no)
@@ -318,6 +321,19 @@ impl MoveHarness {
         self.read_resource_raw(addr, struct_tag).is_some()
     }
 
+    /// Write the resource data `T`.
+    pub fn set_resource<T: Serialize>(
+        &mut self,
+        addr: AccountAddress,
+        struct_tag: StructTag,
+        data: &T,
+    ) {
+        let path = AccessPath::resource_access_path(ResourceKey::new(addr, struct_tag));
+        let state_key = StateKey::AccessPath(path);
+        self.executor
+            .write_state_value(state_key, bcs::to_bytes(data).unwrap());
+    }
+
     /// Enables features
     pub fn enable_features(&mut self, features: Vec<FeatureFlag>) {
         let acc = self.aptos_framework_account();
@@ -352,9 +368,11 @@ impl MoveHarness {
                 }
             })
             .collect::<Vec<_>>();
-        // TODO(Gas): use GasScheduleV2 for the next testnet release
-        let schedule_bytes = bcs::to_bytes(&GasSchedule { entries }).expect("bcs");
-        // set_gas_schedule is not a transaction, so directly call as function
+        let gas_schedule = GasScheduleV2 {
+            feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
+            entries,
+        };
+        let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
         self.executor.exec(
             "gas_schedule",
             "set_gas_schedule",
@@ -368,6 +386,12 @@ impl MoveHarness {
                     .unwrap(),
             ],
         );
+    }
+
+    pub fn sequence_number(&self, addr: &AccountAddress) -> u64 {
+        self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
+            .unwrap()
+            .sequence_number()
     }
 }
 

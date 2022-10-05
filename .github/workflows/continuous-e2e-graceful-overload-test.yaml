@@ -1,0 +1,22 @@
+name: Continuous E2E Graceful Overload
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+jobs:
+  ### Please remember to use different namespace for different tests
+  # Performance test in an optimal setting
+  run-forge-graceful-overload-test:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-graceful-overload-test
+      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_TEST_SUITE: graceful_overload
+      POST_TO_SLACK: true

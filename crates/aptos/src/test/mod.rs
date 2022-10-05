@@ -16,15 +16,18 @@ use crate::common::types::{
     MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
     PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
+
+#[cfg(feature = "cli-framework-test-move")]
 use crate::common::utils::write_to_file;
+
 use crate::move_tool::{
-    ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
-    PublishPackage, RunFunction, TestPackage,
+    ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
+    InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
-    AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
+    AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
     LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
-    ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
+    ShowValidatorStake, StakePoolResult, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
@@ -39,8 +42,11 @@ use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
+use aptos_rest_client::aptos_api_types::{IdentifierWrapper, MoveStructTag};
 use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
 use aptos_sdk::move_types::account_address::AccountAddress;
+use aptos_sdk::move_types::identifier::Identifier;
+use aptos_sdk::move_types::language_storage::ModuleId;
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::validator_config::ValidatorConfig;
@@ -49,7 +55,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
+
+#[cfg(feature = "cli-framework-test-move")]
 use thiserror::private::PathAsDisplay;
+
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -119,6 +128,10 @@ impl CliTestFramework {
         }
 
         framework
+    }
+
+    pub fn addresses(&self) -> Vec<AccountAddress> {
+        self.account_addresses.clone()
     }
 
     async fn check_account_exists(&self, index: usize) -> bool {
@@ -261,11 +274,26 @@ impl CliTestFramework {
         sender_index: usize,
         amount: u64,
         gas_options: Option<GasOptions>,
-    ) -> CliTypedResult<TransferSummary> {
-        TransferCoins {
+    ) -> CliTypedResult<TransactionSummary> {
+        RunFunction {
+            function_id: MemberId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from_str("coin").unwrap(),
+                ),
+                member_id: Identifier::from_str("transfer").unwrap(),
+            },
+            args: vec![
+                ArgWithType::from_str("address:0xdeadbeefcafebabe").unwrap(),
+                ArgWithType::from_str(&format!("u64:{}", amount)).unwrap(),
+            ],
+            type_args: vec![MoveType::Struct(MoveStructTag::new(
+                AccountAddress::ONE.into(),
+                IdentifierWrapper::from_str("aptos_coin").unwrap(),
+                IdentifierWrapper::from_str("AptosCoin").unwrap(),
+                vec![],
+            ))],
             txn_options: self.transaction_options(sender_index, gas_options),
-            account: AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
-            amount,
         }
         .execute()
         .await
@@ -486,6 +514,19 @@ impl CliTestFramework {
         .await
     }
 
+    pub async fn get_pool_address(
+        &self,
+        owner_index: usize,
+    ) -> CliTypedResult<Vec<StakePoolResult>> {
+        GetStakePool {
+            owner_address: self.account_id(owner_index),
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
+        }
+        .execute()
+        .await
+    }
+
     pub async fn initialize_stake_owner(
         &self,
         owner_index: usize,
@@ -505,6 +546,31 @@ impl CliTestFramework {
             initial_stake_amount,
             operator_address: operator_index.map(|idx| self.account_id(idx)),
             voter_address: voter_index.map(|idx| self.account_id(idx)),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn create_stake_pool(
+        &self,
+        owner_index: usize,
+        operator_index: usize,
+        voter_index: usize,
+        amount: u64,
+        commission_percentage: u64,
+    ) -> CliTypedResult<TransactionSummary> {
+        RunFunction {
+            function_id: MemberId::from_str("0x1::staking_contract::create_staking_contract")
+                .unwrap(),
+            args: vec![
+                ArgWithType::address(self.account_id(operator_index)),
+                ArgWithType::address(self.account_id(voter_index)),
+                ArgWithType::u64(amount),
+                ArgWithType::u64(commission_percentage),
+                ArgWithType::bytes(vec![]),
+            ],
+            type_args: vec![],
+            txn_options: self.transaction_options(owner_index, None),
         }
         .execute()
         .await
@@ -662,6 +728,7 @@ impl CliTestFramework {
         self.move_dir = Some(move_dir.path().to_path_buf());
     }
 
+    #[cfg(feature = "cli-framework-test-move")]
     pub fn add_move_files(&self) {
         let move_dir = self.move_dir();
         let sources_dir = move_dir.join("sources");
@@ -706,7 +773,10 @@ impl CliTestFramework {
                 assume_yes: false,
                 assume_no: true,
             },
-            for_test_framework: framework_dir,
+            framework_package_args: FrameworkPackageArgs {
+                framework_git_rev: None,
+                framework_local_dir: framework_dir,
+            },
         }
         .execute()
         .await
@@ -847,7 +917,7 @@ impl CliTestFramework {
     }
 
     pub fn rest_options(&self) -> RestOptions {
-        RestOptions::new(Some(self.endpoint.clone()))
+        RestOptions::new(Some(self.endpoint.clone()), None)
     }
 
     pub fn faucet_options(&self) -> FaucetOptions {

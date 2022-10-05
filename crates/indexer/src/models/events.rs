@@ -9,16 +9,15 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize,
 )]
-#[diesel(table_name = "events")]
-#[belongs_to(Transaction, foreign_key = "transaction_version")]
-#[primary_key(account_address, creation_number, sequence_number)]
+#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[diesel(primary_key(account_address, creation_number, sequence_number))]
+#[diesel(table_name = events)]
 pub struct Event {
     pub sequence_number: i64,
     pub creation_number: i64,
     pub account_address: String,
     pub transaction_version: i64,
     pub transaction_block_height: i64,
-    #[diesel(column_name = type)]
     pub type_: String,
     pub data: serde_json::Value,
     // Default time columns
@@ -32,8 +31,8 @@ impl Event {
         transaction_block_height: i64,
     ) -> Self {
         Event {
-            account_address: event.key.0.get_creator_address().to_string(),
-            creation_number: event.key.0.get_creation_number() as i64,
+            account_address: event.guid.account_address.to_string(),
+            creation_number: event.guid.creation_number.0 as i64,
             sequence_number: event.sequence_number.0 as i64,
             transaction_version,
             transaction_block_height,

@@ -186,7 +186,7 @@ where
                 expected_root_hash,
             );
             (true, vec![], None)
-        } else if let Some((node_key, leaf_node)) = tree_reader.get_rightmost_leaf()? {
+        } else if let Some((node_key, leaf_node)) = tree_reader.get_rightmost_leaf(version)? {
             // If the system crashed in the middle of the previous restoration attempt, we need
             // to recover the partial nodes to the state right before the crash.
             (

@@ -16,6 +16,8 @@ mod full_nodes;
 #[cfg(test)]
 mod fullnode;
 #[cfg(test)]
+mod genesis;
+#[cfg(test)]
 mod indexer;
 #[cfg(test)]
 mod network;

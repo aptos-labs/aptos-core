@@ -23,6 +23,7 @@ members = [
     "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
+    "aptos-move/package-builder",
     "aptos-move/parallel-executor",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
@@ -74,8 +75,6 @@ members = [
     "crates/transaction-emitter-lib",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
-    "ecosystem/sf-indexer/aptos-sf-indexer",
-    "ecosystem/sf-indexer/firehose-stream",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -128,10 +127,7 @@ members = [
     "vm-validator",
 ]
 
-exclude =[
-    "crates/aptos-protos",
-    "ecosystem/sf-indexer/aptos-substreams",
-]
+exclude = ["crates/aptos-protos", "ecosystem/sf-indexer"]
 
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
@@ -183,4 +179,3 @@ debug = true
 [patch.crates-io]
 rocksdb = { git = 'https://github.com/aptos-labs/rust-rocksdb' }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
-diesel = { git = "https://github.com/aptos-labs/diesel", branch = "1.4.x" }

@@ -1,3 +1,151 @@
+/// Gas parameters for global storage.
+///
+/// # General overview sections
+///
+/// [Definitions](#definitions)
+///
+/// * [Utilization dimensions](#utilization-dimensions)
+/// * [Utilization ratios](#utilization-ratios)
+/// * [Gas curve lookup](#gas-curve-lookup)
+/// * [Item-wise operations](#item-wise-operations)
+/// * [Byte-wise operations](#byte-wise-operations)
+///
+/// [Function dependencies](#function-dependencies)
+///
+/// * [Initialization](#initialization)
+/// * [Reconfiguration](#reconfiguration)
+/// * [Setting configurations](#setting-configurations)
+///
+/// # Definitions
+///
+/// ## Utilization dimensions
+///
+/// Global storage gas fluctuates each epoch based on total utilization,
+/// which is defined across two dimensions:
+///
+/// 1. The number of "items" in global storage.
+/// 2. The number of bytes in global storage.
+///
+/// "Items" include:
+///
+/// 1. Resources having the `key` attribute, which have been moved into
+///    global storage via a `move_to()` operation.
+/// 2.  Table entries.
+///
+/// ## Utilization ratios
+///
+/// `initialize()` sets an arbitrary "target" utilization for both
+/// item-wise and byte-wise storage, then each epoch, gas parameters are
+/// reconfigured based on the "utilization ratio" for each of the two
+/// utilization dimensions. The utilization ratio for a given dimension,
+/// either item-wise or byte-wise, is taken as the quotient of actual
+/// utilization and target utilization. For example, given a 500 GB
+/// target and 250 GB actual utilization, the byte-wise utilization
+/// ratio is 50%.
+///
+/// See `base_8192_exponential_curve()` for mathematical definitions.
+///
+/// ## Gas curve lookup
+///
+/// The utilization ratio in a given epoch is used as a lookup value in
+/// a Eulerian approximation to an exponential curve, known as a
+/// `GasCurve`, which is defined in `base_8192_exponential_curve()`,
+/// based on a minimum gas charge and a maximum gas charge.
+///
+/// The minimum gas charge and maximum gas charge at the endpoints of
+/// the curve are set in `initialize()`, and correspond to the following
+/// operations defined in `StorageGas`:
+///
+/// 1. Per-item read
+/// 2. Per-item create
+/// 3. Per-item write
+/// 4. Per-byte read
+/// 5. Per-byte create
+/// 6. Per-byte write
+///
+/// For example, if the byte-wise utilization ratio is 50%, then
+/// per-byte reads will charge the minimum per-byte gas cost, plus
+/// 1.09% of the difference between the maximum and the minimum cost.
+/// See `base_8192_exponential_curve()` for a supporting calculation.
+///
+/// ## Item-wise operations
+///
+/// 1. Per-item read gas is assessed whenever an item is read from
+///    global storage via `borrow_global<T>()` or via a table entry read
+///    operation.
+/// 2. Per-item create gas is assessed whenever an item is created in
+///    global storage via `move_to<T>()` or via a table entry creation
+///    operation.
+/// 3. Per-item write gas is assessed whenever an item is overwritten in
+///    global storage via `borrow_global_mut<T>` or via a table entry
+///    mutation operation.
+///
+/// ## Byte-wise operations
+///
+/// Byte-wise operations are assessed in a manner similar to per-item
+/// operations, but account for the number of bytes affected by the
+/// given operation. Notably, this number denotes the total number of
+/// bytes in an *entire item*.
+///
+/// For example, if an operation mutates a `u8` field in a resource that
+/// has 5 other `u128` fields, the per-byte gas write cost will account
+/// for $(5 * 128) / 8 + 1 = 81$ bytes. Vectors are similarly treated
+/// as fields.
+///
+/// # Function dependencies
+///
+/// The below dependency chart uses `mermaid.js` syntax, which can be
+/// automatically rendered into a diagram (depending on the browser)
+/// when viewing the documentation file generated from source code. If
+/// a browser renders the diagrams with coloring that makes it difficult
+/// to read, try a different browser.
+///
+/// ## Initialization
+///
+/// ```mermaid
+///
+/// flowchart LR
+///
+/// initialize --> base_8192_exponential_curve
+/// base_8192_exponential_curve --> new_gas_curve
+/// base_8192_exponential_curve --> new_point
+/// new_gas_curve --> validate_points
+///
+/// ```
+///
+/// ## Reconfiguration
+///
+/// ```mermaid
+///
+/// flowchart LR
+///
+/// calculate_gas --> Interpolate %% capitalized
+/// calculate_read_gas --> calculate_gas
+/// calculate_create_gas --> calculate_gas
+/// calculate_write_gas --> calculate_gas
+/// on_reconfig --> calculate_read_gas
+/// on_reconfig --> calculate_create_gas
+/// on_reconfig --> calculate_write_gas
+/// reconfiguration::reconfigure --> on_reconfig
+///
+/// ```
+///
+/// Here, the function `interpolate()` is spelled `Interpolate` because
+/// `interpolate` is a reserved word in `mermaid.js`.
+///
+/// ## Setting configurations
+///
+/// ```mermaid
+///
+/// flowchart LR
+///
+/// gas_schedule::set_storage_gas_config --> set_config
+///
+/// ```
+///
+/// # Complete docgen index
+///
+/// The below index is automatically generated from source code:
 module aptos_framework::storage_gas {
 
     use aptos_framework::system_addresses;
@@ -15,33 +163,61 @@ module aptos_framework::storage_gas {
     const EZERO_TARGET_USAGE: u64 = 3;
     const ETARGET_USAGE_TOO_BIG: u64 = 4;
     const EINVALID_MONOTONICALLY_NON_DECREASING_CURVE: u64 = 5;
+    const EINVALID_POINT_RANGE: u64 = 6;
 
     const BASIS_POINT_DENOMINATION: u64 = 10000;
 
-    /// This updates at reconfig and guarantees not to change elsewhere, safe
-    /// for gas calculation.
+    const MAX_U64: u64 = 18446744073709551615;
+
+    /// Storage parameters, reconfigured each epoch.
     ///
-    /// Specifically, it is updated by executing a reconfig transaction based
-    /// on the usage at the begining of the current epoch. The gas schedule
-    /// derived from these parameter will be for gas calculation of the entire
-    /// next epoch.
-    /// -- The data is one epoch older than ideal, but VM doesn't need to worry
-    /// about reloading gas parameters after the first txn of an epoch.
+    /// Parameters are updated during reconfiguration via
+    /// `on_reconfig()`, based on storage utilization at the beginning
+    /// of the epoch in which the reconfiguration transaction is
+    /// executed. The gas schedule derived from these parameters will
+    /// then be used to calculate gas for the entirety of the
+    /// following epoch, such that the data is one epoch older than
+    /// ideal. Notably, however, per this approach, the virtual machine
+    /// does not need to reload gas parameters after the
+    /// first transaction of an epoch.
     struct StorageGas has key {
+        /// Cost to read an item from global storage.
         per_item_read: u64,
+        /// Cost to create an item in global storage.
         per_item_create: u64,
+        /// Cost to overwrite an item in global storage.
         per_item_write: u64,
+        /// Cost to read a byte from global storage.
         per_byte_read: u64,
+        /// Cost to create a byte in global storage.
         per_byte_create: u64,
+        /// Cost to overwrite a byte in global storage.
         per_byte_write: u64,
     }
 
-    // x and y are basis points.
+    /// A point in a Eulerian curve approximation, with each coordinate
+    /// given in basis points:
+    ///
+    /// | Field value | Percentage |
+    /// |-------------|------------|
+    /// | `1`         | 00.01 %    |
+    /// | `10`        | 00.10 %    |
+    /// | `100`       | 01.00 %    |
+    /// | `1000`      | 10.00 %    |
     struct Point has copy, drop, store {
+        /// x-coordinate basis points, corresponding to utilization
+        /// ratio in `base_8192_exponential_curve()`.
         x: u64,
+        /// y-coordinate basis points, corresponding to utilization
+        /// multiplier in `base_8192_exponential_curve()`.
         y: u64
     }
 
+    /// A gas configuration for either per-item or per-byte costs.
+    ///
+    /// Contains a target usage amount, as well as a Eulerian
+    /// approximation of an exponential curve for reads, creations, and
+    /// overwrites. See `StorageGasConfig`.
     struct UsageGasConfig has copy, drop, store {
         target_usage: u64,
         read_curve: GasCurve,
@@ -49,34 +225,78 @@ module aptos_framework::storage_gas {
         write_curve: GasCurve,
     }
 
-    /// The curve assumes there are two points (0, 0) and (10000, 10000) on both ends. Moreover, points must also
-    /// satisfy the following rules:
-    /// 1. the x values must be strictly increasing and between (0, 10000);
-    /// 2. the y values must be non-decreasing and between (0, 10000);
-    /// So the curve will be identified as point (0, 0) and (10000, 10000) interpolated with the points. The y value
-    /// between two points will be calculated by neighboring points as if there is a linear line connecting these two
-    /// points.
+    /// Eulerian approximation of an exponential curve.
+    ///
+    /// Assumes the following endpoints:
+    ///
+    /// * $(x_0, y_0) = (0, 0)$
+    /// * $(x_f, y_f) = (10000, 10000)$
+    ///
+    /// Intermediate points must satisfy:
+    ///
+    /// 1. $x_i > x_{i - 1}$ ( $x$ is strictly increasing).
+    /// 2. $0 \leq x_i \leq 10000$ ( $x$ is between 0 and 10000).
+    /// 3. $y_i \geq y_{i - 1}$ ( $y$ is non-decreasing).
+    /// 4. $0 \leq y_i \leq 10000$ ( $y$ is between 0 and 10000).
+    ///
+    /// Lookup between two successive points is calculated via linear
+    /// interpolation, e.g., as if there were a straight line between
+    /// them.
+    ///
+    /// See `base_8192_exponential_curve()`.
     struct GasCurve has copy, drop, store {
         min_gas: u64,
         max_gas: u64,
         points: vector<Point>,
     }
 
-    /// P(x) = min_price + (base ^ (utilization / target_usage) - 1) / (base - 1) * (max_price - min_price)
-    // Provide a default exponential curve with the base to be 8192, which means:
-    // When DB is at 50% target usage,the price increases roughly 1.09% of (max_price - min_price).
-    // Detailed data points:
-    // 10% -> 0.02%
-    // 20% -> 0.06%
-    // 30% -> 0.17%
-    // 40% -> 0.44%
-    // 50% -> 1.09%
-    // 60% -> 2.71%
-    // 70% -> 6.69%
-    // 80% -> 16.48%
-    // 90% -> 40.61%
-    // 95% -> 63.72%
-    // 99% -> 91.38%
+    /// Default exponential curve having base 8192.
+    ///
+    /// # Function definition
+    ///
+    /// Gas price as a function of utilization ratio is defined as:
+    ///
+    /// $$g(u_r) = g_{min} + \frac{(b^{u_r} - 1)}{b - 1} \Delta_g$$
+    ///
+    /// $$g(u_r) = g_{min} + u_m \Delta_g$$
+    ///
+    /// | Variable                            | Description            |
+    /// |-------------------------------------|------------------------|
+    /// | $g_{min}$                           | `min_gas`              |
+    /// | $g_{max}$                           | `max_gas`              |
+    /// | $\Delta_{g} = g_{max} - g_{min}$    | Gas delta              |
+    /// | $u$                                 | Utilization            |
+    /// | $u_t$                               | Target utilization     |
+    /// | $u_r = u / u_t$                     | Utilization ratio      |
+    /// | $u_m = \frac{(b^{u_r} - 1)}{b - 1}$ | Utilization multiplier |
+    /// | $b = 8192$                          | Exponent base          |
+    ///
+    /// # Example
+    ///
+    /// Hence for a utilization ratio of 50% ( $u_r = 0.5$ ):
+    ///
+    /// $$g(0.5) = g_{min} + \frac{8192^{0.5} - 1}{8192 - 1} \Delta_g$$
+    ///
+    /// $$g(0.5) \approx g_{min} + 0.0109 \Delta_g$$
+    ///
+    /// Which means that the price above `min_gas` is approximately
+    /// 1.09% of the difference between `max_gas` and `min_gas`.
+    ///
+    /// # Utilization multipliers
+    ///
+    /// | $u_r$ | $u_m$ (approximate) |
+    /// |-------|---------------------|
+    /// | 10%   | 0.02%               |
+    /// | 20%   | 0.06%               |
+    /// | 30%   | 0.17%               |
+    /// | 40%   | 0.44%               |
+    /// | 50%   | 1.09%               |
+    /// | 60%   | 2.71%               |
+    /// | 70%   | 6.69%               |
+    /// | 80%   | 16.48%              |
+    /// | 90%   | 40.61%              |
+    /// | 95%   | 63.72%              |
+    /// | 99%   | 91.38%              |
     public fun base_8192_exponential_curve(min_gas: u64, max_gas: u64): GasCurve {
         new_gas_curve(min_gas, max_gas,
             vector[
@@ -95,16 +315,26 @@ module aptos_framework::storage_gas {
         )
     }
 
+    /// Gas configurations for per-item and per-byte prices.
     struct StorageGasConfig has copy, drop, key {
+        /// Per-item gas configuration.
         item_config: UsageGasConfig,
+        /// Per-byte gas configuration.
         byte_config: UsageGasConfig,
     }
 
     public fun new_point(x: u64, y: u64): Point {
-        Point {x, y}
+        assert!(
+            x <= BASIS_POINT_DENOMINATION && y <= BASIS_POINT_DENOMINATION,
+            error::invalid_argument(EINVALID_POINT_RANGE)
+        );
+        Point { x, y }
     }
 
     public fun new_gas_curve(min_gas: u64, max_gas: u64, points: vector<Point>): GasCurve {
+        assert!(max_gas >= min_gas, error::invalid_argument(EINVALID_GAS_RANGE));
+        assert!(max_gas <= MAX_U64 / BASIS_POINT_DENOMINATION, error::invalid_argument(EINVALID_GAS_RANGE));
+        validate_points(&points);
         GasCurve {
             min_gas,
             max_gas,
@@ -113,6 +343,8 @@ module aptos_framework::storage_gas {
     }
 
     public fun new_usage_gas_config(target_usage: u64, read_curve: GasCurve, create_curve: GasCurve, write_curve: GasCurve): UsageGasConfig {
+        assert!(target_usage > 0, error::invalid_argument(EZERO_TARGET_USAGE));
+        assert!(target_usage <= MAX_U64 / BASIS_POINT_DENOMINATION, error::invalid_argument(ETARGET_USAGE_TOO_BIG));
         UsageGasConfig {
             target_usage,
             read_curve,
@@ -130,16 +362,31 @@ module aptos_framework::storage_gas {
 
     public(friend) fun set_config(aptos_framework: &signer, config: StorageGasConfig) acquires StorageGasConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
-        validate_usage_config(&config.item_config);
-        validate_usage_config(&config.byte_config);
         *borrow_global_mut<StorageGasConfig>(@aptos_framework) = config;
     }
 
-    fun init_module(aptos_framework: &signer) {
-        initialize(aptos_framework);
-    }
-
-    public(friend) fun initialize(aptos_framework: &signer) {
+    /// Initialize per-item and per-byte gas prices.
+    ///
+    /// Target utilization is set to 1 billion items and 500 GB.
+    ///
+    /// `GasCurve` endpoints are initialized as follows:
+    ///
+    /// | Data style | Operation | Minimum gas | Maximum gas |
+    /// |------------|-----------|-------------|-------------|
+    /// | Per item   | Read      | 80000       | 8000000     |
+    /// | Per item   | Create    | 2000000     | 200000000   |
+    /// | Per item   | Write     | 400000      | 40000000    |
+    /// | Per byte   | Read      | 40          | 4000        |
+    /// | Per byte   | Create    | 1000        | 100000      |
+    /// | Per byte   | Write     | 200         | 20000       |
+    ///
+    /// `StorageGas` values are additionally initialized, but per
+    /// `on_reconfig()`, they will be reconfigured for each subsequent
+    /// epoch after initialization.
+    ///
+    /// See `base_8192_exponential_curve()` fore more information on
+    /// target utilization.
+    public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             !exists<StorageGasConfig>(@aptos_framework),
@@ -147,7 +394,7 @@ module aptos_framework::storage_gas {
         );
 
         let item_config = UsageGasConfig {
-            target_usage: 1000000000,  // 1 billion
+            target_usage: 1000000000, // 1 billion
             read_curve: base_8192_exponential_curve(80000, 80000 * 100),
             create_curve: base_8192_exponential_curve(2000000, 2000000 * 100),
             write_curve: base_8192_exponential_curve(400000, 400000 * 100),
@@ -158,8 +405,6 @@ module aptos_framework::storage_gas {
             create_curve: base_8192_exponential_curve(1000, 1000 * 100),
             write_curve: base_8192_exponential_curve(200, 200 * 100),
         };
-        validate_usage_config(&item_config);
-        validate_usage_config(&item_config);
         move_to(aptos_framework, StorageGasConfig {
             item_config,
             byte_config,
@@ -170,31 +415,33 @@ module aptos_framework::storage_gas {
             error::already_exists(ESTORAGE_GAS)
         );
         move_to(aptos_framework, StorageGas {
-            per_item_read: 8000,
-            per_item_create: 1280000,
-            per_item_write: 160000,
-            per_byte_read: 1000,
-            per_byte_create: 10000,
-            per_byte_write: 10000,
+            per_item_read: 80000,
+            per_item_create: 2000000,
+            per_item_write: 400000,
+            per_byte_read: 40,
+            per_byte_create: 1000,
+            per_byte_write: 200,
         });
     }
 
-    fun validate_usage_config(config: &UsageGasConfig) {
-        assert!(config.target_usage > 0, error::invalid_argument(EZERO_TARGET_USAGE));
-        assert!(config.target_usage <= 18446744073709551615 / BASIS_POINT_DENOMINATION, error::invalid_argument(ETARGET_USAGE_TOO_BIG));
-        validate_curve(&config.read_curve);
-        validate_curve(&config.create_curve);
-        validate_curve(&config.write_curve);
-    }
-
-    fun validate_curve(curve: &GasCurve) {
-        assert!(curve.max_gas >= curve.min_gas, error::invalid_argument(EINVALID_GAS_RANGE));
-        let points = &curve.points;
+    fun validate_points(points: &vector<Point>) {
         let len = vector::length(points);
+        spec {
+            assume len < MAX_U64;
+        };
         let i = 0;
-        while (i <= len) {
-            let cur = if (i == 0) { &Point {x: 0, y: 0} } else { vector::borrow(points, i - 1) };
-            let next = if (i == len) { &Point {x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION} } else { vector::borrow(points, i) };
+        while ({
+            spec {
+                invariant forall j in 0..i: {
+                    let cur = if (j == 0) { Point { x: 0, y: 0 } } else { points[j - 1] };
+                    let next = if (j == len) { Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION } } else { points[j] };
+                    cur.x < next.x && cur.y <= next.y
+                };
+            };
+            i <= len
+        }) {
+            let cur = if (i == 0) { &Point { x: 0, y: 0 } } else { vector::borrow(points, i - 1) };
+            let next = if (i == len) { &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION } } else { vector::borrow(points, i) };
             assert!(cur.x < next.x && cur.y <= next.y, error::invalid_argument(EINVALID_MONOTONICALLY_NON_DECREASING_CURVE));
             i = i + 1;
         }
@@ -208,33 +455,46 @@ module aptos_framework::storage_gas {
 
         // Check the corner case that current_usage_bps drops before the first point.
         let (left, right) = if (num_points == 0) {
-            (&Point {x: 0, y: 0}, &Point {x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION})
+            (&Point { x: 0, y: 0 }, &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION })
+        } else if (current_usage_bps < vector::borrow(points, 0).x) {
+            (&Point { x: 0, y: 0 }, vector::borrow(points, 0))
+        } else if (vector::borrow(points, num_points - 1).x <= current_usage_bps) {
+            (vector::borrow(points, num_points - 1), &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION })
         } else {
-            let (i, j) = (0, num_points - 1);
-            while (i < j) {
+            let (i, j) = (0, num_points - 2);
+            while ({
+                spec {
+                    invariant i <= j;
+                    invariant j < num_points - 1;
+                    invariant points[i].x <= current_usage_bps;
+                    invariant current_usage_bps < points[j + 1].x;
+                };
+                i < j
+            }) {
                 let mid = j - (j - i) / 2;
                 if (current_usage_bps < vector::borrow(points, mid).x) {
+                    spec {
+                        // j is strictly decreasing.
+                        assert mid - 1 < j;
+                    };
                     j = mid - 1;
                 } else {
+                    spec {
+                        // i is strictly increasing.
+                        assert i < mid;
+                    };
                     i = mid;
                 };
             };
-            if (current_usage_bps < vector::borrow(points, 0).x) {
-                (&Point {x: 0, y: 0}, vector::borrow(points, 0))
-            } else {
-                // Check the corner case that current_usage_bps drops after the last point.
-                (
-                    vector::borrow(points, i),
-                    if (i == num_points - 1) {
-                        &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION }
-                    } else {
-                        vector::borrow(points, i + 1)
-                    }
-                )
-            }
+            (vector::borrow(points, i), vector::borrow(points, i + 1))
         };
+        let y_interpolated = interpolate(left.x, right.x, left.y, right.y, current_usage_bps);
+        interpolate(0, BASIS_POINT_DENOMINATION, curve.min_gas, curve.max_gas, y_interpolated)
+    }
 
-        curve.min_gas + (curve.max_gas - curve.min_gas) * (left.y + (current_usage_bps - left.x) * (right.y - left.y) / (right.x - left.x)) / BASIS_POINT_DENOMINATION
+    // Interpolates y for x on the line between (x0, y0) and (x1, y1).
+    fun interpolate(x0: u64, x1: u64, y0: u64, y1: u64, x: u64): u64 {
+        y0 + (x - x0) * (y1 - y0) / (x1 - x0)
     }
 
     fun calculate_read_gas(config: &UsageGasConfig, usage: u64): u64 {
@@ -296,7 +556,7 @@ module aptos_framework::storage_gas {
             let old_standard_curve_gas = 1;
             while (i <= target + 7) {
                 assert!(calculate_gas(target, i, &constant_curve) == 5, 0);
-                assert!(calculate_gas(target, i, &linear_curve) == (if (i < target) {1 + 999 * (i * BASIS_POINT_DENOMINATION / target) / BASIS_POINT_DENOMINATION} else {1000}), 0);
+                assert!(calculate_gas(target, i, &linear_curve) == (if (i < target) { 1 + 999 * (i * BASIS_POINT_DENOMINATION / target) / BASIS_POINT_DENOMINATION } else { 1000 }), 0);
                 let new_standard_curve_gas = calculate_gas(target, i, &standard_curve);
                 assert!(new_standard_curve_gas >= old_standard_curve_gas, 0);
                 old_standard_curve_gas = new_standard_curve_gas;

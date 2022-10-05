@@ -64,6 +64,9 @@ async fn test_basic_client() {
     info.client().get_transactions(None, None).await.unwrap();
 }
 
+// Test needs to be fixed to estimate over a longer period of time / probably needs an adjustable window
+// to test
+#[ignore]
 #[tokio::test]
 async fn test_gas_estimation() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -263,10 +266,7 @@ async fn test_bcs() {
         .unwrap();
     let expected_txn_hash = pending_transaction.hash.into();
     let expected_txn = client
-        .wait_for_transaction_by_hash_bcs(
-            expected_txn_hash,
-            pending_transaction.request.expiration_timestamp_secs.0,
-        )
+        .wait_for_transaction_bcs(&pending_transaction)
         .await
         .unwrap()
         .into_inner();

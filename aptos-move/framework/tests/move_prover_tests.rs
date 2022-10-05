@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::move_cli::base::prove::run_move_prover;
-use move_deps::move_prover;
+use move_cli::base::prove::run_move_prover;
 use std::path::PathBuf;
 use tempfile::tempdir;
 
@@ -17,7 +16,7 @@ where
 
 pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    let config = move_deps::move_package::BuildConfig {
+    let config = move_package::BuildConfig {
         test_mode: true,
         install_dir: Some(tempdir().unwrap().path().to_path_buf()),
         ..Default::default()

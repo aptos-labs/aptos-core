@@ -11,15 +11,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::data_store::GENESIS_CHANGE_SET_MAINNET;
 use crate::{
     account::{Account, AccountData},
-    data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_TESTNET},
+    data_store::{
+        FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET,
+        GENESIS_CHANGE_SET_TESTNET,
+    },
     golden_outputs::GoldenOutputs,
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
@@ -200,7 +202,7 @@ impl FakeExecutor {
 
     /// Creates fresh genesis from the framework passed in.
     pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts, true);
+        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
         Self::from_genesis(genesis.0.write_set())
     }
 
@@ -463,6 +465,11 @@ impl FakeExecutor {
         StateView::get_state_value(&self.data_store, state_key).unwrap()
     }
 
+    /// Set the blob for the associated AccessPath
+    pub fn write_state_value(&mut self, state_key: StateKey, data_blob: Vec<u8>) {
+        self.data_store.set(state_key, data_blob);
+    }
+
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let vm = AptosVM::new(self.get_state_view());
@@ -547,6 +554,7 @@ impl FakeExecutor {
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
+                LATEST_GAS_FEATURE_VERSION,
                 self.features
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             )
@@ -592,6 +600,7 @@ impl FakeExecutor {
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
+            LATEST_GAS_FEATURE_VERSION,
             self.features
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
         )

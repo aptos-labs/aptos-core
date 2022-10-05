@@ -85,7 +85,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=\"federate\"} == 0 or up{job=\"aptos-procs\"} == 0 or up{job=\"kubernetes-cadvisor\"} == 0 or up{job=\"pushgateway\"} == 0",
+          "expr": "up{job=\"federate\"} == 0 or up{job=\"kubernetes-pods\"} == 0 or up{job=\"kubernetes-cadvisor\"} == 0 or up{job=\"pushgateway\"} == 0",
           "instant": true,
           "format": "table"
         }
@@ -292,7 +292,7 @@
     ]
   },
   "schemaVersion": 36,
-  "version": 1,
+  "version": 2,
   "links": [
     {
       "title": "Other Dashboards",

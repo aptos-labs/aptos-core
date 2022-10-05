@@ -1,6 +1,6 @@
 [package]
 name = "aptos"
-version = "0.3.4"
+version = "0.3.8"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos tool for management of nodes and interacting with the blockchain"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -13,7 +13,8 @@ edition = "2021"
 anyhow = "1.0.57"
 async-trait = "0.1.53"
 base64 = "0.13.0"
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "f94869cdfa1b5d2c9892016e8fb0c59fda1eea2d" }
+chrono = "0.4.19"
 clap = "3.2.11"
 clap_complete = "3.2.3"
 dirs = "4.0.0"
@@ -43,6 +44,7 @@ aptos-faucet = { path = "../aptos-faucet" }
 aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-genesis = { path = "../aptos-genesis" }
 aptos-github-client = { path = "../../secure/storage/github" }
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-keygen = { path = "../aptos-keygen" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
@@ -53,19 +55,25 @@ aptos-telemetry = { path = "../aptos-telemetry" }
 aptos-temppath = { path = "../aptos-temppath" }
 aptos-transactional-test-harness = { path = "../../aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "../../types" }
-aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["testing"] }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
 
 backup-cli = { path = "../../storage/backup/backup-cli" }
 cached-packages = { path = '../../aptos-move/framework/cached-packages' }
 framework = { path = '../../aptos-move/framework' }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "testing", "table-extension"] }
+move-deps = { path = "../../aptos-move/move-deps", features = [
+  "address32",
+  "testing",
+  "table-extension",
+] }
 storage-interface = { path = "../../storage/storage-interface" }
 
 [features]
 default = []
 fuzzing = []
 no-upload-proposal = []
+indexer = ["aptos-node/indexer"]
+cli-framework-test-move = []
 
 [build-dependencies]
 shadow-rs = "0.16.2"

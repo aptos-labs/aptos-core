@@ -13,7 +13,7 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, ContractEventGen},
 };
 use itertools::Itertools;
-use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use proptest::{
     collection::{hash_set, vec},
     prelude::*,
@@ -283,7 +283,7 @@ prop_compose! {
             let event = ContractEvent::new(
                 new_block_event_key(),
                 seq,
-                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 bcs::to_bytes(&new_block_event).unwrap(),
             );
             seq += 1;
