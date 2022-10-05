@@ -137,7 +137,9 @@ Now you have completed setting up your validator node. Additionally, you can als
 
 12.  Copy the `validator-full-node-identity.yaml`, download `genesis.blob` and `waypoint.txt` files into the same working directory on fullnode machine.
 
-13.  Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
+13 Move the `haproxy.cfg` and `blocked.ips` file to `~/$WORKSPACE/keys/` directory.
+
+14.  Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
 Now you have successfully completed setting up your node.
 
-14. Optional: if you need to block an ip address simply add it to the bottom of blocked.ips and reload haproxy
+15. Optional: if you need to block an ip address simply add it to the bottom of blocked.ips and reload haproxy
