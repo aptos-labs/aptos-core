@@ -5,7 +5,9 @@ use crate::common::types::{
     CliCommand, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
-use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
+use aptos_types::account_address::{
+    create_vesting_contract_address, default_stake_pool_address, AccountAddress,
+};
 use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
@@ -22,6 +24,8 @@ pub enum StakeTool {
     InitializeStakeOwner(InitializeStakeOwner),
     SetOperator(SetOperator),
     SetDelegatedVoter(SetDelegatedVoter),
+    UnlockVestedCoins(UnlockVestedCoins),
+    DistributeVestedCoins(DistributeVestedCoins),
 }
 
 impl StakeTool {
@@ -36,6 +40,8 @@ impl StakeTool {
             InitializeStakeOwner(tool) => tool.execute_serialized().await,
             SetOperator(tool) => tool.execute_serialized().await,
             SetDelegatedVoter(tool) => tool.execute_serialized().await,
+            UnlockVestedCoins(tool) => tool.execute_serialized().await,
+            DistributeVestedCoins(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -293,6 +299,68 @@ impl CliCommand<TransactionSummary> for CreateStakingContract {
                 self.commission_percentage,
                 vec![],
             ))
+            .await
+            .map(|inner| inner.into())
+    }
+}
+
+/// Distribute any fully unlocked tokens (rewards and/or vested tokens) from the vesting contract
+/// to shareholders.
+#[derive(Parser)]
+pub struct DistributeVestedCoins {
+    /// Address of the vesting contract's admin.
+    ///
+    /// Defaults to the profile's address if not set.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub admin_address: AccountAddress,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for DistributeVestedCoins {
+    fn command_name(&self) -> &'static str {
+        "DistributeVestedCoins"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let vesting_contract_address = create_vesting_contract_address(self.admin_address, 0, &[]);
+        self.txn_options
+            .submit_transaction(aptos_stdlib::vesting_distribute(vesting_contract_address))
+            .await
+            .map(|inner| inner.into())
+    }
+}
+
+/// Unlock any vesting tokens according to the vesting contract's schedule.
+/// This also unlock any accumulated staking rewards and pays commission to the operator of the
+/// vesting contract's stake pool first.
+///
+/// The unlocked vested tokens and staking rewards are still subject to the staking lockup and
+/// cannot be withdrawn until after the lockup expires.
+#[derive(Parser)]
+pub struct UnlockVestedCoins {
+    /// Address of the vesting contract's admin.
+    ///
+    /// Defaults to the profile's address if not set.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub admin_address: AccountAddress,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for UnlockVestedCoins {
+    fn command_name(&self) -> &'static str {
+        "UnlockVestedCoins"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let vesting_contract_address = create_vesting_contract_address(self.admin_address, 0, &[]);
+        self.txn_options
+            .submit_transaction(aptos_stdlib::vesting_vest(vesting_contract_address))
             .await
             .map(|inner| inner.into())
     }

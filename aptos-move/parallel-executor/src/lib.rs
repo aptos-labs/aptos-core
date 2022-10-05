@@ -135,6 +135,7 @@ and threads that perform these tasks can already detect validation failures
 due to the ESTIMATE markers on memory locations, instead of waiting for a
 subsequent incarnation to finish.
 **/
+pub mod counters;
 pub mod errors;
 pub mod executor;
 pub mod output_delta_resolver;

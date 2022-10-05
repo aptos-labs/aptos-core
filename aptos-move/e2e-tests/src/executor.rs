@@ -21,7 +21,7 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
@@ -554,6 +554,7 @@ impl FakeExecutor {
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
+                LATEST_GAS_FEATURE_VERSION,
                 self.features
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             )
@@ -599,6 +600,7 @@ impl FakeExecutor {
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
+            LATEST_GAS_FEATURE_VERSION,
             self.features
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
         )

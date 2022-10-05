@@ -586,18 +586,23 @@ fn parse_transfer_operation(
     let mut operations = Vec::new();
 
     // Check coin is the native coin
-    let currency = if let Some(TypeTag::Struct(StructTag {
-        address,
-        module,
-        name,
-        ..
-    })) = type_args.first()
-    {
-        parse_currency(*address, module.as_str(), name.as_str())?
-    } else {
-        return Err(ApiError::TransactionParseError(Some(
-            "No coin type in transfer".to_string(),
-        )));
+
+    let currency = match type_args.first() {
+        Some(TypeTag::Struct(struct_tag)) => {
+            let StructTag {
+                address,
+                module,
+                name,
+                ..
+            } = &**struct_tag;
+
+            parse_currency(*address, module.as_str(), name.as_str())?
+        }
+        _ => {
+            return Err(ApiError::TransactionParseError(Some(
+                "No coin type in transfer".to_string(),
+            )))
+        }
     };
 
     // Retrieve the args for the operations

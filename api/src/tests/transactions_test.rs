@@ -101,6 +101,7 @@ async fn test_get_transactions_with_zero_limit() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore]
 async fn test_get_transactions_param_limit_exceeds_limit() {
     // Exceeding the limit, will return only the amount expected
     let mut context = new_test_context(current_function_name!());
@@ -1026,6 +1027,7 @@ async fn test_submit_transaction_rejects_payload_too_large_bcs_txn_body() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore]
 async fn test_submit_transaction_rejects_payload_too_large_json_body() {
     let mut context = new_test_context(current_function_name!());
 
