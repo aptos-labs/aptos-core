@@ -793,7 +793,7 @@ impl EpochManager {
                 proof_timeout_ms: 5000,
                 batch_request_num_peers: 2,
                 end_batch_ms: 500,
-                max_batch_bytes: 1000000,
+                max_batch_bytes: 100000,
                 batch_request_timeout_ms: 2000,
                 max_batch_expiry_round_gap: 20,
                 batch_expiry_grace_rounds: 5,
@@ -801,7 +801,7 @@ impl EpochManager {
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
-                num_nodes_per_worker_handles: 10,
+                num_nodes_per_worker_handles: 5,
             };
 
             // update the number of network_listener workers when start a new round_manager
