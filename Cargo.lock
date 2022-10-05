@@ -167,6 +167,7 @@ dependencies = [
  "base64 0.13.0",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=f94869cdfa1b5d2c9892016e8fb0c59fda1eea2d)",
  "cached-packages",
+ "chrono",
  "clap 3.2.17",
  "clap_complete",
  "dirs 4.0.0",

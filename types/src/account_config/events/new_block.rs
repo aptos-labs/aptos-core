@@ -128,6 +128,10 @@ impl BlockResource {
     pub fn height(&self) -> u64 {
         self.height
     }
+
+    pub fn epoch_interval(&self) -> u64 {
+        self.epoch_interval
+    }
 }
 
 impl MoveStructType for BlockResource {
