@@ -30,7 +30,7 @@ module aptos_token::token {
 
     const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
     const MAX_NFT_NAME_LENGTH: u64 = 128;
-    const MAX_COLLECTION_URI_LENGTH = 512;
+    const MAX_COLLECTION_URI_LENGTH: u64 = 512;
 
     // to support SVG as meta data, the token uri limits should be increased.
     const MAX_TOKEN_URI_LENGTH: u64 = 51200;
