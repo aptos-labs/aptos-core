@@ -31,11 +31,8 @@ module 0xcafe::test {
     );
     builder.add_local_dep("MoveStdlib", &move_stdlib.display().to_string());
     let dir = builder.write_to_temp().unwrap();
-
-    // Should be able to publish.
     assert_success!(h.publish_package(&acc, dir.path()));
 
-    // Should be able to call nothing entry
     let res = h.run_entry_function(
         &acc,
         str::parse("0xcafe::test::some").unwrap(),

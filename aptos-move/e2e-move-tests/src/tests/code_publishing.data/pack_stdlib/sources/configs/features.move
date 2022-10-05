@@ -50,6 +50,11 @@ module std::features {
     // --------------------------------------------------------------------------------------------
     // Vectors
 
+    /// Determines whether legacy vector support has been disabled. Move switched from native functions for
+    /// vectors to opcodes a while ago. However, the compiler is buggy and only maps `std::vector::foo` to an opcode,
+    /// but not e.g. `0x1::vector::foo`, which continues the call the function in the vector module. With this flag
+    /// set, call into vector functions is not longer supported.
+    /// Lifetime: ephemeral
     const NO_LEGACY_VECTOR: u64 = 3;
     public fun support_legacy_vector_enabled(): bool acquires Features {
         is_enabled(NO_LEGACY_VECTOR)
