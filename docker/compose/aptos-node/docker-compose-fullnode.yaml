@@ -3,6 +3,29 @@
 
 version: "3.8"
 services:
+  haproxy:
+    image: haproxytech/haproxy-debian:2.2
+    volumes:
+      - type: bind
+        source: ./haproxy.cfg
+        target: /usr/local/etc/haproxy/haproxy.cfg
+      - type: bind
+        source: ./blocked.ips
+        target: /usr/local/etc/haproxy/blocked.ips
+    networks:
+      - shared
+    expose:
+      - 6180
+      - 6181
+      - 9101
+      - 80
+    ports:
+      - "6180:6180"
+      - "6181:6181"
+      - "80:80"
+      - "9101:9101"
+
+
   fullnode:
     image: "${VALIDATOR_IMAGE_REPO:-aptoslabs/validator}:${IMAGE_TAG:-testnet}"
     networks:
