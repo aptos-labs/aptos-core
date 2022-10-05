@@ -24,7 +24,7 @@ use aptosdb::AptosDB;
 use framework::ReleaseBundle;
 use std::convert::TryInto;
 use storage_interface::DbReaderWriter;
-use vm_genesis::{get_test_ans_admin_address, get_test_ans_funds_address, Validator};
+use vm_genesis::Validator;
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -126,8 +126,8 @@ impl GenesisInfo {
                 voting_power_increase_limit: self.voting_power_increase_limit,
                 employee_vesting_start: 1663456089,
                 employee_vesting_period_duration: 5 * 60, // 5 minutes
-                ans_funds_address: get_test_ans_funds_address(),
-                ans_admin_address: get_test_ans_admin_address(),
+                ans_funds_address: vm_genesis::get_test_ans_funds_address(),
+                ans_admin_address: vm_genesis::get_test_ans_admin_address(),
             },
         )
     }
