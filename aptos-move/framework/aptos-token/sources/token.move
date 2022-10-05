@@ -30,7 +30,10 @@ module aptos_token::token {
 
     const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
     const MAX_NFT_NAME_LENGTH: u64 = 128;
-    const MAX_URI_LENGTH: u64 = 512;
+    const MAX_COLLECTION_URI_LENGTH = 512;
+
+    // to support SVG as meta data, the token uri limits should be increased.
+    const MAX_TOKEN_URI_LENGTH: u64 = 51200;
 
     // Property key stored in default_properties controlling who can burn the token.
     // the corresponding property value is BCS serialized bool.
@@ -705,7 +708,7 @@ module aptos_token::token {
         token_data_id: TokenDataId,
         uri: String
     ) acquires Collections {
-        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+        assert!(string::length(&uri) <= MAX_TOKEN_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
         let creator_addr = token_data_id.creator;
         assert!(signer::address_of(creator) == creator_addr, ENO_MUTATE_CAPABILITY);
         // validate if the properties is mutable
@@ -848,7 +851,7 @@ module aptos_token::token {
         mutate_setting: vector<bool>
     ) acquires Collections {
         assert!(string::length(&name) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
-        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+        assert!(string::length(&uri) <= MAX_COLLECTION_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
         let account_addr = signer::address_of(creator);
         if (!exists<Collections>(account_addr)) {
             move_to(
@@ -932,7 +935,7 @@ module aptos_token::token {
     ): TokenDataId acquires Collections {
         assert!(string::length(&name) <= MAX_NFT_NAME_LENGTH, error::invalid_argument(ENFT_NAME_TOO_LONG));
         assert!(string::length(&collection) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
-        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+        assert!(string::length(&uri) <= MAX_TOKEN_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
         let account_addr = signer::address_of(account);
         assert!(
             exists<Collections>(account_addr),
