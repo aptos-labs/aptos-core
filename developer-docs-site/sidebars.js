@@ -78,6 +78,7 @@ const sidebars = {
         "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
         "guides/running-a-local-multi-node-network",
+        "guides/handle-aptos-errors",
         {
           type: "category",
           label: "Move Guides",

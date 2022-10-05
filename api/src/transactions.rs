@@ -783,7 +783,7 @@ impl TransactionsApi {
         // TODO: Return more specific errors from within this function.
         let data = self.context.get_account_transactions(
             address.into(),
-            page.start(0, u64::MAX, &latest_ledger_info)?,
+            page.start_option(),
             page.limit(&latest_ledger_info)?,
             latest_ledger_info.version(),
             &latest_ledger_info,

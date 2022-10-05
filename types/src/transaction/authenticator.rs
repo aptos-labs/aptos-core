@@ -242,6 +242,13 @@ pub enum Scheme {
     Ed25519 = 0,
     MultiEd25519 = 1,
     // ... add more schemes here
+    /// Scheme identifier used when hashing an account's address together with a seed to derive the
+    /// address (not the authentication key) of a resource account. This is an abuse of the notion
+    /// of a scheme identifier which, for now, serves to domain separate hashes used to derive
+    /// resource account addresses from hashes used to derive authentication keys. Without such
+    /// separation, an adversary could create (and get a signer for) a resource account whose
+    /// address matches an existing address of a MultiEd25519 wallet.
+    DeriveResourceAccountAddress = 255,
 }
 
 impl fmt::Display for Scheme {
@@ -249,6 +256,7 @@ impl fmt::Display for Scheme {
         let display = match self {
             Scheme::Ed25519 => "Ed25519",
             Scheme::MultiEd25519 => "MultiEd25519",
+            Scheme::DeriveResourceAccountAddress => "DeriveResourceAccountAddress",
         };
         write!(f, "Scheme::{}", display)
     }

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_vm::natives;
 use framework::path_in_crate;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
@@ -37,6 +37,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
     natives::aptos_natives(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
     )
 }
 

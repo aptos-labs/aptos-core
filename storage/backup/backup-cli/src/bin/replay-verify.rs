@@ -9,6 +9,7 @@ use aptos_config::config::{
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
 use aptosdb::{AptosDB, GetRestoreHandler};
+use backup_cli::utils::ReplayConcurrencyLevelOpt;
 use backup_cli::{
     coordinators::replay_verify::ReplayVerifyCoordinator,
     metadata::cache::MetadataCacheOpt,
@@ -28,6 +29,8 @@ struct Opt {
     storage: StorageOpt,
     #[clap(flatten)]
     concurrent_downloads: ConcurrentDownloadsOpt,
+    #[clap(flatten)]
+    replay_concurrency_level: ReplayConcurrencyLevelOpt,
     #[clap(long = "target-db-dir", parse(from_os_str))]
     pub db_dir: PathBuf,
     #[clap(flatten)]
@@ -72,6 +75,7 @@ async fn main_impl() -> Result<()> {
         opt.metadata_cache_opt,
         opt.trusted_waypoints_opt,
         opt.concurrent_downloads.get(),
+        opt.replay_concurrency_level.get(),
         restore_handler,
         opt.start_version.unwrap_or(0),
         opt.end_version.unwrap_or(Version::MAX),
