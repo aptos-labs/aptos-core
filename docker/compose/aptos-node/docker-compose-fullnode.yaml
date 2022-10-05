@@ -46,10 +46,6 @@ services:
         target: /opt/aptos/genesis/validator-full-node-identity.yaml
     command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
     restart: unless-stopped
-    ports:
-      - "6182:6182"
-      - "80:8080"
-      - "9101:9101"
     expose:
       - 6182
       - 80

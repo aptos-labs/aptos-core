@@ -102,9 +102,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
   curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/genesis.blob -o genesis.blob
   ```
 
-7. Move the `haproxy.cfg` and `blocked.ips` file to `~/$WORKSPACE/keys/` directory.
-
-8. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
+7. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
 
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `keys` folder, which includes:
@@ -112,19 +110,19 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
       - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 4).
       - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 4).
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 4).
-      - `haproxy.cfg`: High availability proxy config (from step 3).
-      - `blocked.ips`: Blocked IP address config (from step 3).
     - `username` folder, which includes: 
       - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 5).
       - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 5). 
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 6).
     - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 6).
+    - `haproxy.cfg`: High availability proxy config (from step 3).
+    - `blocked.ips`: Blocked IP address config (from step 3).
 
-9. Run docker-compose: `docker-compose up`. (or `docker compose up` depends on your version)
+8. Run docker-compose: `docker-compose up`. (or `docker compose up` depends on your version)
 
 Now you have completed setting up your validator node. Additionally, you can also setup a validator fullnode following the instructions below.
 
-10. <span id="docker-vfn">Now let's setup fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine.</span>
+9. <span id="docker-vfn">Now let's setup fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine.</span>
 
     ```
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose-fullnode.yaml
@@ -133,13 +131,11 @@ Now you have completed setting up your validator node. Additionally, you can als
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/blocked.ips
     ```
 
-11.  Edit `fullnode.yaml` file to update the IP address for validator node.
+10.  Edit `fullnode.yaml` file to update the IP address for validator node.
 
-12.  Copy the `validator-full-node-identity.yaml`, download `genesis.blob` and `waypoint.txt` files into the same working directory on fullnode machine.
+11.  Copy the `validator-full-node-identity.yaml`, download `genesis.blob` and `waypoint.txt` files into the same working directory on fullnode machine.
 
-13 Move the `haproxy.cfg` and `blocked.ips` file to `~/$WORKSPACE/keys/` directory.
-
-14.  Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
+12.  Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
 Now you have successfully completed setting up your node.
 
-15. Optional: if you need to block an ip address simply add it to the bottom of blocked.ips and reload haproxy
+13. Optional: if you need to block an ip address simply add it to the bottom of blocked.ips and reload haproxy
