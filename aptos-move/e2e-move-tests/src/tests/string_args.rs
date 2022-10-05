@@ -650,7 +650,7 @@ fn string_args_generic_instantiation() {
         name: Identifier::new("String").expect("valid identifier"),
         type_params: vec![],
     };
-    let string_type = TypeTag::Struct(string_struct);
+    let string_type = TypeTag::Struct(Box::new(string_struct));
 
     fail_generic(vec![address_type, string_type], tests);
 }

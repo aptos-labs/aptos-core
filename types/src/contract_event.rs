@@ -99,7 +99,7 @@ impl TryFrom<&ContractEvent> for NewBlockEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(Self::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
             anyhow::bail!("Expected NewBlockEvent")
         }
         Self::try_from_bytes(&event.event_data)
@@ -110,7 +110,7 @@ impl TryFrom<&ContractEvent> for NewEpochEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(Self::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
             anyhow::bail!("Expected NewEpochEvent")
         }
         Self::try_from_bytes(&event.event_data)
@@ -121,7 +121,7 @@ impl TryFrom<&ContractEvent> for WithdrawEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(WithdrawEvent::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(Box::new(WithdrawEvent::struct_tag())) {
             anyhow::bail!("Expected Sent Payment")
         }
         Self::try_from_bytes(&event.event_data)
@@ -132,7 +132,7 @@ impl TryFrom<&ContractEvent> for DepositEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(DepositEvent::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(Box::new(DepositEvent::struct_tag())) {
             anyhow::bail!("Expected Received Payment")
         }
         Self::try_from_bytes(&event.event_data)
