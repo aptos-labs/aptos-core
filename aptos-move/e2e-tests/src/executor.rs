@@ -58,6 +58,7 @@ use move_deps::{
     move_vm_types::gas::UnmeteredGasMeter,
 };
 use num_cpus;
+use vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -115,6 +116,14 @@ impl FakeExecutor {
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
     pub fn from_head_genesis() -> Self {
         Self::from_genesis(GENESIS_CHANGE_SET_HEAD.clone().write_set())
+    }
+
+    /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
+    pub fn from_head_genesis_with_count(count: u64) -> Self {
+        Self::from_genesis(
+            generate_genesis_change_set_for_testing_with_count(GenesisOptions::Head, count)
+                .write_set(),
+        )
     }
 
     /// Creates an executor using the standard genesis.
