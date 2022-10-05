@@ -18,3 +18,4 @@ mod rotate_auth_key;
 mod scripts;
 mod stake;
 mod string_args;
+mod vector_numeric_address;
