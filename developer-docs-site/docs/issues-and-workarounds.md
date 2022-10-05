@@ -17,7 +17,7 @@ If you found an issue that is not on this page, submit a [GitHub Issue](https://
 
 #### Description
 
-Run a validator node and receive this error:
+Receive this error from a validator node:
 
 ```json
 {"error":"Invalid EpochChangeProof: Waypoint value mismatch: waypoint value = 3384a932349524093cda8cea714691e668d668fb34260d8a5f77c667d7724372, given value = 81ee9bd880acd25ad617e55913b7345dc01b861adf43971259a22e9a5c82315c","event":"error","name":"initialize"}
@@ -29,9 +29,9 @@ Delete the `secure-data.json` file because very likely you are using an older ve
 
 ### How to find out when the next epoch starts
 
-  :::tip Current epoch duration
-  The Aptos current epoch duration is 1 hour.
-  :::
+:::tip Current epoch duration
+The Aptos current epoch duration is 1 hour.
+:::
 
 To track epoch changes, follow these steps:
 
