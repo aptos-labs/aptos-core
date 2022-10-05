@@ -41,8 +41,8 @@ haproxy:
   affinity: {}
   limits:
     validator:
-      # -- Limit the number of connections per IP address per sec
-      connectionsPerIPPerMin: 2
+      # -- Limit the number of connections per IP address per Min
+      connectionsPerIPPerMin: 12
       # Sustained 100mb/s for 10 sec.
       maxBytesOutRate10sec: 134217728
       rateLimitSession: 256
