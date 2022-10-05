@@ -34,3 +34,9 @@ See the [Petra docs](https://petra.app/docs/petra-intro) for developer and user 
 :::tip
 If you would like to restore an existing Aptos wallet account in Petra, you must first create a new account in Petra, then you can switch and import the account.
 :::
+
+## Get help
+
+Find additional documentation at: [petra.app](https://petra.app/docs/petra-intro)
+
+Join the [Petra Wallet Discord](https://discord.com/invite/petrawallet) for guidance on development.
