@@ -16,7 +16,8 @@ Make sure to see the row describing [**What not to do**](#what-not-to-do).
 
 |Description | Mainnet | Devnet | Long-lived Testnet | Aptos Incentivized Testnet (AIT)|
 |---|---|---|---|---|
-|**REST API URL EDIT**| m |https://fullnode.devnet.aptoslabs.com/v1 | https://fullnode.testnet.aptoslabs.com/v1 | Available during AIT program.|
+|**REST API URL EDIT**| m |https://fullnode.devnet.aptoslabs.com/v1 | https://fullnode.testnet.aptoslabs.com/v1 | Available during AIT program. |
+|**Chain ID**| [Click here and **select Mainnet from top right**](https://explorer.aptoslabs.com/?network=mainnet). |[Click here and **select Devnet from top right**](https://explorer.aptoslabs.com/?network=Devnet).| [Click here and **select Testnet from top right**](https://explorer.aptoslabs.com/?network=Testnet).| Available during AIT program.|
 |**Genesis blob EDIT**| m |https://devnet.aptoslabs.com/genesis.blob | https://testnet.aptoslabs.com/genesis.blob| Available during AIT program. |
 |**Waypoint EDIT**| m |https://devnet.aptoslabs.com/waypoint.txt |https://github.com/aptos-labs/aptos-genesis-waypoint/tree/main/testnet| Available during AIT program.|
 |**Faucet EDIT**| m |https://faucet.devnet.aptoslabs.com/ | https://faucet.testnet.aptoslabs.com/ |Available during AIT program.|
