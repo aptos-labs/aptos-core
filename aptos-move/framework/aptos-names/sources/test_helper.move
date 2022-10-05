@@ -172,7 +172,11 @@ module aptos_names::test_helper {
         let set_name_address_event_v1_event_count_before = domains::get_set_name_address_event_v1_count();
 
         // And also can clear if is registered address, but not owner
-        domains::clear_name_address(user, subdomain_name, domain_name);
+        if (option::is_none(&subdomain_name)) {
+            domains::clear_domain_address(user, domain_name);
+        } else {
+            domains::clear_subdomain_address(user, *option::borrow(&subdomain_name), domain_name);
+        };
         let (_property_version, _expiration_time_sec, target_address) = domains::get_name_record_v1_props_for_name(subdomain_name, domain_name);
         test_utils::print_actual_expected(b"clear_domain_address: ", target_address, option::none(), false);
         assert!(target_address == option::none(), 32);

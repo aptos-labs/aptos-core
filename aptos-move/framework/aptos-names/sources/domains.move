@@ -354,7 +354,7 @@ module aptos_names::domains {
         token_helper::set_token_props(signer_addr, property_keys, property_values, property_types, token_id);
     }
 
-    public fun set_name_address_internal(subdomain_name: Option<String>, domain_name: String, new_address: address): NameRecordV1 acquires NameRegistryV1, SetNameAddressEventsV1 {
+    fun set_name_address_internal(subdomain_name: Option<String>, domain_name: String, new_address: address): NameRecordV1 acquires NameRegistryV1, SetNameAddressEventsV1 {
         assert!(name_is_registered(subdomain_name, domain_name), error::not_found(ENAME_NOT_EXIST));
         let name_record_key = create_name_record_key_v1(subdomain_name, domain_name);
         let aptos_names = borrow_global_mut<NameRegistryV1>(@aptos_names);
@@ -379,7 +379,11 @@ module aptos_names::domains {
         clear_name_address(sign, option::some(subdomain_name), domain_name);
     }
 
-    public fun clear_name_address(sign: &signer, subdomain_name: Option<String>, domain_name: String) acquires NameRegistryV1, SetNameAddressEventsV1 {
+    /// This is a shared entry point for clearing the address of a domain or subdomain
+    /// It enforces owner permissions
+    fun clear_name_address(sign: &signer, subdomain_name: Option<String>, domain_name: String) acquires NameRegistryV1, SetNameAddressEventsV1 {
+        assert!(name_is_registered(subdomain_name, domain_name), error::not_found(ENAME_NOT_EXIST));
+
         let signer_addr = signer::address_of(sign);
         // Only the owner or the registered address can clear the address
         let (is_owner, token_id) = is_owner_of_name(signer_addr, subdomain_name, domain_name);
@@ -387,16 +391,6 @@ module aptos_names::domains {
 
         assert!(is_owner || is_name_resolved_address, error::permission_denied(ENOT_AUTHORIZED));
 
-        let name_record = clear_name_address_internal(subdomain_name, domain_name);
-        if (is_owner) {
-            let (_property_version, expiration_time_sec, _target_address) = get_name_record_v1_props(&name_record);
-            let (property_keys, property_values, property_types) = get_name_property_map(subdomain_name, expiration_time_sec);
-            token_helper::set_token_props(signer_addr, property_keys, property_values, property_types, token_id);
-        };
-    }
-
-    public fun clear_name_address_internal(subdomain_name: Option<String>, domain_name: String): NameRecordV1 acquires NameRegistryV1, SetNameAddressEventsV1 {
-        assert!(name_is_registered(subdomain_name, domain_name), error::not_found(ENAME_NOT_EXIST));
         let name_record_key = create_name_record_key_v1(subdomain_name, domain_name);
         let aptos_names = borrow_global_mut<NameRegistryV1>(@aptos_names);
         let name_record = table::borrow_mut(&mut aptos_names.registry, name_record_key);
@@ -409,7 +403,12 @@ module aptos_names::domains {
             expiration_time_sec,
             option::none(),
         );
-        *name_record
+
+        if (is_owner) {
+            let (_property_version, expiration_time_sec, _target_address) = get_name_record_v1_props(name_record);
+            let (property_keys, property_values, property_types) = get_name_property_map(subdomain_name, expiration_time_sec);
+            token_helper::set_token_props(signer_addr, property_keys, property_values, property_types, token_id);
+        };
     }
 
     fun emit_set_name_address_event_v1(subdomain_name: Option<String>, domain_name: String, property_version: u64, expiration_time_secs: u64, new_address: Option<address>) acquires SetNameAddressEventsV1 {
