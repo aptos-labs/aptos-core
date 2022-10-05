@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_gas::LATEST_GAS_FEATURE_VERSION;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -263,6 +264,7 @@ fn test_new_genesis() {
                     vec![],
                 ),
             ],
+            LATEST_GAS_FEATURE_VERSION,
         )
         .unwrap(),
     ));

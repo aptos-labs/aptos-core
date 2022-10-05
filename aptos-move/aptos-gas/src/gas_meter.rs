@@ -32,6 +32,7 @@ use std::collections::BTreeMap;
 //   - Storage charges:
 //     - Distinguish between new and existing resources
 //     - One item write comes with 1K free bytes
+//     - abort with STORATGE_WRITE_LIMIT_REACHED if WriteOps or Events are too large
 // - V2
 //   - Table
 //     - Fix the gas formula for loading resources so that they are consistent with other
@@ -245,8 +246,8 @@ impl AptosGasMeter {
         }
     }
 
-    pub fn charge_new_resource_as_modify(&self) -> bool {
-        self.feature_version <= 2
+    pub fn feature_version(&self) -> u64 {
+        self.feature_version
     }
 }
 

@@ -3593,6 +3593,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-gas",
  "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
