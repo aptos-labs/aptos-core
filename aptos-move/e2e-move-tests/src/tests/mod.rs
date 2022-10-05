@@ -10,6 +10,7 @@ mod generate_upgrade_script;
 mod governance_updates;
 mod init_module;
 mod lazy_natives;
+mod legacy_vector;
 mod max_loop_depth;
 mod memory_quota;
 mod mint_nft;

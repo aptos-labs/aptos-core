@@ -49,7 +49,7 @@ move-compiler ={ git = "https://github.com/move-language/move", rev = "ed592c619
 move-core-types ={ git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426", features = ["address32"] }
 move-model ={ git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426" }
 move-package ={ git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "0155b47808de249f4030e84354fde154a1500a82" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426" }
 move-table-extension ={ git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426" }
 move-vm-runtime ={ git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426" }
 move-vm-types ={ git = "https://github.com/move-language/move", rev = "ed592c619e87160eb226662581e268d11fbbb426" }
