@@ -1,0 +1,18 @@
+name: "replay-LTT-transactions-nightly"
+on:
+  schedule:
+    - cron: "0 */24 * * *"
+
+env:
+  BUCKET: ${{ secrets.llt_backup_bucket }}
+  SUB_DIR:  ${{ secrets.llt_backup_sub_dir }}
+
+jobs:
+  replay-LTT-transactions:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-setup
+      - run: cargo run -r --bin replay-verify -- --concurrent-downloads 8 --replay_concurrency_level 16 --target-db-dir /tmp/db command-adapter --config scripts/s3-test.yaml
