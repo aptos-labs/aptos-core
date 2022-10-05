@@ -36,7 +36,7 @@ type Bytes = Vec<u8>;
 pub enum EntryFunctionCall {
     /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its signer capability to only one other address at one time.
-    /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
+    /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallengeV2` signed by the account owner's key
     /// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
     /// `account_public_key_bytes` is the public key of the account owner
     /// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing
@@ -737,7 +737,7 @@ impl EntryFunctionCall {
 
 /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
 /// An account can delegate its signer capability to only one other address at one time.
-/// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
+/// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallengeV2` signed by the account owner's key
 /// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
 /// `account_public_key_bytes` is the public key of the account owner
 /// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing

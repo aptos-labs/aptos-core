@@ -158,6 +158,12 @@ impl TransactionGenerator for P2PTransactionGenerator {
                 .choose_multiple(&mut self.rng, transactions_per_account)
                 .cloned()
                 .collect::<Vec<_>>();
+            assert!(
+                receivers.len() >= transactions_per_account,
+                "failed: {} >= {}",
+                receivers.len(),
+                transactions_per_account
+            );
             for i in 0..transactions_per_account {
                 let receiver = receivers.get(i).expect("all_addresses can't be empty");
                 let request = if num_valid_tx > 0 {

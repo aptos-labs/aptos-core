@@ -42,7 +42,7 @@ pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
 pub const DEFAULT_PORT: u16 = 8080;
 pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
 pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 10;
-pub const DEFAULT_MAX_PAGE_SIZE: u16 = 1000;
+pub const DEFAULT_MAX_PAGE_SIZE: u16 = 100;
 
 fn default_enabled() -> bool {
     true

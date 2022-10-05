@@ -25,6 +25,7 @@ rayon = "1.5.2"
 
 aptos-aggregator = { path = "../aptos-aggregator" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 
