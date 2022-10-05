@@ -125,7 +125,7 @@ variable "utility_instance_type" {
 
 variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c6i.4xlarge"
+  default     = "c6i.8xlarge"
 }
 
 variable "num_extra_instance" {
@@ -136,4 +136,13 @@ variable "num_extra_instance" {
 variable "enable_backup" {
   description = "enable data backup from fullnode"
   default     = false
+}
+
+variable "fullnode_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default = "io1"
+  validation {
+      condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
+      error_message = "Supported storage classes are gp3, io1, io2"
+  }
 }
