@@ -299,6 +299,8 @@ impl AptosVM {
             .checked_sub(gas_meter.balance())
             .expect("Balance should always be less than or equal to max gas amount");
 
+        println!("total: {}", gas_used);
+
         let txn_output = TransactionOutput::new(
             write_set,
             events,
@@ -332,6 +334,13 @@ impl AptosVM {
             gas_meter
                 .charge_intrinsic_gas_for_transaction(txn_data.transaction_size())
                 .map_err(|e| e.into_vm_status())?;
+
+                let gas_used = txn_data
+                .max_gas_amount()
+                .checked_sub(gas_meter.balance())
+                .expect("Balance should always be less than or equal to max gas amount");
+    
+                println!("intrinsic: {}", gas_used);
 
             match payload {
                 TransactionPayload::Script(script) => {
@@ -387,6 +396,13 @@ impl AptosVM {
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
             let change_set_ext = session_output
                 .into_change_set(&mut (), gas_meter.charge_new_resource_as_modify())?;
+
+            let gas_used = txn_data
+            .max_gas_amount()
+            .checked_sub(gas_meter.balance())
+            .expect("Balance should always be less than or equal to max gas amount");
+
+            println!("intrinsic + exec: {}", gas_used);
 
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
