@@ -69,7 +69,7 @@ pub struct Layout {
     pub employee_vesting_period_duration: Option<u64>,
     /// Address to send ANS registry fees to
     pub ans_funds_address: Option<AccountAddress>,
-    /// Address of account controlling ANS registry
+    /// AuthKey of account controlling ANS registry
     pub ans_admin_address: Option<AccountAddress>,
 }
 

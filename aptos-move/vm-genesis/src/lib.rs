@@ -446,7 +446,7 @@ fn initialize_aptos_names(
         serialize_values(&vec![
             MoveValue::Signer(AccountAddress::from_hex_literal("0x4").unwrap()),
             MoveValue::Address(genesis_config.ans_funds_address),
-            MoveValue::Address(genesis_config.ans_admin_multisig_auth_key.derived_address()),
+            MoveValue::Address(genesis_config.ans_admin_address),
         ]),
     );
 }

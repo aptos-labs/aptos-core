@@ -24,7 +24,10 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use aptos_types::{
+    account_address::AccountAddress, chain_id::ChainId, transaction::Transaction,
+    waypoint::Waypoint,
+};
 use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};

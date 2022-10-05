@@ -7,7 +7,10 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_temppath::TempPath;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use aptos_types::{
+    account_address::AccountAddress, chain_id::ChainId, transaction::Transaction,
+    waypoint::Waypoint,
+};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use framework::ReleaseBundle;
@@ -69,6 +72,12 @@ impl MainnetGenesisInfo {
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<MainnetGenesisInfo> {
+        let ans_funds_address = genesis_config
+            .ans_funds_address
+            .expect("Expected ANS funds address");
+        let ans_admin_address = genesis_config
+            .ans_admin_address
+            .expect("Expected ANS Admin Multisig AuthKey");
         let employee_vesting_start = genesis_config
             .employee_vesting_start
             .expect("Employee vesting start time (in secs) needs to be provided");
