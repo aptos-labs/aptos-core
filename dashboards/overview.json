@@ -125,31 +125,7 @@
       "title": "Participating Stake ",
       "transparent": false,
       "type": "gauge",
-      "id": 74,
-      "links": [],
       "maxDataPoints": 100,
-      "title": "Participating Stake ",
-      "gridPos": { "h": 5, "w": 4, "x": 7, "y": 1 },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [{ "options": { "match": "null", "result": { "text": "N/A" } }, "type": "special" }],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "red", "value": 67 },
-              { "color": "#EAB839", "value": 75 },
-              { "color": "orange", "value": 80 },
-              { "color": "green", "value": 90 }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
       "options": {
         "orientation": "auto",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -170,26 +146,9 @@
         }
       ],
       "type": "gauge",
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" }
-    },
-    {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 5, "w": 4, "x": 11, "y": 1 },
-      "id": 75,
-      "isNew": false,
-      "span": 0,
-      "title": "Participating Validators ",
-      "transparent": false,
-      "type": "gauge",
-      "maxDataPoints": 100,
-      "type": "gauge",
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 5, "w": 4, "x": 11, "y": 1 },
-      "id": 75,
+      "id": 74,
       "links": [],
-      "title": "Participating Validators ",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -210,6 +169,45 @@
         },
         "overrides": []
       },
+      "gridPos": { "h": 5, "w": 4, "x": 7, "y": 1 },
+      "title": "Participating Stake "
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 5, "w": 4, "x": 11, "y": 1 },
+      "id": 75,
+      "isNew": false,
+      "span": 0,
+      "title": "Participating Validators ",
+      "transparent": false,
+      "type": "gauge",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "match": "null", "result": { "text": "N/A" } }, "type": "special" }],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "red", "value": 67 },
+              { "color": "#EAB839", "value": 75 },
+              { "color": "orange", "value": 80 },
+              { "color": "green", "value": 90 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "id": 75,
+      "links": [],
+      "title": "Participating Validators ",
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "maxDataPoints": 100,
       "options": {
         "orientation": "auto",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -228,7 +226,9 @@
           "refId": "A",
           "step": 10
         }
-      ]
+      ],
+      "type": "gauge",
+      "gridPos": { "h": 5, "w": 4, "x": 11, "y": 1 }
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },

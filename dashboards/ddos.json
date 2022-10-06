@@ -67,8 +67,9 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"})",
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}"
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\"})",
+          "legendFormat": "{{role_type}}-{{network_id}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
@@ -145,8 +146,9 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\" }[$AggInterval]))",
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}"
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\" }[$AggInterval]))",
+          "legendFormat": "{{role_type}}-{{network_id}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual", "sort": 2 },
@@ -223,8 +225,9 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(aptos_connections_rejected{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"}[1m])",
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}"
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_connections_rejected{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\"}[1m])",
+          "legendFormat": "{{role_type}}-{{network_id}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
@@ -301,9 +304,10 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+          "legendFormat": "{{role_type}}-{{network_id}}",
           "format": "time_series"
         }
       ],
@@ -381,9 +385,10 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\", state=\"received\"}[$AggInterval]))",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", type=\"request\", state=\"received\"}[$AggInterval]))",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+          "legendFormat": "{{role_type}}-{{network_id}}",
           "format": "time_series"
         }
       ],
@@ -461,9 +466,10 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+          "legendFormat": "{{role_type}}-{{network_id}}",
           "format": "time_series"
         }
       ],
@@ -541,8 +547,9 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}"
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
+          "legendFormat": "{{role_type}}-{{network_id}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
@@ -619,8 +626,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
-          "legendFormat": "{{owner}}"
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\"}[$AggInterval])"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
@@ -697,8 +704,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
-          "legendFormat": "{{owner}}"
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\"}[$AggInterval])"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
@@ -750,12 +757,11 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 34 },
       "id": 105,
       "isNew": false,
       "renderer": "flot",
       "repeat": "container",
-      "scopedVars": { "container": { "selected": true, "text": "fullnode", "value": "fullnode" } },
       "span": 0,
       "title": "CPU Usage - $container",
       "transparent": false,
@@ -790,16 +796,18 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (owner, container) (rate(container_cpu_usage_seconds_total{container=~\"$container\", owner=~\"$owner\"}[$AggInterval]))",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{container=~\"$container\"}[$AggInterval]))",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
+          "legendFormat": "{{container}}",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "expr": "sum by (owner, container_name) (rate(container_cpu_usage_seconds_total{container_name=~\"$container\", owner=~\"$owner\"}[$AggInterval]))",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "sum by (container_name) (rate(container_cpu_usage_seconds_total{container_name=~\"$container\"}[$AggInterval]))",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}",
+          "legendFormat": "{{container_name}}",
           "format": "time_series"
         }
       ],
@@ -838,12 +846,11 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 146 },
       "id": 115,
       "isNew": false,
       "renderer": "flot",
       "repeat": "container",
-      "scopedVars": { "container": { "selected": true, "text": "fullnode", "value": "fullnode" } },
       "span": 0,
       "title": "IO Operations - $container",
       "transparent": false,
@@ -878,30 +885,34 @@
       "targets": [
         {
           "refId": "C",
-          "expr": "rate(container_fs_reads_total{container=~\"$container\", owner=~\"$owner\"}[$AggInterval])",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(container_fs_reads_total{container=~\"$container\"}[$AggInterval])",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}-reads",
+          "legendFormat": "{{container}}-reads",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "expr": "rate(container_fs_writes_total{container=~\"$container\", owner=~\"$owner\"}[$AggInterval])",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(container_fs_writes_total{container=~\"$container\"}[$AggInterval])",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}-writes",
+          "legendFormat": "{{container}}-writes",
           "format": "time_series"
         },
         {
           "refId": "A",
-          "expr": "rate(container_fs_reads_total{container_name=~\"$container\", owner=~\"$owner\"}[$AggInterval]) ",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(container_fs_reads_total{container_name=~\"$container\"}[$AggInterval]) ",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}-reads",
+          "legendFormat": "{{container_name}}-reads",
           "format": "time_series"
         },
         {
           "refId": "D",
-          "expr": "rate(container_fs_writes_total{container_name=~\"$container\", owner=~\"$owner\"}[$AggInterval])",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(container_fs_writes_total{container_name=~\"$container\"}[$AggInterval])",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}-writes",
+          "legendFormat": "{{container_name}}-writes",
           "format": "time_series"
         }
       ],
@@ -940,12 +951,11 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 258 },
       "id": 107,
       "isNew": false,
       "renderer": "flot",
       "repeat": "container",
-      "scopedVars": { "container": { "selected": true, "text": "fullnode", "value": "fullnode" } },
       "span": 0,
       "title": "Memory Usage % - $container",
       "transparent": false,
@@ -980,16 +990,18 @@
       "targets": [
         {
           "refId": "C",
-          "expr": "container_memory_working_set_bytes{container=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{container=~\"$container\", owner=~\"$owner\"}",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "container_memory_working_set_bytes{container=~\"$container\"} / container_spec_memory_limit_bytes{container=~\"$container\"}",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
+          "legendFormat": "{{container}}",
           "format": "time_series"
         },
         {
           "refId": "A",
-          "expr": "container_memory_working_set_bytes{container_name=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{container_name=~\"$container\", owner=~\"$owner\"}",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "container_memory_working_set_bytes{container_name=~\"$container\"} / container_spec_memory_limit_bytes{container_name=~\"$container\"}",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}",
+          "legendFormat": "{{container_name}}",
           "format": "time_series"
         }
       ],
@@ -1028,12 +1040,11 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 370 },
       "id": 117,
       "isNew": false,
       "renderer": "flot",
       "repeat": "container",
-      "scopedVars": { "container": { "selected": true, "text": "fullnode", "value": "fullnode" } },
       "span": 0,
       "title": "Disk Usage % -$container",
       "transparent": false,
@@ -1068,9 +1079,10 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"}",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{persistentvolumeclaim}}",
+          "legendFormat": "{{persistentvolumeclaim}}",
           "format": "time_series"
         }
       ],
@@ -1122,7 +1134,7 @@
         "multiFormat": "",
         "query": "prometheus",
         "regex": "",
-        "current": { "text": null, "value": null },
+        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -1140,7 +1152,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
         "regex": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
+        "current": { "text": ["default"], "value": "default" },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -1158,7 +1170,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
         "regex": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
+        "current": { "text": ["aws-mainnet-node1"], "value": "aws-mainnet-node1" },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -1174,9 +1186,12 @@
         "allValue": "",
         "multi": true,
         "multiFormat": "",
-        "query": "label_values(network_id)",
+        "query": {
+          "query": "label_values(network_id)",
+          "refId": "VictoriaMetrics Mainnet US-network_id-Variable-Query"
+        },
         "regex": "",
-        "current": { "text": ["Public"], "value": ["Public"] },
+        "current": { "text": ["All"], "value": ["$__all"] },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -1192,25 +1207,7 @@
         "allValue": "",
         "multi": true,
         "multiFormat": "",
-        "query": "label_values(role_type)",
-        "regex": "",
-        "current": { "text": ["full_node"], "value": ["full_node"] },
-        "label": "",
-        "hide": 0,
-        "sort": 0
-      },
-      {
-        "name": "owner",
-        "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
-        "allFormat": "",
-        "allValue": "",
-        "multi": true,
-        "multiFormat": "",
-        "query": "label_values(owner)",
+        "query": { "query": "label_values(role_type)", "refId": "VictoriaMetrics Mainnet US-role_type-Variable-Query" },
         "regex": "",
         "current": { "text": ["All"], "value": ["$__all"] },
         "label": "",
@@ -1228,7 +1225,10 @@
         "allValue": "",
         "multi": true,
         "multiFormat": "",
-        "query": "label_values(protocol_id)",
+        "query": {
+          "query": "label_values(protocol_id)",
+          "refId": "VictoriaMetrics Mainnet US-rpc_protocol-Variable-Query"
+        },
         "regex": "",
         "current": { "text": ["All"], "value": ["$__all"] },
         "label": "RPC Protocol",
@@ -1276,9 +1276,9 @@
         "allValue": "",
         "multi": true,
         "multiFormat": "",
-        "query": "label_values(container)",
+        "query": { "query": "label_values(container)", "refId": "VictoriaMetrics Mainnet US-container-Variable-Query" },
         "regex": "",
-        "current": { "text": ["fullnode"], "value": ["fullnode"] },
+        "current": { "text": ["All"], "value": ["$__all"] },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -1289,7 +1289,26 @@
     "list": [
       {
         "name": "Annotations \u0026 Alerts",
-        "datasource": "-- Grafana --",
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      },
+      {
+        "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "datasource", "uid": "grafana" },
         "showLine": false,
         "iconColor": "rgba(0, 211, 255, 1)",
         "lineColor": "",
@@ -1309,8 +1328,8 @@
     ]
   },
   "refresh": false,
-  "schemaVersion": 26,
-  "version": 1,
+  "schemaVersion": 37,
+  "version": 2,
   "links": [
     {
       "title": "Other Dashboards",
