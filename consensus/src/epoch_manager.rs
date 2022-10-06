@@ -486,7 +486,7 @@ impl EpochManager {
 
         let mut quorum_store_msg_rx_vec = Vec::new();
         self.quorum_store_msg_tx_vec.clear();
-        for _ in 0..self.num_network_workers_for_fragment+2 {
+        for _ in 0..self.num_network_workers_for_fragment + 2 {
             let (quorum_store_msg_tx, quorum_store_msg_rx) =
                 aptos_channel::new::<AccountAddress, VerifiedEvent>(
                     QueueStyle::FIFO,

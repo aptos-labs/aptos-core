@@ -3,10 +3,10 @@
 
 use crate::{
     quorum_store::{
-        counters,
         batch_aggregator::BatchAggregator,
         batch_reader::BatchReaderCommand,
         batch_store::{BatchStoreCommand, PersistRequest},
+        counters,
         proof_builder::ProofBuilderCommand,
         types::Fragment,
     },

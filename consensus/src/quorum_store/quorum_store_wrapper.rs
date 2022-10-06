@@ -3,6 +3,7 @@
 
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
+use crate::quorum_store::utils::ProofQueue;
 use crate::quorum_store::{
     counters,
     quorum_store::{QuorumStoreCommand, QuorumStoreError},
@@ -36,7 +37,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc::Sender as TokioSender, sync::oneshot as TokioOneshot, time};
-use crate::quorum_store::utils::ProofQueue;
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
@@ -266,7 +266,12 @@ impl QuorumStoreWrapper {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let proof_block = self.proofs_for_consensus.pull_proofs(&excluded_proofs, LogicalTime::new(self.latest_logical_time.epoch(), round), max_txns, max_bytes);
+                let proof_block = self.proofs_for_consensus.pull_proofs(
+                    &excluded_proofs,
+                    LogicalTime::new(self.latest_logical_time.epoch(), round),
+                    max_txns,
+                    max_bytes,
+                );
 
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
                     Payload::empty()
@@ -367,7 +372,7 @@ impl QuorumStoreWrapper {
                 Some(msg) = network_msg_rx.next() => {
                    if let VerifiedEvent::ProofOfStoreBroadcast(proof) = msg{
                         debug!("QS: got proof from peer");
-                        
+
                         counters::REMOTE_POS_COUNT.inc();
                         self.proofs_for_consensus.push(*proof);
                     }

@@ -296,7 +296,6 @@ impl QuorumStore {
         while let Some(command) = self.command_rx.recv().await {
             match command {
                 QuorumStoreCommand::Shutdown(ack_tx) => {
-
                     let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
                     self.batch_store_tx
                         .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
@@ -316,16 +315,20 @@ impl QuorumStore {
                     proof_builder_shutdown_rx
                         .await
                         .expect("Failed to stop ProofBuilder");
-                    
+
                     for network_listener_tx in self.nerwork_listener_tx_vec {
-                        let (network_listener_shutdown_tx, network_listener_shutdown_rx) = oneshot::channel();
-                        match network_listener_tx.push(self.my_peer_id, VerifiedEvent::Shutdown(network_listener_shutdown_tx)) {
+                        let (network_listener_shutdown_tx, network_listener_shutdown_rx) =
+                            oneshot::channel();
+                        match network_listener_tx.push(
+                            self.my_peer_id,
+                            VerifiedEvent::Shutdown(network_listener_shutdown_tx),
+                        ) {
                             Ok(()) => debug!("QS: shutdown network listener sent"),
                             Err(err) => panic!("Failed to send to NetworkListener, Err {:?}", err),
                         };
                         network_listener_shutdown_rx
-                        .await
-                        .expect("Failed to stop NetworkListener");
+                            .await
+                            .expect("Failed to stop NetworkListener");
                     }
 
                     ack_tx

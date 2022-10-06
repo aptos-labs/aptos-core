@@ -55,8 +55,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::time::{sleep, Instant};
 use tokio::sync::oneshot as TokioOneshot;
+use tokio::time::{sleep, Instant};
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {

@@ -218,7 +218,7 @@ impl BatchReader {
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
         if value.expiration.epoch() == self.epoch()
             && value.expiration.round() > self.last_committed_round()
-            // && value.expiration.round() <= self.last_committed_round() + self.max_expiry_round_gap
+        // && value.expiration.round() <= self.last_committed_round() + self.max_expiry_round_gap
         {
             if let Some(entry) = self.db_cache.get(&digest) {
                 if entry.expiration.round() >= value.expiration.round() {
