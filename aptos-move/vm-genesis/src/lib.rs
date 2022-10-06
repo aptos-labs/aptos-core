@@ -656,7 +656,13 @@ pub fn generate_genesis_change_set_for_testing_with_count(
         ans_admin_address = Some(get_test_ans_admin_address());
     }
 
-    generate_test_genesis(framework, Some(1), ans_funds_address, ans_admin_address).0
+    generate_test_genesis(
+        framework,
+        Some(count as usize),
+        ans_funds_address,
+        ans_admin_address,
+    )
+    .0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
