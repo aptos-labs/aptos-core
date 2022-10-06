@@ -1181,10 +1181,10 @@ def create_forge_command(
         forge_args.extend([
             "--suite", forge_test_suite
         ])
-    #if forge_runner_duration_secs:
-    forge_args.extend([
-        "--duration-secs", "forge_runner_duration_secs"
-    ])
+    if forge_runner_duration_secs:
+        forge_args.extend([
+            "--duration-secs", forge_runner_duration_secs
+        ])
 
     if forge_num_validators:
         forge_args.extend(["--num-validators", forge_num_validators])
