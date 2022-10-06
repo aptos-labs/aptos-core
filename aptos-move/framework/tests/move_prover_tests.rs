@@ -40,7 +40,7 @@ fn move_framework_prover_tests() {
 #[ignore]
 #[test]
 fn move_names_prover_tests() {
-    run_prover_for_pkg("aptos-names");
+    // run_prover_for_pkg("aptos-names"); // TODO: disabled due to the unsupported syntax used.
 }
 
 #[ignore]
