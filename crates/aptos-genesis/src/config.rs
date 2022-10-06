@@ -152,12 +152,6 @@ pub struct ValidatorConfiguration {
     /// If set to false, the validator will be fully initialized but won't be added to the
     /// validator set.
     pub join_during_genesis: bool,
-    /// Address to send ANS registry fees to
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ans_funds_address: Option<AccountAddress>,
-    /// AuthKey of account controlling ANS registry
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ans_admin_address: Option<AccountAddress>,
 }
 
 impl TryFrom<ValidatorConfiguration> for ValidatorWithCommissionRate {
