@@ -16,7 +16,7 @@ When you are deploying an Aptos node, you will need the following files. These c
 - **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
     ```bash
-    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/docker-compose.yaml
+    wget -O https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/docker-compose.yaml
     ```
 
 ## validator.yaml
@@ -25,7 +25,7 @@ When you are deploying an Aptos node, you will need the following files. These c
 - **Git branch:** `main` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/validator.yaml
+  wget -O https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/validator.yaml
   ```
 
 ## genesis.blob 
@@ -34,7 +34,7 @@ When you are deploying an Aptos node, you will need the following files. These c
 - **Git branch:** `main` on https://github.com/aptos-labs/aptos-genesis-waypoint
 - **Command to download:**
   ```bash
-  wget genesis.blob https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/genesis.blob
+  wget -O genesis.blob https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/genesis.blob
   ```
 
 ## waypoint.txt
@@ -43,7 +43,7 @@ When you are deploying an Aptos node, you will need the following files. These c
 - **Git branch:** `main` on https://github.com/aptos-labs/aptos-genesis-waypoint
 - **Command to download:**
   ```bash
-  wget waypoint.txt https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/waypoint.txt
+  wget -O waypoint.txt https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/waypoint.txt
   ```
 
 ## haproxy.cfg
@@ -52,7 +52,7 @@ When you are deploying an Aptos node, you will need the following files. These c
 - **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/haproxy.cfg
+  wget -O https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/haproxy.cfg
   ```
 
 ## blocked.ips 
@@ -61,7 +61,7 @@ When you are deploying an Aptos node, you will need the following files. These c
 - **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/blocked.ips
+  wget -O https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/blocked.ips
   ```
 
 ## docker-compose-fullnode.yaml (fullnode only)
@@ -74,7 +74,7 @@ Fullnode means either a validator fullnode or a public fullnode.
 - **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/docker-compose-fullnode.yaml
+  wget -O https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/docker-compose-fullnode.yaml
   ```
 
 ## fullnode.yaml (fullnode only)
@@ -87,5 +87,5 @@ Fullnode means either a validator fullnode or a public fullnode.
 - **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/fullnode.yaml
+  wget -O https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/fullnode.yaml
   ```
