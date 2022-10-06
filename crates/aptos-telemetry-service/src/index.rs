@@ -1,19 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::debug;
 use crate::{
     auth,
     constants::GCP_CLOUD_TRACE_CONTEXT_HEADER,
     context::Context,
     custom_event,
-    error::ServiceError,
+    errors::ServiceError,
     log_ingest,
     metrics::SERVICE_ERROR_COUNTS,
     prometheus_push_metrics, remote_config,
     types::response::{ErrorResponse, IndexResponse},
 };
 use std::convert::Infallible;
-use tracing::debug;
 use warp::{
     body::BodyDeserializeError,
     filters::BoxedFilter,
@@ -50,11 +50,11 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(v1_api)
         .recover(handle_rejection)
         .with(warp::trace::trace(|info| {
-            let trace_id = info.request_headers().get(GCP_CLOUD_TRACE_CONTEXT_HEADER).and_then(|h| h.to_str().ok()).unwrap_or_default();
-            // To adhere to Google Cloud's tracing requirements, the trace key should be logging.googleapis.com/trace
-            // This span must be named logging to work around the aptos_logger's tracing_adapter
-            // which prefixes the span name to the field names by default. Otherwise, GCP can't pick up this trace_id
-            let span = tracing::debug_span!("logging", method=%info.method(), path=%info.path(), "googleapis.com/trace"=trace_id);
+            let trace_id = info.request_headers()
+                .get(GCP_CLOUD_TRACE_CONTEXT_HEADER)
+                .and_then(|header_value| header_value.to_str().ok().and_then(|trace_value| trace_value.split_once('/').map(|parts| parts.0)))
+                .unwrap_or_default();
+            let span = tracing::debug_span!("request", method=%info.method(), path=%info.path(), trace_id=trace_id);
             span
         }))
 }

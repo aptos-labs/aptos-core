@@ -6,15 +6,15 @@ use crate::{
     clients::humio::{CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME},
     constants::MAX_CONTENT_LENGTH,
     context::Context,
-    error::{LogIngestError, ServiceError},
+    errors::{LogIngestError, ServiceError},
     metrics::LOG_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
 };
+use crate::{debug, error};
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use std::collections::HashMap;
 use tokio::time::Instant;
-use tracing::{debug, error};
 use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
 /// TODO: Cleanup after v1 API is ramped up

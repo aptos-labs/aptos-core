@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::context::Context;
-use crate::error::{AuthError, ServiceError, ServiceErrorCode};
+use crate::errors::{AuthError, ServiceError, ServiceErrorCode};
 use crate::jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header};
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
 use crate::types::common::NodeType;
+use crate::{debug, error, warn};
 
 use anyhow::Result;
 use reqwest::header::AUTHORIZATION;
-use tracing::{debug, error, warn};
 use warp::filters::BoxedFilter;
 use warp::{reject, Filter, Rejection};
 use warp::{reply, Reply};
