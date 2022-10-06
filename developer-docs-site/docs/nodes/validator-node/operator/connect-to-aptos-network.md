@@ -270,11 +270,70 @@ After your validator node joined the validator set, you can verify the correctne
 
 ## Seeing your stake pool information
 
-To see the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. This example is for Premainnet. For other networks, use the appropriate REST URL for the `--url` field. See [Aptos Blockchain Deployments](/nodes/aptos-deployments) for `--url` field values for other networks. 
+To see the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. 
 
-The below command is for an example owner address `0x0756c80f0597fc221fe043d5388949b34151a4efe5753965bbfb0ed7d0be08ea` and it will display the following information on the owner's stake pool on the premainnet:
 
-- Status of the stake: pending active, active, pending-inactive, inactive.
+
+:::tip Use CLI 0.3.8 or higher
+Make sure you use the CLI version 0.3.8 or higher. See [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md).
+- Type `aptos --help` to see the CLI version.
+- Type `aptos node get-stake-pool --help` for more on the command option for the below example.
+:::
+
+The below command is an example for Premainnet and an example owner address `0x6064d2f4c38b65e9b78fbdf8a80f084159341d47b5e0c192492923326d1bed0a`. For other networks, use the appropriate REST URL for the `--url` field. See [Aptos Blockchain Deployments](/nodes/aptos-deployments) for `--url` field values. 
+
+```bash
+aptos node get-stake-pool \
+  --owner-address 0x6064d2f4c38b65e9b78fbdf8a80f084159341d47b5e0c192492923326d1bed0a \
+  --url https://premainnet.aptosdev.com
+```
+
+Example output:
+
+```json
+ Finished dev [unoptimized + debuginfo] target(s) in 0.84s
+     Running `target/debug/aptos node get-stake-pool --owner-address 0x6064d2f4c38b65e9b78fbdf8a80f084159341d47b5e0c192492923326d1bed0a`
+{
+  "Result": [
+    {
+      "state": "Active",
+      "pool_address": "c103f2e169314df3116d47b0fdd7c0378bf5805976c14af9358a2325ff89f647",
+      "operator_address": "f4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546",
+      "voter_address": "8ac6fe79b3656feda6485fcf872e00033dd35cd9d8e10b485e3dee34949b2f47",
+      "pool_type": "Vesting",
+      "total_stake": 1541689598533365,
+      "commission_percentage": 12,
+      "commission_not_yet_unlocked": 80855824003,
+      "lockup_expiration_local_time": "Thu Nov  3 01:39:48 2022",
+      "consensus_public_key": "0x97f001bb26d1e80e1da9a02b573562abb8e02c5ff2447616a1c27ab4f4756c54795a51684c9e0cb2290f8e204d2035d4",
+      "validator_network_addresses": [
+        "/dns/validator.aptos.main.metahash.biz/tcp/6180/noise-ik/0x7146cf496c4b54631d4d75e7491d0356f663affc8f8f5c44206c88992a605811/handshake/0"
+      ],
+      "fullnode_network_addresses": [
+        "/dns/fullnode.aptos.main.metahash.biz/tcp/6182/noise-ik/0xec699df05d5c6dd59b320cee3559a91ed4c7ce3b34ec4368de81eec867c4b17e/handshake/0"
+      ],
+      "epoch_info": {
+        "epoch": 68,
+        "epoch_interval": 3600000000,
+        "last_epoch_start_time": {
+          "unix_time": 1665074662417326,
+          "utc_time": "2022-10-06T16:44:22.417326Z",
+          "local_time": "Thu Oct  6 16:44:22 2022"
+        },
+        "next_epoch_start_time": {
+          "unix_time": 1665078262417326,
+          "utc_time": "2022-10-06T17:44:22.417326Z",
+          "local_time": "Thu Oct  6 17:44:22 2022"
+        }
+      }
+    }
+  ]
+}
+```
+
+where:
+
+- `state` is the status of the stake and can be: pending active, active, pending-inactive, inactive.
 - Total stake.
 - Consensus key.
 - Addresses (pool, operator, voter). 
@@ -283,18 +342,6 @@ The below command is for an example owner address `0x0756c80f0597fc221fe043d5388
 - Epoch information.
 - Lockup expiration information.
 
-:::tip Use CLI 0.3.8 or higher
-Make sure you use the CLI version 0.3.8 or higher. See [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md).
-- Type `aptos --help` to see the CLI version.
-- Type `aptos node get-stake-pool --help` for more on the command option for the below example.
-:::
-
-```bash
-aptos node get-stake-pool \
-  --owner-address 0x0756c80f0597fc221fe043d5388949b34151a4efe5753965bbfb0ed7d0be08ea \
-  --url https://premainnet.aptosdev.com
-```
-
 ## Checking your validator performance
 
 To see your validator performance in the current and past epochs and rewards earned, run the below command. The output will show the validator's performance in block proposals and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node analyze-validator-performance --help` to see default values used.
@@ -302,6 +349,43 @@ To see your validator performance in the current and past epochs and rewards ear
 ```bash
 aptos node analyze-validator-performance --analyze-mode All \
   --url https://premainnet.aptosdev.com
+```
+
+Example output:
+
+```json
+{
+  "Result": {
+    "current_epoch_successful_proposals": 56,
+    "current_epoch_failed_proposals": 0,
+    "previous_epoch_rewards": [
+      "12312716242",
+      "12272043711",
+      "12312912674",
+      "12313011054",
+      "12313109435",
+      "12180092056",
+      "12313305136",
+      "12313403519",
+      "12313501903",
+      "12313600288"
+    ],
+    "epoch_info": {
+      "epoch": 68,
+      "epoch_interval": 3600000000,
+      "last_epoch_start_time": {
+        "unix_time": 1665074662417326,
+        "utc_time": "2022-10-06T16:44:22.417326Z",
+        "local_time": "Thu Oct  6 16:44:22 2022"
+      },
+      "next_epoch_start_time": {
+        "unix_time": 1665078262417326,
+        "utc_time": "2022-10-06T17:44:22.417326Z",
+        "local_time": "Thu Oct  6 17:44:22 2022"
+      }
+    }
+  }
+}
 ```
 
 ## Leaving validator set
