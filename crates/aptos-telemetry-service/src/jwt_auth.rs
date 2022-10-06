@@ -3,15 +3,15 @@
 
 use aptos_types::{chain_id::ChainId, PeerId};
 
+use crate::error;
 use chrono::Utc;
 use jsonwebtoken::{errors::Error, TokenData};
-use tracing::error;
 use warp::{reject, Rejection};
 
 use crate::context::JsonWebTokenService;
-use crate::error::JwtAuthError;
+use crate::errors::JwtAuthError;
 use crate::{context::Context, types::auth::Claims};
-use crate::{error::ServiceError, types::common::NodeType};
+use crate::{errors::ServiceError, types::common::NodeType};
 
 const BEARER: &str = "BEARER ";
 
