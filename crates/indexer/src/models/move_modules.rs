@@ -7,15 +7,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Queryable,
-    Serialize,
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
 )]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
@@ -31,8 +23,6 @@ pub struct MoveModule {
     pub friends: Option<serde_json::Value>,
     pub structs: Option<serde_json::Value>,
     pub is_deleted: bool,
-    // Default time columns
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 pub struct MoveModuleByteCodeParsed {
@@ -66,7 +56,6 @@ impl MoveModule {
             friends: parsed_data.as_ref().map(|d| d.friends.clone()),
             structs: parsed_data.as_ref().map(|d| d.structs.clone()),
             is_deleted: false,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
@@ -87,7 +76,6 @@ impl MoveModule {
             friends: None,
             structs: None,
             is_deleted: true,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 

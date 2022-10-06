@@ -13,8 +13,10 @@ use super::{
     token_utils::{TokenResource, TokenWriteSet},
 };
 use crate::{
-    database::PgPoolConnection, models::move_resources::MoveResource, schema::tokens,
-    util::ensure_not_negative,
+    database::PgPoolConnection,
+    models::move_resources::MoveResource,
+    schema::tokens,
+    util::{ensure_not_negative, parse_timestamp},
 };
 use aptos_api_types::{
     DeleteTableItem as APIDeleteTableItem, Transaction as APITransaction,
@@ -38,7 +40,7 @@ pub type CurrentTokenPendingClaimPK = (TokenDataIdHash, BigDecimal, Address, Add
 // PK of tokens table, used to dedupe tokens
 pub type TokenPK = (TokenDataIdHash, BigDecimal);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_data_id_hash, property_version, transaction_version))]
 #[diesel(table_name = tokens)]
 pub struct Token {
@@ -49,8 +51,8 @@ pub struct Token {
     pub collection_name: String,
     pub name: String,
     pub token_properties: serde_json::Value,
-    pub inserted_at: chrono::NaiveDateTime,
     pub collection_data_id_hash: String,
+    pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
 #[derive(Debug)]
@@ -98,6 +100,7 @@ impl Token {
             > = HashMap::new();
 
             let txn_version = user_txn.info.version.0 as i64;
+            let txn_timestamp = parse_timestamp(user_txn.timestamp.0, txn_version);
             let mut table_handle_to_owner: TableHandleToOwner = HashMap::new();
             for wsc in &user_txn.info.changes {
                 if let APIWriteSetChange::WriteResource(write_resource) = wsc {
@@ -119,13 +122,20 @@ impl Token {
                         Self::from_write_table_item(
                             write_table_item,
                             txn_version,
+                            txn_timestamp,
                             &table_handle_to_owner,
                         )
                         .unwrap(),
-                        TokenData::from_write_table_item(write_table_item, txn_version).unwrap(),
+                        TokenData::from_write_table_item(
+                            write_table_item,
+                            txn_version,
+                            txn_timestamp,
+                        )
+                        .unwrap(),
                         CollectionData::from_write_table_item(
                             write_table_item,
                             txn_version,
+                            txn_timestamp,
                             &table_handle_to_owner,
                             conn,
                         )
@@ -135,6 +145,7 @@ impl Token {
                         Self::from_delete_table_item(
                             delete_table_item,
                             txn_version,
+                            txn_timestamp,
                             &table_handle_to_owner,
                         )
                         .unwrap(),
@@ -149,6 +160,7 @@ impl Token {
                         CurrentTokenPendingClaim::from_write_table_item(
                             write_table_item,
                             txn_version,
+                            txn_timestamp,
                             &table_handle_to_owner,
                         )
                         .unwrap()
@@ -157,6 +169,7 @@ impl Token {
                         CurrentTokenPendingClaim::from_delete_table_item(
                             delete_table_item,
                             txn_version,
+                            txn_timestamp,
                             &table_handle_to_owner,
                         )
                         .unwrap()
@@ -232,6 +245,7 @@ impl Token {
     pub fn from_write_table_item(
         table_item: &APIWriteTableItem,
         txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
     ) -> anyhow::Result<Option<(Self, TokenOwnership, Option<CurrentTokenOwnership>)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
@@ -262,7 +276,7 @@ impl Token {
                 property_version: token_id.property_version,
                 transaction_version: txn_version,
                 token_properties: token.token_properties,
-                inserted_at: chrono::Utc::now().naive_utc(),
+                transaction_timestamp: txn_timestamp,
             };
 
             let (token_ownership, current_token_ownership) = TokenOwnership::from_token(
@@ -284,6 +298,7 @@ impl Token {
     pub fn from_delete_table_item(
         table_item: &APIDeleteTableItem,
         txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
     ) -> anyhow::Result<Option<(Self, TokenOwnership, Option<CurrentTokenOwnership>)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
@@ -313,7 +328,7 @@ impl Token {
                 property_version: token_id.property_version,
                 transaction_version: txn_version,
                 token_properties: serde_json::Value::Null,
-                inserted_at: chrono::Utc::now().naive_utc(),
+                transaction_timestamp: txn_timestamp,
             };
             let (token_ownership, current_token_ownership) = TokenOwnership::from_token(
                 &token,
@@ -346,7 +361,7 @@ impl TableMetadataForToken {
         }
         let resource = MoveResource::from_write_resource(
             write_resource,
-            0,
+            0, // Placeholder, this isn't used anyway
             txn_version,
             0, // Placeholder, this isn't used anyway
         );
