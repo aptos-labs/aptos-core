@@ -225,7 +225,13 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         false,
     )?;
 
-    let framework = client.get_framework()?;
+    let mut framework = client.get_framework()?;
+    framework.packages.iter_mut().for_each(|p| {
+        p.metadata
+            .modules
+            .iter_mut()
+            .for_each(|m| m.source = vec![])
+    });
     Ok(MainnetGenesisInfo::new(
         layout.chain_id,
         accounts,
