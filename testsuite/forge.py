@@ -1384,6 +1384,9 @@ def test(
     test_args: Optional[List[str]],
     test_suites: Tuple[str],
 ) -> None:
+    forge_enable_failpoints = "true"
+    forge_test_suite = "different_node_speed_and_reliability_test"
+
     """Run a forge test"""
     shell = LocalShell(verbose == "true")
     git = Git(shell)
