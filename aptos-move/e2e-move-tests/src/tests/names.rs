@@ -4,7 +4,7 @@
 
 use crate::{assert_success, MoveHarness};
 use aptos_types::account_address::AccountAddress;
-use vm_genesis::{get_test_ans_admin_address, get_test_ans_funds_address};
+use cached_packages::aptos_names_sdk_builder;
 
 /*
     Below values are for testing only!

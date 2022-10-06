@@ -801,6 +801,7 @@ pub fn generate_test_genesis(
     (genesis, test_validators)
 }
 
+#[allow(unused)]
 fn mainnet_genesis_config() -> GenesisConfiguration {
     // TODO: Update once mainnet numbers are decided. These numbers are just placeholders.
     GenesisConfiguration {
