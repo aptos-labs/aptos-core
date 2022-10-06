@@ -3,7 +3,7 @@
   "slug": "",
   "title": "System",
   "originalTitle": "",
-  "tags": [],
+  "tags": ["aptos-core"],
   "style": "dark",
   "timezone": "",
   "editable": true,
@@ -737,7 +737,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 3,
+  "version": 4,
   "links": [
     {
       "title": "Other Dashboards",

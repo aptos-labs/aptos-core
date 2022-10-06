@@ -42,6 +42,8 @@ use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
+pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
+
 #[derive(Clone)]
 /// A wrapper to make VMRuntime standalone and thread safe.
 pub struct AptosVMImpl {
@@ -113,6 +115,7 @@ impl AptosVMImpl {
         let inner = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
+            gas_feature_version,
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
@@ -215,13 +218,23 @@ impl AptosVMImpl {
             let valid = if let Ok(Some(data)) = data {
                 let approved_execution_hashes =
                     bcs::from_bytes::<ApprovedExecutionHashes>(&data).ok();
-                approved_execution_hashes
+                let valid = approved_execution_hashes
                     .map(|aeh| {
                         aeh.entries
                             .into_iter()
                             .any(|(_, hash)| hash == txn_data.script_hash)
                     })
-                    .unwrap_or(false)
+                    .unwrap_or(false);
+                valid
+                    // If it is valid ensure that it is only the approved payload that exceeds the
+                    // maximum. The (unknown) user input should be restricted to the original
+                    // maximum transaction size.
+                    && (txn_data.script_size + txn_gas_params.max_transaction_size_in_bytes
+                        > txn_data.transaction_size)
+                    // Since an approved transaction can be sent by anyone, the system is safer by
+                    // enforcing an upper limit on governance transactions just so something really
+                    // bad doesn't happen.
+                    && txn_data.transaction_size <= MAXIMUM_APPROVED_TRANSACTION_SIZE.into()
             } else {
                 false
             };
@@ -572,6 +585,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     gas_left: Gas,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
+    gas_feature_version: u64,
 ) -> Result<TransactionOutputExt, VMStatus> {
     let gas_used = txn_data
         .max_gas_amount()
@@ -579,7 +593,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
         .expect("Balance should always be less than or equal to max gas amount");
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-    let change_set_ext = session_out.into_change_set(ap_cache)?;
+    let change_set_ext = session_out.into_change_set(ap_cache, gas_feature_version)?;
     let (delta_change_set, change_set) = change_set_ext.into_inner();
     let (write_set, events) = change_set.into_inner();
 

@@ -382,12 +382,16 @@ mod tests {
     }
 
     fn create_genesis_transaction() -> Transaction {
-        Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
-            WriteSetMut::new(vec![])
-                .freeze()
-                .expect("freeze cannot fail"),
-            vec![],
-        )))
+        Transaction::GenesisTransaction(WriteSetPayload::Direct(
+            ChangeSet::new(
+                WriteSetMut::new(vec![])
+                    .freeze()
+                    .expect("freeze cannot fail"),
+                vec![],
+                3,
+            )
+            .unwrap(),
+        ))
     }
 
     fn create_runtime() -> Runtime {

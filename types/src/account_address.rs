@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use crate::transaction::authenticator::AuthenticationKey;
+use crate::transaction::authenticator::{AuthenticationKey, Scheme};
 use aptos_crypto::{
     ed25519::Ed25519PublicKey,
     hash::{CryptoHasher, HashValue},
@@ -193,6 +193,7 @@ pub fn create_vesting_pool_address(
 pub fn create_resource_address(address: AccountAddress, seed: &[u8]) -> AccountAddress {
     let mut input = bcs::to_bytes(&address).unwrap();
     input.extend(seed);
+    input.push(Scheme::DeriveResourceAccountAddress as u8);
     let hash = HashValue::sha3_256_of(&input);
     AccountAddress::from_bytes(&hash.as_ref()).unwrap()
 }

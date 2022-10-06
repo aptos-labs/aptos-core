@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared_mempool::types::BatchId;
+use crate::shared_mempool::types::MultiBatchId;
 use crate::tests::common;
 use crate::{
     core_mempool::CoreMempool,
@@ -152,7 +152,7 @@ impl MempoolNode {
         for txn in sign_transactions(txns) {
             self.mempool
                 .lock()
-                .remove_transaction(&txn.sender(), txn.sequence_number(), false);
+                .commit_transaction(&txn.sender(), txn.sequence_number());
         }
     }
 
@@ -239,9 +239,9 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
         let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
-        let batch_id = BatchId(1, 10);
+        let batch_id = MultiBatchId::from_timeline_ids(&vec![1].into(), &vec![10].into());
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: batch_id,
+            request_id: batch_id.clone(),
             transactions: sign_transactions(txns),
         };
         let data = protocol_id.to_bytes(&msg).unwrap().into();

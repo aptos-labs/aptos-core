@@ -35,7 +35,7 @@ impl Page {
     }
 
     /// Retrieve the start of the page
-    pub fn start<E: BadRequestError>(
+    fn start<E: BadRequestError>(
         &self,
         default: u64,
         max: u64,
@@ -70,16 +70,11 @@ impl Page {
                 ledger_info,
             ));
         }
+        // If we go over the max page size, we return the max page size
         if limit > self.max_page_size {
-            return Err(E::bad_request_with_code(
-                &format!(
-                    "Given limit value ({}) is too large, it must be < {}",
-                    limit, self.max_page_size
-                ),
-                AptosErrorCode::InvalidInput,
-                ledger_info,
-            ));
+            Ok(self.max_page_size)
+        } else {
+            Ok(limit)
         }
-        Ok(limit)
     }
 }

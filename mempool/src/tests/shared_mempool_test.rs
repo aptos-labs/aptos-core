@@ -7,7 +7,7 @@ use crate::{
     QuorumStoreRequest,
 };
 use aptos_types::transaction::Transaction;
-use consensus_types::common::TransactionSummary;
+use consensus_types::common::RejectedTransactionSummary;
 use futures::{channel::oneshot, executor::block_on, sink::SinkExt};
 use mempool_notifications::MempoolNotificationSender;
 use tokio::runtime::Builder;
@@ -16,17 +16,16 @@ use tokio::runtime::Builder;
 fn test_consensus_events_rejected_txns() {
     let smp = MockSharedMempool::new();
 
-    // Add txns 1, 2, 3, 4
-    // Txn 1: committed successfully
-    // Txn 2: not committed but older than gc block timestamp
-    // Txn 3: not committed and newer than block timestamp
-    let committed_txn =
-        TestTransaction::new(0, 0, 1).make_signed_transaction_with_expiration_time(0);
-    let kept_txn = TestTransaction::new(1, 0, 1).make_signed_transaction(); // not committed or cleaned out by block timestamp gc
+    // Add txns 1, 2, 3
+    // Txn 1: rejected during execution
+    // Txn 2: not committed with different address
+    // Txn 3: not committed with same address
+    let rejected_txn = TestTransaction::new(0, 0, 1).make_signed_transaction();
+    let kept_txn = TestTransaction::new(1, 0, 1).make_signed_transaction();
     let txns = vec![
-        committed_txn.clone(),
-        TestTransaction::new(0, 1, 1).make_signed_transaction_with_expiration_time(0),
+        rejected_txn.clone(),
         kept_txn.clone(),
+        TestTransaction::new(0, 1, 1).make_signed_transaction(),
     ];
     // Add txns to mempool
     {
@@ -34,9 +33,10 @@ fn test_consensus_events_rejected_txns() {
         assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
     }
 
-    let transactions = vec![TransactionSummary {
-        sender: committed_txn.sender(),
-        sequence_number: committed_txn.sequence_number(),
+    let transactions = vec![RejectedTransactionSummary {
+        sender: rejected_txn.sender(),
+        sequence_number: rejected_txn.sequence_number(),
+        hash: rejected_txn.committed_hash(),
     }];
     let (callback, callback_rcv) = oneshot::channel();
     let req = QuorumStoreRequest::RejectNotification(transactions, callback);
@@ -47,8 +47,8 @@ fn test_consensus_events_rejected_txns() {
     });
 
     let pool = smp.mempool.lock();
-    let (timeline, _) = pool.read_timeline(0, 10);
-    assert_eq!(timeline.len(), 1);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0, 0, 0, 0].into(), 10);
+    assert_eq!(timeline.len(), 2);
     assert_eq!(timeline.first().unwrap(), &kept_txn);
 }
 
@@ -65,7 +65,7 @@ fn test_mempool_notify_committed_txns() {
     // Create a new mempool notifier, listener and shared mempool
     let smp = MockSharedMempool::new();
 
-    // Add txns 1, 2, 3, 4
+    // Add txns 1, 2, 3
     // Txn 1: committed successfully
     // Txn 2: not committed but older than gc block timestamp
     // Txn 3: not committed and newer than block timestamp
@@ -93,7 +93,7 @@ fn test_mempool_notify_committed_txns() {
     });
 
     let pool = smp.mempool.lock();
-    let (timeline, _) = pool.read_timeline(0, 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0, 0, 0, 0].into(), 10);
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline.first().unwrap(), &kept_txn);
 }
