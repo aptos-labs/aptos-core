@@ -105,7 +105,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
-        .unwrap();
+    .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
@@ -200,7 +200,7 @@ pub fn encode_genesis_change_set(
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
-        .unwrap();
+    .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
@@ -613,7 +613,7 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
         1,
         "There should only be exactly one NewEpochEvent"
     );
-    assert_eq!(new_epoch_events[0].sequence_number(), 0, );
+    assert_eq!(new_epoch_events[0].sequence_number(), 0,);
 }
 
 /// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions
@@ -756,14 +756,14 @@ pub fn get_test_ans_funds_address() -> AccountAddress {
     AccountAddress::from_hex_literal(
         "0x0ee16f0e4b47d5972f63a642385d52d301e53716b4e1fbd637b9a91a7f1979ba",
     )
-        .unwrap()
+    .unwrap()
 }
 
 pub fn get_test_ans_admin_address() -> AccountAddress {
     AccountAddress::from_hex_literal(
         "0x0ee16f0e4b47d5972f63a642385d52d301e53716b4e1fbd637b9a91a7f1979ba",
     )
-        .unwrap()
+    .unwrap()
 }
 
 pub fn generate_test_genesis(
@@ -844,11 +844,11 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         ans_funds_address: AccountAddress::from_hex_literal(
             "0x3e89c7ef29468198fe58b3ced66d8c7dcb79b5f9fa27313464886334c35730e9",
         )
-            .expect("Funds Address is valid"),
+        .expect("Funds Address is valid"),
         ans_admin_address: AccountAddress::from_hex_literal(
             "0x3e89c7ef29468198fe58b3ced66d8c7dcb79b5f9fa27313464886334c35730e9",
         )
-            .expect("Admin Address is valid"),
+        .expect("Admin Address is valid"),
     }
 }
 
@@ -892,7 +892,7 @@ pub fn test_genesis_module_publishing() {
         LATEST_GAS_FEATURE_VERSION,
         false,
     )
-        .unwrap();
+    .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
     publish_framework(&mut session, cached_packages::head_release_bundle());

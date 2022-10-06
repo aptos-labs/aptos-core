@@ -72,12 +72,6 @@ impl MainnetGenesisInfo {
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<MainnetGenesisInfo> {
-        let ans_funds_address = genesis_config
-            .ans_funds_address
-            .expect("Expected ANS funds address");
-        let ans_admin_address = genesis_config
-            .ans_admin_address
-            .expect("Expected ANS Admin Multisig AuthKey");
         let employee_vesting_start = genesis_config
             .employee_vesting_start
             .expect("Employee vesting start time (in secs) needs to be provided");
@@ -87,10 +81,10 @@ impl MainnetGenesisInfo {
 
         let ans_funds_address = genesis_config
             .ans_funds_address
-            .context("Expected ANS funds address")?;
+            .expect("Expected ANS funds address");
         let ans_admin_address = genesis_config
-            .ans_admin_multisig_auth_key
-            .context("Expected ANS Admin Multisig AuthKey")?;
+            .ans_admin_address
+            .expect("Expected ANS Admin address");
         Ok(MainnetGenesisInfo {
             chain_id,
             accounts,
