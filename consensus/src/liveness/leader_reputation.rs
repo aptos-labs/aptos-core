@@ -556,6 +556,7 @@ pub struct LeaderReputation {
     heuristic: Box<dyn ReputationHeuristic>,
     exclude_round: u64,
     use_root_hash: bool,
+    window_for_chain_health: usize,
 }
 
 impl LeaderReputation {
@@ -567,6 +568,7 @@ impl LeaderReputation {
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
         use_root_hash: bool,
+        window_for_chain_health: usize,
     ) -> Self {
         assert!(epoch_to_proposers.contains_key(&epoch));
         assert_eq!(epoch_to_proposers[&epoch].len(), voting_powers.len());
@@ -579,21 +581,29 @@ impl LeaderReputation {
             heuristic,
             exclude_round,
             use_root_hash,
+            window_for_chain_health,
         }
     }
 
-    fn add_chain_health_metrics(&self, history: &[NewBlockEvent], round: Round) {
+    // Compute chain health metrics, and
+    // - return participating voting power percentage for the window_for_chain_health
+    // - update metric counters for different windows
+    fn compute_chain_health_and_add_metrics(&self, history: &[NewBlockEvent], round: Round) -> f64 {
         let candidates = self.epoch_to_proposers.get(&self.epoch).unwrap();
         // use f64 counter, as total voting power is u128
-        CHAIN_HEALTH_TOTAL_VOTING_POWER.set(self.voting_powers.iter().map(|v| *v as f64).sum());
+        let total_voting_power = self.voting_powers.iter().map(|v| *v as f64).sum();
+        CHAIN_HEALTH_TOTAL_VOTING_POWER.set(total_voting_power);
         CHAIN_HEALTH_TOTAL_NUM_VALIDATORS.set(candidates.len() as i64);
+
+        let mut result = None;
 
         for (counter_index, participants_window_size) in
             CHAIN_HEALTH_WINDOW_SIZES.iter().enumerate()
         {
+            let chosen = self.window_for_chain_health == *participants_window_size;
             let sample_fraction = participants_window_size / 10;
             // Sample longer durations
-            if sample_fraction <= 1 || (round % sample_fraction as u64) == 1 {
+            if chosen || sample_fraction <= 1 || (round % sample_fraction as u64) == 1 {
                 let participants: HashSet<_> = NewBlockEventAggregation::count_votes_custom(
                     &self.epoch_to_proposers,
                     history,
@@ -612,26 +622,49 @@ impl LeaderReputation {
                 )
                 .collect();
 
-                CHAIN_HEALTH_PARTICIPATING_VOTING_POWER[counter_index].set(
-                    candidates
-                        .iter()
-                        .zip(self.voting_powers.iter())
-                        .filter(|(c, _vp)| participants.contains(c))
-                        .map(|(_c, vp)| *vp as f64)
-                        .sum(),
-                );
+                let participating_voting_power = candidates
+                    .iter()
+                    .zip(self.voting_powers.iter())
+                    .filter(|(c, _vp)| participants.contains(c))
+                    .map(|(_c, vp)| *vp as f64)
+                    .sum();
+
+                CHAIN_HEALTH_PARTICIPATING_VOTING_POWER[counter_index]
+                    .set(participating_voting_power);
                 CHAIN_HEALTH_PARTICIPATING_NUM_VALIDATORS[counter_index]
                     .set(participants.len() as i64);
+
+                if chosen {
+                    // do not treat chain as unhealthy, if chain just started, and we don't have enough history to decide.
+                    result = Some(
+                        if history.len() < *participants_window_size && self.epoch <= 2 {
+                            1.0
+                        } else {
+                            participating_voting_power / total_voting_power
+                        },
+                    );
+                }
             }
         }
+
+        result.unwrap_or_else(|| {
+            panic!(
+                "asked window size {} not found in predefined window sizes: {:?}",
+                self.window_for_chain_health, CHAIN_HEALTH_WINDOW_SIZES
+            )
+        })
     }
 }
 
 impl ProposerElection for LeaderReputation {
-    fn get_valid_proposer(&self, round: Round) -> Author {
+    fn get_valid_proposer_and_voting_power_participation_ratio(
+        &self,
+        round: Round,
+    ) -> (Author, f64) {
         let target_round = round.saturating_sub(self.exclude_round);
         let (sliding_window, root_hash) = self.backend.get_block_metadata(self.epoch, target_round);
-        self.add_chain_health_metrics(&sliding_window, round);
+        let voting_power_participation_ratio =
+            self.compute_chain_health_and_add_metrics(&sliding_window, round);
         let mut weights =
             self.heuristic
                 .get_weights(self.epoch, &self.epoch_to_proposers, &sliding_window);
@@ -661,7 +694,17 @@ impl ProposerElection for LeaderReputation {
         };
 
         let chosen_index = choose_index(stake_weights, state);
-        proposers[chosen_index]
+        (proposers[chosen_index], voting_power_participation_ratio)
+    }
+
+    fn get_valid_proposer(&self, round: Round) -> Author {
+        self.get_valid_proposer_and_voting_power_participation_ratio(round)
+            .0
+    }
+
+    fn get_voting_power_participation_ratio(&self, round: Round) -> f64 {
+        self.get_valid_proposer_and_voting_power_participation_ratio(round)
+            .1
     }
 }
 
