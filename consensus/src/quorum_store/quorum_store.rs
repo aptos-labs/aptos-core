@@ -14,7 +14,7 @@ use crate::quorum_store::{
 };
 use crate::round_manager::VerifiedEvent;
 use aptos_logger::debug;
-use aptos_logger::spawn_named;
+// use aptos_logger::spawn_named;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
@@ -159,10 +159,12 @@ impl QuorumStore {
             });
         }
 
-        _ = spawn_named!(
-            &("Quorum:ProofBuilder epoch ".to_owned() + &epoch.to_string()),
-            metrics_monitor.instrument(proof_builder.start(proof_builder_rx, validator_verifier))
-        );
+        tokio::spawn(proof_builder.start(proof_builder_rx, validator_verifier));
+
+        // _ = spawn_named!(
+        //     &("Quorum:ProofBuilder epoch ".to_owned() + &epoch.to_string()),
+        //     metrics_monitor.instrument(proof_builder.start(proof_builder_rx, validator_verifier))
+        // );
 
         for network_msg_rx in network_msg_rx_vec.into_iter() {
             let net = NetworkListener::new(
@@ -173,16 +175,20 @@ impl QuorumStore {
                 proof_builder_tx.clone(),
                 config.max_batch_bytes,
             );
-            _ = spawn_named!(
-                &("Quorum:NetworkListener epoch ".to_owned() + &epoch.to_string()),
-                metrics_monitor.instrument(net.start())
-            );
+            tokio::spawn(net.start());
+
+            // _ = spawn_named!(
+            //     &("Quorum:NetworkListener epoch ".to_owned() + &epoch.to_string()),
+            //     metrics_monitor.instrument(net.start())
+            // );
         }
 
-        _ = spawn_named!(
-            &("Quorum:BatchStore epoch ".to_owned() + &epoch.to_string()),
-            metrics_monitor.instrument(batch_store.start(batch_store_rx, proof_builder_tx.clone()))
-        );
+        tokio::spawn(batch_store.start(batch_store_rx, proof_builder_tx.clone()));
+
+        // _ = spawn_named!(
+        //     &("Quorum:BatchStore epoch ".to_owned() + &epoch.to_string()),
+        //     metrics_monitor.instrument(batch_store.start(batch_store_rx, proof_builder_tx.clone()))
+        // );
 
         debug!("QS: QuorumStore created");
         (

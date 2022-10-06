@@ -324,7 +324,7 @@ impl QuorumStoreWrapper {
 
         // TODO: parameter? bring back back-off?
         let mut interval = time::interval(Duration::from_millis(
-            50, // 50 is currently the end batch timer
+            25, // 50 is currently the end batch timer
         ));
 
         loop {

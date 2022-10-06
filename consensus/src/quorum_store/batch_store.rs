@@ -11,7 +11,7 @@ use crate::quorum_store::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
-use aptos_logger::spawn_named;
+// use aptos_logger::spawn_named;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
 use consensus_types::{
@@ -122,7 +122,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 }
             });
         }
-        _ = spawn_named!(&("Quorum:BatchReader epoch ".to_owned() + &epoch.to_string()), async move {
+
+        tokio::spawn(async move {
             metrics_monitor
                 .instrument(batch_reader_clone.start(
                     batch_reader_rx,
@@ -133,6 +134,18 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 ))
                 .await
         });
+
+        // _ = spawn_named!(&("Quorum:BatchReader epoch ".to_owned() + &epoch.to_string()), async move {
+        //     metrics_monitor
+        //         .instrument(batch_reader_clone.start(
+        //             batch_reader_rx,
+        //             net,
+        //             batch_request_num_peers,
+        //             batch_request_timeout_ms,
+        //             validator_verifier,
+        //         ))
+        //         .await
+        // });
 
         let batch_reader_clone = batch_reader.clone();
         (
@@ -165,9 +178,9 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 debug!("QS: sign digest");
                 if needs_db {
                     // TODO: Consider an async call to DB, but it could be a race with clean.
-                    // self.db
-                    //     .save_batch(persist_request.digest, persist_request.value)
-                    //     .expect("Could not write to DB");
+                    self.db
+                        .save_batch(persist_request.digest, persist_request.value)
+                        .expect("Could not write to DB");
                 }
                 Some(SignedDigest::new(
                     self.epoch,
