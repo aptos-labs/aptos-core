@@ -21,11 +21,10 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
-use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback},
+    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
@@ -448,8 +447,16 @@ impl<
 
         // If we've already synced to the highest known version, there's nothing to do
         if highest_synced_version >= highest_known_ledger_version {
+            info!(LogSchema::new(LogEntry::Bootstrapper)
+                .message(&format!("Highest synced version {} is >= highest known ledger version {}, nothing needs to be done.",
+                    highest_synced_version, highest_known_ledger_version)));
             return self.bootstrapping_complete().await;
         }
+
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+            "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
+            highest_synced_version, highest_known_ledger_info,
+            self.driver_configuration.config.bootstrapping_mode)));
 
         // Bootstrap according to the mode
         match self.driver_configuration.config.bootstrapping_mode {
@@ -508,6 +515,8 @@ impl<
                     .config
                     .num_versions_to_skip_snapshot_sync
             {
+                info!(LogSchema::new(LogEntry::Bootstrapper)
+                    .message("The node is only {} versions behind, will skip bootstrapping."));
                 // We've already bootstrapped to an initial state snapshot. If this a fullnode, the
                 // continuous syncer will take control and get the node up-to-date. If this is a
                 // validator, consensus will take control and sync depending on how it sees fit.

@@ -15,15 +15,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Queryable,
-    Serialize,
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
 )]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(
@@ -45,8 +37,6 @@ pub struct Signature {
     pub signature: String,
     pub threshold: i64,
     pub public_key_indices: serde_json::Value,
-    // Default time columns
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl Signature {
@@ -121,7 +111,6 @@ impl Signature {
             signature: s.signature.to_string(),
             multi_agent_index,
             multi_sig_index: 0,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
@@ -165,7 +154,6 @@ impl Signature {
                 ),
                 multi_agent_index,
                 multi_sig_index: index as i64,
-                inserted_at: chrono::Utc::now().naive_utc(),
             });
         }
         signatures

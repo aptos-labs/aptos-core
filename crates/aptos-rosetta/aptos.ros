@@ -1,3 +1,4 @@
+// A configuration script for the Rosetta CLI provided by the Rosetta Spec
 // Create account workflow (only 1 at a time)
 create_account(1){
     create_account{

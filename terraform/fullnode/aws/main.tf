@@ -62,4 +62,3 @@ provider "kubernetes" {
   cluster_ca_certificate = module.eks.kubernetes.kubernetes_ca_cert
   token                  = data.aws_eks_cluster_auth.aptos.token
 }
-

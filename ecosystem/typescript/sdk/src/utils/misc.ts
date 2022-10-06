@@ -24,7 +24,7 @@ export function fixNodeUrl(nodeUrl: string): string {
   return out;
 }
 
-export const DEFAULT_MAX_GAS_AMOUNT = 20000;
+export const DEFAULT_MAX_GAS_AMOUNT = 200000;
 // Transaction expire timestamp
 export const DEFAULT_TXN_EXP_SEC_FROM_NOW = 20;
 // How long does SDK wait for txhn to finish
