@@ -1183,7 +1183,7 @@ def create_forge_command(
         ])
     #if forge_runner_duration_secs:
     forge_args.extend([
-        "--duration-secs", "1200"
+        "--duration-secs", "forge_runner_duration_secs"
     ])
 
     if forge_num_validators:
