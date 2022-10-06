@@ -399,6 +399,7 @@ fn test_api() {
                 proposers.len(),
             )),
             4,
+            30,
         );
         let round = 42u64;
         let state = [epoch.to_le_bytes(), round.to_le_bytes()].concat().to_vec();

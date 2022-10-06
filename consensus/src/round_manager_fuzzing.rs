@@ -4,7 +4,8 @@
 use crate::{
     block_storage::BlockStore,
     liveness::{
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        proposer_election::ProposerElection,
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, NewRoundEvent, NewRoundReason, RoundState},
     },
@@ -95,7 +96,12 @@ fn create_round_state() -> RoundState {
     let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
     let (round_timeout_sender, _) = channel::new_test(1_024);
     let time_service = Arc::new(SimulatedTimeService::new());
-    RoundState::new(time_interval, time_service, round_timeout_sender)
+    RoundState::new(
+        time_interval,
+        time_service,
+        round_timeout_sender,
+        ChainHealthBackoffConfig::new_no_backoff(),
+    )
 }
 
 // Creates an RoundManager for fuzzing
@@ -151,13 +157,15 @@ fn create_node_for_fuzzing() -> RoundManager {
         1,
         1024,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
     );
 
     //
     let round_state = create_round_state();
 
     // TODO: have two different nodes, one for proposing, one for accepting a proposal
-    let proposer_election = Box::new(RotatingProposer::new(vec![signer.author()], 1));
+    let proposer_election: Arc<Box<dyn ProposerElection + Send + Sync>> =
+        Arc::new(Box::new(RotatingProposer::new(vec![signer.author()], 1)));
 
     let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 

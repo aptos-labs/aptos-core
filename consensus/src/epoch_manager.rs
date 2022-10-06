@@ -20,7 +20,7 @@ use crate::{
             extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
             ProposerAndVoterHeuristic, ReputationHeuristic,
         },
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         proposer_election::ProposerElection,
         rotating_proposer_election::{choose_leader, RotatingProposer},
         round_proposer_election::RoundProposer,
@@ -175,13 +175,19 @@ impl EpochManager {
         &self,
         time_service: Arc<dyn TimeService>,
         timeout_sender: channel::Sender<Round>,
+        chain_health_backoff_config: ChainHealthBackoffConfig,
     ) -> RoundState {
         let time_interval = Box::new(ExponentialTimeInterval::new(
             Duration::from_millis(self.config.round_initial_timeout_ms),
             self.config.round_timeout_backoff_exponent_base,
             self.config.round_timeout_backoff_max_exponent,
         ));
-        RoundState::new(time_interval, time_service, timeout_sender)
+        RoundState::new(
+            time_interval,
+            time_service,
+            timeout_sender,
+            chain_health_backoff_config,
+        )
     }
 
     /// Create a proposer election handler based on proposers
@@ -293,6 +299,7 @@ impl EpochManager {
                     backend,
                     heuristic,
                     onchain_config.leader_reputation_exclude_round(),
+                    self.config.window_for_chain_health,
                 ));
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Box::new(CachedProposerElection::new(
@@ -592,17 +599,25 @@ impl EpochManager {
             );
         }
 
-        info!(epoch = epoch, "Create RoundState");
-        let round_state =
-            self.create_round_state(self.time_service.clone(), self.timeout_sender.clone());
-
         info!(epoch = epoch, "Create ProposerElection");
-        let proposer_election = self.create_proposer_election(&epoch_state, &onchain_config);
+        let proposer_election =
+            Arc::new(self.create_proposer_election(&epoch_state, &onchain_config));
         let network_sender = NetworkSender::new(
             self.author,
             self.network_sender.clone(),
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
+        );
+        let chain_health_backoff_config = ChainHealthBackoffConfig::new(
+            self.config.chain_health_backoff.clone(),
+            proposer_election.clone(),
+        );
+
+        info!(epoch = epoch, "Create RoundState");
+        let round_state = self.create_round_state(
+            self.time_service.clone(),
+            self.timeout_sender.clone(),
+            chain_health_backoff_config.clone(),
         );
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
@@ -649,6 +664,7 @@ impl EpochManager {
             self.config.max_sending_block_txns,
             self.config.max_sending_block_bytes,
             onchain_config.max_failed_authors_to_store(),
+            chain_health_backoff_config,
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(

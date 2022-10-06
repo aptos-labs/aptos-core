@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::Arc};
 
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -18,7 +18,7 @@ use super::proposer_election::ProposerElection;
 // Provides is_valid_proposal that remembers, and rejects if
 // the same leader proposes multiple blocks.
 pub struct UnequivocalProposerElection {
-    proposer_election: Box<dyn ProposerElection + Send + Sync>,
+    proposer_election: Arc<Box<dyn ProposerElection + Send + Sync>>,
     already_proposed: Mutex<(Round, HashValue)>,
 }
 
@@ -26,10 +26,15 @@ impl ProposerElection for UnequivocalProposerElection {
     fn get_valid_proposer(&self, round: Round) -> Author {
         self.proposer_election.get_valid_proposer(round)
     }
+
+    fn get_voting_power_participation_ratio(&self, round: Round) -> f64 {
+        self.proposer_election
+            .get_voting_power_participation_ratio(round)
+    }
 }
 
 impl UnequivocalProposerElection {
-    pub fn new(proposer_election: Box<dyn ProposerElection + Send + Sync>) -> Self {
+    pub fn new(proposer_election: Arc<Box<dyn ProposerElection + Send + Sync>>) -> Self {
         Self {
             proposer_election,
             already_proposed: Mutex::new((0, HashValue::zero())),
