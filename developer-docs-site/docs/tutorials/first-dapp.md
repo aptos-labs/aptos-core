@@ -160,7 +160,7 @@ First, add the SDK to the project's dependencies:
 npm install --save aptos
 ```
 
-You will now see `"aptos": "^0.0.20"` (or similar) in your `package.json`.
+You will now see `"aptos": "^1.3.15"` (or similar) in your `package.json`.
 
 ### Create an `AptosClient`
 
@@ -320,7 +320,7 @@ function App() {
   // ...
 
   // Check for the module; show publish instructions if not present.
-  const [modules, setModules] = React.useState<Types.MoveModule[]>([]);
+  const [modules, setModules] = React.useState<Types.MoveModuleBytecode[]>([]);
   React.useEffect(() => {
     if (!address) return;
     client.getAccountModules(address).then(setModules);
