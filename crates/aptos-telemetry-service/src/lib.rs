@@ -28,7 +28,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tracing::info;
 use warp::{Filter, Reply};
 
 mod auth;
@@ -36,7 +35,8 @@ mod clients;
 mod constants;
 mod context;
 mod custom_event;
-mod error;
+mod errors;
+mod gcp_logger;
 mod index;
 mod jwt_auth;
 mod log_ingest;

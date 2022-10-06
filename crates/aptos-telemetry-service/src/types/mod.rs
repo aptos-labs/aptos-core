@@ -74,7 +74,7 @@ pub mod response {
     use reqwest::StatusCode;
     use serde::{Deserialize, Serialize};
 
-    use crate::error::ServiceError;
+    use crate::errors::ServiceError;
 
     #[derive(Serialize, Deserialize)]
     pub struct IndexResponse {

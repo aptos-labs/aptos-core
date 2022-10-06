@@ -5,13 +5,13 @@ use crate::{
     auth::with_auth,
     constants::MAX_CONTENT_LENGTH,
     context::Context,
-    error::{MetricsIngestError, ServiceError},
+    errors::{MetricsIngestError, ServiceError},
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
+use crate::{debug, error};
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use tokio::time::Instant;
-use tracing::{debug, error};
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
 /// TODO: Cleanup after v1 API is ramped up
@@ -119,9 +119,14 @@ pub async fn handle_metrics_ingest(
 }
 
 fn claims_to_extra_labels(claims: &Claims) -> Vec<String> {
+    let chain_name = if claims.chain_id.id() == 3 {
+        format!("chain_name={}", claims.chain_id.id())
+    } else {
+        format!("chain_name={}", claims.chain_id)
+    };
     vec![
         format!("role={}", claims.node_type),
-        format!("chain_name={}", claims.chain_id),
+        chain_name,
         format!("namespace={}", "telemetry-service"),
         // for community nodes we cannot determine which pod name they run in (or whether they run in k8s at all),
         // so we use the peer id as an approximation/replacement for pod_name
