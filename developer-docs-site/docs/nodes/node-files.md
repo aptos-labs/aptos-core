@@ -1,0 +1,91 @@
+---
+title: "Node Files"
+slug: "node-files"
+---
+
+# Node Files
+
+When you are deploying an Aptos node, you will need the following files. These can be downloaded from separate `aptos-labs` repos on GitHub. The `wget` commands provided below for will work on macOS and Linux. Open a terminal and paste the `wget` command to download the file. 
+
+:::tip Unless specified, all these files are required for validator node.
+:::
+
+## docker-compose.yaml
+
+- **Git repo:** `aptos-core`
+- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Command to download:**
+    ```bash
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/docker-compose.yaml
+    ```
+
+## validator.yaml
+
+- **Git repo:** `aptos-core`
+- **Git branch:** `main` on https://github.com/aptos-labs/aptos-core
+- **Command to download:**
+  ```bash
+  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/validator.yaml
+  ```
+
+## genesis.blob 
+
+- **Git repo:** `aptos-genesis-waypoint`
+- **Git branch:** `main` on https://github.com/aptos-labs/aptos-genesis-waypoint
+- **Command to download:**
+  ```bash
+  wget genesis.blob https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/genesis.blob
+  ```
+
+## waypoint.txt
+
+- **Git repo:** `aptos-genesis-waypoint`
+- **Git branch:** `main` on https://github.com/aptos-labs/aptos-genesis-waypoint
+- **Command to download:**
+  ```bash
+  wget waypoint.txt https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/waypoint.txt
+  ```
+
+## haproxy.cfg
+
+- **Git repo:** `aptos-core`
+- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Command to download:**
+  ```bash
+  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/haproxy.cfg
+  ```
+
+## blocked.ips 
+
+- **Git repo:** `aptos-core`
+- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Command to download:**
+  ```bash
+  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/blocked.ips
+  ```
+
+## docker-compose-fullnode.yaml (fullnode only)
+
+:::tip Fullnode 
+Fullnode means either a validator fullnode or a public fullnode.
+:::
+
+- **Git repo:** `aptos-core`
+- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Command to download:**
+  ```bash
+  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/docker-compose-fullnode.yaml
+  ```
+
+## fullnode.yaml (fullnode only)
+
+:::tip Fullnode 
+Fullnode means either a validator fullnode or a public fullnode.
+:::
+
+- **Git repo:** `aptos-core`
+- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Command to download:**
+  ```bash
+  wget https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/fullnode.yaml
+  ```
