@@ -21,6 +21,11 @@ consensus:
           from_file: /opt/aptos/genesis/waypoint.txt
         identity_blob_path: /opt/aptos/genesis/validator-identity.yaml
 
+state_sync:
+  data_streaming_service:
+    max_concurrent_requests: 10
+    max_request_retry: 10
+
 execution:
   genesis_file_location: /opt/aptos/genesis/genesis.blob
 
