@@ -803,7 +803,7 @@ impl EpochManager {
                 channel_size: 100,
                 proof_timeout_ms: 5000,
                 batch_request_num_peers: 2,
-                end_batch_ms: 50,
+                end_batch_ms: 100,
                 max_batch_bytes: 100000,
                 batch_request_timeout_ms: 2000,
                 max_batch_expiry_round_gap: 20,
