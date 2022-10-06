@@ -389,7 +389,9 @@ impl AuthenticationKey {
 
     /// Create an authentication key from a preimage by taking its sha3 hash
     pub fn from_preimage(preimage: &AuthenticationKeyPreimage) -> AuthenticationKey {
-        AuthenticationKey::new(*HashValue::sha3_256_of(&preimage.0).as_ref())
+        // Unique salt is needed to prevent hash input collision with other domains.
+        let hash_input = [b"authentication_key_derivation", preimage.0.as_slice()].concat();
+        AuthenticationKey::new(*HashValue::sha3_256_of(hash_input.as_slice()).as_ref())
     }
 
     /// Create an authentication key from an Ed25519 public key
