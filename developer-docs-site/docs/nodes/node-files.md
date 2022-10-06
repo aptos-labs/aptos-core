@@ -25,7 +25,7 @@ When you are deploying an Aptos node, you will need the following files. These c
 - **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O validator.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/validator.yaml
+  wget -O validator.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/validator.yaml
   ```
 
 ## genesis.blob 
