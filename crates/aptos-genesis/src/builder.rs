@@ -214,8 +214,6 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
             commission_percentage: config.commission_percentage,
             // Default to joining the genesis validator set.
             join_during_genesis: true,
-            ans_funds_address: None,
-            ans_admin_address: None,
         })
     }
 }
