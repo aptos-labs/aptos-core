@@ -6,7 +6,8 @@ use std::time::Duration;
 use crate::{
     auth::with_auth,
     context::Context,
-    error::{CustomEventIngestError, ServiceError},
+    debug, error,
+    errors::{CustomEventIngestError, ServiceError},
     metrics::BIG_QUERY_BACKEND_REQUEST_DURATION,
     types::{
         auth::Claims,
@@ -14,11 +15,11 @@ use crate::{
         telemetry::{BigQueryRow, TelemetryDump},
     },
 };
+
 use anyhow::anyhow;
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use serde_json::json;
 use tokio::time::Instant;
-use tracing::{debug, error};
 use warp::{filters::BoxedFilter, hyper::StatusCode, reject, reply, Filter, Rejection, Reply};
 
 /// TODO: Cleanup after v1 API is ramped up

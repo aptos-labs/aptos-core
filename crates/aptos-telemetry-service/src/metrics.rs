@@ -3,6 +3,7 @@
 
 use std::{env, io::Write, time::Duration};
 
+use crate::{debug, error};
 use anyhow::anyhow;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
@@ -10,7 +11,6 @@ use aptos_metrics_core::{
 use flate2::{write::GzEncoder, Compression};
 use once_cell::sync::Lazy;
 use tokio::time::{self, Instant};
-use tracing::{debug, error};
 use warp::hyper::body::Bytes;
 
 use crate::{
