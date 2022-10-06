@@ -471,6 +471,152 @@
           }
         }
       }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 33 },
+      "id": 26,
+      "isNew": false,
+      "span": 0,
+      "title": "Read IO Operations (Linux Only)",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, rate(node_linux_disk_num_reads{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P50"
+        },
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.75, rate(node_linux_disk_num_reads{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P75"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.9, rate(node_linux_disk_num_reads{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P90"
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.99, rate(node_linux_disk_num_reads{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P99"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "iops",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 11, "w": 8, "x": 8, "y": 33 },
+      "id": 27,
+      "isNew": false,
+      "span": 0,
+      "title": "Write IO Operations (Linux Only)",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.5, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P50"
+        },
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.75, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P75"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.9, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P90"
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.99, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P99"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "iops",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
     }
   ],
   "rows": null,
@@ -620,7 +766,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 22,
+  "version": 27,
   "links": [
     {
       "title": "aptos core ",
