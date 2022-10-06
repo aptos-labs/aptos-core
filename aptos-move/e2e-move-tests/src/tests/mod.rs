@@ -6,6 +6,7 @@ mod code_publishing;
 mod common;
 mod error_map;
 mod framework_compatibility;
+mod gas;
 mod generate_upgrade_script;
 mod governance_updates;
 mod init_module;
