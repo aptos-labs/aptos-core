@@ -125,13 +125,6 @@
       "title": "Participating Stake ",
       "transparent": false,
       "type": "gauge",
-      "maxDataPoints": 100,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
       "pluginVersion": "9.1.1",
       "targets": [
         {
@@ -145,10 +138,11 @@
           "step": 10
         }
       ],
-      "type": "gauge",
+      "title": "Participating Stake ",
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "gridPos": { "h": 5, "w": 4, "x": 7, "y": 1 },
       "id": 74,
-      "links": [],
+      "maxDataPoints": 100,
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -169,8 +163,14 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 5, "w": 4, "x": 7, "y": 1 },
-      "title": "Participating Stake "
+      "links": [],
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "type": "gauge"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -204,10 +204,6 @@
         "overrides": []
       },
       "id": 75,
-      "links": [],
-      "title": "Participating Validators ",
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "maxDataPoints": 100,
       "options": {
         "orientation": "auto",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -227,8 +223,12 @@
           "step": 10
         }
       ],
+      "title": "Participating Validators ",
       "type": "gauge",
-      "gridPos": { "h": 5, "w": 4, "x": 11, "y": 1 }
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "gridPos": { "h": 5, "w": 4, "x": 11, "y": 1 },
+      "links": [],
+      "maxDataPoints": 100
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
