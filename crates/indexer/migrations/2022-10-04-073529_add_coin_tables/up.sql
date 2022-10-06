@@ -1,4 +1,17 @@
 -- Your SQL goes here
+CREATE VIEW move_resources_view AS
+SELECT transaction_version,
+  write_set_change_index,
+  transaction_block_height,
+  name,
+  address,
+  "type",
+  "module",
+  generic_type_params,
+  data#>>'{}' as json_data,
+  is_deleted,
+  inserted_at
+FROM move_resources;
 CREATE INDEX ps_name_succ_ver_index ON processor_statuses (name, success, version ASC);
 -- adding timestamp to all token tables
 ALTER TABLE token_activities

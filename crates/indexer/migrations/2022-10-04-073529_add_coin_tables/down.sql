@@ -22,3 +22,4 @@ ALTER TABLE token_datas
 DROP COLUMN IF EXISTS transaction_timestamp;
 ALTER TABLE collection_datas
 DROP COLUMN IF EXISTS transaction_timestamp;
+DROP VIEW IF EXISTS move_resources_view;
