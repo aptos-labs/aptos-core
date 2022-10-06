@@ -23,6 +23,7 @@ pub enum StakeTool {
     WithdrawStake(WithdrawStake),
     IncreaseLockup(IncreaseLockup),
     InitializeStakeOwner(InitializeStakeOwner),
+    RequestCommission(RequestCommission),
     SetOperator(SetOperator),
     SetDelegatedVoter(SetDelegatedVoter),
     UnlockVestedCoins(UnlockVestedCoins),
@@ -39,6 +40,7 @@ impl StakeTool {
             WithdrawStake(tool) => tool.execute_serialized().await,
             IncreaseLockup(tool) => tool.execute_serialized().await,
             InitializeStakeOwner(tool) => tool.execute_serialized().await,
+            RequestCommission(tool) => tool.execute_serialized().await,
             SetOperator(tool) => tool.execute_serialized().await,
             SetDelegatedVoter(tool) => tool.execute_serialized().await,
             UnlockVestedCoins(tool) => tool.execute_serialized().await,
@@ -163,14 +165,10 @@ pub struct InitializeStakeOwner {
     pub initial_stake_amount: u64,
 
     /// Account Address of delegated operator
-    ///
-    /// If not specified, it will be the same as the owner
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub operator_address: Option<AccountAddress>,
 
     /// Account address of delegated voter
-    ///
-    /// If not specified, it will be the same as the owner
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub voter_address: Option<AccountAddress>,
 
@@ -310,8 +308,6 @@ impl CliCommand<TransactionSummary> for CreateStakingContract {
 #[derive(Parser)]
 pub struct DistributeVestedCoins {
     /// Address of the vesting contract's admin.
-    ///
-    /// Defaults to the profile's address if not set.
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub admin_address: AccountAddress,
 
@@ -343,8 +339,6 @@ impl CliCommand<TransactionSummary> for DistributeVestedCoins {
 #[derive(Parser)]
 pub struct UnlockVestedCoins {
     /// Address of the vesting contract's admin.
-    ///
-    /// Defaults to the profile's address if not set.
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub admin_address: AccountAddress,
 
@@ -371,7 +365,7 @@ impl CliCommand<TransactionSummary> for UnlockVestedCoins {
 /// contract set up with the staker).
 #[derive(Parser)]
 pub struct RequestCommission {
-    #[clap(long)]
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub owner_address: AccountAddress,
 
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]

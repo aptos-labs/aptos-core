@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::account_address::AccountAddress;
 use crate::{on_chain_config::OnChainConfig, validator_info::ValidatorInfo};
+use move_core_types::account_address::AccountAddress;
 
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -70,15 +70,27 @@ impl ValidatorSet {
     }
 
     pub fn active_validators(&self) -> Vec<AccountAddress> {
-        self.active_validators.iter().cloned().map(|v| v.account_address).collect()
+        self.active_validators
+            .iter()
+            .cloned()
+            .map(|v| v.account_address)
+            .collect()
     }
 
     pub fn pending_active_validators(&self) -> Vec<AccountAddress> {
-        self.pending_active.iter().cloned().map(|v| v.account_address).collect()
+        self.pending_active
+            .iter()
+            .cloned()
+            .map(|v| v.account_address)
+            .collect()
     }
 
     pub fn pending_inactive_validators(&self) -> Vec<AccountAddress> {
-        self.pending_inactive.iter().cloned().map(|v| v.account_address).collect()
+        self.pending_inactive
+            .iter()
+            .cloned()
+            .map(|v| v.account_address)
+            .collect()
     }
 }
 
