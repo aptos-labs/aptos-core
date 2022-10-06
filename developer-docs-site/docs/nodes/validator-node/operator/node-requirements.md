@@ -11,7 +11,7 @@ To make your validator node and validator fullnode deployment hassle-free, make 
 
 - For the Aptos mainnet, we require that you run a validator node and a validator fullnode. We strongly recommend that you run the validator node and the validator fullnode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the validator and the validator fullnode will help ensure smooth deployment of these nodes.
 - We recommend that optionally you run a public fullnode also. However, a public fullnode is not required. If you run public fullnode also, then we strongly recommend that you run the public fullnode on a third machine that is separate and independent from either the validator or the validator fullnode machines. 
-- For best availability and stability, **we recommend that you deploy your nodes on the cloud**. For deploying the nodes in cloud we have provided Terraform support on three cloud providers: GCP, AWS and Azure. See [**Running Validator Node**](running-validator-node/index.md).
+- For best availability and stability, **we recommend that you deploy your nodes on the cloud**. For deploying the nodes in cloud we have provided Terraform support on two cloud providers: GCP and AWS. See [**Running Validator Node**](running-validator-node/index.md).
 - Make sure that you open the network ports prior to connecting to the network. See [Ports](#ports).
 - Make sure that you close these ports after either being accepted or rejected for the network.
 
@@ -30,13 +30,13 @@ For running an Aptos **validator node and validator fullnode** we recommend the 
       - 2.8GHz, or faster
       - Intel Xeon Skylake or newer
   - **Memory**: 32GB RAM.
-  - **Storage**: 1T SSD with at least 40K IOPS and 200MiB/s bandwidth.
+  - **Storage**: 2T SSD with at least 40K IOPS and 200MiB/s bandwidth.
   - **Networking bandwidth**: 1Gbps
 
 ### Example machine types on various clouds
 
 - AWS
-    - c6id.4xlarge (if use local SSD)
+    - c6id.8xlarge (if use local SSD)
     - c6i.8xlarge + io1/io2 EBS volume with 40K IOPS.
 - GCP
     - n2-standard-16 (if use local SSD)
