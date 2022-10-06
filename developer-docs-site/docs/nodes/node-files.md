@@ -46,15 +46,6 @@ When you are deploying an Aptos node, you will need the following files. These c
   wget -O waypoint.txt https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/waypoint.txt
   ```
 
-## haproxy.cfg
-
-- **Git repo:** `aptos-core`
-- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
-- **Command to download:**
-  ```bash
-  wget -O haproxy.cfg https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/haproxy.cfg
-  ```
-
 ## blocked.ips 
 
 - **Git repo:** `aptos-core`
