@@ -268,6 +268,41 @@ After your validator node joined the validator set, you can verify the correctne
     
     You should expect the active value for your `StakePool` to keep increasing. It is updated at every epoch.
 
+## Seeing your stake pool information
+
+To see the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. This example is for Premainnet. For other networks, use the appropriate REST URL for the `--url` field. See [Aptos Blockchain Deployments](/nodes/aptos-deployments) for `--url` field values for other networks. 
+
+The below command is for an example owner address `0x0756c80f0597fc221fe043d5388949b34151a4efe5753965bbfb0ed7d0be08ea` and it will display the following information on the owner's stake pool on the premainnet:
+
+- Status of the stake: pending active, active, pending-inactive, inactive.
+- Total stake.
+- Consensus key.
+- Addresses (pool, operator, voter). 
+- Unlocked commission.
+- Fullnode network address.
+- Epoch information.
+- Lockup expiration information.
+
+:::tip Use CLI 0.3.8 or higher
+Make sure you use the CLI version 0.3.8 or higher. See [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md).
+- Type `aptos --help` to see the CLI version.
+- Type `aptos node get-stake-pool --help` for more on the command option for the below example.
+:::
+
+```bash
+aptos node get-stake-pool \
+  --owner-address 0x0756c80f0597fc221fe043d5388949b34151a4efe5753965bbfb0ed7d0be08ea \
+  --url https://premainnet.aptosdev.com
+```
+
+## Checking your validator performance
+
+To see your validator performance in the current and past epochs and rewards earned, run the below command. The output will show the validator's performance in block proposals and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node analyze-validator-performance --help` to see default values used.
+
+```bash
+aptos node analyze-validator-performance --analyze-mode All \
+  --url https://premainnet.aptosdev.com
+```
 
 ## Leaving validator set
 
