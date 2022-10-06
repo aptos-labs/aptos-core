@@ -140,9 +140,9 @@ variable "enable_backup" {
 
 variable "fullnode_storage_class" {
   description = "Which storage class to use for the validator and fullnode"
-  default = "io1"
+  default     = "io1"
   validation {
-      condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
-      error_message = "Supported storage classes are gp3, io1, io2"
+    condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
   }
 }
