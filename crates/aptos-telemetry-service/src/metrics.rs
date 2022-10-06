@@ -15,7 +15,7 @@ use warp::hyper::body::Bytes;
 
 use crate::{
     clients::victoria_metrics_api,
-    constants::{GCP_CLOUD_RUN_REVISION_ENV, GCP_CLOUD_RUN_SERVICE_ENV},
+    constants::{GCP_CLOUD_RUN_REVISION_ENV, GCP_CLOUD_RUN_SERVICE_ENV, GCP_SERVICE_PROJECT_ID},
 };
 
 const METRICS_EXPORT_FREQUENCY: Duration = Duration::from_secs(15);
@@ -84,8 +84,9 @@ pub(crate) static VALIDATOR_SET_UPDATE_FAILED_COUNT: Lazy<IntCounterVec> = Lazy:
 });
 
 pub struct PrometheusExporter {
-    revision: String,
+    project_id: String,
     service: String,
+    revision: String,
     client: victoria_metrics_api::Client,
 }
 
@@ -93,10 +94,12 @@ impl PrometheusExporter {
     pub fn new(client: victoria_metrics_api::Client) -> Self {
         let revision = env::var(GCP_CLOUD_RUN_REVISION_ENV).unwrap_or_else(|_| "Unknown".into());
         let service = env::var(GCP_CLOUD_RUN_SERVICE_ENV).unwrap_or_else(|_| "Unknown".into());
+        let project_id = env::var(GCP_SERVICE_PROJECT_ID).unwrap_or_else(|_| "Unknown".into());
 
         Self {
-            revision,
+            project_id,
             service,
+            revision,
             client,
         }
     }
@@ -129,6 +132,7 @@ impl PrometheusExporter {
             "namespace=telemetry-web-service".into(),
             format!("cloud_run_revision={}", self.revision),
             format!("cloud_run_service={}", self.service),
+            format!("gcp_project_id={}", self.project_id),
         ];
 
         let start_timer = Instant::now();
