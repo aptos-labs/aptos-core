@@ -159,7 +159,6 @@ fn insert_user_transactions_w_sigs(
                     ut_schema::gas_unit_price.eq(excluded(ut_schema::gas_unit_price)),
                     ut_schema::timestamp.eq(excluded(ut_schema::timestamp)),
                     ut_schema::entry_function_id_str.eq(excluded(ut_schema::entry_function_id_str)),
-                    ut_schema::inserted_at.eq(excluded(ut_schema::inserted_at)),
                 )),
             None,
         )?;

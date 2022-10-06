@@ -3,7 +3,7 @@
 
 use aptos_indexer::{
     database::{new_db_pool, PgDbPool, PgPoolConnection},
-    models::transactions::TransactionModel,
+    models::transactions::TransactionQuery,
 };
 use aptos_sdk::types::LocalAccount;
 use cached_packages::aptos_stdlib::aptos_token_stdlib;
@@ -138,7 +138,7 @@ async fn test_old_indexer() {
     let mut transactions = vec![];
     for v in 0..2 {
         transactions
-            .push(TransactionModel::get_by_version(v, &mut conn_pool.get().unwrap()).unwrap());
+            .push(TransactionQuery::get_by_version(v, &mut conn_pool.get().unwrap()).unwrap());
     }
     transactions.sort_by(|a, b| a.0.type_.partial_cmp(&b.0.type_).unwrap());
 
@@ -159,7 +159,7 @@ async fn test_old_indexer() {
     assert!(wsc0.len() > 10);
 
     // This is the transfer
-    let (tx2, ut2, bmt2, events2, wsc2) = TransactionModel::get_by_hash(
+    let (tx2, ut2, bmt2, events2, wsc2) = TransactionQuery::get_by_hash(
         t_tx.hash.to_string().as_str(),
         &mut conn_pool.get().unwrap(),
     )

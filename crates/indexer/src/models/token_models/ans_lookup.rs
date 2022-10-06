@@ -21,7 +21,7 @@ type Subdomain = String;
 // PK of current_ans_lookup, i.e. domain and subdomain name
 pub type CurrentAnsLookupPK = (Domain, Subdomain);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(domain, subdomain))]
 #[diesel(table_name = current_ans_lookup)]
 pub struct CurrentAnsLookup {
@@ -30,7 +30,6 @@ pub struct CurrentAnsLookup {
     pub registered_address: Option<String>,
     pub last_transaction_version: i64,
     pub expiration_timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 pub enum ANSEvent {
@@ -124,7 +123,6 @@ impl CurrentAnsLookup {
                                     registered_address: inner.new_address.get_string(),
                                     last_transaction_version: txn_version,
                                     expiration_timestamp,
-                                    inserted_at: chrono::Utc::now().naive_utc(),
                                 }
                             }
                             ANSEvent::RegisterNameEventV1(inner) => {
@@ -141,7 +139,6 @@ impl CurrentAnsLookup {
                                     registered_address: None,
                                     last_transaction_version: txn_version,
                                     expiration_timestamp,
-                                    inserted_at: chrono::Utc::now().naive_utc(),
                                 }
                             }
                         };
