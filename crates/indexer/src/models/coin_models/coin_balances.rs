@@ -16,26 +16,28 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, owner_address, coin_type))]
 #[diesel(table_name = coin_balances)]
 pub struct CoinBalance {
     pub transaction_version: i64,
     pub owner_address: String,
+    pub coin_type_hash: String,
     pub coin_type: String,
     pub amount: BigDecimal,
-    pub inserted_at: chrono::NaiveDateTime,
+    pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(owner_address, coin_type))]
 #[diesel(table_name = current_coin_balances)]
 pub struct CurrentCoinBalance {
     pub owner_address: String,
+    pub coin_type_hash: String,
     pub coin_type: String,
     pub amount: BigDecimal,
     pub last_transaction_version: i64,
-    pub inserted_at: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
 
 impl CoinBalance {
@@ -43,6 +45,7 @@ impl CoinBalance {
     pub fn from_write_resource(
         write_resource: &APIWriteResource,
         txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<(Self, CurrentCoinBalance, EventToCoinType)>> {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinStoreResource(inner)) => {
@@ -54,16 +57,18 @@ impl CoinBalance {
                 let coin_balance = Self {
                     transaction_version: txn_version,
                     owner_address: owner_address.clone(),
+                    coin_type_hash: coin_info_type.to_hash(),
                     coin_type: coin_info_type.get_coin_type_trunc(),
                     amount: inner.coin.value.clone(),
-                    inserted_at: chrono::Utc::now().naive_utc(),
+                    transaction_timestamp: txn_timestamp,
                 };
                 let current_coin_balance = CurrentCoinBalance {
                     owner_address,
+                    coin_type_hash: coin_info_type.to_hash(),
                     coin_type: coin_info_type.get_coin_type_trunc(),
                     amount: inner.coin.value.clone(),
                     last_transaction_version: txn_version,
-                    inserted_at: chrono::Utc::now().naive_utc(),
+                    last_transaction_timestamp: txn_timestamp,
                 };
                 let event_to_coin_mapping: EventToCoinType = HashMap::from([
                     (

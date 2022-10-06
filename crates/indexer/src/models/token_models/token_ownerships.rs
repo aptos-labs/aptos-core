@@ -11,7 +11,7 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
     token_data_id_hash,
     property_version,
@@ -30,11 +30,11 @@ pub struct TokenOwnership {
     pub owner_address: Option<String>,
     pub amount: BigDecimal,
     pub table_type: Option<String>,
-    pub inserted_at: chrono::NaiveDateTime,
     pub collection_data_id_hash: String,
+    pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_data_id_hash, property_version, owner_address))]
 #[diesel(table_name = current_token_ownerships)]
 pub struct CurrentTokenOwnership {
@@ -47,9 +47,9 @@ pub struct CurrentTokenOwnership {
     pub amount: BigDecimal,
     pub token_properties: serde_json::Value,
     pub last_transaction_version: i64,
-    pub inserted_at: chrono::NaiveDateTime,
     pub collection_data_id_hash: String,
     pub table_type: String,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
 
 impl TokenOwnership {
@@ -77,8 +77,8 @@ impl TokenOwnership {
                     amount: amount.clone(),
                     token_properties: token.token_properties.clone(),
                     last_transaction_version: txn_version,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                     table_type: tm.table_type.clone(),
+                    last_transaction_timestamp: token.transaction_timestamp,
                 }),
                 Some(tm.owner_address.clone()),
                 Some(tm.table_type.clone()),
@@ -117,7 +117,7 @@ impl TokenOwnership {
                 table_type,
                 transaction_version: token.transaction_version,
                 table_handle,
-                inserted_at: chrono::Utc::now().naive_utc(),
+                transaction_timestamp: token.transaction_timestamp,
             },
             curr_token_ownership,
         )

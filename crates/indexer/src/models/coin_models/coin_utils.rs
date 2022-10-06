@@ -5,12 +5,16 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::coin_infos::CoinSupplyLookup;
-use crate::{models::move_resources::MoveResource, util::truncate_str};
+use crate::{
+    models::move_resources::MoveResource,
+    util::{hash_str, truncate_str},
+};
 use anyhow::{Context, Result};
 use aptos_api_types::{deserialize_from_string, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
+const COIN_TYPE_HASH_LENGTH: usize = 5000;
 /**
  * This file defines deserialized coin types as defined in our 0x1 contracts.
  */
@@ -32,11 +36,12 @@ impl CoinInfoResource {
         truncate_str(&self.symbol, 10)
     }
 
-    pub fn get_supply(&self, supply_lookup: &CoinSupplyLookup) -> Option<BigDecimal> {
+    /// In case we do want to track supply
+    pub fn _get_supply(&self, supply_lookup: &CoinSupplyLookup) -> Option<BigDecimal> {
         if let Some(inner) = self.supply.vec.get(0) {
-            let mut maybe_supply = inner.integer.get_supply();
+            let mut maybe_supply = inner.integer._get_supply();
             if maybe_supply.is_none() {
-                maybe_supply = inner.aggregator.get_supply(supply_lookup);
+                maybe_supply = inner.aggregator._get_supply(supply_lookup);
             }
             maybe_supply
         } else {
@@ -62,7 +67,8 @@ pub struct AggregatorWrapperResource {
 }
 
 impl AggregatorWrapperResource {
-    pub fn get_supply(&self, supply_lookup: &CoinSupplyLookup) -> Option<BigDecimal> {
+    /// In case we do want to track supply
+    pub fn _get_supply(&self, supply_lookup: &CoinSupplyLookup) -> Option<BigDecimal> {
         if let Some(aggregator) = self.vec.get(0) {
             let table_handle = aggregator.handle.clone();
             let table_key = aggregator.key.clone();
@@ -79,7 +85,8 @@ pub struct IntegerWrapperResource {
 }
 
 impl IntegerWrapperResource {
-    pub fn get_supply(&self) -> Option<BigDecimal> {
+    /// In case we do want to track supply
+    pub fn _get_supply(&self) -> Option<BigDecimal> {
         self.vec.get(0).map(|inner| inner.value.clone())
     }
 }
@@ -170,8 +177,12 @@ impl CoinInfoType {
         })
     }
 
+    pub fn to_hash(&self) -> String {
+        hash_str(&self.coin_type.to_string())
+    }
+
     pub fn get_coin_type_trunc(&self) -> String {
-        truncate_str(&self.coin_type, 256)
+        truncate_str(&self.coin_type, COIN_TYPE_HASH_LENGTH)
     }
 }
 

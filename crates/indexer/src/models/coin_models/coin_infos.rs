@@ -20,18 +20,18 @@ pub type TableKey = String;
 pub type Supply = BigDecimal;
 pub type CoinSupplyLookup = HashMap<(TableHandle, TableKey), Supply>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
-#[diesel(primary_key(coin_type))]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(coin_type_hash))]
 #[diesel(table_name = coin_infos)]
 pub struct CoinInfo {
+    pub coin_type_hash: String,
     pub coin_type: String,
     pub transaction_version_created: i64,
     pub creator_address: String,
     pub name: String,
     pub symbol: String,
     pub decimals: i32,
-    pub supply: BigDecimal,
-    pub inserted_at: chrono::NaiveDateTime,
+    pub transaction_created_timestamp: chrono::NaiveDateTime,
 }
 
 impl CoinInfo {
@@ -39,7 +39,7 @@ impl CoinInfo {
     pub fn from_write_resource(
         write_resource: &APIWriteResource,
         txn_version: i64,
-        coin_supply_lookup: &CoinSupplyLookup,
+        txn_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<Self>> {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinInfoResource(inner)) => {
@@ -47,25 +47,16 @@ impl CoinInfo {
                     &write_resource.data.typ.generic_type_params[0],
                     txn_version,
                 )?;
-                let supply = inner.get_supply(coin_supply_lookup).unwrap_or_else(|| {
-                    aptos_logger::warn!(
-                        "supply missing in coin info: {:?}, txn {}, coin_supply_lookup {:?}",
-                        inner,
-                        txn_version,
-                        coin_supply_lookup
-                    );
-                    BigDecimal::from(0)
-                });
 
                 Ok(Some(Self {
+                    coin_type_hash: coin_info_type.to_hash(),
                     coin_type: coin_info_type.get_coin_type_trunc(),
                     transaction_version_created: txn_version,
                     creator_address: coin_info_type.creator_address.clone(),
                     name: inner.get_name_trunc(),
                     symbol: inner.get_symbol_trunc(),
                     decimals: inner.decimals,
-                    supply,
-                    inserted_at: chrono::Utc::now().naive_utc(),
+                    transaction_created_timestamp: txn_timestamp,
                 }))
             }
             _ => Ok(None),

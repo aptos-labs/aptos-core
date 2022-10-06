@@ -134,7 +134,7 @@ fn insert_coin_activities(
                     is_gas_fee.eq(excluded(is_gas_fee)),
                     is_transaction_success.eq(excluded(is_transaction_success)),
                     entry_function_id_str.eq(excluded(entry_function_id_str)),
-                    inserted_at.eq(excluded(inserted_at)),
+                    transaction_timestamp.eq(excluded(transaction_timestamp)),
                 )),
             None,
         )?;
@@ -154,7 +154,7 @@ fn insert_coin_infos(
             conn,
             diesel::insert_into(schema::coin_infos::table)
                 .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict(coin_type)
+                .on_conflict(coin_type_hash)
                 .do_update()
                 .set((
                     transaction_version_created.eq(excluded(transaction_version_created)),
@@ -162,8 +162,7 @@ fn insert_coin_infos(
                     name.eq(excluded(name)),
                     symbol.eq(excluded(symbol)),
                     decimals.eq(excluded(decimals)),
-                    supply.eq(excluded(supply)),
-                    inserted_at.eq(excluded(inserted_at)),
+                    transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
                 )),
             Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
         )?;
@@ -183,11 +182,11 @@ fn insert_coin_balances(
             conn,
             diesel::insert_into(schema::coin_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, owner_address, coin_type))
+                .on_conflict((transaction_version, owner_address, coin_type_hash))
                 .do_update()
                 .set((
                     amount.eq(excluded(amount)),
-                    inserted_at.eq(excluded(inserted_at)),
+                    transaction_timestamp.eq(excluded(transaction_timestamp)),
                 )),
             None,
         )?;
@@ -207,12 +206,12 @@ fn insert_current_coin_balances(
             conn,
             diesel::insert_into(schema::current_coin_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((owner_address, coin_type))
+                .on_conflict((owner_address, coin_type_hash))
                 .do_update()
                 .set((
                     amount.eq(excluded(amount)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 )),
                 Some(" WHERE current_coin_balances.last_transaction_version <= excluded.last_transaction_version "),
             )?;

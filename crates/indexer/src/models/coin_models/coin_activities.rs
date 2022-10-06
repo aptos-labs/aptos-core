@@ -10,7 +10,10 @@ use super::{
     coin_infos::{CoinInfo, CoinSupplyLookup},
     coin_utils::{CoinEvent, EventGuidResource},
 };
-use crate::{schema::coin_activities, util::truncate_str};
+use crate::{
+    schema::coin_activities,
+    util::{parse_timestamp, truncate_str},
+};
 use aptos_api_types::{
     Event as APIEvent, Transaction as APITransaction, TransactionInfo as APITransactionInfo,
     TransactionPayload, UserTransactionRequest, WriteSetChange as APIWriteSetChange,
@@ -32,7 +35,7 @@ type CoinType = String;
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
 pub type EventToCoinType = HashMap<EventGuidResource, CoinType>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
     transaction_version,
     event_account_address,
@@ -53,7 +56,7 @@ pub struct CoinActivity {
     pub is_transaction_success: bool,
     pub entry_function_id_str: Option<String>,
     pub block_height: i64,
-    pub inserted_at: chrono::NaiveDateTime,
+    pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
 /// Coin information is mostly in Resources but some pieces are in table items (e.g. supply from aggregator table)
@@ -73,6 +76,7 @@ impl CoinActivity {
     /// CoinInfo Resource: Contains name, symbol, decimals and supply. (if supply is aggregator, however, actual supply amount will live in a separate table)
     /// CoinStore Resource: Contains owner address and coin type information used to complete events
     /// Aggregator Table Item: Contains current supply of a coin
+    /// Note, we're not currently tracking supply
     pub fn from_transaction(
         transaction: &APITransaction,
     ) -> (
@@ -88,19 +92,26 @@ impl CoinActivity {
             HashMap::new();
         let mut all_event_to_coin_type: EventToCoinType = HashMap::new();
 
-        let (txn_info, writesets, events, maybe_user_request) = match &transaction {
-            APITransaction::GenesisTransaction(inner) => {
-                (&inner.info, &inner.info.changes, &inner.events, None)
-            }
+        let (txn_info, writesets, events, maybe_user_request, txn_timestamp) = match &transaction {
+            APITransaction::GenesisTransaction(inner) => (
+                &inner.info,
+                &inner.info.changes,
+                &inner.events,
+                None,
+                chrono::NaiveDateTime::from_timestamp(0, 0),
+            ),
             APITransaction::UserTransaction(inner) => (
                 &inner.info,
                 &inner.info.changes,
                 &inner.events,
                 Some(&inner.request),
+                parse_timestamp(inner.timestamp.0, inner.info.version.0 as i64),
             ),
             _ => return Default::default(),
         };
 
+        // Get coin info, then coin balances. We can leverage coin balances to get the metadata required for events
+        let txn_version = txn_info.version.0 as i64;
         let mut entry_function_id_str = None;
         if let Some(user_request) = maybe_user_request {
             entry_function_id_str = match &user_request.payload {
@@ -114,6 +125,7 @@ impl CoinActivity {
                 txn_info,
                 user_request,
                 &entry_function_id_str,
+                txn_timestamp,
             ));
         }
         // First we need to make a pass to get all tables that potentially contains coin supply information
@@ -125,15 +137,18 @@ impl CoinActivity {
             }
         }
 
-        // Get coin info, then coin balances. We can leverage coin balances to get the metadata required for events
-        let txn_version = txn_info.version.0 as i64;
         for wsc in writesets {
             let (maybe_coin_info, maybe_coin_balance_data) =
                 if let APIWriteSetChange::WriteResource(write_resource) = wsc {
                     (
-                        CoinInfo::from_write_resource(write_resource, txn_version, &supply_lookup)
+                        CoinInfo::from_write_resource(write_resource, txn_version, txn_timestamp)
                             .unwrap(),
-                        CoinBalance::from_write_resource(write_resource, txn_version).unwrap(),
+                        CoinBalance::from_write_resource(
+                            write_resource,
+                            txn_version,
+                            txn_timestamp,
+                        )
+                        .unwrap(),
                     )
                 } else {
                     (None, None)
@@ -166,6 +181,7 @@ impl CoinActivity {
                     &all_event_to_coin_type,
                     txn_info.block_height.unwrap().0 as i64,
                     &entry_function_id_str,
+                    txn_timestamp,
                 )),
                 None => {}
             };
@@ -186,6 +202,7 @@ impl CoinActivity {
         event_to_coin_type: &EventToCoinType,
         block_height: i64,
         entry_function_id_str: &Option<String>,
+        transaction_timestamp: chrono::NaiveDateTime,
     ) -> Self {
         let amount = match coin_event {
             CoinEvent::WithdrawCoinEvent(inner) => inner.amount.clone(),
@@ -218,7 +235,7 @@ impl CoinActivity {
             is_transaction_success: true,
             entry_function_id_str: entry_function_id_str.clone(),
             block_height,
-            inserted_at: chrono::Utc::now().naive_utc(),
+            transaction_timestamp,
         }
     }
 
@@ -226,6 +243,7 @@ impl CoinActivity {
         txn_info: &APITransactionInfo,
         user_transaction_request: &UserTransactionRequest,
         entry_function_id_str: &Option<String>,
+        transaction_timestamp: chrono::NaiveDateTime,
     ) -> Self {
         let aptos_coin_burned = BigDecimal::from(
             txn_info.gas_used.0 * user_transaction_request.gas_unit_price.0 as u64,
@@ -244,7 +262,7 @@ impl CoinActivity {
             is_transaction_success: txn_info.success,
             entry_function_id_str: entry_function_id_str.clone(),
             block_height: txn_info.block_height.unwrap().0 as i64,
-            inserted_at: chrono::Utc::now().naive_utc(),
+            transaction_timestamp,
         }
     }
 }
