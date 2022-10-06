@@ -235,7 +235,7 @@ impl AptosVM {
                     gas_meter.balance(),
                     txn_data,
                     status,
-                    gas_meter.charge_new_resource_as_modify(),
+                    gas_meter.feature_version(),
                 )
                 .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
@@ -286,7 +286,7 @@ impl AptosVM {
         let epilogue_change_set_ext = session
             .finish()
             .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.charge_new_resource_as_modify())?;
+            .into_change_set(&mut (), gas_meter.feature_version())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
@@ -385,8 +385,8 @@ impl AptosVM {
             self.resolve_pending_code_publish(&mut session, gas_meter)?;
 
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-            let change_set_ext = session_output
-                .into_change_set(&mut (), gas_meter.charge_new_resource_as_modify())?;
+            let change_set_ext =
+                session_output.into_change_set(&mut (), gas_meter.feature_version())?;
 
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -527,7 +527,7 @@ impl AptosVM {
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
         let change_set_ext =
-            session_output.into_change_set(&mut (), gas_meter.charge_new_resource_as_modify())?;
+            session_output.into_change_set(&mut (), gas_meter.feature_version())?;
 
         // Charge gas for write set
         gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -735,9 +735,11 @@ impl AptosVM {
         let mut gas_meter = UnmeteredGasMeter;
 
         Ok(match writeset_payload {
-            WriteSetPayload::Direct(change_set) => {
-                ChangeSetExt::new(DeltaChangeSet::empty(), change_set.clone())
-            }
+            WriteSetPayload::Direct(change_set) => ChangeSetExt::new(
+                DeltaChangeSet::empty(),
+                change_set.clone(),
+                self.0.get_gas_feature_version(),
+            ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
                 let senders = match txn_sender {
@@ -768,7 +770,7 @@ impl AptosVM {
 
                 match execution_result {
                     Ok(session_out) => session_out
-                        .into_change_set(&mut (), self.0.get_gas_feature_version() <= 2)
+                        .into_change_set(&mut (), self.0.get_gas_feature_version())
                         .map_err(Err)?,
                     Err(e) => {
                         return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
@@ -890,7 +892,7 @@ impl AptosVM {
             0.into(),
             &txn_data,
             ExecutionStatus::Success,
-            self.0.get_gas_feature_version() <= 2,
+            self.0.get_gas_feature_version(),
         )?;
         Ok((VMStatus::Executed, output))
     }

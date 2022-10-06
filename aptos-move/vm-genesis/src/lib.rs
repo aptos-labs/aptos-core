@@ -134,7 +134,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     session1_out.squash(session2_out).unwrap();
 
-    let change_set_ext = session1_out.into_change_set(&mut (), false).unwrap();
+    let change_set_ext = session1_out
+        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -230,7 +232,9 @@ pub fn encode_genesis_change_set(
 
     session1_out.squash(session2_out).unwrap();
 
-    let change_set_ext = session1_out.into_change_set(&mut (), false).unwrap();
+    let change_set_ext = session1_out
+        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and

@@ -7,15 +7,7 @@ use aptos_api_types::{DeleteResource, MoveStructTag as APIMoveStructTag, WriteRe
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 #[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Queryable,
-    Serialize,
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
 )]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
@@ -31,8 +23,6 @@ pub struct MoveResource {
     pub generic_type_params: Option<serde_json::Value>,
     pub data: Option<serde_json::Value>,
     pub is_deleted: bool,
-    // Default time columns
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 pub struct MoveStructTag {
@@ -60,7 +50,6 @@ impl MoveResource {
             generic_type_params: parsed_data.generic_type_params,
             data: Some(serde_json::to_value(&write_resource.data.data).unwrap()),
             is_deleted: false,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
@@ -82,7 +71,6 @@ impl MoveResource {
             generic_type_params: parsed_data.generic_type_params,
             data: None,
             is_deleted: true,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
