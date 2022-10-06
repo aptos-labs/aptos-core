@@ -46,7 +46,12 @@ impl NetworkTest for SimpleValidatorUpgrade {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let mut first_batch = all_validators.clone();
+        let all_fullnodes = ctx
+            .swarm()
+            .full_nodes()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
+        let mut first_batch = all_validators;
         let second_batch = first_batch.split_off(first_batch.len() / 2);
         let first_node = first_batch.pop().unwrap();
         let duration = Duration::from_secs(30);
@@ -61,7 +66,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         // Generate some traffic
         let txn_stat = generate_traffic(
             ctx,
-            &all_validators,
+            &all_fullnodes,
             duration,
             aptos_global_constants::GAS_UNIT_PRICE,
         )?;
