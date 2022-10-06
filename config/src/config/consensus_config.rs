@@ -32,6 +32,19 @@ pub struct ConsensusConfig {
     // the period = (poll_count - 1) * 30ms
     pub quorum_store_poll_count: u64,
     pub intra_consensus_channel_buffer_size: usize,
+
+    // Used to decide if backpressure is needed.
+    // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
+    pub window_for_chain_health: usize,
+    pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ChainHealthBackoffValues {
+    pub backoff_if_below_participating_voting_power_percentage: usize,
+
+    pub max_sending_block_txns_override: u64,
+    pub max_sending_block_bytes_override: u64,
 }
 
 impl Default for ConsensusConfig {
@@ -59,6 +72,30 @@ impl Default for ConsensusConfig {
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 10,
             intra_consensus_channel_buffer_size: 10,
+
+            window_for_chain_health: 100,
+            chain_health_backoff: vec![
+                ChainHealthBackoffValues {
+                    backoff_if_below_participating_voting_power_percentage: 80,
+                    max_sending_block_txns_override: 2000,
+                    max_sending_block_bytes_override: 500 * 1024,
+                },
+                ChainHealthBackoffValues {
+                    backoff_if_below_participating_voting_power_percentage: 75,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: 400 * 1024,
+                },
+                ChainHealthBackoffValues {
+                    backoff_if_below_participating_voting_power_percentage: 72,
+                    max_sending_block_txns_override: 400,
+                    max_sending_block_bytes_override: 200 * 1024,
+                },
+                ChainHealthBackoffValues {
+                    backoff_if_below_participating_voting_power_percentage: 69,
+                    max_sending_block_txns_override: 200,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+            ],
         }
     }
 }
