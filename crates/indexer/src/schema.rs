@@ -201,6 +201,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    indexer_status (db) {
+        db -> Varchar,
+        is_indexer_up -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     ledger_infos (chain_id) {
         chain_id -> Int8,
     }
@@ -435,6 +443,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_token_ownerships,
     current_token_pending_claims,
     events,
+    indexer_status,
     ledger_infos,
     move_modules,
     move_resources,
