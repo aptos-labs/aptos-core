@@ -23,6 +23,8 @@ use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
+use rand::rngs::OsRng;
+use rand::Rng;
 use std::{
     collections::HashSet,
     time::{Duration, SystemTime},
@@ -136,9 +138,17 @@ impl Mempool {
         let expiration_time =
             aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
+        let jitter = Duration::from_secs(OsRng.gen_range(0, 10));
+        let positive = OsRng.gen_range(0, 2) == 0;
+        let expiration_time_with_jitter = if positive {
+            expiration_time.saturating_add(jitter)
+        } else {
+            expiration_time.saturating_sub(jitter)
+        };
+
         let txn_info = MempoolTransaction::new(
             txn,
-            expiration_time,
+            expiration_time_with_jitter,
             ranking_score,
             timeline_state,
             AccountSequenceInfo::Sequential(db_sequence_number),
