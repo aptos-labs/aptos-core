@@ -5,6 +5,8 @@ use crate::{
     block_storage::BlockReader, state_replication::PayloadManager, util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
+use aptos_config::config::ChainHealthBackoffValues;
+use aptos_logger::warn;
 use consensus_types::{
     block::Block,
     block_data::BlockData,
@@ -14,7 +16,8 @@ use consensus_types::{
 
 use consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
-use std::sync::Arc;
+use num_traits::ToPrimitive;
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
@@ -23,6 +26,56 @@ use super::{
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
 mod proposal_generator_test;
+
+#[derive(Clone)]
+pub struct ChainHealthBackoffConfig {
+    backoffs: BTreeMap<usize, ChainHealthBackoffValues>,
+    proposer_election: Option<Arc<Box<dyn ProposerElection + Send + Sync>>>,
+}
+
+impl ChainHealthBackoffConfig {
+    pub fn new(
+        backoffs: Vec<ChainHealthBackoffValues>,
+        proposer_election: Arc<Box<dyn ProposerElection + Send + Sync>>,
+    ) -> Self {
+        let original_len = backoffs.len();
+        let backoffs = backoffs
+            .into_iter()
+            .map(|v| (v.backoff_if_below_participating_voting_power_percentage, v))
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(original_len, backoffs.len());
+        Self {
+            backoffs,
+            proposer_election: Some(proposer_election),
+        }
+    }
+
+    pub fn new_no_backoff() -> Self {
+        Self {
+            backoffs: BTreeMap::new(),
+            proposer_election: None,
+        }
+    }
+
+    pub fn get_backoff(&self, round: Round) -> Option<&ChainHealthBackoffValues> {
+        if self.backoffs.is_empty() {
+            None
+        } else {
+            let voting_power_ratio = (self
+                .proposer_election
+                .as_ref()
+                .unwrap()
+                .get_voting_power_participation_ratio(round)
+                * 100.0)
+                .to_usize()
+                .unwrap();
+            self.backoffs
+                .range(voting_power_ratio..)
+                .next()
+                .map(|(_, v)| v)
+        }
+    }
+}
 
 /// ProposalGenerator is responsible for generating the proposed block on demand: it's typically
 /// used by a validator that believes it's a valid candidate for serving as a proposer at a given
@@ -50,6 +103,9 @@ pub struct ProposalGenerator {
     max_block_bytes: u64,
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
+
+    chain_health_backoff_config: ChainHealthBackoffConfig,
+
     // Last round that a proposal was generated
     last_round_generated: Round,
 }
@@ -63,6 +119,7 @@ impl ProposalGenerator {
         max_block_txns: u64,
         max_block_bytes: u64,
         max_failed_authors_to_store: usize,
+        chain_health_backoff_config: ChainHealthBackoffConfig,
     ) -> Self {
         Self {
             author,
@@ -72,6 +129,7 @@ impl ProposalGenerator {
             max_block_txns,
             max_block_bytes,
             max_failed_authors_to_store,
+            chain_health_backoff_config,
             last_round_generated: 0,
         }
     }
@@ -119,6 +177,18 @@ impl ProposalGenerator {
             bail!("Already proposed in the round {}", round);
         }
 
+        let chain_health_backoff = self.chain_health_backoff_config.get_backoff(round);
+        if let Some(value) = chain_health_backoff {
+            warn!(
+                "Generating proposal sleeping for {}, due to chain health backoff",
+                value.proposer_create_proposal_backoff_ms
+            );
+            tokio::time::sleep(Duration::from_millis(
+                value.proposer_create_proposal_backoff_ms,
+            ))
+            .await;
+        }
+
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
         let (payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
@@ -156,11 +226,22 @@ impl ProposalGenerator {
             // the local time exceeds it.
             let timestamp = self.time_service.get_current_timestamp();
 
+            let (max_block_txns, max_block_bytes) = if let Some(value) = chain_health_backoff {
+                (
+                    self.max_block_txns
+                        .min(value.max_sending_block_txns_override),
+                    self.max_block_bytes
+                        .min(value.max_sending_block_bytes_override),
+                )
+            } else {
+                (self.max_block_txns, self.max_block_bytes)
+            };
+
             let payload = self
                 .payload_manager
                 .pull_payload(
-                    self.max_block_txns,
-                    self.max_block_bytes,
+                    max_block_txns,
+                    max_block_bytes,
                     payload_filter,
                     wait_callback,
                     pending_ordering,

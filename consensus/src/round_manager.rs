@@ -160,7 +160,7 @@ impl RoundManager {
         epoch_state: EpochState,
         block_store: Arc<BlockStore>,
         round_state: RoundState,
-        proposer_election: Box<dyn ProposerElection + Send + Sync>,
+        proposer_election: Arc<Box<dyn ProposerElection + Send + Sync>>,
         proposal_generator: ProposalGenerator,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         network: NetworkSender,

@@ -4,7 +4,7 @@
 use crate::{
     block_storage::{BlockReader, BlockStore},
     liveness::{
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         proposer_election::ProposerElection,
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, RoundState},
@@ -85,7 +85,12 @@ impl NodeSetup {
         let base_timeout = Duration::new(60, 0);
         let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
         let (round_timeout_sender, _) = channel::new_test(1_024);
-        RoundState::new(time_interval, time_service, round_timeout_sender)
+        RoundState::new(
+            time_interval,
+            time_service,
+            round_timeout_sender,
+            ChainHealthBackoffConfig::new_no_backoff(),
+        )
     }
 
     fn create_proposer_election(author: Author) -> Box<dyn ProposerElection + Send + Sync> {
@@ -205,10 +210,11 @@ impl NodeSetup {
             10,
             1000,
             10,
+            ChainHealthBackoffConfig::new_no_backoff(),
         );
 
         let round_state = Self::create_round_state(time_service);
-        let proposer_election = Self::create_proposer_election(proposer_author);
+        let proposer_election = Arc::new(Self::create_proposer_election(proposer_author));
         let mut safety_rules =
             MetricsSafetyRules::new(safety_rules_manager.client(), storage.clone());
         safety_rules.perform_initialize().unwrap();

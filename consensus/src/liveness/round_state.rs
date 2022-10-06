@@ -17,6 +17,8 @@ use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
 
+use super::proposal_generator::ChainHealthBackoffConfig;
+
 /// A reason for starting a new round: introduced for monitoring / debug purposes.
 #[derive(Serialize, Debug, PartialEq, Eq)]
 pub enum NewRoundReason {
@@ -158,6 +160,8 @@ pub struct RoundState {
     vote_sent: Option<Vote>,
     // The handle to cancel previous timeout task when moving to next round.
     abort_handle: Option<AbortHandle>,
+
+    chain_health_backoff_config: ChainHealthBackoffConfig,
 }
 
 #[derive(Default, Schema)]
@@ -186,6 +190,7 @@ impl RoundState {
         time_interval: Box<dyn RoundTimeInterval>,
         time_service: Arc<dyn TimeService>,
         timeout_sender: channel::Sender<Round>,
+        chain_health_backoff_config: ChainHealthBackoffConfig,
     ) -> Self {
         // Our counters are initialized lazily, so they're not going to appear in
         // Prometheus if some conditions never happen. Invoking get() function enforces creation.
@@ -203,6 +208,7 @@ impl RoundState {
             pending_votes: PendingVotes::new(),
             vote_sent: None,
             abort_handle: None,
+            chain_health_backoff_config,
         }
     }
 
@@ -301,7 +307,21 @@ impl RoundState {
     /// Setup the timeout task and return the duration of the current timeout
     fn setup_timeout(&mut self, multiplier: u32) -> Duration {
         let timeout_sender = self.timeout_sender.clone();
-        let timeout = self.setup_deadline(multiplier);
+
+        let current_chain_health_backoff = self
+            .chain_health_backoff_config
+            .get_backoff(self.current_round);
+        let backoff_timeout_ms = if let Some(value) = current_chain_health_backoff {
+            warn!(
+                "Increasing round timeout by {} ms, due to chain health backoff",
+                value.round_timeout_backoff_ms
+            );
+            value.round_timeout_backoff_ms
+        } else {
+            0
+        };
+
+        let timeout = self.setup_deadline(multiplier, Duration::from_millis(backoff_timeout_ms));
         trace!(
             "Scheduling timeout of {} ms for round {}",
             timeout.as_millis(),
@@ -317,7 +337,7 @@ impl RoundState {
     }
 
     /// Setup the current round deadline and return the duration of the current round
-    fn setup_deadline(&mut self, multiplier: u32) -> Duration {
+    fn setup_deadline(&mut self, multiplier: u32, backoff_timeout: Duration) -> Duration {
         let round_index_after_committed_round = {
             if self.highest_committed_round == 0 {
                 // Genesis doesn't require the 3-chain rule for commit, hence start the index at
@@ -332,7 +352,8 @@ impl RoundState {
         let timeout = self
             .time_interval
             .get_round_duration(round_index_after_committed_round)
-            * multiplier;
+            * multiplier
+            + backoff_timeout;
         let now = self.time_service.get_current_timestamp();
         debug!(
             round = self.current_round,
