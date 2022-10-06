@@ -109,6 +109,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
     initialize(&mut session, consensus_config, chain_id, genesis_config);
+    initialize_features(&mut session);
     initialize_aptos_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
@@ -202,6 +203,7 @@ pub fn encode_genesis_change_set(
 
     // On-chain genesis process.
     initialize(&mut session, consensus_config, chain_id, genesis_config);
+    initialize_features(&mut session);
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
@@ -365,6 +367,22 @@ fn initialize(
             MoveValue::U64(rewards_rate_denominator),
             MoveValue::U64(genesis_config.voting_power_increase_limit),
         ]),
+    );
+}
+
+fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
+    let features: Vec<u64> = vec![1, 2];
+
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(bcs::to_bytes(&features).unwrap());
+    serialized_values.push(bcs::to_bytes(&Vec::<u64>::new()).unwrap());
+
+    exec_function(
+        session,
+        "features",
+        "change_feature_flags",
+        vec![],
+        serialized_values,
     );
 }
 

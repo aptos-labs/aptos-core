@@ -83,11 +83,12 @@ impl MoveHarness {
         }
     }
 
-    pub fn new_with_features(features: Vec<FeatureFlag>) -> Self {
+    pub fn new_with_features(
+        enabled_features: Vec<FeatureFlag>,
+        disabled_features: Vec<FeatureFlag>,
+    ) -> Self {
         let mut h = Self::new();
-        if !features.is_empty() {
-            h.enable_features(features);
-        }
+        h.enable_features(enabled_features, disabled_features);
         h
     }
 
@@ -364,9 +365,10 @@ impl MoveHarness {
     }
 
     /// Enables features
-    pub fn enable_features(&mut self, features: Vec<FeatureFlag>) {
+    pub fn enable_features(&mut self, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
         let acc = self.aptos_framework_account();
-        let enable = features.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor.exec(
             "features",
             "change_feature_flags",
@@ -375,8 +377,8 @@ impl MoveHarness {
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
-                bcs::to_bytes(&enable).unwrap(),
-                bcs::to_bytes(&Vec::<u64>::new()).unwrap(),
+                bcs::to_bytes(&enabled).unwrap(),
+                bcs::to_bytes(&disabled).unwrap(),
             ],
         );
     }
