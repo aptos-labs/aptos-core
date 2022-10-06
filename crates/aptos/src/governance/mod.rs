@@ -13,7 +13,7 @@ use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::U64;
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{Client, Transaction};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Script, TransactionPayload},
@@ -29,6 +29,9 @@ use serde::Serialize;
 use std::path::Path;
 use std::{collections::BTreeMap, fmt::Formatter, fs, path::PathBuf};
 use tempfile::TempDir;
+use aptos_sdk::move_types::language_storage::CORE_CODE_ADDRESS;
+use aptos_types::governance::{Proposal, VotingForum};
+use aptos_types::stake_pool::StakePool;
 
 /// Tool for on-chain governance
 ///
@@ -247,17 +250,38 @@ impl CliCommand<TransactionSummary> for SubmitVote {
             }
         };
 
-        // TODO: Display details of proposal
+        let client: &Client = &self.txn_options.rest_options.client(&self.txn_options.profile_options)?;
+        let voting_forum: VotingForum = client
+            .get_account_resource_bcs::<VotingForum>(CORE_CODE_ADDRESS, "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>")
+            .await?
+            .into_inner();
+        let proposal_id = self.proposal_id;
+        let proposal: Proposal = client.get_table_item_bcs::<u64, Proposal>(
+            voting_forum.proposals,
+            "u64",
+            "0x1::voting::Proposal<0x1::governance_proposal::GovernanceProposal>",
+            proposal_id,
+        )
+            .await?
+            .into_inner();
+        println!("proposal: {:?}", proposal);
+
+        let pool_address = self.pool_address_args.pool_address;
+        let stake_pool = client
+            .get_account_resource_bcs::<StakePool>(pool_address, "0x1::stake::StakePool")
+            .await?
+            .into_inner();
+        let voting_power = stake_pool.get_governance_voting_power();
 
         prompt_yes_with_override(
-            &format!("Are you sure you want to vote {}", vote_str),
+            &format!("Are you sure you want to vote {} with voting power = {}", vote_str, voting_power),
             self.txn_options.prompt_options,
         )?;
 
         self.txn_options
             .submit_transaction(aptos_stdlib::aptos_governance_vote(
-                self.pool_address_args.pool_address,
-                self.proposal_id,
+                pool_address,
+                proposal_id,
                 vote,
             ))
             .await
