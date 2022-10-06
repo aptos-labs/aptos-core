@@ -71,8 +71,8 @@ pub struct GenesisConfiguration {
     pub employee_vesting_start: u64,
     pub employee_vesting_period_duration: u64,
     // Aptos Names configuration
-    pub ans_funds_address: AccountAddress,
-    pub ans_admin_address: AccountAddress,
+    pub ans_funds_address: Option<AccountAddress>,
+    pub ans_admin_address: Option<AccountAddress>,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -216,7 +216,9 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
-    initialize_aptos_names(&mut session, genesis_config);
+    if genesis_config.ans_funds_address.is_some() {
+        initialize_aptos_names(&mut session, genesis_config);
+    }
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -445,8 +447,8 @@ fn initialize_aptos_names(
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(AccountAddress::from_hex_literal("0x4").unwrap()),
-            MoveValue::Address(genesis_config.ans_funds_address),
-            MoveValue::Address(genesis_config.ans_admin_address),
+            MoveValue::Address(genesis_config.ans_funds_address.unwrap()),
+            MoveValue::Address(genesis_config.ans_admin_address.unwrap()),
         ]),
     );
 }
@@ -639,19 +641,15 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         }
     };
 
-    generate_test_genesis(framework, Some(1)).0
-}
+    // TODO: Make ANS addresses mandatory once we have the ANS modules in testnet branch.
+    let mut ans_funds_address = None;
+    let mut ans_admin_address = None;
+    if genesis_options == GenesisOptions::Head {
+        ans_funds_address = Some(get_test_ans_funds_address());
+        ans_admin_address = Some(get_test_ans_admin_address());
+    }
 
-/// Generate a genesis `ChangeSet` for mainnet
-pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
-    let framework = match genesis_options {
-        GenesisOptions::Head => cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => framework::testnet_release_bundle(),
-        // We don't yet have mainnet, so returning testnet here
-        GenesisOptions::Mainnet => framework::testnet_release_bundle(),
-    };
-
-    generate_mainnet_genesis(framework, Some(1)).0
+    generate_test_genesis(framework, Some(1), ans_funds_address, ans_admin_address).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -662,7 +660,12 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(cached_packages::head_release_bundle(), count)
+    generate_test_genesis(
+        cached_packages::head_release_bundle(),
+        count,
+        Some(get_test_ans_funds_address()),
+        Some(get_test_ans_admin_address()),
+    )
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -762,6 +765,8 @@ pub fn get_test_ans_admin_address() -> AccountAddress {
 pub fn generate_test_genesis(
     framework: &ReleaseBundle,
     count: Option<usize>,
+    ans_funds_address: Option<AccountAddress>,
+    ans_admin_address: Option<AccountAddress>,
 ) -> (ChangeSet, Vec<TestValidator>) {
     let test_validators = TestValidator::new_test_set(count, Some(100_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
@@ -789,29 +794,9 @@ pub fn generate_test_genesis(
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
             // ANS specific configuration
-            ans_funds_address: get_test_ans_funds_address(),
-            ans_admin_address: get_test_ans_admin_address(),
+            ans_funds_address,
+            ans_admin_address,
         },
-    );
-    (genesis, test_validators)
-}
-
-pub fn generate_mainnet_genesis(
-    framework: &ReleaseBundle,
-    count: Option<usize>,
-) -> (ChangeSet, Vec<TestValidator>) {
-    // TODO: Update to have custom validators/accounts with initial balances at genesis.
-    let test_validators = TestValidator::new_test_set(count, Some(1_000_000_000_000_000));
-    let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
-    let validators = &validators_;
-
-    let genesis = encode_genesis_change_set(
-        &GENESIS_KEYPAIR.1,
-        validators,
-        framework,
-        OnChainConsensusConfig::default(),
-        ChainId::test(),
-        &mainnet_genesis_config(),
     );
     (genesis, test_validators)
 }
@@ -834,14 +819,18 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         employee_vesting_start: 1663456089,
         employee_vesting_period_duration: 5 * 60, // 5 minutes
         // TODO: update once decided
-        ans_funds_address: AccountAddress::from_hex_literal(
-            "0x3e89c7ef29468198fe58b3ced66d8c7dcb79b5f9fa27313464886334c35730e9",
-        )
-        .expect("Funds Address is valid"),
-        ans_admin_address: AccountAddress::from_hex_literal(
-            "0x3e89c7ef29468198fe58b3ced66d8c7dcb79b5f9fa27313464886334c35730e9",
-        )
-        .expect("Admin Address is valid"),
+        ans_funds_address: Some(
+            AccountAddress::from_hex_literal(
+                "0x3e89c7ef29468198fe58b3ced66d8c7dcb79b5f9fa27313464886334c35730e9",
+            )
+            .expect("Funds Address is valid"),
+        ),
+        ans_admin_address: Some(
+            AccountAddress::from_hex_literal(
+                "0x3e89c7ef29468198fe58b3ced66d8c7dcb79b5f9fa27313464886334c35730e9",
+            )
+            .expect("Admin Address is valid"),
+        ),
     }
 }
 

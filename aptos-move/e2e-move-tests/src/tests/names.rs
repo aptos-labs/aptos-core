@@ -4,7 +4,6 @@
 
 use crate::{assert_success, MoveHarness};
 use aptos_types::account_address::AccountAddress;
-use cached_packages::aptos_names_sdk_builder;
 use vm_genesis::{get_test_ans_admin_address, get_test_ans_funds_address};
 
 /*
@@ -23,16 +22,6 @@ fn test_names_end_to_end() {
 
     let user1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
     let user2 = harness.new_account_at(AccountAddress::from_hex_literal("0x456").unwrap());
-    let ans_account = harness.new_account_at(AccountAddress::from_hex_literal("0x4").unwrap());
-
-    // Run initialization. script. We expect this to be called from genesis or governance proposal script
-    assert_success!(harness.run_transaction_payload(
-        &ans_account,
-        aptos_names_sdk_builder::domains_initialize(
-            get_test_ans_funds_address(),
-            get_test_ans_admin_address(),
-        ),
-    ));
 
     // Register a domain
     assert_success!(harness.run_transaction_payload(

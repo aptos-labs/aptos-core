@@ -126,8 +126,8 @@ impl GenesisInfo {
                 voting_power_increase_limit: self.voting_power_increase_limit,
                 employee_vesting_start: 1663456089,
                 employee_vesting_period_duration: 5 * 60, // 5 minutes
-                ans_funds_address: vm_genesis::get_test_ans_funds_address(),
-                ans_admin_address: vm_genesis::get_test_ans_admin_address(),
+                ans_funds_address: Some(vm_genesis::get_test_ans_funds_address()),
+                ans_admin_address: Some(vm_genesis::get_test_ans_admin_address()),
             },
         )
     }
