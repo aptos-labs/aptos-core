@@ -5,7 +5,7 @@ slug: "node-files"
 
 # Node Files
 
-When you are deploying an Aptos node, you will need the following files. These can be downloaded from separate `aptos-labs` repos on GitHub. The `wget` commands provided below for will work on macOS and Linux. Open a terminal and paste the `wget` command to download the file. 
+When you are deploying an Aptos node, you will need the following files. These can be downloaded from separate `aptos-labs` repos on GitHub. The `wget` commands provided below will work on macOS and Linux. Open a terminal and paste the `wget` command to download the file. 
 
 :::tip Unless specified, all these files are required for validator node.
 :::
