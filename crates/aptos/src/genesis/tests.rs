@@ -36,7 +36,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, TestValidator};
+use vm_genesis::{get_test_ans_funds_address, AccountBalance, TestValidator};
 
 const INITIAL_BALANCE: u64 = 100_000_000_000_000;
 
@@ -178,8 +178,13 @@ async fn create_users(
     } else {
         None
     };
-    let git_options =
-        setup_git_dir(root_private_key.as_ref(), validator_names, ChainId::test()).await;
+    let git_options = setup_git_dir(
+        root_private_key.as_ref(),
+        validator_names,
+        ChainId::test(),
+        is_mainnet,
+    )
+    .await;
 
     // Only write validators to folders
     for i in 0..num_validators {
@@ -228,6 +233,7 @@ async fn setup_git_dir(
     root_private_key: Option<&Ed25519PrivateKey>,
     users: Vec<String>,
     chain_id: ChainId,
+    is_mainnet: bool,
 ) -> GitOptions {
     let git_options = git_options();
     let layout_file = TempPath::new();
@@ -239,6 +245,7 @@ async fn setup_git_dir(
         root_private_key.map(|inner| inner.public_key()),
         users,
         chain_id,
+        is_mainnet,
     )
     .await;
     let setup_command = SetupGit {
@@ -279,6 +286,7 @@ async fn create_layout_file(
     root_public_key: Option<Ed25519PublicKey>,
     users: Vec<String>,
     chain_id: ChainId,
+    is_mainnet: bool,
 ) {
     GenerateLayoutTemplate {
         output_file: PathBuf::from(file),
@@ -296,6 +304,10 @@ async fn create_layout_file(
     layout.chain_id = chain_id;
     layout.is_test = true;
     layout.total_supply = Some(INITIAL_BALANCE * 16);
+    if is_mainnet {
+        layout.ans_admin_address = Some(get_test_ans_funds_address());
+        layout.ans_funds_address = Some(get_test_ans_funds_address());
+    };
 
     write_to_file(
         file,

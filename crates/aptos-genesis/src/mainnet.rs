@@ -141,8 +141,8 @@ impl MainnetGenesisInfo {
                 voting_power_increase_limit: self.voting_power_increase_limit,
                 employee_vesting_start: self.employee_vesting_start,
                 employee_vesting_period_duration: self.employee_vesting_period_duration,
-                ans_funds_address: self.ans_funds_address,
-                ans_admin_address: self.ans_admin_address,
+                ans_funds_address: Some(self.ans_funds_address),
+                ans_admin_address: Some(self.ans_admin_address),
             },
         )
     }
