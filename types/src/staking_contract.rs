@@ -22,10 +22,10 @@ pub struct DistributionPool {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StakingContract {
-    principal: u64,
+    pub principal: u64,
     pub pool_address: AccountAddress,
     owner_cap: AccountAddress,
-    commission_percentage: u64,
+    pub commission_percentage: u64,
     distribution_pool: DistributionPool,
     signer_cap: AccountAddress,
 }

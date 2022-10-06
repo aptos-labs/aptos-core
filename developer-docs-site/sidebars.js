@@ -96,6 +96,7 @@ const sidebars = {
     },
     "nodes/aptos-deployments",
     "nodes/leaderboard-metrics",
+    "nodes/node-files",
     /** Delete during clean up
     {
       type: "category",
