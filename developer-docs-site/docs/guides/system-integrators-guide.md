@@ -21,7 +21,7 @@ This document will guide you through the following tasks to integrate with Aptos
 
 There are three well-supported networks for integrating with the Aptos blockchain:
 
-1. Local testnet -- our standalone tool for local development against a known version of the codebase with no live network.
+1. Local testnet -- our standalone tool for local development against a known version of the codebase with no external network.
 1. Devnet -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
 1. Testnet -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 
@@ -87,9 +87,7 @@ This is covered in depth in the [Accounts](../concepts/basics-accounts.md) docum
 
 An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts. Keys can be rotated via the [`account::rotate_authentication_key`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L183) function.
 
-Refreshing the keys is generally regarded as good hygiene in the security field. However, this presents a challenge for system integrators who are used to using a mnemonic to represent both a private key and its associated account. To simplify this for the system integrators, Aptos will provide an on-chain mapping, before the launch of the mainnet. The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address.
-
-TODO: When will we provide an on-chain mapping, before the launch of the mainnet?
+Refreshing the keys is generally regarded as good hygiene in the security field. However, this presents a challenge for system integrators who are used to using a mnemonic to represent both a private key and its associated account. To simplify this for the system integrators, Aptos provides an on-chain mapping via `aptos account lookup-address`. The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address.
 
 ### Preventing replay attacks
 
