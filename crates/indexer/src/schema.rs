@@ -32,6 +32,18 @@ diesel::table! {
         uri_mutable -> Bool,
         description_mutable -> Bool,
         inserted_at -> Timestamp,
+        table_handle -> Varchar,
+    }
+}
+
+diesel::table! {
+    current_ans_lookup (domain, subdomain) {
+        domain -> Varchar,
+        subdomain -> Varchar,
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Timestamp,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -49,6 +61,7 @@ diesel::table! {
         description_mutable -> Bool,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        table_handle -> Varchar,
     }
 }
 
@@ -346,6 +359,7 @@ diesel::table! {
 diesel::allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
     collection_datas,
+    current_ans_lookup,
     current_collection_datas,
     current_token_datas,
     current_token_ownerships,

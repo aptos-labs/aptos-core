@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_types::on_chain_config::FeatureFlag;
 use framework::natives::code::{PackageRegistry, UpgradePolicy};
 use move_deps::move_core_types::parser::parse_struct_tag;
@@ -294,7 +294,11 @@ fn code_publishing_using_resource_account(#[case] features: Vec<FeatureFlag>) {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     let mut pack = PackageBuilder::new("Package1").with_policy(UpgradePolicy::compat());
-    pack.add_source("m", "module 0x0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a::m { public fun f() {} }");
+    let module_address = create_resource_address(*acc.address(), &[]);
+    pack.add_source(
+        "m",
+        &format!("module 0x{}::m {{ public fun f() {{}} }}", module_address),
+    );
     let pack_dir = pack.write_to_temp().unwrap();
     let package = framework::BuiltPackage::build(
         pack_dir.path().to_owned(),

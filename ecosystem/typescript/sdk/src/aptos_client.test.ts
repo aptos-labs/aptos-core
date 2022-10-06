@@ -3,12 +3,11 @@
 
 import { AptosClient } from "./aptos_client";
 import * as Gen from "./generated/index";
-import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
 import { TxnBuilderTypes, TransactionBuilderMultiEd25519, TransactionBuilderRemoteABI } from "./transaction_builder";
 import { TokenClient } from "./token_client";
 import { HexString } from "./hex_string";
-import { FAUCET_URL, NODE_URL } from "./utils/test_helper.test";
+import { getFaucetClient, NODE_URL } from "./utils/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "./bcs";
 
 const account = "0x1::account::Account";
@@ -74,7 +73,7 @@ test(
   "submits bcs transaction",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
 
     const account1 = new AptosAccount();
     await faucetClient.fundAccount(account1.address(), 100_000_000);
@@ -117,7 +116,7 @@ test(
   "submits transaction with remote ABI",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
 
     const account1 = new AptosAccount();
     await faucetClient.fundAccount(account1.address(), 100_000_000);
@@ -154,7 +153,7 @@ test(
   "submits multisig transaction",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
 
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
@@ -171,11 +170,11 @@ test(
     const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
 
     const mutisigAccountAddress = authKey.derivedAddress();
-    await faucetClient.fundAccount(mutisigAccountAddress, 5000000);
+    await faucetClient.fundAccount(mutisigAccountAddress, 50000000);
 
     let resources = await client.getAccountResources(mutisigAccountAddress);
     let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("5000000");
+    expect((accountResource!.data as any).coin.value).toBe("50000000");
 
     const account4 = new AptosAccount();
     await faucetClient.fundAccount(account4.address(), 0);
@@ -228,7 +227,7 @@ test(
   "submits json transaction simulation",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
 
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
@@ -282,7 +281,7 @@ test(
   "submits bcs transaction simulation",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
 
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
@@ -340,15 +339,15 @@ test(
   "submits multiagent transaction",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
     const tokenClient = new TokenClient(client);
 
     const alice = new AptosAccount();
     const bob = new AptosAccount();
 
     // Fund both Alice's and Bob's Account
-    await faucetClient.fundAccount(alice.address(), 10000000);
-    await faucetClient.fundAccount(bob.address(), 10000000);
+    await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(bob.address(), 100000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
@@ -422,7 +421,7 @@ test(
   "publishes a package",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
 
     const account1 = new AptosAccount(
       new HexString("0x883fdd67576e5fdceb370ba665b8af8856d0cae63fd808b8d16077c6b008ea8c").toUint8Array(),
@@ -457,7 +456,7 @@ test(
   "rotates auth key ed25519",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
 
     const alice = new AptosAccount();
     await faucetClient.fundAccount(alice.address(), 100_000_000);
@@ -507,7 +506,7 @@ test(
   "estimates max gas amount",
   async () => {
     const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = getFaucetClient();
 
     const alice = new AptosAccount();
     await faucetClient.fundAccount(alice.address(), 10000000);

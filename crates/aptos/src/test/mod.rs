@@ -540,7 +540,7 @@ impl CliTestFramework {
                 // TODO(greg): revisit after fixing gas estimation
                 Some(GasOptions {
                     gas_unit_price: Some(1),
-                    max_gas: Some(10000),
+                    max_gas: Some(100000),
                 }),
             ),
             initial_stake_amount,

@@ -25,10 +25,12 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
     cd ~/$WORKSPACE
     ```
 
-3. Download the validator.yaml and docker-compose.yaml configuration files into this directory.
+3. Download the validator.yaml, docker-compose.yaml, haproxy.cfg, and blocked.ips configuration files into this directory.
     ```
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose.yaml
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/validator.yaml
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/haproxy.cfg
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/blocked.ips
     ```
 
 4. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
@@ -123,6 +125,8 @@ Now you have completed setting up your validator node. Additionally, you can als
     ```
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose-fullnode.yaml
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/fullnode.yaml
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/haproxy.cfg
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/blocked.ips
     ```
 
 10.  Edit `fullnode.yaml` file to update the IP address for validator node.
@@ -131,3 +135,5 @@ Now you have completed setting up your validator node. Additionally, you can als
 
 12.  Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
 Now you have successfully completed setting up your node.
+
+13. Optional: if you need to block an ip address simply add it to the bottom of blocked.ips and reload haproxy

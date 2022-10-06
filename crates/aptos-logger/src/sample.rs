@@ -88,7 +88,7 @@ macro_rules! sample {
     };
 
     ($sample_rate:expr, $($args:tt)+) => {{
-        static SAMPLING: Sampling = $crate::sample::Sampling::new($sample_rate);
+        static SAMPLING: $crate::sample::Sampling = $crate::sample::Sampling::new($sample_rate);
         if SAMPLING.sample() {
             $($args)+
         }

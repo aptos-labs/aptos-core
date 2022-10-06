@@ -3,7 +3,7 @@
   "slug": "",
   "title": "State Sync v2.3",
   "originalTitle": "",
-  "tags": [],
+  "tags": ["aptos-core"],
   "style": "dark",
   "timezone": "",
   "editable": true,
@@ -2060,6 +2060,25 @@
     "list": [
       {
         "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      },
+      {
+        "name": "Annotations \u0026 Alerts",
         "datasource": { "type": "datasource", "uid": "grafana" },
         "showLine": false,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -2080,16 +2099,18 @@
     ]
   },
   "refresh": "5s",
-  "schemaVersion": 36,
-  "version": 1,
+  "schemaVersion": 37,
+  "version": 2,
   "links": [
     {
-      "title": "Other Dashboards",
+      "title": "aptos-core",
       "type": "dashboards",
       "asDropdown": true,
       "icon": "external link",
       "includeVars": true,
-      "keepTime": true
+      "keepTime": true,
+      "tags": ["aptos-core"],
+      "targetBlank": true
     }
   ],
   "time": { "from": "now-15m", "to": "now" },

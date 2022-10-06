@@ -1,8 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{CliResult, Tool};
+use crate::{
+    move_tool::{ArgWithType, FunctionArgType},
+    CliResult, Tool,
+};
 use clap::Parser;
+use std::str::FromStr;
 
 /// In order to ensure that there aren't duplicate input arguments for untested CLI commands,
 /// we call help on every command to ensure it at least runs
@@ -89,6 +93,17 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "stake", "set-operator", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "stake", "unlock-stake", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "stake", "withdraw-stake", "--help"]).await;
+}
+
+/// Ensure we can parse URLs for args
+#[tokio::test]
+async fn ensure_can_parse_args_with_urls() {
+    let result = ArgWithType::from_str("string:https://aptoslabs.com").unwrap();
+    matches!(result._ty, FunctionArgType::String);
+    assert_eq!(
+        result.arg,
+        bcs::to_bytes(&"https://aptoslabs.com".to_string()).unwrap()
+    );
 }
 
 async fn assert_cmd_not_panic(args: &[&str]) {

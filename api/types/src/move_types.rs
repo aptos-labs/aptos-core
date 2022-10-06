@@ -20,14 +20,13 @@ use move_core_types::{
 };
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
-use poem_openapi::types::Type;
-use poem_openapi::{Enum, Object, Union};
+use poem_openapi::{types::Type, Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::Display;
 use std::{
     collections::BTreeMap,
     convert::{From, Into, TryFrom, TryInto},
     fmt,
+    fmt::Display,
     result::Result,
     str::FromStr,
 };
@@ -533,10 +532,10 @@ pub enum MoveType {
 }
 
 /// Maximum number of recursive types
-/// Currently, this is allowed up to the serde limit of 128
+/// Currently, this is allowed up to the serde limit of 16
 ///
 /// TODO: Should this number be re-evaluated
-const MAX_RECURSIVE_TYPES_ALLOWED: u8 = 128;
+pub const MAX_RECURSIVE_TYPES_ALLOWED: u8 = 16;
 
 impl VerifyInputWithRecursion for MoveType {
     fn verify(&self, recursion_count: u8) -> anyhow::Result<()> {
@@ -685,7 +684,7 @@ impl From<TypeTag> for MoveType {
             TypeTag::Vector(v) => MoveType::Vector {
                 items: Box::new(MoveType::from(*v)),
             },
-            TypeTag::Struct(v) => MoveType::Struct(v.into()),
+            TypeTag::Struct(v) => MoveType::Struct((*v).into()),
         }
     }
 }
@@ -702,7 +701,7 @@ impl From<&TypeTag> for MoveType {
             TypeTag::Vector(v) => MoveType::Vector {
                 items: Box::new(MoveType::from(v.as_ref())),
             },
-            TypeTag::Struct(v) => MoveType::Struct(v.into()),
+            TypeTag::Struct(v) => MoveType::Struct((&**v).into()),
         }
     }
 }
@@ -718,7 +717,7 @@ impl TryFrom<MoveType> for TypeTag {
             MoveType::Address => TypeTag::Address,
             MoveType::Signer => TypeTag::Signer,
             MoveType::Vector { items } => TypeTag::Vector(Box::new((*items).try_into()?)),
-            MoveType::Struct(v) => TypeTag::Struct(v.try_into()?),
+            MoveType::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
             _ => {
                 return Err(anyhow::anyhow!(
                     "Invalid move type for converting into `TypeTag`: {:?}",
@@ -1238,7 +1237,7 @@ mod tests {
         assert_serialize(Vector(Box::new(U8)), json!("vector<u8>"));
 
         assert_serialize(
-            Struct(create_nested_struct()),
+            Struct(Box::new(create_nested_struct())),
             json!("0x1::Home::ABC<address, 0x1::account::Base<u128, vector<u64>, vector<0x1::type::String>, 0x1::type::String>>"),
         );
     }
@@ -1267,7 +1266,7 @@ mod tests {
                         vec![(
                             identifier("nested_vector"),
                             Vector(
-                                TypeTag::Struct(type_struct("Host")),
+                                TypeTag::Struct(Box::new(type_struct("Host"))),
                                 vec![Struct(annotated_move_struct(
                                     "String",
                                     vec![
@@ -1475,7 +1474,7 @@ mod tests {
             address: address("0x1"),
             module: identifier("Home"),
             name: identifier("ABC"),
-            type_params: vec![TypeTag::Address, TypeTag::Struct(account)],
+            type_params: vec![TypeTag::Address, TypeTag::Struct(Box::new(account))],
         }
     }
 
@@ -1487,8 +1486,8 @@ mod tests {
             type_params: vec![
                 TypeTag::U128,
                 TypeTag::Vector(Box::new(TypeTag::U64)),
-                TypeTag::Vector(Box::new(TypeTag::Struct(type_struct("String")))),
-                TypeTag::Struct(type_struct("String")),
+                TypeTag::Vector(Box::new(TypeTag::Struct(Box::new(type_struct("String"))))),
+                TypeTag::Struct(Box::new(type_struct("String"))),
             ],
         }
     }

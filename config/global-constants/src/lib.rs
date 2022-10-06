@@ -33,8 +33,7 @@ pub const GAS_UNIT_PRICE: u64 = 0;
 #[cfg(not(any(test, feature = "testing")))]
 pub const GAS_UNIT_PRICE: u64 = 100;
 
-pub const INITIAL_BALANCE: u64 = 100_000_000;
-pub const MAX_GAS_AMOUNT: u64 = 100_000;
+pub const MAX_GAS_AMOUNT: u64 = 1_000_000;
 pub const GAS_HEADROOM_NUMERATOR: u64 = 3;
 pub const GAS_HEADROOM_DENOMINATOR: u64 = 2;
 

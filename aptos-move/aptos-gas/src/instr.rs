@@ -60,9 +60,10 @@ crate::params::define_gas_parameters!(
         [move_loc_base: InternalGas, "move_loc.base", 120],
         [st_loc_base: InternalGas, "st_loc.base", 120],
         // call
-        [call_base: InternalGas, "call.base", 1500],
+        [call_base: InternalGas, "call.base", 1000],
         [call_per_arg: InternalGasPerArg, "call.per_arg", 100],
-        [call_generic_base: InternalGas, "call_generic.base", 1500],
+        [call_per_local: InternalGasPerArg, optional "call.per_local", 100],
+        [call_generic_base: InternalGas, "call_generic.base", 1000],
         [
             call_generic_per_ty_arg: InternalGasPerArg,
             "call_generic.per_ty_arg",
@@ -73,6 +74,7 @@ crate::params::define_gas_parameters!(
             "call_generic.per_arg",
             100
         ],
+        [call_generic_per_local: InternalGasPerArg, optional "call_generic.per_local", 100],
         // struct
         [pack_base: InternalGas, "pack.base", 220],
         [pack_per_field: InternalGasPerArg, "pack.per_field", 40],
@@ -210,7 +212,6 @@ impl InstructionGasParameters {
             BrFalse => self.br_false,
             Branch => self.branch,
 
-            Pop => self.pop,
             LdU8 => self.ld_u8,
             LdU64 => self.ld_u64,
             LdU128 => self.ld_u128,

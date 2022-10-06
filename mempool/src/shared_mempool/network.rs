@@ -9,7 +9,8 @@ use crate::{
     shared_mempool::{
         tasks,
         types::{
-            notify_subscribers, BatchId, PeerSyncState, SharedMempool, SharedMempoolNotification,
+            notify_subscribers, MultiBatchId, PeerSyncState, SharedMempool,
+            SharedMempoolNotification,
         },
     },
 };
@@ -60,12 +61,12 @@ pub enum MempoolSyncMsg {
     /// Broadcast request issued by the sender.
     BroadcastTransactionsRequest {
         /// Unique id of sync request. Can be used by sender for rebroadcast analysis
-        request_id: BatchId,
+        request_id: MultiBatchId,
         transactions: Vec<SignedTransaction>,
     },
     /// Broadcast ack issued by the receiver.
     BroadcastTransactionsResponse {
-        request_id: BatchId,
+        request_id: MultiBatchId,
         /// Retry signal from recipient if there are txns in corresponding broadcast
         /// that were rejected from mempool but may succeed on resend.
         retry: bool,
@@ -190,7 +191,10 @@ impl MempoolNetworkInterface {
             // If we have a new peer, let's insert new data, otherwise, let's just update the current state
             if is_new_peer {
                 counters::active_upstream_peers(&peer.network_id()).inc();
-                sync_states.insert(peer, PeerSyncState::new(metadata));
+                sync_states.insert(
+                    peer,
+                    PeerSyncState::new(metadata, self.mempool_config.broadcast_buckets.len()),
+                );
             } else if let Some(peer_state) = sync_states.get_mut(&peer) {
                 peer_state.metadata = metadata;
             }
@@ -265,7 +269,7 @@ impl MempoolNetworkInterface {
     pub fn process_broadcast_ack(
         &self,
         peer: PeerNetworkId,
-        batch_id: BatchId,
+        batch_id: MultiBatchId,
         retry: bool,
         backoff: bool,
         timestamp: SystemTime,
@@ -356,7 +360,7 @@ impl MempoolNetworkInterface {
         peer: PeerNetworkId,
         scheduled_backoff: bool,
         smp: &mut SharedMempool<V>,
-    ) -> Result<(BatchId, Vec<SignedTransaction>, Option<&str>), BroadcastError>
+    ) -> Result<(MultiBatchId, Vec<SignedTransaction>, Option<&str>), BroadcastError>
     where
         V: TransactionValidation,
     {
@@ -385,15 +389,15 @@ impl MempoolNetworkInterface {
             .sent_batches
             .clone()
             .into_iter()
-            .filter(|(id, _batch)| !mempool.timeline_range(id.0, id.1).is_empty())
-            .collect::<BTreeMap<BatchId, SystemTime>>();
+            .filter(|(id, _batch)| !mempool.timeline_range(&id.0).is_empty())
+            .collect::<BTreeMap<MultiBatchId, SystemTime>>();
         state.broadcast_info.retry_batches = state
             .broadcast_info
             .retry_batches
             .clone()
             .into_iter()
-            .filter(|id| !mempool.timeline_range(id.0, id.1).is_empty())
-            .collect::<BTreeSet<BatchId>>();
+            .filter(|id| !mempool.timeline_range(&id.0).is_empty())
+            .collect::<BTreeSet<MultiBatchId>>();
 
         // Check for batch to rebroadcast:
         // 1. Batch that did not receive ACK in configured window of time
@@ -433,16 +437,20 @@ impl MempoolNetworkInterface {
                         Some(counters::RETRY_BROADCAST_LABEL)
                     };
 
-                    let txns = mempool.timeline_range(id.0, id.1);
-                    (*id, txns, metric_label)
+                    let txns = mempool.timeline_range(&id.0);
+                    (id.clone(), txns, metric_label)
                 }
                 None => {
                     // Fresh broadcast
                     let (txns, new_timeline_id) = mempool.read_timeline(
-                        state.timeline_id,
+                        &state.timeline_id,
                         self.mempool_config.shared_mempool_batch_size,
                     );
-                    (BatchId(state.timeline_id, new_timeline_id), txns, None)
+                    (
+                        MultiBatchId::from_timeline_ids(&state.timeline_id, &new_timeline_id),
+                        txns,
+                        None,
+                    )
                 }
             };
 
@@ -457,7 +465,7 @@ impl MempoolNetworkInterface {
     async fn send_batch(
         &self,
         peer: PeerNetworkId,
-        batch_id: BatchId,
+        batch_id: MultiBatchId,
         transactions: Vec<SignedTransaction>,
     ) -> Result<(), BroadcastError> {
         let request = MempoolSyncMsg::BroadcastTransactionsRequest {
@@ -477,7 +485,7 @@ impl MempoolNetworkInterface {
     fn update_broadcast_state(
         &self,
         peer: PeerNetworkId,
-        batch_id: BatchId,
+        batch_id: MultiBatchId,
         send_time: SystemTime,
     ) -> Result<usize, BroadcastError> {
         let mut sync_states = self.sync_states.write_lock();
@@ -486,14 +494,14 @@ impl MempoolNetworkInterface {
             .ok_or(BroadcastError::PeerNotFound(peer))?;
 
         // Update peer sync state with info from above broadcast.
-        state.timeline_id = std::cmp::max(state.timeline_id, batch_id.1);
+        state.timeline_id.update(&batch_id);
         // Turn off backoff mode after every broadcast.
         state.broadcast_info.backoff_mode = false;
+        state.broadcast_info.retry_batches.remove(&batch_id);
         state
             .broadcast_info
             .sent_batches
             .insert(batch_id, send_time);
-        state.broadcast_info.retry_batches.remove(&batch_id);
         Ok(state.broadcast_info.sent_batches.len())
     }
 
@@ -513,8 +521,10 @@ impl MempoolNetworkInterface {
 
         let num_txns = transactions.len();
         let send_time = SystemTime::now();
-        self.send_batch(peer, batch_id, transactions).await?;
-        let num_pending_broadcasts = self.update_broadcast_state(peer, batch_id, send_time)?;
+        self.send_batch(peer, batch_id.clone(), transactions)
+            .await?;
+        let num_pending_broadcasts =
+            self.update_broadcast_state(peer, batch_id.clone(), send_time)?;
         notify_subscribers(SharedMempoolNotification::Broadcast, &smp.subscribers);
 
         // Log all the metrics

@@ -12,12 +12,14 @@ fn can_upgrade_framework_on_testnet() {
     h.increase_transaction_size();
 
     // Upgrade all frameworks in bottom up order as they may have dependencies from each other
-    let acc = h.aptos_framework_account();
-    publish(&acc, &mut h, "move-stdlib");
-    publish(&acc, &mut h, "aptos-stdlib");
-    publish(&acc, &mut h, "aptos-framework");
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x3").unwrap());
-    publish(&acc, &mut h, "aptos-token");
+    let acc1 = h.aptos_framework_account();
+    publish(&acc1, &mut h, "move-stdlib");
+    publish(&acc1, &mut h, "aptos-stdlib");
+    publish(&acc1, &mut h, "aptos-framework");
+    let acc3 = h.new_account_at(AccountAddress::from_hex_literal("0x3").unwrap());
+    publish(&acc3, &mut h, "aptos-token");
+    let acc4 = h.new_account_at(AccountAddress::from_hex_literal("0x4").unwrap());
+    publish(&acc4, &mut h, "aptos-names");
 }
 
 fn publish(acc: &Account, h: &mut MoveHarness, path: &str) {

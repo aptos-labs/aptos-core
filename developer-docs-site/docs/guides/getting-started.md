@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 
 # Getting Started
 
-To kickstart your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
+To kickstart your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section. See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for the supported operating systems.
 
 ## Clone the Aptos-core repo
 
@@ -26,23 +26,27 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     cd aptos-core
     ```
 
-3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment.
+3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment by installing most of the dependencies needed to build, test and inspect Aptos Core. Note, you may be prompted for your password:
 
     ```
     ./scripts/dev_setup.sh
     ```
+    :::tip
+    You can see the available options for the script by running `./scripts/dev_setup.sh --help`
+    :::
 
-4. Update your current shell environment.
+4. Update your current shell environment to run `cargo build` and other Aptos-related commands:
 
     ```
     source ~/.cargo/env
     ```
-5. Skip this below step if you are not installing an Aptos node.
+
+5. Optionally, check out a release branch to install an Aptos node:
 
     <Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
 
-    Checkout the `devnet` branch using:
+    Check out the `devnet` branch using:
 
     ```
     git checkout --track origin/devnet
@@ -50,7 +54,7 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     </TabItem>
     <TabItem value="testnet" label="Testnet" default>
 
-    Checkout the `testnet` branch using:
+    Check out the `testnet` branch using:
 
     ```
     git checkout --track origin/testnet-stable
@@ -62,9 +66,9 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
 
 Install the Aptos CLI following the [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md) guide. 
 
-## Install tools
+## Install tools for macOS
 
-Make sure you have the below tools installed on your computer. You will need them for running the [Developer Tutorials](/docs/tutorials/index.md), in the order specified. The below list is for macOS:
+Make sure you have the below tools installed on your computer if running macOS. You will need them for running the [Developer Tutorials](/docs/tutorials/index.md), in the order specified:
 
 - **Homebrew**: [https://brew.sh/](https://brew.sh/)
 - **Node.js**: Install [Node.js](https://nodejs.org/en/download/), which will install `npm` and `npx`, by executing the below command on your Terminal:
@@ -79,7 +83,7 @@ Make sure you have the below tools installed on your computer. You will need the
 
 Now your basic Aptos development environment is ready.
 
-## Aptos Developer Resources
+## Aptos developer resources
 
 This section contains links to frequently referred Aptos developer resources. 
 

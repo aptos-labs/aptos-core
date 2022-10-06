@@ -33,6 +33,9 @@ impl ChunkOutput {
     ) -> Result<Self> {
         let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
 
+        // to print txn output for debugging, uncomment:
+        // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
+
         Ok(Self {
             transactions,
             transaction_outputs,

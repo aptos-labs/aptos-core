@@ -45,6 +45,7 @@ const sidebars = {
         "concepts/basics-accounts",
         "concepts/basics-events",
         "concepts/basics-gas-txn-fee",
+        "concepts/base-gas",
         {
           type: "category",
           label: "Coin and Token",
@@ -77,6 +78,7 @@ const sidebars = {
         "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
         "guides/running-a-local-multi-node-network",
+        "guides/handle-aptos-errors",
         {
           type: "category",
           label: "Move Guides",

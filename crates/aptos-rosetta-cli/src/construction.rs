@@ -37,19 +37,32 @@ impl ConstructionCommand {
 
 #[derive(Debug, Parser)]
 pub struct TransactionArgs {
-    #[clap(long)]
-    expiry_offset_secs: Option<i64>,
+    /// Number of seconds from now to expire
+    ///
+    /// If not provided, it will default to 60 seconds
+    #[clap(long, default_value_t = 60)]
+    expiry_offset_secs: i64,
+    /// Sequence number for transaction
+    ///
+    /// If not provided, the Rosetta server will pull from onchain
     #[clap(long)]
     sequence_number: Option<u64>,
+    /// Maximum gas amount for a transaction
+    ///
+    /// If not provided, the Rosetta server will estimate it
     #[clap(long)]
     max_gas: Option<u64>,
+    /// Gas price per unit of gas
+    ///
+    /// If not provided, the Rosetta server will estimate it
     #[clap(long)]
     gas_price: Option<u64>,
 }
 
 impl TransactionArgs {
+    /// Calculate expiry time given the offset seconds
     pub fn expiry_time(&self) -> anyhow::Result<u64> {
-        let offset = self.expiry_offset_secs.unwrap_or(60);
+        let offset = self.expiry_offset_secs;
         if offset > 0 {
             Ok(
                 (SystemTime::now().duration_since(UNIX_EPOCH)?
@@ -95,10 +108,9 @@ impl CreateAccountCommand {
         info!("Create account: {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .create_account(
@@ -116,7 +128,8 @@ impl CreateAccountCommand {
 
 /// Transfer coins via Rosetta
 ///
-/// Only the native coin is allowed for now
+/// Only the native coin is allowed for now.  It will create the account if it
+/// does not exist
 #[derive(Debug, Parser)]
 pub struct TransferCommand {
     #[clap(flatten)]
@@ -148,10 +161,9 @@ impl TransferCommand {
         info!("Transfer {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .transfer(
@@ -189,10 +201,10 @@ pub struct SetOperatorCommand {
     /// AccountAddress if it rotates
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     sender: Option<AccountAddress>,
-    /// The receiving account
+    /// The old operator of the stake pool
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     old_operator: Option<AccountAddress>,
-    /// The receiving account
+    /// The new operator of the stake pool
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_operator: AccountAddress,
 }
@@ -202,10 +214,9 @@ impl SetOperatorCommand {
         info!("Set operator {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .set_operator(
@@ -243,10 +254,10 @@ pub struct SetVoterCommand {
     /// AccountAddress if it rotates
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     sender: Option<AccountAddress>,
-    /// The receiving account
+    /// The operator of the stake pool
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     operator: Option<AccountAddress>,
-    /// The receiving account
+    /// The new voter for the stake pool
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_voter: AccountAddress,
 }
@@ -256,10 +267,9 @@ impl SetVoterCommand {
         info!("Set voter {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .set_voter(
@@ -313,10 +323,9 @@ impl CreateStakePoolCommand {
         info!("CreateStakePool {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let private_key = self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
+        let private_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding, &self.profile_options)?;
 
         client
             .create_stake_pool(

@@ -116,3 +116,163 @@ resource "aws_eks_node_group" "nodes" {
     kubernetes_config_map.aws-auth,
   ]
 }
+
+resource "aws_iam_openid_connect_provider" "cluster" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["9e99a48a9960b14926bb7f3b02e22da2b0ab7280"] # Thumbprint of Root CA for EKS OIDC, Valid until 2037
+  url             = aws_eks_cluster.aptos.identity[0].oidc[0].issuer
+}
+
+locals {
+  oidc_provider = replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")
+}
+
+# EBS CSI ADDON
+
+data "aws_iam_policy_document" "aws-ebs-csi-driver-trust-policy" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type = "Federated"
+      identifiers = [
+        "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_provider}"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider}:sub"
+      values   = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "aws-ebs-csi-driver" {
+  name                 = "aptos-${local.workspace_name}-ebs-csi-controller"
+  path                 = var.iam_path
+  permissions_boundary = var.permissions_boundary_policy
+  assume_role_policy   = data.aws_iam_policy_document.aws-ebs-csi-driver-trust-policy.json
+}
+
+resource "aws_iam_role_policy_attachment" "caws-ebs-csi-driver" {
+  role = aws_iam_role.aws-ebs-csi-driver.name
+  # From this reference: https://docs.aws.amazon.com/eks/latest/userguide/csi-iam-role.html
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_eks_addon" "aws-ebs-csi-driver" {
+  cluster_name             = aws_eks_cluster.aptos.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.aws-ebs-csi-driver.arn
+}
+
+# access control
+data "aws_iam_policy_document" "cluster-autoscaler-assume-role" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type = "Federated"
+      identifiers = [
+        "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_provider}"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider}:sub"
+      # the name of the kube-system cluster-autoscaler service account
+      values = ["system:serviceaccount:kube-system:cluster-autoscaler"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "cluster-autoscaler" {
+  statement {
+    sid = "Autoscaling"
+    actions = [
+      "autoscaling:SetDesiredCapacity",
+      "autoscaling:TerminateInstanceInAutoScalingGroup"
+    ]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/k8s.io/cluster-autoscaler/${aws_eks_cluster.aptos.name}"
+      values   = ["owned"]
+    }
+  }
+
+  statement {
+    sid = "DescribeAutoscaling"
+    actions = [
+      "autoscaling:DescribeAutoScalingInstances",
+      "autoscaling:DescribeAutoScalingGroups",
+      "ec2:DescribeLaunchTemplateVersions",
+      "autoscaling:DescribeTags",
+      "autoscaling:DescribeLaunchConfigurations"
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role" "cluster-autoscaler" {
+  name                 = "aptos-fullnode-${local.workspace_name}-cluster-autoscaler"
+  path                 = var.iam_path
+  permissions_boundary = var.permissions_boundary_policy
+  assume_role_policy   = data.aws_iam_policy_document.cluster-autoscaler-assume-role.json
+}
+
+resource "aws_iam_role_policy" "cluster-autoscaler" {
+  name   = "Helm"
+  role   = aws_iam_role.cluster-autoscaler.name
+  policy = data.aws_iam_policy_document.cluster-autoscaler.json
+}
+
+locals {
+  autoscaling_helm_chart_path = "${path.module}/../../helm/autoscaling"
+}
+
+resource "helm_release" "autoscaling" {
+  name        = "autoscaling"
+  namespace   = "kube-system"
+  chart       = local.autoscaling_helm_chart_path
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({
+      autoscaler = {
+        enabled     = true
+        clusterName = aws_eks_cluster.aptos.name
+        image = {
+          # EKS does not report patch version
+          tag = "v${aws_eks_cluster.aptos.version}.0"
+        }
+        serviceAccount = {
+          annotations = {
+            "eks.amazonaws.com/role-arn" = aws_iam_role.cluster-autoscaler.arn
+          }
+        }
+      }
+    })
+  ]
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.autoscaling_helm_chart_path, "**") : filesha1("${local.autoscaling_helm_chart_path}/${f}")]))
+  }
+}

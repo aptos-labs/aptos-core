@@ -53,10 +53,13 @@ resource "helm_release" "fullnode" {
   max_history = 10
   wait        = false
 
+  depends_on = [module.eks]
+
   values = [
     jsonencode({
       chain = {
-        era = var.era
+        era  = var.era
+        name = var.chain_name
       }
       image = {
         tag = local.image_tag
@@ -68,7 +71,7 @@ resource "helm_release" "fullnode" {
         "eks.amazonaws.com/nodegroup" = "fullnode"
       }
       storage = {
-        class = "gp2"
+        class = var.fullnode_storage_class
       }
       backup = {
         enable = count.index == 0 ? var.enable_backup : false
