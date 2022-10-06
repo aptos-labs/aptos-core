@@ -21,8 +21,8 @@ use move_core_types::parser::parse_struct_tag;
 fn rotate_auth_key_ed25519_to_ed25519() {
     let mut harness = MoveHarness::new();
     let account1 = harness.new_account_with_key_pair();
-
     let account2 = harness.new_account_with_key_pair();
+
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_key_rotation_transaction(
         0,
@@ -43,7 +43,6 @@ fn rotate_auth_key_ed25519_to_ed25519() {
 fn rotate_auth_key_ed25519_to_multi_ed25519() {
     let mut harness = MoveHarness::new();
     let account1 = harness.new_account_with_key_pair();
-
     let private_key = MultiEd25519PrivateKey::generate_for_testing();
     let public_key = MultiEd25519PublicKey::from(&private_key);
     let auth_key = AuthenticationKey::multi_ed25519(&public_key);
@@ -68,8 +67,8 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
 fn rotate_auth_key_twice() {
     let mut harness = MoveHarness::new();
     let mut account1 = harness.new_account_with_key_pair();
-
     let account2 = harness.new_account_with_key_pair();
+
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_key_rotation_transaction(
         0,
