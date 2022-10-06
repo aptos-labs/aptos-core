@@ -36,7 +36,9 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use vm_genesis::{get_test_ans_funds_address, AccountBalance, TestValidator, get_test_ans_admin_address};
+use vm_genesis::{
+    get_test_ans_admin_address, get_test_ans_funds_address, AccountBalance, TestValidator,
+};
 
 const INITIAL_BALANCE: u64 = 100_000_000_000_000;
 
@@ -305,8 +307,8 @@ async fn create_layout_file(
     layout.is_test = true;
     layout.total_supply = Some(INITIAL_BALANCE * 16);
     if is_mainnet {
-        layout.ans_admin_address = Some(get_test_ans_funds_address());
-        layout.ans_funds_address = Some(get_test_ans_admin_address());
+        layout.ans_admin_address = Some(get_test_ans_admin_address());
+        layout.ans_funds_address = Some(get_test_ans_funds_address());
     };
 
     write_to_file(
