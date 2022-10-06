@@ -5,40 +5,11 @@ slug: "connect-to-aptos-network"
 
 # Connecting to Aptos Network
 
-This document describes how to connect your running validator node and public fullnode to an Aptos network. Follow these instructions only if your validator is meeting the minimal staking requirement. (1M APT token)
+This document describes how to connect your running validator node and public fullnode to an Aptos network. Follow these instructions only if your validator has met the minimal staking requirement. 
 
-## Initializing the staking pool
-
-:::tip Examples using testnet
-The CLI command examples used in this section use testnet. You can use the same command for mainnet by passing the mainnet URL for the `--rest-url` parameter.
-::: 
-
-1. Initialize CLI with your wallet **private key**. For Petra wallet, you can get your wallet private key from **Settings** > **Credentials**.
-
-  ```bash
-  aptos init --profile testnet-owner \
-    --rest-url https://testnet.aptoslabs.com
-  ```
-
-2. Initialize staking pool using CLI.
-
-  ```bash
-  aptos stake initialize-stake-owner \
-    --initial-stake-amount 100000000000000 \
-    --operator-address <operator-address> \
-    --voter-address <voter-address> \
-    --profile testnet-owner
-  ```
-
-3. Do not forget to transfer some coins to your operator account to pay for gas. You can use Petra wallet directly or with the below command using CLI:
-
-  ```bash
-  aptos account create --account <operator-account> --profile testnet-owner
-  aptos account transfer \
-  --account <operator-account> \
-  --amount 5000 \
-  --profile testnet-owner
-  ```
+:::tip Minimum staking requirement
+The current required minimum for staking is 1M APT tokens.
+:::
 
 ## Bootstrapping validator node
 
@@ -268,125 +239,6 @@ After your validator node joined the validator set, you can verify the correctne
     
     You should expect the active value for your `StakePool` to keep increasing. It is updated at every epoch.
 
-## Seeing your stake pool information
-
-To see the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. 
-
-
-
-:::tip Use CLI 0.3.8 or higher
-Make sure you use the CLI version 0.3.8 or higher. See [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md).
-- Type `aptos --help` to see the CLI version.
-- Type `aptos node get-stake-pool --help` for more on the command option for the below example.
-:::
-
-The below command is an example for Premainnet and an example owner address `0x6064d2f4c38b65e9b78fbdf8a80f084159341d47b5e0c192492923326d1bed0a`. For other networks, use the appropriate REST URL for the `--url` field. See [Aptos Blockchain Deployments](/nodes/aptos-deployments) for `--url` field values. 
-
-```bash
-aptos node get-stake-pool \
-  --owner-address 0x6064d2f4c38b65e9b78fbdf8a80f084159341d47b5e0c192492923326d1bed0a \
-  --url https://premainnet.aptosdev.com
-```
-
-Example output:
-
-```json
- Finished dev [unoptimized + debuginfo] target(s) in 0.84s
-     Running `target/debug/aptos node get-stake-pool --owner-address 0x6064d2f4c38b65e9b78fbdf8a80f084159341d47b5e0c192492923326d1bed0a`
-{
-  "Result": [
-    {
-      "state": "Active",
-      "pool_address": "c103f2e169314df3116d47b0fdd7c0378bf5805976c14af9358a2325ff89f647",
-      "operator_address": "f4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546",
-      "voter_address": "8ac6fe79b3656feda6485fcf872e00033dd35cd9d8e10b485e3dee34949b2f47",
-      "pool_type": "Vesting",
-      "total_stake": 1541689598533365,
-      "commission_percentage": 12,
-      "commission_not_yet_unlocked": 80855824003,
-      "lockup_expiration_local_time": "Thu Nov  3 01:39:48 2022",
-      "consensus_public_key": "0x97f001bb26d1e80e1da9a02b573562abb8e02c5ff2447616a1c27ab4f4756c54795a51684c9e0cb2290f8e204d2035d4",
-      "validator_network_addresses": [
-        "/dns/validator.aptos.main.metahash.biz/tcp/6180/noise-ik/0x7146cf496c4b54631d4d75e7491d0356f663affc8f8f5c44206c88992a605811/handshake/0"
-      ],
-      "fullnode_network_addresses": [
-        "/dns/fullnode.aptos.main.metahash.biz/tcp/6182/noise-ik/0xec699df05d5c6dd59b320cee3559a91ed4c7ce3b34ec4368de81eec867c4b17e/handshake/0"
-      ],
-      "epoch_info": {
-        "epoch": 68,
-        "epoch_interval": 3600000000,
-        "last_epoch_start_time": {
-          "unix_time": 1665074662417326,
-          "utc_time": "2022-10-06T16:44:22.417326Z",
-          "local_time": "Thu Oct  6 16:44:22 2022"
-        },
-        "next_epoch_start_time": {
-          "unix_time": 1665078262417326,
-          "utc_time": "2022-10-06T17:44:22.417326Z",
-          "local_time": "Thu Oct  6 17:44:22 2022"
-        }
-      }
-    }
-  ]
-}
-```
-
-where:
-
-- `state` is the status of the stake and can be: pending active, active, pending-inactive, inactive.
-- Total stake.
-- Consensus key.
-- Addresses (pool, operator, voter). 
-- Unlocked commission.
-- Fullnode network address.
-- Epoch information.
-- Lockup expiration information.
-
-## Checking your validator performance
-
-To see your validator performance in the current and past epochs and rewards earned, run the below command. The output will show the validator's performance in block proposals and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node analyze-validator-performance --help` to see default values used.
-
-```bash
-aptos node analyze-validator-performance --analyze-mode All \
-  --url https://premainnet.aptosdev.com
-```
-
-Example output:
-
-```json
-{
-  "Result": {
-    "current_epoch_successful_proposals": 56,
-    "current_epoch_failed_proposals": 0,
-    "previous_epoch_rewards": [
-      "12312716242",
-      "12272043711",
-      "12312912674",
-      "12313011054",
-      "12313109435",
-      "12180092056",
-      "12313305136",
-      "12313403519",
-      "12313501903",
-      "12313600288"
-    ],
-    "epoch_info": {
-      "epoch": 68,
-      "epoch_interval": 3600000000,
-      "last_epoch_start_time": {
-        "unix_time": 1665074662417326,
-        "utc_time": "2022-10-06T16:44:22.417326Z",
-        "local_time": "Thu Oct  6 16:44:22 2022"
-      },
-      "next_epoch_start_time": {
-        "unix_time": 1665078262417326,
-        "utc_time": "2022-10-06T17:44:22.417326Z",
-        "local_time": "Thu Oct  6 17:44:22 2022"
-      }
-    }
-  }
-}
-```
 
 ## Leaving validator set
 
