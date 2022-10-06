@@ -224,7 +224,7 @@ async fn test_block_request() {
         SignedDigestInfo::new(digest, LogicalTime::new(0, 10)),
         AggregateSignature::empty(),
     );
-    wrapper.insert_proof(proof.clone()).await;
+    wrapper.insert_proof(proof.clone());
 
     let (callback_tx, callback_rx) = oneshot::channel();
     let req = WrapperCommand::GetBlockRequest(
@@ -234,7 +234,7 @@ async fn test_block_request() {
         PayloadFilter::InQuorumStore(HashSet::new()),
         callback_tx,
     );
-    wrapper.handle_consensus_request(req).await;
+    wrapper.handle_consensus_request(req);
     let ConsensusResponse::GetBlockResponse(payload) = callback_rx.await.unwrap().unwrap();
     if let Payload::InQuorumStore(proofs) = payload {
         assert_eq!(proofs.len(), 1);

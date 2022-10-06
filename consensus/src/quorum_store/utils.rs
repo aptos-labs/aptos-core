@@ -17,7 +17,11 @@ use std::{
     mem,
     time::Duration,
 };
+use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::collections::HashMap;
+use claims::assert_some;
 use tokio::time::timeout;
+use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 
 pub(crate) struct BatchBuilder {
     id: BatchId,
@@ -191,6 +195,78 @@ impl MempoolProxy {
                     "[direct_mempool_quorum_store] did not receive expected GetBatchResponse"
                 )),
             },
+        }
+    }
+}
+
+
+// TODO: unitest
+pub struct ProofQueue {
+    digest_queue: VecDeque<(HashValue, LogicalTime)>,
+    digest_proof: HashMap<HashValue, Option<ProofOfStore>>, // None means committed
+}
+
+impl ProofQueue {
+    pub(crate) fn new() -> Self {
+        Self {
+            digest_queue: VecDeque::new(),
+            digest_proof: HashMap::new(),
+        }
+    }
+
+
+    pub(crate) fn push(&mut self, proof: ProofOfStore) {
+        match self.digest_proof.entry(*proof.digest()) {
+            Vacant(entry) => {
+                self.digest_queue.push_back((*proof.digest(), proof.expiration()));
+                entry.insert(Some(proof));
+            }
+            Occupied(mut entry) => {
+                if entry.get().is_some() && entry.get().as_ref().unwrap().expiration() < proof.expiration() {
+                    entry.insert(Some(proof));
+                }
+            }
+        }
+    }
+
+    // gets excluded and iterates over the vector returning non excluded or expired entries.
+    pub(crate) fn pull_proofs(&mut self, excluded_proofs: &HashSet<HashValue>, current_time: LogicalTime, max_txns: u64, max_bytes: u64) -> Vec<ProofOfStore> {
+        let num_expired = self
+            .digest_queue
+            .iter()
+            .take_while(|(_, expiration_time)| *expiration_time < current_time)
+            .count();
+        for (digest, _ ) in self.digest_queue.drain(0..num_expired){
+            assert_some!(self.digest_proof.remove(&digest));
+        }
+
+        let mut ret = Vec::new();
+        let mut cur_bytes = 0;
+        let mut cur_txns = 0;
+        for (digest, expiration) in self.digest_queue.iter() {
+            if *expiration >= current_time &&
+                !excluded_proofs.contains(digest) {
+                match self.digest_proof.get(digest).expect("Entry for unexpired digest must exist") {
+                    Some(proof) => {
+                        // TODO: cur_bytes += proof.bytes.
+                        // TODO: cur_txns += proof.txns.
+                        if cur_bytes > max_bytes || cur_txns > max_txns {
+                            // Exceeded the limit for requested bytes or number of transactions.
+                            break;
+                        }
+                        ret.push(proof.clone());
+                    },
+                    None => {}, // Proof was already committed, skip.
+                }
+            }
+        }
+        ret
+    }
+
+    //mark in the hashmap committed PoS, but keep them until they expire
+    pub(crate) fn mark_committed(&mut self, digests: Vec<HashValue>) {
+        for digest in digests{
+            self.digest_proof.insert(digest, None);
         }
     }
 }

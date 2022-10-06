@@ -89,6 +89,7 @@ pub enum SignedDigestError {
     DuplicatedSignature,
 }
 
+// TODO: add num txn and num bytes in batch
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct ProofOfStore {

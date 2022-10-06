@@ -36,6 +36,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc::Sender as TokioSender, sync::oneshot as TokioOneshot, time};
+use crate::quorum_store::utils::ProofQueue;
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
@@ -48,9 +49,10 @@ pub struct QuorumStoreWrapper {
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
-    proofs_for_consensus: HashMap<HashValue, ProofOfStore>,
+    proofs_for_consensus: ProofQueue,
     mempool_txn_pull_max_count: u64,
-    mempool_txn_pull_max_bytes: u64, // TODO: check if this is necessary, also check batch_builder
+    mempool_txn_pull_max_bytes: u64,
+    // TODO: check if this is necessary, also check batch_builder
     // For ensuring that batch size does not exceed QuorumStore limit.
     max_batch_bytes: u64,
     max_batch_expiry_round_gap: Round,
@@ -90,7 +92,7 @@ impl QuorumStoreWrapper {
             batch_expirations: RoundExpirations::new(),
             batch_builder: BatchBuilder::new(batch_id, max_batch_bytes as usize),
             latest_logical_time: LogicalTime::new(epoch, 0),
-            proofs_for_consensus: HashMap::new(),
+            proofs_for_consensus: ProofQueue::new(),
             mempool_txn_pull_max_count,
             mempool_txn_pull_max_bytes,
             max_batch_bytes,
@@ -214,15 +216,9 @@ impl QuorumStoreWrapper {
             .await;
     }
 
-    pub(crate) async fn insert_proof(&mut self, mut new_proof: ProofOfStore) {
-        let maybe_proof = self.proofs_for_consensus.remove(new_proof.digest());
-        if let Some(proof) = maybe_proof {
-            if proof.expiration() > new_proof.expiration() {
-                new_proof = proof;
-            }
-        }
-        self.proofs_for_consensus
-            .insert(*new_proof.digest(), new_proof);
+    #[cfg(test)]
+    pub(crate) fn insert_proof(&mut self, mut proof: ProofOfStore) {
+        self.proofs_for_consensus.push(proof);
     }
 
     pub(crate) async fn handle_local_proof(
@@ -240,7 +236,7 @@ impl QuorumStoreWrapper {
                 // Handle batch_id
 
                 counters::LOCAL_POS_COUNT.inc();
-                self.insert_proof(proof.clone()).await;
+                self.proofs_for_consensus.push(proof.clone());
                 self.broadcast_completed_proof(proof, network_sender).await;
             }
             Err(QuorumStoreError::Timeout(batch_id)) => {
@@ -257,10 +253,10 @@ impl QuorumStoreWrapper {
         }
     }
 
-    pub(crate) async fn handle_consensus_request(&mut self, msg: WrapperCommand) {
+    pub(crate) fn handle_consensus_request(&mut self, msg: WrapperCommand) {
         match msg {
             // TODO: check what max_txns consensus is using
-            WrapperCommand::GetBlockRequest(round, max_txns, _max_bytes, filter, callback) => {
+            WrapperCommand::GetBlockRequest(round, max_txns, max_bytes, filter, callback) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -270,25 +266,8 @@ impl QuorumStoreWrapper {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                // TODO: optimization: exclude proofs if corresponding batches aren't present locally.
-                let mut proof_block = Vec::new();
-                let mut expired = Vec::new();
-                for proof in self.proofs_for_consensus.values() {
-                    if proof_block.len() == max_txns as usize {
-                        break;
-                    }
+                let proof_block = self.proofs_for_consensus.pull_proofs(&excluded_proofs, LogicalTime::new(self.latest_logical_time.epoch(), round), max_txns, max_bytes);
 
-                    if proof.expiration()
-                        < LogicalTime::new(self.latest_logical_time.epoch(), round)
-                    {
-                        expired.push(proof.digest().clone());
-                    } else if !excluded_proofs.contains(proof.digest()) {
-                        proof_block.push(proof.clone());
-                    }
-                }
-                for digest in expired {
-                    self.proofs_for_consensus.remove(&digest);
-                }
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
                     Payload::empty()
                 } else {
@@ -324,15 +303,7 @@ impl QuorumStoreWrapper {
                         );
                     }
                 }
-                for digest in digests {
-                    if self.proofs_for_consensus.remove(&digest).is_some() {
-                        debug!(
-                            "QS: removed digest {} from batches_for_consensus, new size {}",
-                            digest,
-                            self.proofs_for_consensus.len(),
-                        );
-                    }
-                }
+                self.proofs_for_consensus.mark_committed(digests);
             }
         }
     }
@@ -391,14 +362,14 @@ impl QuorumStoreWrapper {
             }
                 },
                 Some(msg) = consensus_receiver.next() => {
-                    self.handle_consensus_request(msg).await;
+                    self.handle_consensus_request(msg)
                 },
                 Some(msg) = network_msg_rx.next() => {
                    if let VerifiedEvent::ProofOfStoreBroadcast(proof) = msg{
                         debug!("QS: got proof from peer");
                         
                         counters::REMOTE_POS_COUNT.inc();
-                        self.insert_proof(*proof).await;
+                        self.proofs_for_consensus.push(*proof);
                     }
                 },
             }
