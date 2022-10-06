@@ -18,10 +18,7 @@ use move_deps::move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use vm_genesis::{
-    generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
-    GenesisOptions,
-};
+use vm_genesis::{generate_genesis_change_set_for_testing, GenesisOptions};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =
@@ -29,9 +26,6 @@ pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =
 
 pub static GENESIS_CHANGE_SET_TESTNET: Lazy<ChangeSet> =
     Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Testnet));
-
-pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
-    Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Mainnet));
 
 /// An in-memory implementation of [`StateView`] and [`RemoteCache`] for the VM.
 ///

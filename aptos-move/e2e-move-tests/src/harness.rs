@@ -91,14 +91,6 @@ impl MoveHarness {
         h
     }
 
-    pub fn new_mainnet() -> Self {
-        register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
-            executor: FakeExecutor::from_mainnet_genesis(),
-            txn_seq_no: BTreeMap::default(),
-        }
-    }
-
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {

@@ -13,10 +13,7 @@ use std::{
 
 use crate::{
     account::{Account, AccountData},
-    data_store::{
-        FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET,
-        GENESIS_CHANGE_SET_TESTNET,
-    },
+    data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_TESTNET},
     golden_outputs::GoldenOutputs,
 };
 use aptos_bitvec::BitVec;
@@ -47,7 +44,6 @@ use aptos_vm::{
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
-use framework::ReleaseBundle;
 use move_deps::{
     move_core_types::{
         account_address::AccountAddress,
@@ -131,11 +127,6 @@ impl FakeExecutor {
         Self::from_genesis(GENESIS_CHANGE_SET_TESTNET.clone().write_set())
     }
 
-    /// Creates an executor using the mainnet genesis.
-    pub fn from_mainnet_genesis() -> Self {
-        Self::from_genesis(GENESIS_CHANGE_SET_MAINNET.clone().write_set())
-    }
-
     /// Creates an executor in which no genesis state has been applied yet.
     pub fn no_genesis() -> Self {
         FakeExecutor {
@@ -207,12 +198,6 @@ impl FakeExecutor {
             genesis.add_module(&id, bytes.to_vec());
         }
         genesis
-    }
-
-    /// Creates fresh genesis from the framework passed in.
-    pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
-        Self::from_genesis(genesis.0.write_set())
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.
