@@ -21,7 +21,7 @@ pub async fn send_cli_telemetry_event(
     command: String,
     latency: Duration,
     success: bool,
-    error: Option<String>,
+    error: Option<&str>,
 ) {
     // Collection information about the cli command
     collect_cli_info(command, latency, success, error, &mut build_information);
@@ -53,11 +53,15 @@ pub(crate) fn collect_cli_info(
     command: String,
     latency: Duration,
     success: bool,
-    error: Option<String>,
+    error: Option<&str>,
     build_information: &mut BTreeMap<String, String>,
 ) {
     build_information.insert(COMMAND.into(), command);
     build_information.insert(LATENCY.into(), latency.as_millis().to_string());
     build_information.insert(SUCCESS.into(), success.to_string());
-    utils::insert_optional_value(build_information, ERROR, error);
+    utils::insert_optional_value(
+        build_information,
+        ERROR,
+        error.map(|inner| inner.to_string()),
+    );
 }
