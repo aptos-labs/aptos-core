@@ -46,6 +46,7 @@ pub enum GovernanceTool {
     Vote(SubmitVote),
     ViewProposal(ViewProposal),
     ListProposals(ListProposals),
+    VerifyProposal(VerifyProposal),
     ExecuteProposal(ExecuteProposal),
     GenerateUpgradeProposal(GenerateUpgradeProposal),
 }
@@ -60,6 +61,7 @@ impl GovernanceTool {
             GenerateUpgradeProposal(tool) => tool.execute_serialized_success().await,
             ViewProposal(tool) => tool.execute_serialized().await,
             ListProposals(tool) => tool.execute_serialized().await,
+            VerifyProposal(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -81,6 +83,65 @@ pub struct ListProposals {
     rest_options: RestOptions,
     #[clap(flatten)]
     profile: ProfileOptions,
+}
+
+#[derive(Parser)]
+pub struct VerifyProposal {
+    #[clap(long)]
+    proposal_id: u64,
+
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileScriptFunction,
+    #[clap(flatten)]
+    rest_options: RestOptions,
+    #[clap(flatten)]
+    profile: ProfileOptions,
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<VerifyProposalResponse> for VerifyProposal {
+    fn command_name(&self) -> &'static str {
+        "VerifyProposal"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<VerifyProposalResponse> {
+        // Compile local first
+        let (_, hash) = self
+            .compile_proposal_args
+            .compile("SubmitProposal", self.prompt_options)?;
+
+        let client = self.rest_options.client(&self.profile)?;
+        let forum = client
+            .get_account_resource_bcs::<VotingForum>(
+                AccountAddress::ONE,
+                "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",
+            )
+            .await?
+            .into_inner();
+        let voting_table = forum.table_handle.0;
+
+        let proposal: Proposal = get_proposal(&client, voting_table, self.proposal_id)
+            .await?
+            .into();
+
+        let computed_hash = hash.to_hex();
+        let onchain_hash = proposal.execution_hash;
+
+        Ok(VerifyProposalResponse {
+            verified: computed_hash == onchain_hash,
+            computed_hash,
+            onchain_hash,
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyProposalResponse {
+    verified: bool,
+    computed_hash: String,
+    onchain_hash: String,
 }
 
 // TODO: Move this to a correct location
