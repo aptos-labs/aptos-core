@@ -15,6 +15,7 @@ module aptos_names::test_helper {
     use std::signer;
     use std::string::{Self, String};
     use std::vector;
+    use aptos_names::config::unrestricted_mint_enabled;
 
     // Ammount to mint to test accounts during the e2e tests
     const MINT_AMOUNT_APT: u64 = 500;
@@ -58,7 +59,7 @@ module aptos_names::test_helper {
     }
 
     /// Register the domain, and verify the registration was done correctly
-    public fun register_name(user: &signer, subdomain_name: Option<String>, domain_name: String, registration_duration_secs: u64, expected_fq_domain_name: String, expected_property_version: u64) {
+    public fun register_name(user: &signer, subdomain_name: Option<String>, domain_name: String, registration_duration_secs: u64, expected_fq_domain_name: String, expected_property_version: u64, register_domain_signature: vector<u8>) {
         let user_addr = signer::address_of(user);
 
         let is_subdomain = option::is_some(&subdomain_name);
@@ -69,7 +70,11 @@ module aptos_names::test_helper {
 
         let years = (time_helper::seconds_to_years(registration_duration_secs) as u8);
         if (option::is_none(&subdomain_name)) {
-            domains::register_domain(user, domain_name, years);
+            if (unrestricted_mint_enabled()) {
+                domains::register_domain(user, domain_name, years);
+            } else {
+                domains::register_domain_with_signature(user, domain_name, years, register_domain_signature);
+            }
         } else {
             domains::register_subdomain(user, *option::borrow(&subdomain_name), domain_name, registration_duration_secs);
         };
