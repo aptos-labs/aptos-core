@@ -7,6 +7,7 @@ Anyone can read, but only admins can write, as all write methods are gated via p
 
 module aptos_names::config {
     friend aptos_names::domains;
+    friend aptos_names::verify;
 
     use aptos_framework::account;
     use aptos_framework::aptos_account;
@@ -28,6 +29,8 @@ module aptos_names::config {
     const CONFIG_KEY_TOKENDATA_URL_PREFIX: vector<u8> = b"tokendata_url_prefix";
     const CONFIG_KEY_DOMAIN_PRICE_PREFIX: vector<u8> = b"domain_price_";
     const CONFIG_KEY_SUBDOMAIN_PRICE: vector<u8> = b"subdomain_price";
+    const CONFIG_KEY_ADMIN_PUBLIC_KEY: vector<u8> = b"admin_public_key";
+    const CONFIG_KEY_UNRESTRICTED_MINT_ENABLED: vector<u8> = b"unrestricted_mint_enabled";
 
     const DOMAIN_TYPE: vector<u8> = b"domain";
     const SUBDOMAIN_TYPE: vector<u8> = b"subdomain";
@@ -59,6 +62,11 @@ module aptos_names::config {
         // TODO: SET THIS TO SOMETHING REAL
         set_tokendata_description(framework, string::utf8(b"This is an official Aptos Foundation Name Service Name"));
         set_tokendata_url_prefix(framework, string::utf8(b"https://aptosnames.com/api/v1/metadata/"));
+
+        // TODO: SET THIS TO SOMETHING REAL
+        let public_key: vector<u8> = vector<u8>[78, 223, 79, 162, 141, 187, 221, 61, 167, 178, 113, 30, 108, 153, 98, 132, 30, 250, 154, 102, 169, 41, 70, 119, 66, 234, 162, 31, 95, 133, 133, 111];
+        set_admin_public_key(framework, public_key);
+        set_v1(@aptos_names, config_key_unrestricted_mint_enabled(), &true);
 
         // TODO: SET REAL VALUES FOR DOMAIN PRICES
         // 0.2 APT
@@ -142,6 +150,14 @@ module aptos_names::config {
         read_u64_v1(@aptos_names, &config_key_subdomain_price())
     }
 
+    public(friend) fun admin_public_key(): vector<u8> acquires ConfigurationV1 {
+        read_u8_vector_v1(@aptos_names, &config_key_admin_public_key())
+    }
+
+    public fun unrestricted_mint_enabled(): bool acquires ConfigurationV1 {
+        read_bool_v1(@aptos_names, &config_key_unrestricted_mint_enabled())
+    }
+
 
     //
     // Setters
@@ -199,6 +215,18 @@ module aptos_names::config {
         set_v1(@aptos_names, config_key_domain_price(length), &price)
     }
 
+    public entry fun set_admin_public_key(sign: &signer, public_key: vector<u8>) acquires ConfigurationV1 {
+        assert_signer_is_admin(sign);
+        set_v1(@aptos_names, config_key_admin_public_key(), &public_key);
+    }
+
+    // set if we want to allow users to bypass signature verification
+    // when unrestricted_mint_enabled == false, signature verification is required for registering a domain
+    public entry fun set_unrestricted_mint_enabled(sign: &signer, unrestricted_mint_enabled: bool) acquires ConfigurationV1 {
+        assert_signer_is_admin(sign);
+        set_v1(@aptos_names, config_key_unrestricted_mint_enabled(), &unrestricted_mint_enabled);
+    }
+
 
     //
     // Configuration Methods
@@ -254,6 +282,14 @@ module aptos_names::config {
         string::utf8(CONFIG_KEY_SUBDOMAIN_PRICE)
     }
 
+    public fun config_key_admin_public_key(): String {
+        string::utf8(CONFIG_KEY_ADMIN_PUBLIC_KEY)
+    }
+
+    public fun config_key_unrestricted_mint_enabled(): String {
+        string::utf8(CONFIG_KEY_UNRESTRICTED_MINT_ENABLED)
+    }
+
     fun set_v1<T: copy>(addr: address, config_name: String, value: &T) acquires ConfigurationV1 {
         let map = &mut borrow_global_mut<ConfigurationV1>(addr).config;
         let value = property_map::create_property_value(value);
@@ -288,6 +324,10 @@ module aptos_names::config {
         property_map::read_bool(&borrow_global<ConfigurationV1>(addr).config, key)
     }
 
+    public fun read_u8_vector_v1(addr: address, key: &String): vector<u8> acquires ConfigurationV1 {
+        let property_value = property_map::borrow(&borrow_global<ConfigurationV1>(addr).config, key);
+        property_map::borrow_value(property_value)
+    }
 
     //
     // Tests

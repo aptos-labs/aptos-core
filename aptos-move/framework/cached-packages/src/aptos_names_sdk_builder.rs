@@ -38,6 +38,10 @@ pub enum EntryFunctionCall {
         addr: AccountAddress,
     },
 
+    ConfigSetAdminPublicKey {
+        public_key: Vec<u8>,
+    },
+
     ConfigSetDomainPriceForLength {
         price: u64,
         length: u64,
@@ -69,6 +73,10 @@ pub enum EntryFunctionCall {
 
     ConfigSetTokendataUrlPrefix {
         description: Vec<u8>,
+    },
+
+    ConfigSetUnrestrictedMintEnabled {
+        unrestricted_mint_enabled: bool,
     },
 
     DomainsClearDomainAddress {
@@ -123,6 +131,13 @@ pub enum EntryFunctionCall {
         num_years: u8,
     },
 
+    /// Enforcing signature for `register_domain`
+    DomainsRegisterDomainWithSignature {
+        domain_name: Vec<u8>,
+        num_years: u8,
+        register_domain_signature: Vec<u8>,
+    },
+
     /// A wrapper around `register_name` as an entry function.
     /// Option<String> is not currently serializable, so we have these convenience method
     DomainsRegisterSubdomain {
@@ -149,6 +164,7 @@ impl EntryFunctionCall {
         use EntryFunctionCall::*;
         match self {
             ConfigSetAdminAddress { addr } => config_set_admin_address(addr),
+            ConfigSetAdminPublicKey { public_key } => config_set_admin_public_key(public_key),
             ConfigSetDomainPriceForLength { price, length } => {
                 config_set_domain_price_for_length(price, length)
             }
@@ -167,6 +183,9 @@ impl EntryFunctionCall {
             ConfigSetTokendataUrlPrefix { description } => {
                 config_set_tokendata_url_prefix(description)
             }
+            ConfigSetUnrestrictedMintEnabled {
+                unrestricted_mint_enabled,
+            } => config_set_unrestricted_mint_enabled(unrestricted_mint_enabled),
             DomainsClearDomainAddress { domain_name } => domains_clear_domain_address(domain_name),
             DomainsClearSubdomainAddress {
                 subdomain_name,
@@ -202,6 +221,15 @@ impl EntryFunctionCall {
                 domain_name,
                 num_years,
             } => domains_register_domain(domain_name, num_years),
+            DomainsRegisterDomainWithSignature {
+                domain_name,
+                num_years,
+                register_domain_signature,
+            } => domains_register_domain_with_signature(
+                domain_name,
+                num_years,
+                register_domain_signature,
+            ),
             DomainsRegisterSubdomain {
                 subdomain_name,
                 domain_name,
@@ -250,6 +278,21 @@ pub fn config_set_admin_address(addr: AccountAddress) -> TransactionPayload {
         ident_str!("set_admin_address").to_owned(),
         vec![],
         vec![bcs::to_bytes(&addr).unwrap()],
+    ))
+}
+
+pub fn config_set_admin_public_key(public_key: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 4,
+            ]),
+            ident_str!("config").to_owned(),
+        ),
+        ident_str!("set_admin_public_key").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&public_key).unwrap()],
     ))
 }
 
@@ -373,6 +416,21 @@ pub fn config_set_tokendata_url_prefix(description: Vec<u8>) -> TransactionPaylo
         ident_str!("set_tokendata_url_prefix").to_owned(),
         vec![],
         vec![bcs::to_bytes(&description).unwrap()],
+    ))
+}
+
+pub fn config_set_unrestricted_mint_enabled(unrestricted_mint_enabled: bool) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 4,
+            ]),
+            ident_str!("config").to_owned(),
+        ),
+        ident_str!("set_unrestricted_mint_enabled").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&unrestricted_mint_enabled).unwrap()],
     ))
 }
 
@@ -550,6 +608,30 @@ pub fn domains_register_domain(domain_name: Vec<u8>, num_years: u8) -> Transacti
     ))
 }
 
+/// Enforcing signature for `register_domain`
+pub fn domains_register_domain_with_signature(
+    domain_name: Vec<u8>,
+    num_years: u8,
+    register_domain_signature: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 4,
+            ]),
+            ident_str!("domains").to_owned(),
+        ),
+        ident_str!("register_domain_with_signature").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&domain_name).unwrap(),
+            bcs::to_bytes(&num_years).unwrap(),
+            bcs::to_bytes(&register_domain_signature).unwrap(),
+        ],
+    ))
+}
+
 /// A wrapper around `register_name` as an entry function.
 /// Option<String> is not currently serializable, so we have these convenience method
 pub fn domains_register_subdomain(
@@ -624,6 +706,16 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ConfigSetAdminAddress {
                 addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn config_set_admin_public_key(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ConfigSetAdminPublicKey {
+                public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -715,6 +807,18 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ConfigSetTokendataUrlPrefix {
                 description: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn config_set_unrestricted_mint_enabled(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ConfigSetUnrestrictedMintEnabled {
+                unrestricted_mint_enabled: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -820,6 +924,20 @@ mod decoder {
         }
     }
 
+    pub fn domains_register_domain_with_signature(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DomainsRegisterDomainWithSignature {
+                domain_name: bcs::from_bytes(script.args().get(0)?).ok()?,
+                num_years: bcs::from_bytes(script.args().get(1)?).ok()?,
+                register_domain_signature: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn domains_register_subdomain(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DomainsRegisterSubdomain {
@@ -875,6 +993,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::config_set_admin_address),
         );
         map.insert(
+            "config_set_admin_public_key".to_string(),
+            Box::new(decoder::config_set_admin_public_key),
+        );
+        map.insert(
             "config_set_domain_price_for_length".to_string(),
             Box::new(decoder::config_set_domain_price_for_length),
         );
@@ -907,6 +1029,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::config_set_tokendata_url_prefix),
         );
         map.insert(
+            "config_set_unrestricted_mint_enabled".to_string(),
+            Box::new(decoder::config_set_unrestricted_mint_enabled),
+        );
+        map.insert(
             "domains_clear_domain_address".to_string(),
             Box::new(decoder::domains_clear_domain_address),
         );
@@ -937,6 +1063,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "domains_register_domain".to_string(),
             Box::new(decoder::domains_register_domain),
+        );
+        map.insert(
+            "domains_register_domain_with_signature".to_string(),
+            Box::new(decoder::domains_register_domain_with_signature),
         );
         map.insert(
             "domains_register_subdomain".to_string(),
