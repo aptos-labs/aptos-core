@@ -1,5 +1,5 @@
 [package]
-name = "AuctionHouse"
+name = "MarketPlace"
 version = "0.0.1"
 
 [dependencies]
@@ -8,4 +8,4 @@ AptosToken = { local = "../../framework/aptos-token" }
 
 [addresses]
 std = "0x1"
-auction_house = "_"
+marketplace = "_"

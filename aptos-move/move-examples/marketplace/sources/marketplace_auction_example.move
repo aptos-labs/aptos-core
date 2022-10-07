@@ -1,27 +1,25 @@
-// support first price auction (english auction), the highest bid win the auction
-// this example shows an auction house that stores user listing under auction house's account.
-
-module auction_house::auction_house_own_listing {
+// support first price auction (english auction), the highest bid wins the auction
+module marketplace::marketplace_auction_example {
 
     use aptos_framework::account;
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
-    use aptos_std::guid::{Self, ID};
+    use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
     use aptos_token::token::{Self, TokenId};
-    use auction_house::bid;
-    use auction_house::listing::{Self, Listing, ListingEvent};
+    use marketplace::marketplace_bid_utils::{Self as bid, BidId, create_bid_id};
+    use marketplace::marketplace_listing_utils::{Self as listing, Listing, ListingEvent};
     use std::error;
     use std::signer;
     use std::string::String;
     use std::vector;
+    use aptos_framework::guid;
 
     //
     // Constants
     //
 
-    const AUCTION_DELAY_TIME_SEC: u64 = 300;
 
     //
     // Errors
@@ -54,6 +52,18 @@ module auction_house::auction_house_own_listing {
     /// Auction not ended
     const EAUCTION_NOT_ENDED: u64 = 9;
 
+    /// Bid with same price exists for this auction
+    const EBID_WITH_SAME_PRICE_EXISTS: u64 = 10;
+
+    /// Bid not match the bid_id in the auction
+    const EBID_NOT_MATCH_ID_IN_AUCTION: u64 = 11;
+
+    /// Auction has zero bids
+    const EAUCION_HAS_ZERO_BIDS: u64 = 12;
+
+    /// Auction highest bid is zero
+    const EAUCTION_HIGHEST_BID_ZERO: u64 = 13;
+
     struct AuctionHouseConfig has key {
         market_fee_numerator: u64,
         market_fee_denominator: u64,
@@ -70,20 +80,20 @@ module auction_house::auction_house_own_listing {
 
     struct BidEvent has copy, drop, store {
         market_address: address,
-        bid_id: ID,
+        bid_id: BidId,
+        offer_price: u64,
+        expiration_sec: u64,
     }
 
     struct CancelBidEvent has copy, drop, store {
         market_address: address,
-        bid_id: ID,
+        bid_id: BidId,
     }
 
     struct Auction<phantom CoinType> has drop, store {
         listing: Listing<CoinType>,
-        bids: vector<ID>,
-        highest_price: u64,
-        highest_bid: ID,
-        min_incremental_price: u64,
+        bids: SimpleMap<u64, BidId>, // mapping between the price and BidId
+        offer_numbers: vector<u64>, // the prices recorded for all the bids
     }
 
     public entry fun initialize_auction_house(
@@ -124,12 +134,11 @@ module auction_house::auction_house_own_listing {
         start_sec: u64, // specify when the auction starts
         expiration_sec: u64, // specify when the auction ends
         withdraw_expiration_sec: u64,
-        min_incremental_price: u64,
     ): Auction<CoinType> {
         let sec = timestamp::now_seconds();
         assert!(sec <= start_sec, error::invalid_argument(EINVALID_START_TIME));
         assert!(start_sec < expiration_sec, error::invalid_argument(EINVALID_EXPIRATION_TIME));
-        let listing = listing::create_list<CoinType>(
+        let listing = listing::create_listing<CoinType>(
             owner,
             token_id,
             amount,
@@ -142,10 +151,8 @@ module auction_house::auction_house_own_listing {
 
         Auction<CoinType>{
             listing,
-            bids: vector::empty(),
-            highest_price: 0,
-            highest_bid: guid::create_id(@auction_house, 0),
-            min_incremental_price,
+            bids: simple_map::create(),
+            offer_numbers: vector::empty(),
         }
     }
 
@@ -159,7 +166,7 @@ module auction_house::auction_house_own_listing {
         min_price: u64,
         start_sec: u64, // specify when the auction starts
         expiration_sec: u64, // specify when the auction ends
-        min_incremental_price: u64,
+        withdraw_expiration_sec: u64, // specify deadline of token withdraw
     ) acquires Auctions {
         let token_id = token::create_token_id_raw(creator, collection_name, token_name, property_version);
         create_auction_with_token_id<CoinType>(
@@ -169,7 +176,7 @@ module auction_house::auction_house_own_listing {
             min_price,
             start_sec,
             expiration_sec,
-            min_incremental_price,
+            withdraw_expiration_sec,
         );
     }
 
@@ -179,11 +186,9 @@ module auction_house::auction_house_own_listing {
         amount: u64,
         min_price: u64,
         start_sec: u64, // specify when the auction starts
-        expiration_sec: u64, // specify when the auction ends
-        min_incremental_price: u64,
+        listing_expiration_sec: u64, // specify when the auction ends
+        withdraw_expiration_sec: u64, // specify deadline of token withdraw
     ): u64 acquires Auctions {
-        // min_incremental_price should be bigger than 0, this also ensure the offer_price is bigger than 0
-        assert!(min_incremental_price > 0, error::invalid_argument(EBID_MIN_INCREMENTAL_IS_ZERO));
 
         let auction = generate_auction_data<CoinType>(
             owner,
@@ -191,9 +196,8 @@ module auction_house::auction_house_own_listing {
             amount,
             min_price,
             start_sec,
-            expiration_sec,
-            expiration_sec + AUCTION_DELAY_TIME_SEC, // allow time to withdraw
-            min_incremental_price,
+            listing_expiration_sec,
+            withdraw_expiration_sec, // allow time to withdraw
         );
 
         // initialized coin store when listing
@@ -201,7 +205,7 @@ module auction_house::auction_house_own_listing {
             coin::register<CoinType>(owner);
         };
 
-        let auctions = borrow_global_mut<Auctions<CoinType>>(@auction_house);
+        let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
         event::emit_event<ListingEvent>(
             &mut auctions.listing_event,
             listing::create_listing_event(
@@ -211,8 +215,9 @@ module auction_house::auction_house_own_listing {
                 min_price,
                 false,
                 start_sec,
-                expiration_sec,
-                @auction_house,
+                listing_expiration_sec,
+                listing_expiration_sec + 50,
+                @marketplace,
             ),
         );
 
@@ -231,10 +236,63 @@ module auction_house::auction_house_own_listing {
         token_amount:u64,
         offer_price: u64,
         auction_id: u64,
+        withdraw_expiration_sec: u64,
     ) acquires Auctions {
         // create bid and store it under the user account
         let token_id = token::create_token_id_raw(creator, collection_name, token_name, property_version);
-        create_bid_with_token_id<CoinType>(bidder, token_id, token_amount, offer_price, auction_id);
+        create_bid_with_token_id<CoinType>(bidder, token_id, token_amount, offer_price, auction_id, withdraw_expiration_sec);
+    }
+
+    /// Allow the bid to increase the coin for an existing bid
+    public entry fun increase_bid<CoinType>(
+        bidder: &signer,
+        price_delta: u64,
+        auction_id: u64,
+    ) acquires Auctions {
+        let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
+        assert!(table::contains(&mut auctions.all_active_auctions, auction_id), error::not_found(EAUCTION_NOT_EXIST));
+        let auction = table::borrow_mut(&mut auctions.all_active_auctions, auction_id);
+        let listing_id = listing::get_listing_id<CoinType>(&auction.listing);
+        let bid_id = bid::create_bid_id(signer::address_of(bidder), listing_id);
+        increase_bid_price<CoinType>(
+            bidder,
+            bid_id,
+            price_delta,
+            auction_id,
+        )
+    }
+
+
+    /// Increase the offered price for an existing bid
+    /// The new price should not be same as any existing offered price
+    public fun increase_bid_price<CoinType>(
+        bidder: &signer,
+        bid_id: BidId,
+        price_delta: u64,
+        auction_id: u64,
+    ) acquires Auctions {
+        let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
+        assert!(table::contains(&mut auctions.all_active_auctions, auction_id), error::not_found(EAUCTION_NOT_EXIST));
+        let auction = table::borrow_mut(&mut auctions.all_active_auctions, auction_id);
+
+        // get the listing info
+        // auction is still active
+        let now = timestamp::now_seconds();
+        assert!(now <= listing::get_listing_expiration<CoinType>(&auction.listing), error::invalid_argument(EAUCTION_ENDED));
+
+
+        // assert new offer_price is not duplicate price
+        let (old_price, _) = bid::get_bid_info<CoinType>(bid_id);
+        let new_offer_price = old_price + price_delta;
+        // check if same price exists previously, only bid with a different price can enter the auction
+        assert!(!simple_map::contains_key(&auction.bids, &new_offer_price), error::already_exists(EBID_WITH_SAME_PRICE_EXISTS));
+
+        bid::increase_bid(
+            bidder,
+            bid_id,
+            price_delta,
+            &auction.listing
+        );
     }
 
     public fun create_bid_with_token_id<CoinType>(
@@ -243,16 +301,11 @@ module auction_house::auction_house_own_listing {
         token_amount:u64,
         offer_price: u64,
         auction_id: u64,
-    ): ID acquires Auctions {
-        let auctions = borrow_global_mut<Auctions<CoinType>>(@auction_house);
+        withdraw_expiration_sec: u64,
+    ): BidId acquires Auctions {
+        let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
         assert!(table::contains(&mut auctions.all_active_auctions, auction_id), error::not_found(EAUCTION_NOT_EXIST));
         let auction = table::borrow_mut(&mut auctions.all_active_auctions, auction_id);
-
-        // bid increase has to be bigger than smallest incremental
-        assert!(
-            offer_price >= auction.highest_price + auction.min_incremental_price,
-            error::invalid_argument(EBID_INCREASE_TOO_SMALL)
-        );
 
         // initialize token store when bidding
         token::initialize_token_store(bidder);
@@ -261,6 +314,10 @@ module auction_house::auction_house_own_listing {
         // auction is still active
         let now = timestamp::now_seconds();
         assert!(now <= listing::get_listing_expiration<CoinType>(&auction.listing), error::invalid_argument(EAUCTION_ENDED));
+
+        // check if same price exists previously, only bid with a different price can enter the auction
+        assert!(!simple_map::contains_key(&auction.bids, &offer_price), error::already_exists(EBID_WITH_SAME_PRICE_EXISTS));
+
         // allow participant to withdraw coin 60 secs after auction ends, configurable by each marketplace
         let bid_id = bid::bid<CoinType>(
             bidder,
@@ -268,44 +325,36 @@ module auction_house::auction_house_own_listing {
             token_amount,
             offer_price * token_amount,
             &auction.listing,
-            listing::get_listing_expiration<CoinType>(&auction.listing) + AUCTION_DELAY_TIME_SEC
+            withdraw_expiration_sec,
         );
 
         event::emit_event<BidEvent>(
             &mut auctions.bid_event,
             BidEvent {
-                market_address: @auction_house,
+                market_address: @marketplace,
                 bid_id,
+                offer_price,
+                expiration_sec: withdraw_expiration_sec,
             },
         );
 
         // store the bid for this auction, only higher bid can enter the auction.
-        *(&mut auction.highest_price) = offer_price;
-        *(&mut auction.highest_bid) = bid_id;
-        vector::push_back(&mut auction.bids, bid_id);
+        simple_map::add(&mut auction.bids, offer_price, bid_id);
+        vector::push_back(&mut auction.offer_numbers, offer_price);
         bid_id
     }
 
-    /// bidder can release their coin from the bid after auction ends.
-    /// the coin will be deposit back to bidder's account
-    public entry fun release_coin_from_bid<CoinType>(
-        bidder: &signer,
-        bid_id_creation_number: u64,
-    ) {
-        bid::release_coin_from_bid<CoinType>(bidder, bid_id_creation_number);
-    }
-
-    /// auction house owner can remove auction from inventory
+    /// Auction house owner can remove auction from inventory
     public fun remove_auction<CoinType>(account: &signer, auction_id: u64): Auction<CoinType> acquires Auctions {
-        assert!(signer::address_of(account) == @auction_house, error::permission_denied(EONLY_AUCTION_HOUSE_OWNER_CAN_PERFORM_THIS_OPERATION));
-        let auctions = borrow_global_mut<Auctions<CoinType>>(@auction_house);
+        assert!(signer::address_of(account) == @marketplace, error::permission_denied(EONLY_AUCTION_HOUSE_OWNER_CAN_PERFORM_THIS_OPERATION));
+        let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
         table::remove(&mut auctions.all_active_auctions, auction_id)
     }
 
-    /// complete the auction
+    /// Complete the auction, select the highest bid from existing bids and execute the bid against the listing
     public entry fun complete_auction<CoinType>(account: &signer, auction_id: u64) acquires Auctions, AuctionHouseConfig {
-        assert!(signer::address_of(account) == @auction_house, error::permission_denied(EONLY_AUCTION_HOUSE_OWNER_CAN_PERFORM_THIS_OPERATION));
-        let auctions = borrow_global_mut<Auctions<CoinType>>(@auction_house);
+        assert!(signer::address_of(account) == @marketplace, error::permission_denied(EONLY_AUCTION_HOUSE_OWNER_CAN_PERFORM_THIS_OPERATION));
+        let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
         assert!(table::contains(&auctions.all_active_auctions, auction_id), error::not_found(EAUCTION_NOT_EXIST));
 
         let auction = table::borrow_mut(&mut auctions.all_active_auctions, auction_id);
@@ -313,21 +362,21 @@ module auction_house::auction_house_own_listing {
         let now = timestamp::now_seconds();
         assert!(now >= expiration_time, error::invalid_state(EAUCTION_NOT_ENDED));
 
-        let config = borrow_global<AuctionHouseConfig>(@auction_house);
+        let config = borrow_global<AuctionHouseConfig>(@marketplace);
         let auction = remove_auction<CoinType>(account, auction_id);
+        let highest_bid_id = find_highest_bid(&auction);
 
         let Auction {
             listing,
             bids,
-            highest_price: _,
-            highest_bid,
-            min_incremental_price: _,
+            offer_numbers: _,
         } = auction;
 
-        if ( vector::length(&bids ) > 0) {
+
+        if ( simple_map::length(&bids) > 0) {
             // get the bid corresponding to highest price
-            bid::execute_listing_bid(
-                highest_bid,
+            bid::execute_listing_bid<CoinType>(
+                highest_bid_id,
                 listing,
                 config.fee_address,
                 config.market_fee_numerator,
@@ -336,7 +385,80 @@ module auction_house::auction_house_own_listing {
         };
     }
 
-    #[test(lister = @0xAF, bidder_a = @0xBB, bidder_b = @0xBA, framework = @0x1, house = @auction_house, fee_account = @0xa)]
+    /// The same function exists in the marketplace bid utils.
+    /// Have this function here is to make the marketplace feature complete since the marketplace contract should also
+    /// allow users an entry function to withdraw coin
+    public entry fun withdraw_coin_from_bid<CoinType>(
+        bidder: &signer,
+        lister_addr: address,
+        listing_creation_number: u64,
+    ) {
+        bid::withdraw_coin_from_bid<CoinType>(bidder, lister_addr, listing_creation_number);
+    }
+
+    /// bidder can remove their bid from the auction so that the bid won't participate in auction
+    /// This doesn't withdraw the actual coin from the bid
+    public entry fun cancel_bid_in_auction<CoinType>(
+        bidder: &signer,
+        auction_id: u64,
+    ) acquires Auctions {
+        let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
+        assert!(table::contains(&auctions.all_active_auctions, auction_id), error::not_found(EAUCTION_NOT_EXIST));
+        let auction = table::borrow_mut(&mut auctions.all_active_auctions, auction_id);
+
+        let now = timestamp::now_seconds();
+        assert!(now < listing::get_listing_expiration<CoinType>(&auction.listing), error::invalid_argument(EAUCTION_ENDED));
+
+        let listing_id = listing::get_listing_id<CoinType>(&auction.listing);
+        let bidder_address = signer::address_of(bidder);
+        let bid_id = create_bid_id(bidder_address, listing_id);
+
+        let (offer_price, _) = bid::get_bid_info<CoinType>(bid_id);
+        assert!(simple_map::contains_key(&mut auction.bids, &offer_price), error::not_found(EBID_NOT_FOUND_FOR_AUCTION));
+        assert!(
+            *simple_map::borrow(&mut auction.bids, &offer_price) == bid_id,
+            error::permission_denied(EBID_NOT_MATCH_ID_IN_AUCTION)
+        );
+
+        simple_map::remove(&mut auction.bids, &offer_price);
+        let (found, index) = vector::index_of(&mut auction.offer_numbers, &offer_price);
+        assert!(found, error::not_found(EBID_NOT_FOUND_FOR_AUCTION));
+        vector::swap_remove(&mut auction.offer_numbers, index);
+
+        event::emit_event<CancelBidEvent>(
+            &mut auctions.cancel_bid_events,
+            CancelBidEvent {
+                market_address: @marketplace,
+                bid_id,
+            },
+        );
+    }
+
+    /// Get the listing id corresponding to a auction
+    public fun get_auction_listing_id<CoinType>(auction_id: u64): guid::ID acquires Auctions {
+        let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
+        assert!(table::contains(&auctions.all_active_auctions, auction_id), error::not_found(EAUCTION_NOT_EXIST));
+        let auction = table::borrow_mut(&mut auctions.all_active_auctions, auction_id);
+
+       listing::get_listing_id<CoinType>(&auction.listing)
+    }
+
+    fun find_highest_bid<CoinType>(auction: &Auction<CoinType>): BidId {
+        assert!(simple_map::length(&auction.bids) > 0, error::invalid_state(EAUCION_HAS_ZERO_BIDS));
+        let highest_price = 0;
+        let ind = 0;
+        while (ind < vector::length(&auction.offer_numbers)) {
+            let price = *vector::borrow(&auction.offer_numbers, ind);
+            if (price > highest_price) {
+                highest_price = price;
+            };
+            ind = ind + 1;
+        };
+        assert!(highest_price > 0, error::invalid_state(EAUCTION_HIGHEST_BID_ZERO));
+        *simple_map::borrow(&auction.bids, &highest_price)
+    }
+
+    #[test(lister = @0xAF, bidder_a = @0xBB, bidder_b = @0xBA, framework = @0x1, house = @marketplace, fee_account = @0xa)]
     public fun test_listing_one_and_two_bids(
         lister: signer,
         bidder_a: signer,
@@ -366,7 +488,17 @@ module auction_house::auction_house_own_listing {
         initialize_auction<coin::FakeMoney>(&house);
 
         // owner creats a listing
-        let token_id = token::create_collection_and_token(&lister, 2, 2, 2);
+        let token_id = token::create_collection_and_token(
+            &lister,
+            2,
+            2,
+            2,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
         let (creator, collection, name, version) = token::get_token_id_fields(&token_id);
         create_auction<coin::FakeMoney>(
             &lister,
@@ -378,7 +510,7 @@ module auction_house::auction_house_own_listing {
             1,
             1,
             2,
-            1,
+            2 + 10,
         );
 
         timestamp::update_global_time_for_test(1000000);
@@ -398,6 +530,7 @@ module auction_house::auction_house_own_listing {
             1,
             100,
             1,
+            1 + 10,
         );
 
         bid<coin::FakeMoney>(
@@ -409,6 +542,7 @@ module auction_house::auction_house_own_listing {
             1,
             300,
             1,
+            1 + 10,
         );
 
         timestamp::update_global_time_for_test(3000000);
@@ -422,13 +556,13 @@ module auction_house::auction_house_own_listing {
         assert!(coin::balance<coin::FakeMoney>(signer::address_of(&lister)) == 297, 1);
     }
 
-    #[test(lister = @0xAF, bidder_a = @0xBB, framework = @0x1, house = @auction_house)]
+    #[test(lister = @0xAF, bidder_a = @0xBB, framework = @0x1, house = @marketplace)]
     public fun test_cancel_bid(
         lister: signer,
         bidder_a: signer,
         framework: signer,
         house: signer,
-    ) acquires Auctions, AuctionHouseConfig {
+    ) acquires Auctions {
         use aptos_framework::coin;
         use aptos_framework::account;
         timestamp::set_time_has_started_for_testing(&framework);
@@ -447,7 +581,18 @@ module auction_house::auction_house_own_listing {
         initialize_auction<coin::FakeMoney>(&house);
 
         // owner creats a listing
-        let token_id = token::create_collection_and_token(&lister, 2, 2, 2);
+        let token_id = token::create_collection_and_token(
+            &lister,
+            2,
+            2,
+            2,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
+
         let auction_id = create_auction_with_token_id<coin::FakeMoney>(
             &lister,
             token_id,
@@ -455,31 +600,37 @@ module auction_house::auction_house_own_listing {
             1,
             12,
             20,
-            1,
+            20 + 50,
         );
         coin::create_fake_money(&framework, &bidder_a, 1000);
         coin::transfer<coin::FakeMoney>(&framework, signer::address_of(&bidder_a), 500);
 
         timestamp::update_global_time_for_test(12000000);
 
-        let bid_id = create_bid_with_token_id<coin::FakeMoney>(
+        create_bid_with_token_id<coin::FakeMoney>(
             &bidder_a,
             token_id,
             1,
             100,
             auction_id,
+            20 + 50,
         );
 
         // bid_id_creation_number should be shown to users to allow them cancel the bid
-        cancel_bid<coin::FakeMoney>(&bidder_a, auction_id, guid::id_creation_num(&bid_id));
+        cancel_bid_in_auction<coin::FakeMoney>(&bidder_a, auction_id);
         let auction = table::borrow(
             &borrow_global<Auctions<coin::FakeMoney>>(signer::address_of(&house)).all_active_auctions,
             auction_id
         );
-        assert!(vector::length(&auction.bids) == 0, 1);
-
+        assert!(simple_map::length(&auction.bids) == 0, 1);
         timestamp::update_global_time_for_test(300000000);
-        complete_auction<coin::FakeMoney>(&house, auction_id);
+
+        let listing_id = get_auction_listing_id<coin::FakeMoney>(auction_id);
+        withdraw_coin_from_bid<coin::FakeMoney>(
+            &bidder_a,
+            guid::id_creator_address(&listing_id),
+            guid::id_creation_num(&listing_id)
+        );
     }
 }
 
