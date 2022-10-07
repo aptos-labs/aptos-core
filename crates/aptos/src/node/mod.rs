@@ -420,7 +420,6 @@ pub async fn get_stake_pools(
         None,
     )
     .await;
-    println!("direct_stake_pool {:?}", direct_stake_pool);
     if let Ok(direct_stake_pool) = direct_stake_pool {
         stake_pool_results.push(direct_stake_pool);
     };
