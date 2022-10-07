@@ -879,18 +879,18 @@ Which means that the price above <code>min_gas</code> is approximately
 
 Initialize per-item and per-byte gas prices.
 
-Target utilization is set to 1 billion items and 500 GB.
+Target utilization is set to 2 billion items and 1 TB.
 
 <code><a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a></code> endpoints are initialized as follows:
 
 | Data style | Operation | Minimum gas | Maximum gas |
 |------------|-----------|-------------|-------------|
-| Per item   | Read      | 80000       | 8000000     |
-| Per item   | Create    | 2000000     | 200000000   |
-| Per item   | Write     | 400000      | 40000000    |
-| Per byte   | Read      | 40          | 4000        |
-| Per byte   | Create    | 1000        | 100000      |
-| Per byte   | Write     | 200         | 20000       |
+| Per item   | Read      | 300K        | 300K * 100  |
+| Per item   | Create    | 5M          | 5M * 100    |
+| Per item   | Write     | 300K        | 300K * 100  |
+| Per byte   | Read      | 300         | 300 * 100   |
+| Per byte   | Create    | 5K          | 5K * 100    |
+| Per byte   | Write     | 5K          | 5K * 100    |
 
 <code><a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a></code> values are additionally initialized, but per
 <code><a href="storage_gas.md#0x1_storage_gas_on_reconfig">on_reconfig</a>()</code>, they will be reconfigured for each subsequent
@@ -916,17 +916,20 @@ target utilization.
         <a href="_already_exists">error::already_exists</a>(<a href="storage_gas.md#0x1_storage_gas_ESTORAGE_GAS_CONFIG">ESTORAGE_GAS_CONFIG</a>)
     );
 
+    <b>let</b> k: u64 = 1000;
+    <b>let</b> m: u64 = 1000 * 1000;
+
     <b>let</b> item_config = <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">UsageGasConfig</a> {
-        target_usage: 1000000000, // 1 billion
-        read_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(80000, 80000 * 100),
-        create_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(2000000, 2000000 * 100),
-        write_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(400000, 400000 * 100),
+        target_usage: 2 * k * m, // 2 billion
+        read_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(300 * k, 300 * k * 100),
+        create_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(5 * m, 5 * m * 100),
+        write_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(300 * k, 300 * k * 100),
     };
     <b>let</b> byte_config = <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">UsageGasConfig</a> {
-        target_usage: 500000000000, // 500 GB
-        read_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(40, 40 * 100),
-        create_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(1000, 1000 * 100),
-        write_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(200, 200 * 100),
+        target_usage: 1 * m * m, // 1TB
+        read_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(300, 300 * 100),
+        create_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(5 * k,  5 * k * 100),
+        write_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(5 * k,  5 * k * 100),
     };
     <b>move_to</b>(aptos_framework, <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a> {
         item_config,
@@ -938,12 +941,12 @@ target utilization.
         <a href="_already_exists">error::already_exists</a>(<a href="storage_gas.md#0x1_storage_gas_ESTORAGE_GAS">ESTORAGE_GAS</a>)
     );
     <b>move_to</b>(aptos_framework, <a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a> {
-        per_item_read: 80000,
-        per_item_create: 2000000,
-        per_item_write: 400000,
-        per_byte_read: 40,
-        per_byte_create: 1000,
-        per_byte_write: 200,
+        per_item_read: 300 * k,
+        per_item_create: 5 * m,
+        per_item_write: 300 * k,
+        per_byte_read: 300,
+        per_byte_create: 5 * k,
+        per_byte_write: 5 * k,
     });
 }
 </code></pre>
