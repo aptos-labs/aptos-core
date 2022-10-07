@@ -13,27 +13,20 @@ set -e
 NAME='aptos-cli'
 CRATE_NAME='aptos'
 CARGO_PATH="crates/$CRATE_NAME/Cargo.toml"
+NAME="$1"
 
 # Grab system information
 ARCH=`uname -m`
 OS=`uname -s`
 VERSION=`cat "$CARGO_PATH" | grep "^\w*version =" | sed 's/^.*=[ ]*"//g' | sed 's/".*$//g'`
 
-if [ "$OS" == "Darwin" ]; then
-  # Rename Darwin to MacOSX so it's less confusing
-  OS="MacOSX"
-elif [ "$OS" == "Linux" ]; then
-  # Get linux flavor
-  OS=`cat /etc/os-release | grep '^NAME=' | sed 's/^.*=//g' | sed 's/"//g'`
-fi
-
-echo "Building release $VERSION of $NAME for $OS-$ARCH"
+echo "Building release $VERSION of $NAME for $OS-$NAME"
 cargo build -p $CRATE_NAME --profile cli
 
 cd target/cli/
 
 # Compress the CLI
-ZIP_NAME="$NAME-$VERSION-$OS-$ARCH.zip"
+ZIP_NAME="$NAME-$VERSION-$NAME-$ARCH.zip"
 
 echo "Zipping release: $ZIP_NAME"
 zip $ZIP_NAME $CRATE_NAME
