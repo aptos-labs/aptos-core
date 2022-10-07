@@ -9,7 +9,7 @@ import TabItem from '@theme/TabItem';
 
 The [Aptos Explorer](https://explorer.aptoslabs.com/] lets you delve into the activity on the Aptos blockchain in great detail, seeing transactions, validators, and account information. With the Aptos Explorer, you may ensure the work you do in the [Aptos Petra Wallet](install-petra-wallet.md) and elsewhere on the blockchain is accurately reflected in Aptos.
 
-The Aptos Explorer provides a one-step search engine across the blockchain to discover details about wallets, transactions, network analytics, user accounts, smart contracts, and more. The Aptos Explorer also offers dedicated pages for key elements of the blockchain and acts as the source of truth for all things Aptos.
+The Aptos Explorer provides a one-step search engine across the blockchain to discover details about wallets, transactions, network analytics, user accounts, smart contracts, and more. The Aptos Explorer also offers dedicated pages for key elements of the blockchain and acts as the source of truth for all things Aptos. See the [Aptos Glossary](../reference/glossary.md) for definitions of many of the terms found here.
 
 ## Users
 
