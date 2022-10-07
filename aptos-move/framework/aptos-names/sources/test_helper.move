@@ -58,7 +58,7 @@ module aptos_names::test_helper {
     }
 
     /// Register the domain, and verify the registration was done correctly
-    public fun register_name(user: &signer, subdomain_name: Option<String>, domain_name: String, registration_duration_secs: u64, expected_fq_domain_name: String, expected_property_version: u64) {
+    public fun register_name(user: &signer, subdomain_name: Option<String>, domain_name: String, registration_duration_secs: u64, expected_fq_domain_name: String, expected_property_version: u64, register_domain_signature: Option<vector<u8>>) {
         let user_addr = signer::address_of(user);
 
         let is_subdomain = option::is_some(&subdomain_name);
@@ -69,7 +69,11 @@ module aptos_names::test_helper {
 
         let years = (time_helper::seconds_to_years(registration_duration_secs) as u8);
         if (option::is_none(&subdomain_name)) {
-            domains::register_domain(user, domain_name, years);
+            if (option::is_none(&register_domain_signature)) {
+                domains::register_domain(user, domain_name, years);
+            } else {
+                domains::register_domain_with_signature(user, domain_name, years, *option::borrow(&register_domain_signature));
+            }
         } else {
             domains::register_subdomain(user, *option::borrow(&subdomain_name), domain_name, registration_duration_secs);
         };
