@@ -345,6 +345,8 @@ pub enum KeyType {
     Ed25519,
     /// X25519 key used for network handshakes and identity
     X25519,
+    /// A BLS12381 key for consensus
+    Bls12381,
 }
 
 impl Display for KeyType {
@@ -352,6 +354,7 @@ impl Display for KeyType {
         let str = match self {
             KeyType::Ed25519 => "ed25519",
             KeyType::X25519 => "x25519",
+            KeyType::Bls12381 => "bls12381",
         };
         write!(f, "{}", str)
     }
@@ -364,6 +367,7 @@ impl FromStr for KeyType {
         match s.to_lowercase().as_str() {
             "ed25519" => Ok(KeyType::Ed25519),
             "x25519" => Ok(KeyType::X25519),
+            "bls12381" => Ok(KeyType::Bls12381),
             _ => Err("Invalid key type: Must be one of [ed25519, x25519]"),
         }
     }

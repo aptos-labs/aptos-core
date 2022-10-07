@@ -8,7 +8,7 @@ use crate::common::types::{
 };
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
-use crate::node::analyze::analyze_validators::AnalyzeValidators;
+use crate::node::analyze::analyze_validators::{AnalyzeValidators, ValidatorStats};
 use crate::node::analyze::fetch_metadata::FetchMetadata;
 use crate::{
     common::{
@@ -1206,6 +1206,10 @@ pub struct AnalyzeValidatorPerformance {
     #[clap(arg_enum, long)]
     pub(crate) analyze_mode: AnalyzeMode,
 
+    /// Optional. Run the analysis for specific stake pool (validator) addresses.
+    #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub pool_addresses: Vec<AccountAddress>,
+
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
@@ -1245,8 +1249,18 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
         let print_detailed = self.analyze_mode == AnalyzeMode::DetailedEpochTable
             || self.analyze_mode == AnalyzeMode::All;
         for epoch_info in epochs {
-            let epoch_stats =
+            let mut epoch_stats =
                 AnalyzeValidators::analyze(&epoch_info.blocks, &epoch_info.validators);
+            if !self.pool_addresses.is_empty() {
+                let mut filtered_stats: HashMap<AccountAddress, ValidatorStats> = HashMap::new();
+                for pool_address in &self.pool_addresses {
+                    filtered_stats.insert(
+                        *pool_address,
+                        *epoch_stats.validator_stats.get(pool_address).unwrap(),
+                    );
+                }
+                epoch_stats.validator_stats = filtered_stats;
+            }
             if print_detailed {
                 println!(
                     "Detailed table for {}epoch {}:",

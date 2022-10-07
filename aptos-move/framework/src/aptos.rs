@@ -90,7 +90,7 @@ impl ReleaseTarget {
         ReleaseBundle::read(path)
     }
 
-    pub fn create_release(self, out: Option<PathBuf>) -> anyhow::Result<()> {
+    pub fn create_release(self, with_srcs: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
         let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let packages = self
             .packages()
@@ -101,7 +101,7 @@ impl ReleaseTarget {
             .collect::<Vec<_>>();
         let options = ReleaseOptions {
             build_options: BuildOptions {
-                with_srcs: true,
+                with_srcs,
                 with_abis: true,
                 with_source_maps: false,
                 with_error_map: true,
