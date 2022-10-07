@@ -41,7 +41,7 @@ To find a transaction:
 1. Click the transaction result that appears immediately below the search field, highlighted in green within the following screenshot:
 <center>
 <ThemedImage
-alt="Search Aptos Explorer for transaction"
+alt="Search Aptos Explorer for a transaction"
 sources={{
     light: useBaseUrl('/img/docs/1-explorer-search-txn.png'),
     dark: useBaseUrl('/img/docs/1-explorer-search-txn-dark.png'),
@@ -75,7 +75,18 @@ Click the **Transactions** tab at the top or  **View all Transactions** at the b
 
 The *Transactions* page displays all transactions on the Aptos blockchain in order, with the latest at the top of an ever-growing list.
 
-In the transactions list, single click the **Hash** column to see and copy the hash for the transaction or double click the hash to go directly to the transaction details for the hash.
+In the transactions list, single-click the **Hash** column to see and copy the hash for the transaction or double-click the hash to go directly to the transaction details for the hash.
+
+<center>
+<ThemedImage
+alt="Aptos Explorer Transactions page with hash highlighted"
+sources={{
+    light: useBaseUrl('/img/docs/3-explorer-transactions.png'),
+    dark: useBaseUrl('/img/docs/3-explorer-transactions-dark.png'),
+  }}
+/>
+</center>
+
 
 Otherwise, click anywhere else in the row of the desired transaction to load its [Transaction details](#transaction-details) page.
 
@@ -87,18 +98,73 @@ https://explorer.aptoslabs.com/txn/0xf48137d98f00b9f574801c22ca33842795df8b4e775
 
 Use the controls at the bottom of the list to navigate back through transactions historically.
 
-#### Transaction details
+### Transaction details
 
-##### Overview
+The *Transaction details* page reveals all information for a given transaction, starting with its default *Overview* tab. There you can see a transaction's status, sender, version, gas fee, and much more:
 
-##### Events
+<center>
+<ThemedImage
+alt="Aptos Explorer Transaction Details tab"
+sources={{
+    light: useBaseUrl('/img/docs/4-explorer-txn-details.png'),
+    dark: useBaseUrl('/img/docs/4-explorer-txn-details-dark.png'),
+  }}
+/>
+</center>
 
 
-##### Payload
+Scrolling down on the Overview, you can also see the transaction's signature (with `public_key`) and hashes for tracking.
 
-##### Changes
+The Transaction details page offers even more information in the following tabs.
+
+#### Events
+
+The Transaction details *Events* tab shows the transaction's [sequence numbers](../reference/glossary.md#sequence-number), including their types and data.
+
+#### Payload
+
+The Transaction details *Payload* tab displays the transaction's actual code used. Click the down arrow at the bottom of the code block to expand it and see all contents.
+
+#### Changes
+
+The Transaction details *Changes* tab shows the addresses, state key hashes, and data for each index in the transaction.
+
+TODO: Determine if state key hash and state root hash are the same and if so link to:
+https://aptos.dev/reference/glossary/#state-root-hash
 
 ### Accounts
+
+The *Accounts* page aggregates all transactions, tokens, and other resources in a single set of views starting with its default *Transactions* tab:
+
+<center>
+<ThemedImage
+alt="Aptos Explorer Accounts page"
+sources={{
+    light: useBaseUrl('/img/docs/5-explorer-accounts.png'),
+    dark: useBaseUrl('/img/docs/5-explorer-accounts-dark.png'),
+  }}
+/>
+</center>
+
+You can load your acccount page by On the Accounts > Transactions tab, click any transaction to go to its [Transaction details](#transaction-details) page.
+
+As on the main [Transactions](#transactions) page, you may also single-click the **Hash** column to see and copy the hash for the transaction or double-click the hash to go directly to the transaction details for the hash.
+
+As with Transactions, the Aptos Explorer provides tabs for additional information about the account.
+
+#### Tokens
+
+The *Tokens* tab displays any assets owned by the account, as well as details about the tokens themselves (name, collection, and more).
+
+#### Resources
+
+The *Resources* tab shows a view of all types used by the account. Use the *Collapse All* toggle at top right to see all types at once.
+
+#### Modules
+
+The *Modules* tab displays the bytecode and ABI used by the account.
+
+#### Info
 
 ### Blocks
 
