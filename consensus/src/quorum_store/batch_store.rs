@@ -175,6 +175,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             .save(persist_request.digest, persist_request.value.clone()) // TODO: what is this comes from old epoch?
         {
             Ok(needs_db) => {
+                let num_txns = persist_request.value.maybe_payload.as_ref().unwrap().len() as u64;
+                let num_bytes = persist_request.value.num_bytes as u64;
                 debug!("QS: sign digest");
                 if needs_db {
                     // TODO: Consider an async call to DB, but it could be a race with clean.
@@ -186,6 +188,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     self.epoch,
                     persist_request.digest,
                     expiration,
+                    num_txns,
+                    num_bytes,
                     self.validator_signer.clone(),
                 ).unwrap())
             }

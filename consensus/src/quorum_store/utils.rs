@@ -258,8 +258,8 @@ impl ProofQueue {
                     .expect("Entry for unexpired digest must exist")
                 {
                     Some(proof) => {
-                        // TODO: cur_bytes += proof.bytes.
-                        // TODO: cur_txns += proof.txns.
+                        cur_bytes = cur_bytes + proof.info().num_bytes;
+                        cur_txns = cur_txns + proof.info().num_txns;
                         if cur_bytes > max_bytes || cur_txns > max_txns {
                             // Exceeded the limit for requested bytes or number of transactions.
                             break;

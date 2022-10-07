@@ -262,7 +262,7 @@ impl QuorumStore {
 
                 self.proof_builder_tx
                     .send(ProofBuilderCommand::InitProof(
-                        SignedDigestInfo::new(digest, expiration),
+                        SignedDigestInfo::new(digest, expiration, payload.len() as u64, num_bytes as u64),
                         fragment.batch_id(),
                         proof_tx,
                     ))

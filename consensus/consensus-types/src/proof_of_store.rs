@@ -39,11 +39,13 @@ impl LogicalTime {
 pub struct SignedDigestInfo {
     pub digest: HashValue,
     pub expiration: LogicalTime,
+    pub num_txns: u64,
+    pub num_bytes: u64,
 }
 
 impl SignedDigestInfo {
-    pub fn new(digest: HashValue, expiration: LogicalTime) -> Self {
-        Self { digest, expiration }
+    pub fn new(digest: HashValue, expiration: LogicalTime, num_txns: u64, num_bytes: u64) -> Self {
+        Self { digest, expiration, num_txns, num_bytes }
     }
 }
 
@@ -61,9 +63,11 @@ impl SignedDigest {
         epoch: u64,
         digest: HashValue,
         expiration: LogicalTime,
+        num_txns: u64,
+        num_bytes: u64,
         validator_signer: Arc<ValidatorSigner>,
     ) -> Result<Self, CryptoMaterialError> {
-        let info = SignedDigestInfo::new(digest, expiration);
+        let info = SignedDigestInfo::new(digest, expiration, num_txns, num_bytes);
         let signature = validator_signer.sign(&info)?;
 
         Ok(Self {
@@ -85,7 +89,7 @@ impl SignedDigest {
 
 #[derive(Debug, PartialEq)]
 pub enum SignedDigestError {
-    WrongDigest,
+    WrongInfo,
     DuplicatedSignature,
 }
 
@@ -105,6 +109,8 @@ impl ProofOfStore {
             multi_signature,
         }
     }
+
+    pub fn info(&self) -> &SignedDigestInfo { &self.info }
 
     pub fn digest(&self) -> &HashValue {
         &self.info.digest
