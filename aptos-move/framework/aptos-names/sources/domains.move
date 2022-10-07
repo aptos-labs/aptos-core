@@ -8,6 +8,7 @@ module aptos_names::domains {
     use aptos_names::time_helper;
     use aptos_names::token_helper;
     use aptos_names::utf8_utils;
+    use aptos_names::verify;
     use aptos_std::event;
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::Self;
@@ -16,6 +17,8 @@ module aptos_names::domains {
     use std::option::{Self, Option};
     use std::signer;
     use std::string::String;
+    use std::vector;
+    use aptos_names::config::unrestricted_mint_enabled;
 
 
     /// The Naming Service contract is not enabled
@@ -44,6 +47,8 @@ module aptos_names::domains {
     const ESUBDOMAIN_CAN_NOT_EXCEED_DOMAIN_REGISTRATION: u64 = 14;
     /// The subdomain name is too short (must be >= 2)
     const ESUBDOMAIN_TOO_SHORT: u64 = 15;
+    /// The required `register_domain_signature` for `register_domain` is missing
+    const EVALID_SIGNATURE_REQUIRED: u64 = 16;
 
     struct NameRecordKeyV1 has copy, drop, store {
         subdomain_name: Option<String>,
@@ -133,7 +138,7 @@ module aptos_names::domains {
 
     /// A wrapper around `register_name` as an entry function.
     /// Option<String> is not currently serializable, so we have these convenience methods
-    public entry fun register_domain(sign: &signer, domain_name: String, num_years: u8) acquires NameRegistryV1, RegisterNameEventsV1, SetNameAddressEventsV1 {
+    public entry fun register_domain(sign: &signer, domain_name: String, num_years: u8, signature: vector<u8>) acquires NameRegistryV1, RegisterNameEventsV1, SetNameAddressEventsV1 {
         assert!(config::is_enabled(), error::unavailable(ENOT_ENABLED));
         assert!(num_years > 0 && num_years <= config::max_number_of_years_registered(), error::out_of_range(EINVALID_NUMBER_YEARS));
 
@@ -148,13 +153,27 @@ module aptos_names::domains {
         assert!(is_valid, error::invalid_argument(EDOMAIN_HAS_INVALID_CHARACTERS));
         assert!(length <= config::max_domain_length(), error::out_of_range(EDOMAIN_TOO_LONG));
 
+        let account_address = signer::address_of(sign);
+        // if unrestricted_mint_enabled() is false, or if we are calling this function
+        // from `register_domain_with_signature` with a `signature` of length 64,
+        // verify the signature
+        if (!unrestricted_mint_enabled() || vector::length(&signature) == 64) {
+            assert!(vector::length(&signature) == 64, error::invalid_argument(EVALID_SIGNATURE_REQUIRED));
+            verify::verify_register_domain_signature(signature, account::get_sequence_number(account_address), account_address, domain_name);
+        };
 
         let price = price_model::price_for_domain_v1(length, num_years);
         coin::transfer<AptosCoin>(sign, config::foundation_fund_address(), price);
 
         register_name_internal(sign, subdomain_name, domain_name, registration_duration_secs, price);
         // Automatically set the name to point to the sender's address
-        set_name_address_internal(subdomain_name, domain_name, signer::address_of(sign));
+        set_name_address_internal(subdomain_name, domain_name, account_address);
+    }
+
+    /// Enforcing signature for `register_domain`
+    public entry fun register_domain_with_signature(sign: &signer, domain_name: String, num_years: u8, register_domain_signature: vector<u8>) acquires NameRegistryV1, RegisterNameEventsV1, SetNameAddressEventsV1 {
+        assert!(vector::length(&register_domain_signature) == 64, error::invalid_argument(EVALID_SIGNATURE_REQUIRED));
+        register_domain(sign, domain_name, num_years, register_domain_signature);
     }
 
     /// A wrapper around `register_name` as an entry function.

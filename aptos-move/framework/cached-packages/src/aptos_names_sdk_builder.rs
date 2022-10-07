@@ -59,6 +59,10 @@ pub enum EntryFunctionCall {
         max_years_registered: u8,
     },
 
+    ConfigSetPublicKey {
+        public_key: Vec<u8>,
+    },
+
     ConfigSetSubdomainPrice {
         price: u64,
     },
@@ -69,6 +73,10 @@ pub enum EntryFunctionCall {
 
     ConfigSetTokendataUrlPrefix {
         description: Vec<u8>,
+    },
+
+    ConfigSetUnrestrictedMintEnabled {
+        unrestricted_mint_enabled: bool,
     },
 
     DomainsClearDomainAddress {
@@ -121,6 +129,14 @@ pub enum EntryFunctionCall {
     DomainsRegisterDomain {
         domain_name: Vec<u8>,
         num_years: u8,
+        signature: Vec<u8>,
+    },
+
+    /// Enforcing signature for `register_domain`
+    DomainsRegisterDomainWithSignature {
+        domain_name: Vec<u8>,
+        num_years: u8,
+        register_domain_signature: Vec<u8>,
     },
 
     /// A wrapper around `register_name` as an entry function.
@@ -160,6 +176,7 @@ impl EntryFunctionCall {
             ConfigSetMaxNumberOfYearsRegistered {
                 max_years_registered,
             } => config_set_max_number_of_years_registered(max_years_registered),
+            ConfigSetPublicKey { public_key } => config_set_public_key(public_key),
             ConfigSetSubdomainPrice { price } => config_set_subdomain_price(price),
             ConfigSetTokendataDescription { description } => {
                 config_set_tokendata_description(description)
@@ -167,6 +184,9 @@ impl EntryFunctionCall {
             ConfigSetTokendataUrlPrefix { description } => {
                 config_set_tokendata_url_prefix(description)
             }
+            ConfigSetUnrestrictedMintEnabled {
+                unrestricted_mint_enabled,
+            } => config_set_unrestricted_mint_enabled(unrestricted_mint_enabled),
             DomainsClearDomainAddress { domain_name } => domains_clear_domain_address(domain_name),
             DomainsClearSubdomainAddress {
                 subdomain_name,
@@ -201,7 +221,17 @@ impl EntryFunctionCall {
             DomainsRegisterDomain {
                 domain_name,
                 num_years,
-            } => domains_register_domain(domain_name, num_years),
+                signature,
+            } => domains_register_domain(domain_name, num_years, signature),
+            DomainsRegisterDomainWithSignature {
+                domain_name,
+                num_years,
+                register_domain_signature,
+            } => domains_register_domain_with_signature(
+                domain_name,
+                num_years,
+                register_domain_signature,
+            ),
             DomainsRegisterSubdomain {
                 subdomain_name,
                 domain_name,
@@ -331,6 +361,21 @@ pub fn config_set_max_number_of_years_registered(max_years_registered: u8) -> Tr
     ))
 }
 
+pub fn config_set_public_key(public_key: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 4,
+            ]),
+            ident_str!("config").to_owned(),
+        ),
+        ident_str!("set_public_key").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&public_key).unwrap()],
+    ))
+}
+
 pub fn config_set_subdomain_price(price: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -373,6 +418,21 @@ pub fn config_set_tokendata_url_prefix(description: Vec<u8>) -> TransactionPaylo
         ident_str!("set_tokendata_url_prefix").to_owned(),
         vec![],
         vec![bcs::to_bytes(&description).unwrap()],
+    ))
+}
+
+pub fn config_set_unrestricted_mint_enabled(unrestricted_mint_enabled: bool) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 4,
+            ]),
+            ident_str!("config").to_owned(),
+        ),
+        ident_str!("set_unrestricted_mint_enabled").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&unrestricted_mint_enabled).unwrap()],
     ))
 }
 
@@ -532,7 +592,11 @@ pub fn domains_initialize(
 
 /// A wrapper around `register_name` as an entry function.
 /// Option<String> is not currently serializable, so we have these convenience methods
-pub fn domains_register_domain(domain_name: Vec<u8>, num_years: u8) -> TransactionPayload {
+pub fn domains_register_domain(
+    domain_name: Vec<u8>,
+    num_years: u8,
+    signature: Vec<u8>,
+) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -546,6 +610,31 @@ pub fn domains_register_domain(domain_name: Vec<u8>, num_years: u8) -> Transacti
         vec![
             bcs::to_bytes(&domain_name).unwrap(),
             bcs::to_bytes(&num_years).unwrap(),
+            bcs::to_bytes(&signature).unwrap(),
+        ],
+    ))
+}
+
+/// Enforcing signature for `register_domain`
+pub fn domains_register_domain_with_signature(
+    domain_name: Vec<u8>,
+    num_years: u8,
+    register_domain_signature: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 4,
+            ]),
+            ident_str!("domains").to_owned(),
+        ),
+        ident_str!("register_domain_with_signature").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&domain_name).unwrap(),
+            bcs::to_bytes(&num_years).unwrap(),
+            bcs::to_bytes(&register_domain_signature).unwrap(),
         ],
     ))
 }
@@ -687,6 +776,16 @@ mod decoder {
         }
     }
 
+    pub fn config_set_public_key(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ConfigSetPublicKey {
+                public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn config_set_subdomain_price(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ConfigSetSubdomainPrice {
@@ -715,6 +814,18 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ConfigSetTokendataUrlPrefix {
                 description: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn config_set_unrestricted_mint_enabled(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ConfigSetUnrestrictedMintEnabled {
+                unrestricted_mint_enabled: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -814,6 +925,21 @@ mod decoder {
             Some(EntryFunctionCall::DomainsRegisterDomain {
                 domain_name: bcs::from_bytes(script.args().get(0)?).ok()?,
                 num_years: bcs::from_bytes(script.args().get(1)?).ok()?,
+                signature: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn domains_register_domain_with_signature(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DomainsRegisterDomainWithSignature {
+                domain_name: bcs::from_bytes(script.args().get(0)?).ok()?,
+                num_years: bcs::from_bytes(script.args().get(1)?).ok()?,
+                register_domain_signature: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None
@@ -895,6 +1021,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::config_set_max_number_of_years_registered),
         );
         map.insert(
+            "config_set_public_key".to_string(),
+            Box::new(decoder::config_set_public_key),
+        );
+        map.insert(
             "config_set_subdomain_price".to_string(),
             Box::new(decoder::config_set_subdomain_price),
         );
@@ -905,6 +1035,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "config_set_tokendata_url_prefix".to_string(),
             Box::new(decoder::config_set_tokendata_url_prefix),
+        );
+        map.insert(
+            "config_set_unrestricted_mint_enabled".to_string(),
+            Box::new(decoder::config_set_unrestricted_mint_enabled),
         );
         map.insert(
             "domains_clear_domain_address".to_string(),
@@ -937,6 +1071,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "domains_register_domain".to_string(),
             Box::new(decoder::domains_register_domain),
+        );
+        map.insert(
+            "domains_register_domain_with_signature".to_string(),
+            Box::new(decoder::domains_register_domain_with_signature),
         );
         map.insert(
             "domains_register_subdomain".to_string(),

@@ -8,6 +8,8 @@ module aptos_names::domain_e2e_tests {
     use std::option;
     use std::signer;
     use std::vector;
+    use aptos_framework::chain_id;
+    use aptos_names::config::{set_unrestricted_mint_enabled, set_public_key};
 
     #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
     fun happy_path_e2e_test(myself: &signer, user: signer, aptos: signer, rando: signer, foundation: signer) {
@@ -18,7 +20,7 @@ module aptos_names::domain_e2e_tests {
         let user_addr = signer::address_of(user);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
 
         // Set an address and verify it
         test_helper::set_name_address(user, option::none(), test_helper::domain_name(), user_addr);
@@ -35,13 +37,39 @@ module aptos_names::domain_e2e_tests {
     }
 
     #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
+    fun happy_path_e2e_test_with_signature(myself: &signer, user: signer, aptos: signer, rando: signer, foundation: signer) {
+        let users = test_helper::e2e_test_setup(myself, user, &aptos, rando, &foundation);
+        let user = vector::borrow(&users, 0);
+
+        let user_addr = signer::address_of(user);
+
+        chain_id::initialize_for_test(&aptos, 4);
+        set_public_key(myself, x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18");
+        set_unrestricted_mint_enabled(myself, false);
+
+        let signature: vector<u8> = x"b0c3921a0bc73582b8d70b85041cc299d9291fa84e821aa22f0f028e12955c32c7e93e0d7e9e6da046aafb1d0dfd6d28755725e0e118ee57fdaec0b1b0035004";
+
+        // Register the domain
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, signature);
+
+        // Set an address and verify it
+        test_helper::set_name_address(user, option::none(), test_helper::domain_name(), user_addr);
+
+        // Ensure the owner can clear the address
+        test_helper::clear_name_address(user, option::none(), test_helper::domain_name());
+
+        // Set it back for following tests
+        test_helper::set_name_address(user, option::none(), test_helper::domain_name(), user_addr);
+    }
+
+    #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
     fun names_are_registerable_after_expiry_e2e_test(myself: &signer, user: signer, aptos: signer, rando: signer, foundation: signer) {
         let users = test_helper::e2e_test_setup(myself, user, &aptos, rando, &foundation);
         let user = vector::borrow(&users, 0);
         let rando = vector::borrow(&users, 1);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
 
         // Set the time past the domain's expiration time
         let (_, expiration_time_sec, _) = domains::get_name_record_v1_props_for_name(option::none(), test_helper::domain_name());
@@ -53,7 +81,7 @@ module aptos_names::domain_e2e_tests {
         assert!(domains::name_is_registerable(option::none(), test_helper::domain_name()), 82);
 
         // Lets try to register it again, now that it is expired
-        test_helper::register_name(rando, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 2);
+        test_helper::register_name(rando, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 2, vector::empty<u8>());
 
         // And again!
         let (_, expiration_time_sec, _) = domains::get_name_record_v1_props_for_name(option::none(), test_helper::domain_name());
@@ -65,7 +93,7 @@ module aptos_names::domain_e2e_tests {
         assert!(domains::name_is_registerable(option::none(), test_helper::domain_name()), 82);
 
         // Lets try to register it again, now that it is expired
-        test_helper::register_name(rando, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 3);
+        test_helper::register_name(rando, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 3, vector::empty<u8>());
     }
 
     #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
@@ -75,9 +103,9 @@ module aptos_names::domain_e2e_tests {
         let user = vector::borrow(&users, 0);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         // Ensure we can't register it again
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
     }
 
     #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
@@ -88,7 +116,7 @@ module aptos_names::domain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         // Ensure we can't set it as a rando. The expected target address doesn't matter as it won't get hit
         test_helper::set_name_address(rando, option::none(), test_helper::domain_name(), @aptos_names);
     }
@@ -101,7 +129,7 @@ module aptos_names::domain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register the domain, and set its address
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         test_helper::set_name_address(user, option::none(), test_helper::domain_name(), signer::address_of(user));
 
         // Ensure we can't clear it as a rando
@@ -115,7 +143,7 @@ module aptos_names::domain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register the domain, and set its address
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1,vector::empty<u8>());
         test_helper::set_name_address(user, option::none(), test_helper::domain_name(), signer::address_of(rando));
 
         // Ensure we can clear as owner
@@ -131,7 +159,7 @@ module aptos_names::domain_e2e_tests {
         let rando_addr = signer::address_of(rando);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
 
         domains::force_set_domain_address(myself, test_helper::domain_name(), rando_addr);
         let (_property_version, _expiration_time_sec, target_address) = domains::get_name_record_v1_props_for_name(option::none(), test_helper::domain_name());
@@ -149,7 +177,7 @@ module aptos_names::domain_e2e_tests {
         let rando_addr = signer::address_of(rando);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
 
         // Rando is not allowed to do this
         domains::force_set_domain_address(rando, test_helper::domain_name(), rando_addr);
@@ -162,7 +190,7 @@ module aptos_names::domain_e2e_tests {
         let user = vector::borrow(&users, 0);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         let (is_owner, _token_id) = domains::is_owner_of_name(signer::address_of(user), option::none(), test_helper::domain_name());
         assert!(is_owner, 1);
 
@@ -201,7 +229,7 @@ module aptos_names::domain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         let (is_owner, _token_id) = domains::is_owner_of_name(signer::address_of(user), option::none(), test_helper::domain_name());
         assert!(is_owner, 1);
 

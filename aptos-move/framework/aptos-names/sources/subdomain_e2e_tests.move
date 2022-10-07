@@ -19,7 +19,7 @@ module aptos_names::subdomain_e2e_tests {
         let user_addr = signer::address_of(user);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
 
         // Set an address and verify it
         test_helper::set_name_address(user, option::none(), test_helper::domain_name(), user_addr);
@@ -35,7 +35,7 @@ module aptos_names::subdomain_e2e_tests {
         test_helper::set_name_address(user, option::none(), test_helper::domain_name(), user_addr);
 
         // Register a subdomain!
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
 
         // Set a subdomain address and verify it
         test_helper::set_name_address(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), user_addr);
@@ -55,10 +55,10 @@ module aptos_names::subdomain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
 
         // Register a subdomain!
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
 
         // Set the time past the domain's expiration time
         let (_, expiration_time_sec, _) = domains::get_name_record_v1_props_for_name(option::some(test_helper::subdomain_name()), test_helper::domain_name());
@@ -75,14 +75,14 @@ module aptos_names::subdomain_e2e_tests {
         assert!(!domains::name_is_registerable(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 92);
 
         // Lets try to register it again, now that it is expired
-        test_helper::register_name(rando, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 2);
+        test_helper::register_name(rando, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 2, vector::empty<u8>());
         // The subdomain should now be registerable: it's both expired AND the domain is registered
         assert!(domains::name_is_expired(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 93);
         assert!(domains::name_is_registered(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 94);
         assert!(domains::name_is_registerable(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 95);
 
         // and likewise for the subdomain
-        test_helper::register_name(rando, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 2);
+        test_helper::register_name(rando, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 2, vector::empty<u8>());
 
         // And again!
         let (_, expiration_time_sec, _) = domains::get_name_record_v1_props_for_name(option::some(test_helper::subdomain_name()), test_helper::domain_name());
@@ -100,14 +100,14 @@ module aptos_names::subdomain_e2e_tests {
         assert!(!domains::name_is_registerable(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 92);
 
         // Lets try to register it again, now that it is expired
-        test_helper::register_name(rando, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 3);
+        test_helper::register_name(rando, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 3, vector::empty<u8>());
         // The subdomain should now be registerable: it's both expired AND the domain is registered
         assert!(domains::name_is_expired(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 93);
         assert!(domains::name_is_registered(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 94);
         assert!(domains::name_is_registerable(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 95);
 
         // and likewise for the subdomain
-        test_helper::register_name(rando, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 3);
+        test_helper::register_name(rando, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 3, vector::empty<u8>());
     }
 
     #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
@@ -117,10 +117,10 @@ module aptos_names::subdomain_e2e_tests {
         let user = vector::borrow(&users, 0);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         // Try to register a subdomain twice (ensure we can't)
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
     }
 
     #[test(myself = @aptos_names, user = @0x077, aptos = @0x1, rando = @0x266f, foundation = @0xf01d)]
@@ -131,8 +131,8 @@ module aptos_names::subdomain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register the domain and subdomain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
         // Ensure we can't clear it as a rando. The expected target address doesn't matter as it won't get hit
         test_helper::set_name_address(rando, option::some(test_helper::subdomain_name()), test_helper::domain_name(), @aptos_names);
     }
@@ -145,8 +145,8 @@ module aptos_names::subdomain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register the domain and subdomain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
         test_helper::set_name_address(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), signer::address_of(user));
         // Ensure we can't clear it as a rando. The expected target address doesn't matter as it won't get hit
         test_helper::set_name_address(rando, option::some(test_helper::subdomain_name()), test_helper::domain_name(), @aptos_names);
@@ -161,8 +161,8 @@ module aptos_names::subdomain_e2e_tests {
         let rando_addr = signer::address_of(rando);
 
         // Register the domain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
 
         domains::force_set_subdomain_address(myself, test_helper::subdomain_name(), test_helper::domain_name(), rando_addr);
         let (_property_version, _expiration_time_sec, target_address) = domains::get_name_record_v1_props_for_name(option::some(test_helper::subdomain_name()), test_helper::domain_name());
@@ -181,8 +181,8 @@ module aptos_names::subdomain_e2e_tests {
         let rando_addr = signer::address_of(rando);
 
         // Register the domain and subdomain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
 
         // Rando is not allowed to do this
         domains::force_set_subdomain_address(rando, test_helper::subdomain_name(), test_helper::domain_name(), rando_addr);
@@ -194,8 +194,8 @@ module aptos_names::subdomain_e2e_tests {
         let user = vector::borrow(&users, 0);
 
         // Register the domain and subdomain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
         let (is_owner, _token_id) = domains::is_owner_of_name(signer::address_of(user), option::some(test_helper::subdomain_name()), test_helper::domain_name());
         assert!(is_owner, 1);
 
@@ -215,7 +215,7 @@ module aptos_names::subdomain_e2e_tests {
         let user = vector::borrow(&users, 0);
 
         // No subdomain is registered yet
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         assert!(!domains::name_is_registered(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 1);
 
         // Take the subdomain name
@@ -235,7 +235,7 @@ module aptos_names::subdomain_e2e_tests {
         let user = vector::borrow(&users, 0);
 
         // No subdomain is registered yet- domain is registered for 1 year
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         assert!(!domains::name_is_registered(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 1);
 
         // Take the subdomain name for longer than domain: this should explode
@@ -250,8 +250,8 @@ module aptos_names::subdomain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register the domain and subdomain
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
-        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
+        test_helper::register_name(user, option::some(test_helper::subdomain_name()), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_subdomain_name(), 1, vector::empty<u8>());
         let (is_owner, _token_id) = domains::is_owner_of_name(signer::address_of(user), option::some(test_helper::subdomain_name()), test_helper::domain_name());
         assert!(is_owner, 1);
 
@@ -267,7 +267,7 @@ module aptos_names::subdomain_e2e_tests {
         let rando = vector::borrow(&users, 1);
 
         // Register a domain, and ensure no subdomain is registered yet
-        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1);
+        test_helper::register_name(user, option::none(), test_helper::domain_name(), test_helper::one_year_secs(), test_helper::fq_domain_name(), 1, vector::empty<u8>());
         assert!(!domains::name_is_registered(option::some(test_helper::subdomain_name()), test_helper::domain_name()), 1);
 
         // Attempt (and fail) to take the subdomain name for much longer than users are allowed to register it for
