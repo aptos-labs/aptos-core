@@ -74,7 +74,8 @@ Example output:
 To see your validator performance in the current and past epochs and rewards earned, run the below command. The output will show the validator's performance in block proposals and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node analyze-validator-performance --help` to see default values used.
 
 ```bash
-aptos node analyze-validator-performance --analyze-mode All \
+aptos node get-performance \ 
+  --pool-address <pool address> \
   --url https://premainnet.aptosdev.com
 ```
 
