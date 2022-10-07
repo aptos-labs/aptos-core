@@ -61,7 +61,13 @@ pub async fn handle_metrics_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling prometheus metrics ingest");
 
-    let extra_labels = claims_to_extra_labels(&claims);
+    let extra_labels = claims_to_extra_labels(
+        &claims,
+        context
+            .peer_identities()
+            .get(&claims.chain_id)
+            .and_then(|peers| peers.get(&claims.peer_id)),
+    );
 
     let start_timer = Instant::now();
 
@@ -118,23 +124,32 @@ pub async fn handle_metrics_ingest(
     Ok(reply::with_status(reply::reply(), StatusCode::CREATED))
 }
 
-fn claims_to_extra_labels(claims: &Claims) -> Vec<String> {
+fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<String> {
     let chain_name = if claims.chain_id.id() == 3 {
         format!("chain_name={}", claims.chain_id.id())
     } else {
         format!("chain_name={}", claims.chain_id)
     };
-    vec![
-        format!("role={}", claims.node_type),
-        chain_name,
-        format!("namespace={}", "telemetry-service"),
+    let pod_name = if let Some(common_name) = common_name {
+        format!(
+            "kubernetes_pod_name=peer_id:{}//{}",
+            common_name,
+            claims.peer_id.to_hex_literal()
+        )
+    } else {
         // for community nodes we cannot determine which pod name they run in (or whether they run in k8s at all),
         // so we use the peer id as an approximation/replacement for pod_name
         // This works well with our existing grafana dashboards
         format!(
             "kubernetes_pod_name=peer_id:{}",
             claims.peer_id.to_hex_literal()
-        ),
+        )
+    };
+    vec![
+        format!("role={}", claims.node_type),
+        chain_name,
+        format!("namespace={}", "telemetry-service"),
+        pod_name,
     ]
 }
 
@@ -152,14 +167,38 @@ mod test {
 
     #[test]
     fn verify_labels() {
-        let claims = claims_to_extra_labels(&super::Claims {
-            chain_id: ChainId::new(25),
-            peer_id: PeerId::from_str("0x1").unwrap(),
-            node_type: NodeType::Validator,
-            epoch: 3,
-            exp: 123,
-            iat: 123,
-        });
+        let claims = claims_to_extra_labels(
+            &super::Claims {
+                chain_id: ChainId::new(25),
+                peer_id: PeerId::from_str("0x1").unwrap(),
+                node_type: NodeType::Validator,
+                epoch: 3,
+                exp: 123,
+                iat: 123,
+            },
+            Some(&String::from("test_name")),
+        );
+        assert_eq!(
+            claims,
+            vec![
+                "role=validator",
+                "chain_name=25",
+                "namespace=telemetry-service",
+                "kubernetes_pod_name=peer_id:test_name//0x1",
+            ]
+        );
+
+        let claims = claims_to_extra_labels(
+            &super::Claims {
+                chain_id: ChainId::new(25),
+                peer_id: PeerId::from_str("0x1").unwrap(),
+                node_type: NodeType::Validator,
+                epoch: 3,
+                exp: 123,
+                iat: 123,
+            },
+            None,
+        );
         assert_eq!(
             claims,
             vec![

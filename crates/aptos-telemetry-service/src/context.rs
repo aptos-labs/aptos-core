@@ -117,6 +117,7 @@ pub struct Context {
     chain_set: HashSet<ChainId>,
     jwt_service: JsonWebTokenService,
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
+    peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
 }
 
 impl Context {
@@ -127,6 +128,7 @@ impl Context {
         chain_set: HashSet<ChainId>,
         jwt_service: JsonWebTokenService,
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
+        peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
     ) -> Self {
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
@@ -135,6 +137,7 @@ impl Context {
             chain_set,
             jwt_service,
             log_env_map,
+            peer_identities,
         }
     }
 
@@ -169,6 +172,10 @@ impl Context {
 
     pub(crate) fn bigquery_client(&self) -> Option<&TableWriteClient> {
         self.clients.bigquery_client.as_ref()
+    }
+
+    pub(crate) fn peer_identities(&self) -> &HashMap<ChainId, HashMap<PeerId, String>> {
+        &self.peer_identities
     }
 
     pub fn chain_set(&self) -> &HashSet<ChainId> {
