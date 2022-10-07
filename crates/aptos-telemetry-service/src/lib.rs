@@ -151,6 +151,7 @@ impl AptosTelemetryServiceArgs {
             chain_set,
             jwt_service,
             config.log_env_map.clone(),
+            config.peer_identities.clone(),
         );
 
         PeerSetCacheUpdater::new(
@@ -212,6 +213,7 @@ pub struct TelemetryServiceConfig {
     pub humio_url: String,
 
     pub log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
+    pub peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
 }
 
 impl TelemetryServiceConfig {
