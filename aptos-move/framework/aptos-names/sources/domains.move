@@ -8,6 +8,7 @@ module aptos_names::domains {
     use aptos_names::time_helper;
     use aptos_names::token_helper;
     use aptos_names::utf8_utils;
+    use aptos_names::verify;
     use aptos_std::event;
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::Self;
@@ -16,6 +17,7 @@ module aptos_names::domains {
     use std::option::{Self, Option};
     use std::signer;
     use std::string::String;
+    use aptos_names::config::unrestricted_mint_enabled;
 
 
     /// The Naming Service contract is not enabled
@@ -155,6 +157,15 @@ module aptos_names::domains {
         register_name_internal(sign, subdomain_name, domain_name, registration_duration_secs, price);
         // Automatically set the name to point to the sender's address
         set_name_address_internal(subdomain_name, domain_name, signer::address_of(sign));
+    }
+
+    /// Generic function for registering domain with or without signature, depending on if unrestricted_mint_enabled is true
+    public entry fun register_domain_with_signature(sign: &signer, domain_name: String, num_years: u8, register_domain_signature: vector<u8>) acquires NameRegistryV1, RegisterNameEventsV1, SetNameAddressEventsV1 {
+        if (!unrestricted_mint_enabled()) {
+            let account_address = signer::address_of(sign);
+            verify::verify_register_domain_signature(register_domain_signature, account::get_sequence_number(account_address), account_address, domain_name);
+        };
+        register_domain(sign, domain_name, num_years);
     }
 
     /// A wrapper around `register_name` as an entry function.
