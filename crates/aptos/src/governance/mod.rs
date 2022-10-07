@@ -13,7 +13,10 @@ use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::U64;
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{Client, Transaction};
+use aptos_sdk::move_types::language_storage::CORE_CODE_ADDRESS;
+use aptos_types::governance::VotingRecords;
+use aptos_types::stake_pool::StakePool;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Script, TransactionPayload},
@@ -226,17 +229,18 @@ pub struct SubmitVote {
 
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    #[clap(flatten)]
-    pub(crate) pool_address_args: PoolAddressArgs,
+    /// Comma separated list of pool addresses.
+    #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_addresses: Vec<AccountAddress>,
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for SubmitVote {
+impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
     fn command_name(&self) -> &'static str {
         "SubmitVote"
     }
 
-    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+    async fn execute(mut self) -> CliTypedResult<Vec<TransactionSummary>> {
         let (vote_str, vote) = match (self.yes, self.no) {
             (true, false) => ("Yes", true),
             (false, true) => ("No", false),
@@ -247,22 +251,77 @@ impl CliCommand<TransactionSummary> for SubmitVote {
             }
         };
 
-        // TODO: Display details of proposal
-
-        prompt_yes_with_override(
-            &format!("Are you sure you want to vote {}", vote_str),
-            self.txn_options.prompt_options,
-        )?;
-
-        self.txn_options
-            .submit_transaction(aptos_stdlib::aptos_governance_vote(
-                self.pool_address_args.pool_address,
-                self.proposal_id,
-                vote,
-            ))
+        let client: &Client = &self
+            .txn_options
+            .rest_options
+            .client(&self.txn_options.profile_options)?;
+        let proposal_id = self.proposal_id;
+        let voting_records = client
+            .get_account_resource_bcs::<VotingRecords>(
+                CORE_CODE_ADDRESS,
+                "0x1::aptos_governance::VotingRecords",
+            )
             .await
-            .map(TransactionSummary::from)
+            .unwrap()
+            .into_inner()
+            .votes;
+
+        let mut summaries: Vec<TransactionSummary> = vec![];
+        for pool_address in self.pool_addresses {
+            let voting_record = client
+                .get_table_item(
+                    voting_records,
+                    "0x1::aptos_governance::RecordKey",
+                    "bool",
+                    VotingRecord {
+                        proposal_id: proposal_id.to_string(),
+                        stake_pool: pool_address,
+                    },
+                )
+                .await;
+            let voted = if let Ok(voting_record) = voting_record {
+                voting_record.into_inner().as_bool().unwrap()
+            } else {
+                false
+            };
+            if voted {
+                println!("Stake pool {} already voted", pool_address);
+                continue;
+            }
+
+            let stake_pool = client
+                .get_account_resource_bcs::<StakePool>(pool_address, "0x1::stake::StakePool")
+                .await?
+                .into_inner();
+            let voting_power = stake_pool.get_governance_voting_power();
+
+            prompt_yes_with_override(
+                &format!(
+                    "Vote {} with voting power = {} from stake pool {}?",
+                    vote_str, voting_power, pool_address
+                ),
+                self.txn_options.prompt_options,
+            )?;
+
+            summaries.push(
+                self.txn_options
+                    .submit_transaction(aptos_stdlib::aptos_governance_vote(
+                        pool_address,
+                        proposal_id,
+                        vote,
+                    ))
+                    .await
+                    .map(TransactionSummary::from)?,
+            );
+        }
+        Ok(summaries)
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VotingRecord {
+    proposal_id: String,
+    stake_pool: AccountAddress,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

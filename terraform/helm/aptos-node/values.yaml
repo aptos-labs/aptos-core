@@ -31,23 +31,18 @@ haproxy:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 4
-      memory: 8Gi
+      cpu: 1.5
+      memory: 2Gi
     requests:
-      cpu: 4
-      memory: 8Gi
+      cpu: 1.5
+      memory: 2Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
   limits:
     validator:
-      # -- Limit the number of connections per IP address per sec
+      # -- Limit the number of connections per IP address per minute
       connectionsPerIPPerMin: 2
-      # Sustained 100mb/s for 10 sec.
-      maxBytesOutRate10sec: 134217728
-      rateLimitSession: 256
-      tcpBufSize: 524288
-
   config:
     # -- Whether to send Proxy Protocol v2
     send_proxy_protocol: &send_proxy_protocol false
@@ -75,7 +70,7 @@ validator:
     # -- Kubernetes storage class to use for validator persistent storage
     class:
     # -- Size of validator persistent storage
-    size: 1000Gi
+    size: 2048Gi
   # -- Log level for the validator
   rust_log: info
   # -- Remote log level for the validator
@@ -109,7 +104,7 @@ fullnode:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:
     # -- Size of fullnode persistent storage
-    size: 1000Gi
+    size: 2048Gi
   # -- Log level for the fullnode
   rust_log: info
   # -- Remote log level for the fullnode
