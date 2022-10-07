@@ -33,7 +33,7 @@ executor-types = { path = "../executor-types" }
 scratchpad = { path = "../../storage/scratchpad" }
 storage-interface = { path = "../../storage/storage-interface" }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "2ceedb15751f586fc657b7e94325cacf9ed9629f", features = ["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4", features = ["address32"] }
 
 [dev-dependencies]
 proptest = "1.0.0"
