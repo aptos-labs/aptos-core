@@ -32,6 +32,10 @@ impl StakePool {
     pub fn get_total_staked_amount(&self) -> u64 {
         self.active + self.inactive + self.pending_active + self.pending_inactive
     }
+
+    pub fn get_governance_voting_power(&self) -> u64 {
+        self.active + self.pending_active + self.pending_inactive
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

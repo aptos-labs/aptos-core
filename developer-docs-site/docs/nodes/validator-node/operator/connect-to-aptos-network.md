@@ -5,40 +5,11 @@ slug: "connect-to-aptos-network"
 
 # Connecting to Aptos Network
 
-This document describes how to connect your running validator node and public fullnode to an Aptos network. Follow these instructions only if your validator is meeting the minimal staking requirement. (1M APT token)
+This document describes how to connect your running validator node and public fullnode to an Aptos network. Follow these instructions only if your validator has met the minimal staking requirement. 
 
-## Initializing the staking pool
-
-:::tip Examples using testnet
-The CLI command examples used in this section use testnet. You can use the same command for mainnet by passing the mainnet URL for the `--rest-url` parameter.
-::: 
-
-1. Initialize CLI with your wallet **private key**. For Petra wallet, you can get your wallet private key from **Settings** > **Credentials**.
-
-  ```bash
-  aptos init --profile testnet-owner \
-    --rest-url https://testnet.aptoslabs.com
-  ```
-
-2. Initialize staking pool using CLI.
-
-  ```bash
-  aptos stake initialize-stake-owner \
-    --initial-stake-amount 100000000000000 \
-    --operator-address <operator-address> \
-    --voter-address <voter-address> \
-    --profile testnet-owner
-  ```
-
-3. Do not forget to transfer some coins to your operator account to pay for gas. You can use Petra wallet directly or with the below command using CLI:
-
-  ```bash
-  aptos account create --account <operator-account> --profile testnet-owner
-  aptos account transfer \
-  --account <operator-account> \
-  --amount 5000 \
-  --profile testnet-owner
-  ```
+:::tip Minimum staking requirement
+The current required minimum for staking is 1M APT tokens.
+:::
 
 ## Bootstrapping validator node
 
