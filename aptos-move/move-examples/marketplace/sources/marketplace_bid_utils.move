@@ -1,5 +1,5 @@
-/// bid library for listing token for sale and bid for tokens
-/// An example can be found under aptos-move/move_examples/marketplace
+/// An marketplace library providing basic function for buy and bid
+/// To see how to use the library, please check the two example contract in the same folder
 module marketplace::marketplace_bid_utils {
 
     use aptos_framework::account;
@@ -12,8 +12,8 @@ module marketplace::marketplace_bid_utils {
     use marketplace::marketplace_listing_utils::{Self as listing_util, Listing, create_listing_id_raw};
     use std::signer;
     use std::error;
-    #[test_only]
     use std::string::String;
+    use aptos_token::property_map::{Self, PropertyMap};
 
     //
     // Errors
@@ -61,6 +61,7 @@ module marketplace::marketplace_bid_utils {
         coin: Coin<CoinType>,
         offer_price: u64,
         expiration_sec: u64,
+        config: PropertyMap,
     }
 
     /// This is the BidId used dedup the bid from the same signer for a listing
@@ -101,6 +102,10 @@ module marketplace::marketplace_bid_utils {
         market_place_address: address,
     }
 
+    //
+    // entry functions
+    //
+
     /// Allow buyer to directly buy from a listing directly listed under an account without paying any fee
     public entry fun buy_from_owner_with_fee<CoinType>(
         buyer: &signer,
@@ -113,6 +118,35 @@ module marketplace::marketplace_bid_utils {
         let entry = listing_util::remove_listing<CoinType>(lister_address, listing_creation_number);
         buy_from_listing_with_fee<CoinType>(buyer, entry, market_fee_address, fee_numerator, fee_denominator);
     }
+
+    /// Bidder can withdraw the bid after the bid expires to get the coin back and store them in the coinstore
+    public entry fun withdraw_coin_from_bid<CoinType>(
+        bidder: &signer,
+        lister_addr: address,
+        listing_creation_number: u64,
+    ) acquires BidRecords {
+        let bidder_address = signer::address_of(bidder);
+        let listing_id = create_listing_id_raw(lister_addr, listing_creation_number);
+        let bid_id = create_bid_id(bidder_address, listing_id);
+
+        let bid_records = borrow_global_mut<BidRecords<CoinType>>(bidder_address);
+        assert!(table::contains(&bid_records.records, bid_id), error::not_found(EBID_NOT_EXIST));
+
+        let bid = table::remove(&mut bid_records.records, bid_id);
+        assert!(timestamp::now_seconds() > bid.expiration_sec, error::permission_denied(ECANNOT_DRAW_FUND_BEFORE_EXPIRATION_TIME));
+
+        coin::deposit(bidder_address, clear_bid(bid));
+        event::emit_event<WithdrawBidEvent<CoinType>>(
+            &mut bid_records.withdraw_bid_event,
+            WithdrawBidEvent<CoinType> {
+                bid_id
+            },
+        );
+    }
+
+    //
+    // public functions
+    //
 
     /// Buy from listings. This can be called by marketplace contracts with their own fee config and stored Listing
     public fun buy_from_listing_with_fee<CoinType>(
@@ -132,6 +166,7 @@ module marketplace::marketplace_bid_utils {
             start_sec,
             expiration_sec,
             withdraw_cap,
+            _,
         ) = listing_util::destroy_listing(entry);
         let now = timestamp::now_seconds();
         assert!(now > start_sec, error::invalid_argument(EBUY_FROM_NOT_STARTED_LISTING));
@@ -199,26 +234,6 @@ module marketplace::marketplace_bid_utils {
         };
     }
 
-    /// validate if bid is legit for a listing.
-    public fun assert_bid_parameters<CoinType>(
-        token_id: TokenId,
-        offer_price: u64,
-        token_amount: u64,
-        entry: &Listing<CoinType>,
-        bid_time: u64,
-    ) {
-        // validate token_id match
-        assert!(token_id == listing_util::get_listing_token_id(entry), error::invalid_argument(ETOKEN_ID_NOT_MATCH));
-        // validate offerred amount and price
-        let listed_amount =  listing_util::get_listing_token_amount(entry);
-        let min_total = listing_util::get_listing_min_price(entry) * listed_amount;
-        let total_coin_amount = offer_price * token_amount;
-        assert!(total_coin_amount >= min_total, ENO_SUFFICIENT_FUND);
-        assert!(token_amount == listed_amount, ETOKEN_AMOUNT_NOT_MATCH);
-        assert!(bid_time >= listing_util::get_listing_start(entry), error::invalid_argument(ELISTING_NOT_STARTED));
-        assert!(bid_time <= listing_util::get_listing_expiration(entry), error::invalid_argument(ELISTING_EXPIRED));
-    }
-
     /// withdraw the coin and store them in bid struct and return a global unique bid id
     public fun bid<CoinType>(
         bidder: &signer,
@@ -227,6 +242,10 @@ module marketplace::marketplace_bid_utils {
         offer_price: u64,
         entry: &Listing<CoinType>,
         expiration_sec: u64,
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        types: vector<String>,
+
     ): BidId acquires BidRecords {
         initialize_bid_records<CoinType>(bidder);
         let bidder_address = signer::address_of(bidder);
@@ -251,6 +270,7 @@ module marketplace::marketplace_bid_utils {
             coin,
             offer_price,
             expiration_sec,
+            config: property_map::new(keys, values, types),
         };
 
         table::add(&mut bid_records.records, bid_id, bid);
@@ -304,64 +324,6 @@ module marketplace::marketplace_bid_utils {
         );
     }
 
-    /// Bidder can withdraw the bid after the bid expires to get the coin back and store them in the coinstore
-    public entry fun withdraw_coin_from_bid<CoinType>(
-        bidder: &signer,
-        lister_addr: address,
-        listing_creation_number: u64,
-    ) acquires BidRecords {
-        let bidder_address = signer::address_of(bidder);
-        let listing_id = create_listing_id_raw(lister_addr, listing_creation_number);
-        let bid_id = create_bid_id(bidder_address, listing_id);
-
-        let bid_records = borrow_global_mut<BidRecords<CoinType>>(bidder_address);
-        assert!(table::contains(&bid_records.records, bid_id), error::not_found(EBID_NOT_EXIST));
-
-        let bid = table::remove(&mut bid_records.records, bid_id);
-        assert!(timestamp::now_seconds() > bid.expiration_sec, error::permission_denied(ECANNOT_DRAW_FUND_BEFORE_EXPIRATION_TIME));
-
-        coin::deposit(bidder_address, clear_bid(bid));
-        event::emit_event<WithdrawBidEvent<CoinType>>(
-            &mut bid_records.withdraw_bid_event,
-            WithdrawBidEvent<CoinType> {
-                bid_id
-            },
-        );
-    }
-
-    fun deduct_fee<CoinType>(
-        total_coin: &mut Coin<CoinType>,
-        fee_numerator: u64,
-        fee_denominator: u64
-    ): Coin<CoinType> {
-        let value = coin::value(total_coin);
-        let fee = if (fee_denominator == 0) {
-            0
-        } else {
-            value * fee_numerator/ fee_denominator
-        };
-        coin::extract(total_coin, fee)
-    }
-
-    fun emit_order_executed_event<CoinType>(
-        buyer: address,
-        lister_address: address,
-        listing_creation_number: u64,
-        executed_price: u64,
-        market_place_address: address,
-    ) acquires BidRecords {
-        let records = borrow_global_mut<BidRecords<CoinType>>(buyer);
-        event::emit_event<OrderExecutedEvent<CoinType>>(
-            &mut records.order_executed_event,
-            OrderExecutedEvent<CoinType> {
-                buyer,
-                lister_address,
-                listing_creation_number,
-                executed_price,
-                market_place_address,
-            },
-        );
-    }
 
     /// execute a bid to a listing, no signer required to perform this function
     /// pay fee to 3rd party based on a percentage
@@ -386,6 +348,7 @@ module marketplace::marketplace_bid_utils {
             _,
             expiration_sec,
             withdraw_cap,
+            _,
         ) = listing_util::destroy_listing(entry);
         let coin_owner = bid.id.bidder;
         // validate offerred amount and price
@@ -435,15 +398,24 @@ module marketplace::marketplace_bid_utils {
         );
     }
 
-    /// destruct the bid struct and extract coins
-    fun clear_bid<CoinType>(bid: Bid<CoinType>): Coin<CoinType> {
-        let Bid {
-            id: _,
-            coin,
-            offer_price: _,
-            expiration_sec: _,
-        } = bid;
-        coin
+    /// validate if bid is legit for a listing.
+    public fun assert_bid_parameters<CoinType>(
+        token_id: TokenId,
+        offer_price: u64,
+        token_amount: u64,
+        entry: &Listing<CoinType>,
+        bid_time: u64,
+    ) {
+        // validate token_id match
+        assert!(token_id == listing_util::get_listing_token_id(entry), error::invalid_argument(ETOKEN_ID_NOT_MATCH));
+        // validate offerred amount and price
+        let listed_amount =  listing_util::get_listing_token_amount(entry);
+        let min_total = listing_util::get_listing_min_price(entry) * listed_amount;
+        let total_coin_amount = offer_price * token_amount;
+        assert!(total_coin_amount >= min_total, ENO_SUFFICIENT_FUND);
+        assert!(token_amount == listed_amount, ETOKEN_AMOUNT_NOT_MATCH);
+        assert!(bid_time >= listing_util::get_listing_start(entry), error::invalid_argument(ELISTING_NOT_STARTED));
+        assert!(bid_time <= listing_util::get_listing_expiration(entry), error::invalid_argument(ELISTING_EXPIRED));
     }
 
     public fun get_bid_info<CoinType>(
@@ -472,6 +444,56 @@ module marketplace::marketplace_bid_utils {
     /// get bidder listing id from BidId
     public fun get_bid_id_listing_id(bid_id: &BidId): ID {
         bid_id.listing_id
+    }
+
+    //
+    // Private or friend functions
+    //
+
+    /// destruct the bid struct and extract coins
+    fun clear_bid<CoinType>(bid: Bid<CoinType>): Coin<CoinType> {
+        let Bid {
+            id: _,
+            coin,
+            offer_price: _,
+            expiration_sec: _,
+            config: _
+        } = bid;
+        coin
+    }
+
+    fun emit_order_executed_event<CoinType>(
+        buyer: address,
+        lister_address: address,
+        listing_creation_number: u64,
+        executed_price: u64,
+        market_place_address: address,
+    ) acquires BidRecords {
+        let records = borrow_global_mut<BidRecords<CoinType>>(buyer);
+        event::emit_event<OrderExecutedEvent<CoinType>>(
+            &mut records.order_executed_event,
+            OrderExecutedEvent<CoinType> {
+                buyer,
+                lister_address,
+                listing_creation_number,
+                executed_price,
+                market_place_address,
+            },
+        );
+    }
+
+    fun deduct_fee<CoinType>(
+        total_coin: &mut Coin<CoinType>,
+        fee_numerator: u64,
+        fee_denominator: u64
+    ): Coin<CoinType> {
+        let value = coin::value(total_coin);
+        let fee = if (fee_denominator == 0) {
+            0
+        } else {
+            value * fee_numerator/ fee_denominator
+        };
+        coin::extract(total_coin, fee)
     }
 
     #[test_only]
@@ -511,6 +533,9 @@ module marketplace::marketplace_bid_utils {
             0,
             100,
             200,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
         );
 
         coin::create_fake_money(aptos_framework, bidder_a, 100);
@@ -528,6 +553,9 @@ module marketplace::marketplace_bid_utils {
             offered_price,
             &entry,
             100000001,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
         );
         (bid_1, entry)
     }
@@ -644,6 +672,9 @@ module marketplace::marketplace_bid_utils {
             start_sec,
             end_sec,
             end_sec + 1, // token transfer happens immedidately after buying
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
         );
 
         coin::create_fake_money(aptos_framework, buyer, 100);

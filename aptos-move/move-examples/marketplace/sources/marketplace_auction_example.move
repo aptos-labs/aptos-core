@@ -1,4 +1,6 @@
-// support first price auction (english auction), the highest bid wins the auction
+/// This is an example demonstrating how to use marketplace_bid_utils and market_place_listing_utils to build an auction house
+/// The basic flow can be found in test test_listing_one_and_two_bids
+/// For more detailed description, check readme
 module marketplace::marketplace_auction_example {
 
     use aptos_framework::account;
@@ -15,11 +17,7 @@ module marketplace::marketplace_auction_example {
     use std::string::String;
     use std::vector;
     use aptos_framework::guid;
-
-    //
-    // Constants
-    //
-
+    use aptos_token::property_map;
 
     //
     // Errors
@@ -147,6 +145,9 @@ module marketplace::marketplace_auction_example {
             start_sec,
             expiration_sec,
             withdraw_expiration_sec,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
         );
 
         Auction<CoinType>{
@@ -218,6 +219,7 @@ module marketplace::marketplace_auction_example {
                 listing_expiration_sec,
                 listing_expiration_sec + 50,
                 @marketplace,
+                property_map::empty(),
             ),
         );
 
@@ -326,6 +328,9 @@ module marketplace::marketplace_auction_example {
             offer_price * token_amount,
             &auction.listing,
             withdraw_expiration_sec,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
         );
 
         event::emit_event<BidEvent>(
@@ -633,4 +638,3 @@ module marketplace::marketplace_auction_example {
         );
     }
 }
-

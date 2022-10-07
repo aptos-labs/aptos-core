@@ -1,3 +1,5 @@
+/// An marketplace library providing basic function for listing NFTs
+/// To see how to use the library, please check the two example contract in the same folder
 module marketplace::marketplace_listing_utils {
     use std::error;
     use std::signer;
@@ -7,6 +9,7 @@ module marketplace::marketplace_listing_utils {
     use aptos_std::table::{Self, Table};
     use aptos_std::guid::{Self, ID};
     use aptos_token::token::{Self, TokenId, WithdrawCapability};
+    use aptos_token::property_map::{Self, PropertyMap};
 
     friend marketplace::marketplace_bid_utils;
 
@@ -41,34 +44,7 @@ module marketplace::marketplace_listing_utils {
         start_sec: u64, // timestamp in secs for the listing starting time
         expiration_sec: u64, // timestamp in secs for the listing expiration time
         withdraw_cap: WithdrawCapability,
-    }
-
-    /// Return a listing struct, marketplace owner can use this function to create a listing and store it in its inventory
-    public fun create_listing<CoinType>(
-        owner: &signer,
-        token_id: TokenId,
-        amount: u64,
-        min_price: u64,
-        instant_sale: bool,
-        start_sec: u64,
-        listing_expiration_sec: u64,
-        withdraw_expiration_sec: u64 // The end time when the listed token can be withdrawn.
-    ): Listing<CoinType> {
-        let owner_addr = signer::address_of(owner);
-        assert!(listing_expiration_sec > start_sec, error::invalid_argument(ESTART_TIME_LARGER_THAN_EXPIRE_TIME));
-        assert!(token::balance_of(owner_addr, token_id) >= amount, error::invalid_argument(EOWNER_NOT_HAVING_ENOUGH_TOKEN));
-        assert!(withdraw_expiration_sec > listing_expiration_sec, error::invalid_argument(EWITHDRAW_EXPIRE_TIME_SHORT_THAN_LISTING_TIME));
-        assert!(amount > 0, error::invalid_argument(ELISTING_ZERO_TOKEN));
-        Listing<CoinType> {
-            id: create_listing_id(owner),
-            token_id,
-            amount,
-            min_price,
-            instant_sale,
-            start_sec,
-            expiration_sec: listing_expiration_sec,
-            withdraw_cap: token::create_withdraw_capability(owner, token_id, amount, withdraw_expiration_sec),
-        }
+        config: PropertyMap,
     }
 
     struct ListingEvent has copy, drop, store {
@@ -81,13 +57,13 @@ module marketplace::marketplace_listing_utils {
         expiration_sec: u64,
         withdraw_sec: u64,
         market_address: address,
+        config: PropertyMap,
     }
 
     struct CancelListingEvent has copy, drop, store {
         id: ID,
         market_address: address,
     }
-
 
     /// store listings on the owner's account
     struct ListingRecords<phantom CoinType> has key {
@@ -96,64 +72,9 @@ module marketplace::marketplace_listing_utils {
         cancel_listing_event: EventHandle<CancelListingEvent>,
     }
 
-    public fun initialize_listing_records<CoinType>(owner: &signer){
-        let owner_addr = signer::address_of(owner);
-
-        if (!exists<ListingRecords<CoinType>>(owner_addr)) {
-            move_to(
-                owner,
-                ListingRecords<CoinType> {
-                    records: table::new(),
-                    listing_event: account::new_event_handle<ListingEvent>(owner),
-                    cancel_listing_event: account::new_event_handle<CancelListingEvent>(owner),
-                }
-            );
-        };
-    }
-
-    public fun create_list_under_user_account<CoinType>(
-        owner: &signer,
-        token_id: TokenId,
-        amount: u64,
-        min_price: u64,
-        instant_sale: bool,
-        start_sec: u64,
-        expiration_sec: u64,
-        withdraw_expiration_sec: u64,
-    ): ID acquires ListingRecords {
-        let owner_addr = signer::address_of(owner);
-        let record = create_listing<CoinType>(
-            owner,
-            token_id,
-            amount,
-            min_price,
-            instant_sale,
-            start_sec,
-            expiration_sec,
-            withdraw_expiration_sec,
-        );
-        initialize_listing_records<CoinType>(owner);
-        let records = borrow_global_mut<ListingRecords<CoinType>>(owner_addr);
-
-        let id = create_listing_id(owner);
-        // add a new record to the listing
-        table::add(&mut records.records, id, record);
-        event::emit_event<ListingEvent>(
-            &mut records.listing_event,
-            ListingEvent {
-                id,
-                token_id,
-                amount,
-                min_price,
-                instant_sale,
-                start_sec,
-                expiration_sec,
-                withdraw_sec: withdraw_expiration_sec,
-                market_address: owner_addr,
-            },
-        );
-        id
-    }
+    //
+    // entry functions
+    //
 
     /// creator uses this function to directly list token for sale under their own accounts
     public entry fun direct_listing<CoinType>(
@@ -202,6 +123,104 @@ module marketplace::marketplace_listing_utils {
         );
     }
 
+    //
+    // public functions
+    //
+
+    /// Return a listing struct, marketplace owner can use this function to create a listing and store it in its inventory
+    public fun create_listing<CoinType>(
+        owner: &signer,
+        token_id: TokenId,
+        amount: u64,
+        min_price: u64,
+        instant_sale: bool,
+        start_sec: u64,
+        listing_expiration_sec: u64,
+        withdraw_expiration_sec: u64, // The end time when the listed token can be withdrawn.
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        types: vector<String>,
+    ): Listing<CoinType> {
+        let owner_addr = signer::address_of(owner);
+        assert!(listing_expiration_sec > start_sec, error::invalid_argument(ESTART_TIME_LARGER_THAN_EXPIRE_TIME));
+        assert!(token::balance_of(owner_addr, token_id) >= amount, error::invalid_argument(EOWNER_NOT_HAVING_ENOUGH_TOKEN));
+        assert!(withdraw_expiration_sec > listing_expiration_sec, error::invalid_argument(EWITHDRAW_EXPIRE_TIME_SHORT_THAN_LISTING_TIME));
+        assert!(amount > 0, error::invalid_argument(ELISTING_ZERO_TOKEN));
+        Listing<CoinType> {
+            id: create_listing_id(owner),
+            token_id,
+            amount,
+            min_price,
+            instant_sale,
+            start_sec,
+            expiration_sec: listing_expiration_sec,
+            withdraw_cap: token::create_withdraw_capability(owner, token_id, amount, withdraw_expiration_sec),
+            config: property_map::new(keys, values, types),
+        }
+    }
+
+    public fun initialize_listing_records<CoinType>(owner: &signer){
+        let owner_addr = signer::address_of(owner);
+
+        if (!exists<ListingRecords<CoinType>>(owner_addr)) {
+            move_to(
+                owner,
+                ListingRecords<CoinType> {
+                    records: table::new(),
+                    listing_event: account::new_event_handle<ListingEvent>(owner),
+                    cancel_listing_event: account::new_event_handle<CancelListingEvent>(owner),
+                }
+            );
+        };
+    }
+
+    public fun create_list_under_user_account<CoinType>(
+        owner: &signer,
+        token_id: TokenId,
+        amount: u64,
+        min_price: u64,
+        instant_sale: bool,
+        start_sec: u64,
+        expiration_sec: u64,
+        withdraw_expiration_sec: u64,
+    ): ID acquires ListingRecords {
+        let owner_addr = signer::address_of(owner);
+        let record = create_listing<CoinType>(
+            owner,
+            token_id,
+            amount,
+            min_price,
+            instant_sale,
+            start_sec,
+            expiration_sec,
+            withdraw_expiration_sec,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+        );
+        initialize_listing_records<CoinType>(owner);
+        let records = borrow_global_mut<ListingRecords<CoinType>>(owner_addr);
+
+        let id = create_listing_id(owner);
+        // add a new record to the listing
+        table::add(&mut records.records, id, record);
+        event::emit_event<ListingEvent>(
+            &mut records.listing_event,
+            ListingEvent {
+                id,
+                token_id,
+                amount,
+                min_price,
+                instant_sale,
+                start_sec,
+                expiration_sec,
+                withdraw_sec: withdraw_expiration_sec,
+                market_address: owner_addr,
+                config: property_map::empty(),
+            },
+        );
+        id
+    }
 
     public fun destroy_listing<CoinType>(entry: Listing<CoinType>): (
         ID,
@@ -211,7 +230,8 @@ module marketplace::marketplace_listing_utils {
         bool,
         u64,
         u64,
-        WithdrawCapability
+        WithdrawCapability,
+        PropertyMap,
     ){
         let Listing {
             id,
@@ -222,14 +242,9 @@ module marketplace::marketplace_listing_utils {
             start_sec,
             expiration_sec,
             withdraw_cap,
+            config,
         } = entry;
-        (id, token_id, amount, min_price, instant_sale, start_sec, expiration_sec, withdraw_cap)
-    }
-
-    /// internal function for creating a new unique id for a listing
-    fun create_listing_id(owner: &signer): ID {
-        let gid = account::create_guid(owner);
-        guid::id(&gid)
+        (id, token_id, amount, min_price, instant_sale, start_sec, expiration_sec, withdraw_cap, config)
     }
 
     /// util function for constructing the listing id from raw fields
@@ -284,9 +299,10 @@ module marketplace::marketplace_listing_utils {
         expiration_sec: u64,
         withdraw_sec: u64,
         market_address: address,
+        config: PropertyMap
     ): ListingEvent {
         ListingEvent {
-            id, token_id, amount, min_price, instant_sale, start_sec, expiration_sec, withdraw_sec, market_address
+            id, token_id, amount, min_price, instant_sale, start_sec, expiration_sec, withdraw_sec, market_address, config
         }
     }
 
@@ -307,6 +323,16 @@ module marketplace::marketplace_listing_utils {
             listing.start_sec,
             listing.expiration_sec,
         )
+    }
+
+    //
+    // Private or friend functions
+    //
+
+    /// internal function for creating a new unique id for a listing
+    fun create_listing_id(owner: &signer): ID {
+        let gid = account::create_guid(owner);
+        guid::id(&gid)
     }
 
     /// Get the listing struct which contains withdraw_capability
