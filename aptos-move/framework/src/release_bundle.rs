@@ -32,7 +32,7 @@ pub struct ReleaseBundle {
 /// A release package consists of package metdata and the code.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReleasePackage {
-    metadata: PackageMetadata,
+    pub metadata: PackageMetadata,
     code: Vec<Vec<u8>>,
 }
 

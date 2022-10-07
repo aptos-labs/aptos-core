@@ -1,0 +1,7 @@
+[package]
+name = "test"
+version = "0.0.0"
+
+[dependencies]
+AptosStdlib = { local = "../../../../../framework/aptos-stdlib" }
+MoveStdlib = { local = "../../../../../framework/move-stdlib" }

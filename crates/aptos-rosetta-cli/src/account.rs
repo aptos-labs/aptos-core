@@ -45,7 +45,7 @@ pub struct AccountBalanceCommand {
     /// Account to list the balance
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     account: AccountAddress,
-
+    /// Whether to show the amount of stake instead of the normal balance
     #[clap(long)]
     stake_amount: bool,
 }

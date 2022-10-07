@@ -41,6 +41,18 @@ resource "kubernetes_storage_class" "io1" {
   }
 }
 
+resource "kubernetes_storage_class" "io2" {
+  metadata {
+    name = "io2"
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "io2"
+    iops = "40000"
+  }
+}
+
 resource "kubernetes_role_binding" "psp-kube-system" {
   metadata {
     name      = "eks:podsecuritypolicy:privileged"
@@ -120,7 +132,7 @@ locals {
     validator = {
       name = var.validator_name
       storage = {
-        class = kubernetes_storage_class.gp3.metadata[0].name
+        class = var.validator_storage_class
       }
       nodeSelector = {
         "eks.amazonaws.com/nodegroup" = "validators"
@@ -134,7 +146,7 @@ locals {
     }
     fullnode = {
       storage = {
-        class = kubernetes_storage_class.gp3.metadata[0].name
+        class = var.fullnode_storage_class
       }
       nodeSelector = {
         "eks.amazonaws.com/nodegroup" = "validators"

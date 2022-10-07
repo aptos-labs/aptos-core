@@ -270,7 +270,7 @@ mod test {
     use super::*;
     use crate::{
         database::{new_db_pool, PgPoolConnection},
-        models::transactions::TransactionModel,
+        models::transactions::TransactionQuery,
         processors::default_processor::DefaultTransactionProcessor,
     };
     use aptos_api_test_context::new_test_context;
@@ -652,7 +652,7 @@ mod test {
 
         // This is a block metadata transaction
         let (tx1, ut1, bmt1, events1, wsc1) =
-            TransactionModel::get_by_version(69158, &mut conn_pool.get().unwrap()).unwrap();
+            TransactionQuery::get_by_version(69158, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(tx1.type_, "block_metadata_transaction");
         assert!(ut1.is_none());
         assert!(bmt1.is_some());
@@ -661,7 +661,7 @@ mod test {
 
         // This is the genesis transaction
         let (tx0, ut0, bmt0, events0, wsc0) =
-            TransactionModel::get_by_version(0, &mut conn_pool.get().unwrap()).unwrap();
+            TransactionQuery::get_by_version(0, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(tx0.type_, "genesis_transaction");
         assert!(ut0.is_none());
         assert!(bmt0.is_none());
@@ -780,7 +780,7 @@ mod test {
 
         // This is a user transaction, so the bmt should be None
         let (tx2, ut2, bmt2, events2, wsc2) =
-            TransactionModel::get_by_version(691595, &mut conn_pool.get().unwrap()).unwrap();
+            TransactionQuery::get_by_version(691595, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(
             tx2.hash,
             "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb"

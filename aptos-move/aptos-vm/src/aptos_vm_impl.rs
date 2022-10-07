@@ -585,6 +585,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     gas_left: Gas,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
+    gas_feature_version: u64,
 ) -> Result<TransactionOutputExt, VMStatus> {
     let gas_used = txn_data
         .max_gas_amount()
@@ -592,7 +593,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
         .expect("Balance should always be less than or equal to max gas amount");
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-    let change_set_ext = session_out.into_change_set(ap_cache)?;
+    let change_set_ext = session_out.into_change_set(ap_cache, gas_feature_version)?;
     let (delta_change_set, change_set) = change_set_ext.into_inner();
     let (write_set, events) = change_set.into_inner();
 

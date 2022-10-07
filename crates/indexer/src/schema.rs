@@ -19,6 +19,51 @@ diesel::table! {
 }
 
 diesel::table! {
+    coin_activities (transaction_version, event_account_address, event_creation_number, event_sequence_number) {
+        transaction_version -> Int8,
+        event_account_address -> Varchar,
+        event_creation_number -> Int8,
+        event_sequence_number -> Int8,
+        owner_address -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        activity_type -> Varchar,
+        is_gas_fee -> Bool,
+        is_transaction_success -> Bool,
+        entry_function_id_str -> Nullable<Varchar>,
+        block_height -> Int8,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    coin_balances (transaction_version, owner_address, coin_type_hash) {
+        transaction_version -> Int8,
+        owner_address -> Varchar,
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    coin_infos (coin_type_hash) {
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        transaction_version_created -> Int8,
+        creator_address -> Varchar,
+        name -> Varchar,
+        symbol -> Varchar,
+        decimals -> Int4,
+        transaction_created_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     collection_datas (collection_data_id_hash, transaction_version) {
         collection_data_id_hash -> Varchar,
         transaction_version -> Int8,
@@ -33,6 +78,7 @@ diesel::table! {
         description_mutable -> Bool,
         inserted_at -> Timestamp,
         table_handle -> Varchar,
+        transaction_timestamp -> Timestamp,
     }
 }
 
@@ -43,6 +89,18 @@ diesel::table! {
         registered_address -> Nullable<Varchar>,
         expiration_timestamp -> Timestamp,
         last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    current_coin_balances (owner_address, coin_type_hash) {
+        owner_address -> Varchar,
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        last_transaction_version -> Int8,
+        last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
     }
 }
@@ -62,6 +120,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
         table_handle -> Varchar,
+        last_transaction_timestamp -> Timestamp,
     }
 }
 
@@ -87,6 +146,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
+        last_transaction_timestamp -> Timestamp,
     }
 }
 
@@ -104,6 +164,7 @@ diesel::table! {
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
         table_type -> Text,
+        last_transaction_timestamp -> Timestamp,
     }
 }
 
@@ -121,6 +182,7 @@ diesel::table! {
         table_handle -> Varchar,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        last_transaction_timestamp -> Timestamp,
     }
 }
 
@@ -247,6 +309,7 @@ diesel::table! {
         coin_type -> Nullable<Text>,
         coin_amount -> Nullable<Numeric>,
         inserted_at -> Timestamp,
+        transaction_timestamp -> Timestamp,
     }
 }
 
@@ -272,6 +335,7 @@ diesel::table! {
         default_properties -> Jsonb,
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
+        transaction_timestamp -> Timestamp,
     }
 }
 
@@ -289,6 +353,7 @@ diesel::table! {
         table_type -> Nullable<Text>,
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
+        transaction_timestamp -> Timestamp,
     }
 }
 
@@ -303,6 +368,7 @@ diesel::table! {
         token_properties -> Jsonb,
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
+        transaction_timestamp -> Timestamp,
     }
 }
 
@@ -358,8 +424,12 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
+    coin_activities,
+    coin_balances,
+    coin_infos,
     collection_datas,
     current_ans_lookup,
+    current_coin_balances,
     current_collection_datas,
     current_token_datas,
     current_token_ownerships,

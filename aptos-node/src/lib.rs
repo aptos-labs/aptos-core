@@ -670,6 +670,18 @@ pub fn setup_environment(
     let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
 
     let chain_id = fetch_chain_id(&db_rw)?;
+
+    let build_info = build_information!();
+    // Start the telemetry service as early as possible and before any blocking calls
+    // We have all the necesary info here to start the telemetry service
+    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
+        node_config.clone(),
+        chain_id,
+        build_info,
+        remote_log_rx,
+        logger_filter_update_job,
+    );
+
     for network_config in network_configs.into_iter() {
         let network_id = network_config.network_id;
         debug!("Creating runtime for {}", network_id);
@@ -854,16 +866,6 @@ pub fn setup_environment(
         ));
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     }
-
-    let build_info = build_information!();
-    // Create the telemetry service
-    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
-        node_config.clone(),
-        chain_id,
-        build_info,
-        remote_log_rx,
-        logger_filter_update_job,
-    );
 
     Ok(AptosHandle {
         _api: api_runtime,

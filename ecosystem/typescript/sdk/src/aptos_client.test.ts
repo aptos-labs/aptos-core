@@ -170,11 +170,11 @@ test(
     const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
 
     const mutisigAccountAddress = authKey.derivedAddress();
-    await faucetClient.fundAccount(mutisigAccountAddress, 5000000);
+    await faucetClient.fundAccount(mutisigAccountAddress, 50000000);
 
     let resources = await client.getAccountResources(mutisigAccountAddress);
     let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("5000000");
+    expect((accountResource!.data as any).coin.value).toBe("50000000");
 
     const account4 = new AptosAccount();
     await faucetClient.fundAccount(account4.address(), 0);
@@ -346,8 +346,8 @@ test(
     const bob = new AptosAccount();
 
     // Fund both Alice's and Bob's Account
-    await faucetClient.fundAccount(alice.address(), 10000000);
-    await faucetClient.fundAccount(bob.address(), 10000000);
+    await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(bob.address(), 100000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
