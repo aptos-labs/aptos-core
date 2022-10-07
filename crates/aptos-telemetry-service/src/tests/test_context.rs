@@ -36,6 +36,7 @@ pub async fn new_test_context() -> TestContext {
         pfn_allowlist: HashMap::new(),
         log_env_map: HashMap::new(),
         metrics_exporter_base_url: "".into(),
+        peer_identities: HashMap::new(),
     };
 
     let peers = PeerStoreTuple::default();
@@ -49,6 +50,7 @@ pub async fn new_test_context() -> TestContext {
             ClientTuple::new(None, Some(BTreeMap::new()), None),
             HashSet::new(),
             jwt_service,
+            HashMap::new(),
             HashMap::new(),
         ),
     )
