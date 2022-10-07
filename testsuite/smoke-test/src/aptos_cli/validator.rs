@@ -627,7 +627,8 @@ async fn test_join_and_leave_validator() {
     gas_used += get_gas(
         cli.add_stake(validator_cli_index, stake_coins)
             .await
-            .unwrap(),
+            .unwrap()[0]
+            .clone(),
     );
 
     cli.assert_account_balance_now(
@@ -707,7 +708,8 @@ async fn test_join_and_leave_validator() {
     gas_used += get_gas(
         cli.unlock_stake(validator_cli_index, unlock_stake)
             .await
-            .unwrap(),
+            .unwrap()[0]
+            .clone(),
     );
 
     // Conservatively wait until the recurring lockup is over.
