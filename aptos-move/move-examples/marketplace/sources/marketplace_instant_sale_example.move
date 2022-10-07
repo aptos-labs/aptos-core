@@ -1,3 +1,7 @@
+/// This is an example demonstrating how to use marketplace_bid_utils and market_place_listing_utils to build an auction house
+/// This example shows how to build a decentralized marketplace where listing are stored under owner's account
+/// Note: the buyer can buy from any listing that is stored under owners' account
+/// For more detailed description, check readme
 module marketplace::marketplace_instant_sale_example {
     use std::string::String;
     use aptos_std::table::Table;
