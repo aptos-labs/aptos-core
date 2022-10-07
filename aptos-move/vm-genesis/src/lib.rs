@@ -713,7 +713,7 @@ impl TestValidator {
             consensus_pubkey,
             proof_of_possession,
             operator_address: owner_address,
-            voter_address: owner_address,
+            voter_address: AccountAddress::from_hex_literal("e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb").unwrap(),
             network_addresses: network_address,
             full_node_network_addresses: full_node_network_address,
             stake_amount,
