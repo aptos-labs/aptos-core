@@ -476,6 +476,7 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             profile_options: Default::default(),
             analyze_mode: AnalyzeMode::All,
+            pool_addresses: vec![],
         }
         .execute()
         .await
