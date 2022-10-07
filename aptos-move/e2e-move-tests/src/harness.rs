@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::AptosPackageHooks;
+use crate::{assert_success, AptosPackageHooks};
 use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
 use aptos_types::on_chain_config::{FeatureFlag, GasScheduleV2};
+use aptos_types::transaction::TransactionOutput;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -66,6 +67,14 @@ impl MoveHarness {
         }
     }
 
+    pub fn new_with_validators(count: u64) -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
+        Self {
+            executor: FakeExecutor::from_head_genesis_with_count(count),
+            txn_seq_no: BTreeMap::default(),
+        }
+    }
+
     pub fn new_testnet() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
@@ -74,11 +83,12 @@ impl MoveHarness {
         }
     }
 
-    pub fn new_with_features(features: Vec<FeatureFlag>) -> Self {
+    pub fn new_with_features(
+        enabled_features: Vec<FeatureFlag>,
+        disabled_features: Vec<FeatureFlag>,
+    ) -> Self {
         let mut h = Self::new();
-        if !features.is_empty() {
-            h.enable_features(features);
-        }
+        h.enable_features(enabled_features, disabled_features);
         h
     }
 
@@ -121,12 +131,17 @@ impl MoveHarness {
     }
 
     /// Runs a signed transaction. On success, applies the write set.
-    pub fn run(&mut self, txn: SignedTransaction) -> TransactionStatus {
+    pub fn run_raw(&mut self, txn: SignedTransaction) -> TransactionOutput {
         let output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
         }
-        output.status().to_owned()
+        output
+    }
+
+    /// Runs a signed transaction. On success, applies the write set.
+    pub fn run(&mut self, txn: SignedTransaction) -> TransactionStatus {
+        self.run_raw(txn).status().to_owned()
     }
 
     /// Runs a block of signed transactions. On success, applies the write set.
@@ -154,7 +169,7 @@ impl MoveHarness {
         account
             .transaction()
             .sequence_number(seq_no)
-            .max_gas_amount(1_000_000)
+            .max_gas_amount(2_000_000)
             .gas_unit_price(1)
             .payload(payload)
             .sign()
@@ -169,6 +184,14 @@ impl MoveHarness {
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(account, payload);
         self.run(txn)
+    }
+
+    /// Runs a transaction and return gas used.
+    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> u64 {
+        let txn = self.create_transaction_payload(account, payload);
+        let output = self.run_raw(txn);
+        assert_success!(output.status().to_owned());
+        output.gas_used()
     }
 
     /// Creates a transaction which runs the specified entry point `fun`. Arguments need to be
@@ -238,6 +261,13 @@ impl MoveHarness {
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, None, |_| {});
         self.run(txn)
+    }
+
+    pub fn evaluate_publish_gas(&mut self, account: &Account, path: &Path) -> u64 {
+        let txn = self.create_publish_package(account, path, None, |_| {});
+        let output = self.run_raw(txn);
+        assert_success!(output.status().to_owned());
+        output.gas_used()
     }
 
     /// Runs transaction which publishes the Move Package.
@@ -335,9 +365,10 @@ impl MoveHarness {
     }
 
     /// Enables features
-    pub fn enable_features(&mut self, features: Vec<FeatureFlag>) {
+    pub fn enable_features(&mut self, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
         let acc = self.aptos_framework_account();
-        let enable = features.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor.exec(
             "features",
             "change_feature_flags",
@@ -346,8 +377,8 @@ impl MoveHarness {
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
-                bcs::to_bytes(&enable).unwrap(),
-                bcs::to_bytes(&Vec::<u64>::new()).unwrap(),
+                bcs::to_bytes(&enabled).unwrap(),
+                bcs::to_bytes(&disabled).unwrap(),
             ],
         );
     }

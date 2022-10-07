@@ -71,8 +71,10 @@ While your node is syncing, you'll be able to see the
 
 ## Fast syncing
 
-:::tip 
-This is the fastest and cheapest method of syncing your node.
+:::tip
+Note: this is the fastest and cheapest method of syncing your node. It
+requires the node to start from an empty state (i.e., not have any existing
+storage data).
 :::
 
 To download the latest blockchain state and continue to apply new
@@ -91,6 +93,21 @@ While your node is syncing, you'll be able to see the
 However, `aptos_state_sync_version{type="synced"}` will only increase once
 the node has bootstrapped. This may take several hours depending on the 
 amount of data, network bandwidth and node resources available.
+
+Note: if `aptos_state_sync_version{type="synced"}` increases but
+`aptos_state_sync_version{type="synced_states"}` does not, do the following:
+1. Double-check the node configuration file has correctly been updated.
+2. Make sure that the node is starting up with an empty storage database
+(i.e., that it has not synced any state previously).
+3. Add the following to your node configuration to account for any potential
+network delays that may occur when initializing slow network connections:
+
+```yaml
+ state_sync:
+   state_sync_driver:
+     ...
+     max_connection_deadline_secs: 1000000 # Tolerate slow peer discovery & connections
+```
 
 ## State sync architecture
 

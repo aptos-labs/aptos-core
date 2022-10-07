@@ -107,7 +107,7 @@ module aptos_names::token_helper {
         }
     }
 
-    public fun create_token_data(token_resource: &signer, subdomain_name: Option<String>, domain_name: String, type: String): TokenDataId {
+    fun create_token_data(token_resource: &signer, subdomain_name: Option<String>, domain_name: String, type: String): TokenDataId {
         // Set up the NFT
         let collection_name = config::collection_name_v1();
         assert!(token::check_collection_exists(signer::address_of(token_resource), collection_name), ECOLLECTION_NOT_EXISTS);

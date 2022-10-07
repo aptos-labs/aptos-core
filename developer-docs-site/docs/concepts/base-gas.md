@@ -273,7 +273,7 @@ As of the time of this writing, by far the most expensive instruction gas operat
 Loading a constant costs 650 gas units (.065 octals), borrow operations cost 500 units (0.05 octals), reading or writing to a reference costs 200 gas units (0.02 octals), and loading a `u128` on the stack costs 80 gas units (0.008 octals).
 Hence pass-by-value is less expensive than pass-by-reference for a primitive type like `u64`, but more expensive for a larger data structure like a 40-byte `struct`.
 
-Notably, instruction gas is completely dwarfed by storage costs; there is technically an incentive to reduce the number of function calls in a program, for example, engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions (in nearly all cases).
+Notably, instruction gas is completely dwarfed by storage costs; there is technically an incentive to reduce the number of function calls in a program, for example, but engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions (in nearly all cases).
 
 In extreme cases it is possible for instruction gas to outweigh storage gas, for example if a loopwise mathematical function takes 10,000 iterations to converge; but again this is an extreme case and for most applications storage gas has a larger impact on base gas than does instruction gas.
 
