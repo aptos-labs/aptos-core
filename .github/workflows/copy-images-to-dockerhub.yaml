@@ -32,10 +32,6 @@ jobs:
 
   copy-images:
     needs: wait-for-images-to-have-been-built
-    strategy:
-      fail-fast: false
-      matrix:
-        IMAGE_NAME: [validator, forge, tools, faucet, indexer, node-checker]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -48,7 +44,7 @@ jobs:
       - name: Login to ECR
         uses: docker/login-action@v2
         with:
-          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
+          registry: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
           username: ${{ secrets.AWS_ACCESS_KEY_ID }}
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
@@ -58,16 +54,10 @@ jobs:
           username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
 
-      - name: Push Images to Dockerhub
-        uses: akhilerm/tag-push-action@v2.0.0
-        with:
-          src: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ github.sha }}
-          dst: |
-            docker.io/aptoslab/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
-            docker.io/aptoslab/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
-            docker.io/aptoslabs/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
-            docker.io/aptoslabs/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
-            ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
-            ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
-            ${{ secrets.AWS_ECR_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com/aptos/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
-            ${{ secrets.AWS_ECR_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com/aptos/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
+      - name: Release Images
+        env:
+          GIT_SHA: ${{ github.sha }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
+          IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
+        run: ./docker/release_images.sh
