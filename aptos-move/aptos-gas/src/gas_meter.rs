@@ -41,6 +41,8 @@ use std::collections::BTreeMap;
 //   - TBA
 pub const LATEST_GAS_FEATURE_VERSION: u64 = 3;
 
+pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
+
 /// A trait for converting from a map representation of the on-chain gas schedule.
 pub trait FromOnChainGasSchedule: Sized {
     /// Constructs a value of this type from a map representation of the on-chain gas schedule.
