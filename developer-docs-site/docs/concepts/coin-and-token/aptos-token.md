@@ -57,9 +57,9 @@ To make mutability explicit for both the creator and owner, the Aptos token stan
 
 ### Storing metadata off-chain
 
-Follow the following standard to ensure your NFT can be correctly displayed by various wallets, 
+Follow the standard below to ensure your NFT can be correctly displayed by various wallets.
 
-You should store the metadata in a JSON file located in an off-chain storage such as [arweave](https://www.arweave.org/) and provide the link to the JSON file in the `uri` field of the token or the collection. We recommend the developers to follow the [ERC-1155 off-chain data](https://eips.ethereum.org/EIPS/eip-1155) schema to format their JSON files.
+You should store the metadata in a JSON file located in an off-chain storage solution such as [arweave](https://www.arweave.org/) and provide the link to the JSON file in the `uri` field of the token or the collection. We recommend the developers to follow the [ERC-1155 off-chain data](https://eips.ethereum.org/EIPS/eip-1155) schema to format their JSON files.
 ```json
 {
   "image": "https://www.arweave.net/abcd5678?ext=png",
@@ -99,20 +99,20 @@ You should store the metadata in a JSON file located in an off-chain storage suc
   }
 }
 ```
-* image: this is the url to the image asset. You may use the ?ext={file_extension} query to provide information on the file type.
-* animation_url: this is the url to the multimedia attachment of the asset.
-* external_url: this is the url to an external website that user can also view the image.
-* attributes - Object array, where an object should contain trait_type and value fields. value can be a string or a number.
-* properties.files: object array, where an object should contain the uri and type of the file that is part of the asset. The type should match the file extension. The array should also include files specified in image and animation_url fields, and any other that are associated with the asset. You may use the ?ext={file_extension} query to provide information on the file type.
-* properties.category: supported categories:
-  * image - PNG, GIF, JPG
-  * video - MP4, MOV 
-  * audio - MP3, FLAC, WAV
-  * vr - 3D models; GLB, GLTF 
-  * html - HTML pages; scripts and relative paths within the HTML page are also supported
+* `image`: URL to the image asset. You may use the `?ext={file_extension}` query to provide information on the file type.
+* `animation_url`: URL to the multimedia attachment of the asset.
+* `external_url`: URL to an external website where the user can also view the image.
+* `attributes` - Object array, where an object should contain `trait_type` and `value` fields. `value` can be a string or a number.
+* `properties.files`: Object array, where an object should contain the URI and type of the file that is part of the asset. The type should match the file extension. The array should also include files specified in `image` and `animation_url` fields, as well as any other files associated with the asset. You may use the `?ext={file_extension}` query to provide information on the file type.
+* `properties.category`: Has supported categories:
+  * `image` - PNG, GIF, JPG
+  * `video` - MP4, MOV 
+  * `audio` - MP3, FLAC, WAV
+  * `vr` - 3D models; GLB, GLTF 
+  * `html` - HTML pages; scripts and relative paths within the HTML page are also supported
 
-You can also host your files on CDN to provide faster loading time by using `cdn` flag in the file object. 
-When the file exists, this should be the primary location to read the media file (video, audio, vr) by wallet. 
+You can also host your files on CDN to provide faster loading time by using the `cdn` flag in the file object. 
+When the file exists, this should be the primary location to read the media file (`video`, `audio`, `vr`) by wallet. 
 If the file is no longer available, the wallet can fall back to use the `animation_url` to load the file. 
 ```json
 "properties": {
