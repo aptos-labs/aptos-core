@@ -88,7 +88,12 @@ pub async fn handle_log_ingest(
     fields.insert(EPOCH_FIELD_NAME.into(), claims.epoch.to_string());
 
     let mut tags = HashMap::new();
-    tags.insert(CHAIN_ID_TAG_NAME.into(), claims.chain_id.to_string());
+    let chain_name = if claims.chain_id.id() == 3 {
+        format!("{}", claims.chain_id.id())
+    } else {
+        format!("{}", claims.chain_id)
+    };
+    tags.insert(CHAIN_ID_TAG_NAME.into(), chain_name);
     tags.insert(PEER_ROLE_TAG_NAME.into(), claims.node_type.to_string());
 
     let unstructured_log = UnstructuredLog {
