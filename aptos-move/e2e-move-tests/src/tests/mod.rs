@@ -8,6 +8,7 @@ mod error_map;
 mod framework_compatibility;
 mod generate_upgrade_script;
 mod governance_updates;
+mod infinite_loop;
 mod init_module;
 mod lazy_natives;
 mod max_loop_depth;
