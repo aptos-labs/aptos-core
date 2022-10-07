@@ -11,7 +11,7 @@ echo "PROFILE: $PROFILE"
 echo "FEATURES: $FEATURES"
 
 # Build all the rust binaries
-cargo build --profile=$PROFILE \
+cargo build --locked --profile=$PROFILE \
     -p aptos \
     -p aptos-faucet \
     -p aptos-node \
