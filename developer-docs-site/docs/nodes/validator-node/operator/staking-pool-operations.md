@@ -5,7 +5,7 @@ slug: "staking-pool-operations"
 
 # Staking Pool Operations
 
-This document describes how to perform staking pool operations. Note that you can stake only when you met the minimal staking requirement. 
+This document describes how to perform staking pool operations. Note that you can stake only when you meet the minimal staking requirement. 
 
 :::tip Minimum staking requirement
 The current required minimum for staking is 1M APT tokens.
@@ -21,7 +21,7 @@ Make sure that this initializing the stake pool step was performed by the owner.
 If you run into any errors, see the [Issues and Workarounds](/docs/issues-and-workarounds.md).
 :::
 
-Follow these steps to setup the validator node using the operator account and join the validator set.
+Follow the below steps to set up the validator node using the operator account and join the validator set.
 
 :::tip Mainnet vs Testnet
 The below CLI command examples use mainnet. See the `--rest-url` value for testnet or devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
@@ -42,13 +42,14 @@ The `account_private_key` for the operator can be found in the `private-keys.yam
 
 ### 2. Check your validator account balance 
 
-Make sure you have some coins to pay gas. You can do this step either by checking on the Aptos Explorer or using the CLI:
+Make sure you have enough APT coins to pay for gas. You can check for this either on the Aptos Explorer or using the CLI:
 
-On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=testnet` or use the CLI:
+- On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=Mainnet`, or 
+- Use the CLI:
 
-```bash
-aptos account list --profile mainnet-operator
-```
+  ```bash
+  aptos account list --profile mainnet-operator
+  ```
     
 This will show you the coin balance you have in the validator account. You will see an output like below:
     
