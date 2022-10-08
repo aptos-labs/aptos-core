@@ -27,80 +27,82 @@ Follow these steps to setup the validator node using the operator account and jo
 The below CLI command examples use mainnet. See the `--rest-url` value for testnet or devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
 :::
 
-1. Initialize Aptos CLI.
+### 1. Initialize Aptos CLI
 
-    ```bash
-    aptos init --profile mainnet-operator \
-    --private-key <operator_account_private_key> \
-    --rest-url https://fullnode.mainnet.aptoslabs.com/v1 \
-    --skip-faucet
-    ```
+  ```bash
+  aptos init --profile mainnet-operator \
+  --private-key <operator_account_private_key> \
+  --rest-url https://fullnode.mainnet.aptoslabs.com/v1 \
+  --skip-faucet
+  ```
+  
+:::tip
+The `account_private_key` for the operator can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
+:::
+
+### 2. Check your validator account balance 
+
+Make sure you have some coins to pay gas. You can do this step either by checking on the Aptos Explorer or using the CLI:
+
+On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=testnet` or use the CLI:
+
+```bash
+aptos account list --profile mainnet-operator
+```
     
-    :::tip
-    The `account_private_key` for the operator can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
-    :::
-
-2. Check your validator account balance. Make sure you have some coins to pay gas. You can do this step either by checking on the Aptos Explorer or using the CLI:
-
-    On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=testnet` or use the CLI:
-
-    ```bash
-    aptos account list --profile mainnet-operator
-    ```
+This will show you the coin balance you have in the validator account. You will see an output like below:
     
-    This will show you the coin balance you have in the validator account. You will see something like:
-    
-    ```json
-    "coin": {
-        "value": "5000"
-      }
-    ```
+```json
+"coin": {
+    "value": "5000"
+  }
+```
 
-3. Update validator network addresses on chain.
+### 3. Update validator network addresses on-chain
 
-    ```bash
-    aptos node update-validator-network-addresses  \
-      --pool-address <pool-address> \
-      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
-      --profile mainnet-operator
-    ```
+```bash
+aptos node update-validator-network-addresses  \
+  --pool-address <pool-address> \
+  --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+  --profile mainnet-operator
+```
 
-4. Rotate the validator consensus key on chain.
+### 4. Rotate the validator consensus key on-chain
 
-    ```bash
-    aptos node update-consensus-key  \
-      --pool-address <pool-address> \
-      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
-      --profile mainnet-operator
-    ```
+```bash
+aptos node update-consensus-key  \
+  --pool-address <pool-address> \
+  --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+  --profile mainnet-operator
+```
 
-5. **Join the validator set.**
+### 5. Join the validator set
 
-    ```bash
-    aptos node join-validator-set \
-      --pool-address <pool-address> \
-      --profile mainnet-operator
-    ```
+```bash
+aptos node join-validator-set \
+  --pool-address <pool-address> \
+  --profile mainnet-operator
+```
 
-    The `ValidatorSet` will be updated at every epoch change. You will see your node joining the validator set only in the next epoch. Both validator and validator fullnode will start syncing once your validator is in the validator set.
+The `ValidatorSet` will be updated at every epoch change. You will see your node joining the validator set only in the next epoch. Both validator and validator fullnode will start syncing once your validator is in the validator set.
 
-    :::tip When is next epoch?
-    Click to find out [when the next epoch starts](/issues-and-workarounds#how-to-find-out-when-the-next-epoch-starts).
-    :::
+:::tip When is next epoch?
+Click to find out [when the next epoch starts](/issues-and-workarounds#how-to-find-out-when-the-next-epoch-starts).
+:::
 
-6. Check the validator set. 
+### 6. Check the validator set
    
-    Run the below command to look for your validator in the "pending_active" list.
+Run the below command to look for your validator in the "pending_active" list.
 
-    ```bash
-    aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.pending_active' | grep <pool_address>
-    ```
-    
-    When the next epoch change happens, the node will be moved into "active_validators" list. **During this time you might see errors like "No connected AptosNet peers". This is normal.** Run the below command to see your validator in the "active_validators" list:
-    
-    ```bash
-    aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active_validators' | grep <pool_address>
-    ```
+```bash
+aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.pending_active' | grep <pool_address>
+```
+
+When the next epoch change happens, the node will be moved into "active_validators" list. **During this time you might see errors like "No connected AptosNet peers". This is normal.** Run the below command to see your validator in the "active_validators" list:
+
+```bash
+aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active_validators' | grep <pool_address>
+```
 
 
 ## Checking your stake pool information
