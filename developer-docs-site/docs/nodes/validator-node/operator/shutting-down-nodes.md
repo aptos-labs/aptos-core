@@ -5,15 +5,17 @@ slug: "shutting-down-nodes"
 
 # Shutting Down Nodes
 
-Follow these instructions to shut down the validator node and cleanup the resources used by the node.
+Follow these instructions to shut down the validator node and validator fullnode, and cleanup the resources used by the nodes.
 
-:::tip Leave validator set first
-Before you shutdown the node, make sure to first leave validator set first. This will be become effective in the next epoch.
+## Leaving validator set
+
+Before you shutdown the node, make sure to first leave validator set first. This will be become effective in the next epoch. Also note that a node can choose to leave validator set at anytime, or it would happen automatically when there is insufficient stake in the validator account. To leave the validator set, run the below command, shown using the example profile of `testnet-operator`:
 
 ```bash
 aptos node leave-validator-set --profile testnet-operator --pool-address <owner-address>
 ```
-:::
+
+After leaving the validator set, follow any one of the below sections to shut down your nodes. 
 
 ## Using source code
 

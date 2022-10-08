@@ -71,13 +71,8 @@ aptos stake set-delegated-voter \
 ```bash
 aptos stake add-stake \
   --amount <amount> \
-  --profile testnet-owner \
-  --max-gas 10000
+  --profile testnet-owner
 ```
-
-:::tip Max gas
-You can adjust the above `max-gas` number. Ensure that you sent your operator enough tokens to pay for the gas fee.
-:::
 
 ### Increase stake lockup
 

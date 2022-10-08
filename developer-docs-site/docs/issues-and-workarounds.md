@@ -25,7 +25,7 @@ Receive this error from a validator node:
 
 #### Workaround
 
-Delete the `secure-data.json` file because very likely you are using an older version of it. See [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node) for the location of this file. 
+Delete the `secure-data.json` file because very likely you are using an older version of it.  Check your `validator.yaml` file and you will see something like `path: /opt/aptos/data/secure-data.json`. Or see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node) for the location of this file. For Docker, you can delete this file by `docker` commands such as: `docker-compose down --volumes` (check the `docker-compose` help). Finally, **remember to restart the node. **
 
 ### How to find out when the next epoch starts
 

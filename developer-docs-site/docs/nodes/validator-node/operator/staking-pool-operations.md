@@ -5,15 +5,97 @@ slug: "staking-pool-operations"
 
 # Staking Pool Operations
 
-This document describes how to perform staking pool operations. You can stake only when you met the minimal staking requirement. 
+This document describes how to perform staking pool operations. Note that you can stake only when you met the minimal staking requirement. 
 
 :::tip Minimum staking requirement
 The current required minimum for staking is 1M APT tokens.
 :::
 
-## Seeing your stake pool information
+## Initialize the stake pool
 
-To see the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. 
+Make sure that this step was performed by the owner. See [Initialize staking pool](/nodes/validator-node/owner/index#initialize-staking-pool) in the owner documentation section.
+
+## Joining validator set
+
+:::tip Errors? 
+If you run into any errors, see the [Issues and Workarounds](/docs/issues-and-workarounds.md).
+:::
+
+Follow these steps to setup the validator node using the operator account and join the validator set.
+
+1. Initialize Aptos CLI.
+
+    ```bash
+    aptos init --profile mainnet-operator \
+    --private-key <operator_account_private_key> \
+    --rest-url https://testnet.aptoslabs.com \
+    --skip-faucet
+    ```
+    
+    :::tip
+    The `account_private_key` for the operator can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
+    :::
+
+2. Check your validator account balance. Make sure you have some coins to pay gas. You can do this step either by checking on the Aptos Explorer or using the CLI:
+
+    On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=testnet` or use the CLI:
+
+    ```bash
+    aptos account list --profile mainnet-operator
+    ```
+    
+    This will show you the coin balance you have in the validator account. You will see something like:
+    
+    ```json
+    "coin": {
+        "value": "5000"
+      }
+    ```
+
+3. Update validator network addresses on chain.
+
+    ```bash
+    aptos node update-validator-network-addresses  \
+      --pool-address <pool-address> \
+      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --profile mainnet-operator
+    ```
+
+4. Rotate the validator consensus key on chain.
+
+    ```bash
+    aptos node update-consensus-key  \
+      --pool-address <pool-address> \
+      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --profile mainnet-operator
+    ```
+
+5. **Join the validator set.**
+
+    ```bash
+    aptos node join-validator-set \
+      --pool-address <pool-address> \
+      --profile mainnet-operator
+    ```
+
+    The `ValidatorSet` will be updated at every epoch change, which is **once every 2 hours**. You will only see your node joining the validator set in the next epoch. Both validator and fullnode will start syncing once your validator is in the validator set.
+
+6. Check the validator set.
+
+    ```bash
+    aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.pending_active' | grep <pool_address>
+    ```
+    
+    You will see your validator node in "pending_active" list. When the next epoch change happens, the node will be moved into "active_validators" list. This will happen within one hour from the completion of previous step. **During this time you might see errors like "No connected AptosNet peers". This is normal.**
+    
+    ```bash
+    aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active_validators' | grep <pool_address>
+    ```
+
+
+## Checking your stake pool information
+
+To check the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. 
 
 :::tip Use CLI 0.3.8 or higher
 Make sure you use the CLI version 0.3.8 or higher. See [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md).
@@ -69,7 +151,20 @@ Example output:
 }
 ```
 
-## Checking your validator performance
+
+## Request commission
+
+As an operator, you can request commission once a month, i.e., at the end of a lockup period, by running the following command. Make sure to provide the operator and the owner addresses.
+
+```bash
+aptos stake request-commission \
+  --operator-address 0x3bec5a529b023449dfc86e9a6b5b51bf75cec4a62bf21c15bbbef08a75f7038f \
+  --owner-address 0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb
+```
+
+## Misc
+
+### Checking your validator performance
 
 To see your validator performance in the current and past epochs and rewards earned, run the below command. The output will show the validator's performance in block proposals and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node analyze-validator-performance --help` to see default values used.
 
@@ -115,7 +210,7 @@ Example output:
 }
 ```
 
-## Rotating the consensus key
+### Rotating the consensus key
 
 You can rotate the operator consensus key by running the following command. Make sure to provide the pool address, the path to the `config.yaml` file and the profile:
 
@@ -126,7 +221,7 @@ aptos node update-consensus-key \
   --profile <profile>
   ```
 
-## Update addresses for validator and validator fullnode 
+### Update addresses for validator and validator fullnode 
 
 You can update the address for the validator node and the validator fullnode by running the following command. Make sure to provide the pool address, the path to the `operator.yaml` file and the profile:
 
@@ -137,12 +232,10 @@ aptos node update-validator-network-addresses \
   --profile <profile>
   ```
 
-## Request commission
+### Check performance for all epochs
 
-As an operator, you can request commission once a month, i.e., at the end of a lockup period, by running the following command. Make sure to provide the operator and the owner addresses.
+how can we receive performance for all epochs since Genesis? The command that you have provided early, only displays info for the latest period
 
 ```bash
-aptos stake request-commission \
-  --operator-address 0x3bec5a529b023449dfc86e9a6b5b51bf75cec4a62bf21c15bbbef08a75f7038f \
-  --owner-address 0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb
+aptos node analyze-validator-performance --analyze-mode=detailed-epoch-table '--url=https://premainnet.aptosdev.com' --start-epoch=0 | grep <pool address>
 ```

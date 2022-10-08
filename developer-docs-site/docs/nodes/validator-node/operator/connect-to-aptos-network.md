@@ -101,84 +101,6 @@ aptos node get-stake-pool --owner-address <owner_address> --url <REST API URL>
       --from-file=validator-full-node-identity.yaml=keys/validator-full-node-identity.yaml
   ```
 
-## Joining validator set
-
-Follow these steps to setup the validator node using the operator account and join the validator set.
-
-1. Initialize Aptos CLI.
-
-    ```bash
-    aptos init --profile testnet-operator \
-    --private-key <operator_account_private_key> \
-    --rest-url https://testnet.aptoslabs.com \
-    --skip-faucet
-    ```
-    
-    :::tip
-    The `account_private_key` for the operator can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
-    :::
-
-2. Check your validator account balance. Make sure you have some coins to pay gas. You can do this step either by checking on the Aptos Explorer or using the CLI:
-
-    On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=testnet` or use the CLI:
-
-    ```bash
-    aptos account list --profile testnet-operator
-    ```
-    
-    This will show you the coin balance you have in the validator account. You will see something like:
-    
-    ```json
-    "coin": {
-        "value": "5000"
-      }
-    ```
-
-3. Update validator network addresses on chain.
-
-    ```bash
-    aptos node update-validator-network-addresses  \
-      --pool-address <pool-address> \
-      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
-      --profile testnet-operator
-    ```
-
-4. Update the validator consensus key on chain.
-
-    ```bash
-    aptos node update-consensus-key  \
-      --pool-address <pool-address> \
-      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
-      --profile testnet-operator
-    ```
-
-5. Join the validator set.
-
-    ```bash
-    aptos node join-validator-set \
-      --pool-address <pool-address> \
-      --profile testnet-operator \
-      --max-gas 10000 
-    ```
-
-    :::tip Max gas
-    You can adjust the above `max-gas` number. Ensure that you sent your operator enough tokens to pay for the gas fee.
-    :::
-
-    The `ValidatorSet` will be updated at every epoch change, which is **once every 2 hours**. You will only see your node joining the validator set in the next epoch. Both validator and fullnode will start syncing once your validator is in the validator set.
-
-6. Check the validator set.
-
-    ```bash
-    aptos node show-validator-set --profile testnet-operator | jq -r '.Result.pending_active' | grep <pool_address>
-    ```
-    
-    You will see your validator node in "pending_active" list. When the next epoch change happens, the node will be moved into "active_validators" list. This will happen within one hour from the completion of previous step. **During this time you might see errors like "No connected AptosNet peers". This is normal.**
-    
-    ```bash
-    aptos node show-validator-set --profile testnet-operator | jq -r '.Result.active_validators' | grep <pool_address>
-    ```
-
 
 ## Verify node connections
 
@@ -238,14 +160,3 @@ After your validator node joined the validator set, you can verify the correctne
     ```
     
     You should expect the active value for your `StakePool` to keep increasing. It is updated at every epoch.
-
-
-## Leaving validator set
-
-A node can choose to leave validator set at anytime, or it would happen automatically when there is insufficient stake in the validator account. To leave the validator set, you can perform the following steps:
-
-Leave validator set (will take effect in next epoch):
-
-```bash
-aptos node leave-validator-set --profile testnet-operator --pool-address <owner-address>
-```
