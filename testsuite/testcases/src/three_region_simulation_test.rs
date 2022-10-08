@@ -93,7 +93,7 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
 // 1 Gbps
 fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
     SwarmNetworkBandwidth {
-        rate: 1000,
+        rate: 100,
         limit: 20971520,
         buffer: 10000,
     }
