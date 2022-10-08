@@ -84,7 +84,7 @@ logging:
 backup:
   image:
     repo: aptoslabs/tools
-    tag: devnet
+    tag:
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -126,7 +126,7 @@ backup_verify:
 restore:
   image:
     repo: aptoslabs/tools
-    tag: devnet
+    tag:
     pullPolicy: IfNotPresent
   resources:
     limits:
