@@ -111,7 +111,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 
-        Ok(LoadDestination::AllNodes)
+        Ok(LoadDestination::AllValidators)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
