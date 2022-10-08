@@ -17,7 +17,7 @@ The [Petra wallet extension](/docs/guides/install-petra-wallet.md) is supported 
 ## Owner operations with CLI
 
 :::tip Testnet vs Mainnet
-The below examples use testnet. See the `--rest-url` value for mainnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
+The below CLI command examples use mainnet. See the `--rest-url` value for testnet and devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
 :::
 
 ### Initialize CLI
@@ -25,8 +25,8 @@ The below examples use testnet. See the `--rest-url` value for mainnet in [Aptos
 Initialize CLI with your Petra wallet private key or create new wallet. 
 
 ```bash
-aptos init --profile testnet-owner \
-  --rest-url https://fullnode.testnet.aptoslabs.com/v1
+aptos init --profile mainnet-owner \
+  --rest-url https://fullnode.mainnet.aptoslabs.com/v1
 ```
 
 You can either enter the private key from an existing wallet, or create new wallet address.
@@ -38,7 +38,7 @@ aptos stake initialize-stake-owner \
   --initial-stake-amount 100000000000000 \
   --operator-address <operator-address> \
   --voter-address <voter-address> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Transfer coin between accounts
@@ -47,7 +47,7 @@ aptos stake initialize-stake-owner \
 aptos account transfer \
   --account <operator-address> \
   --amount <amount> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Switch operator
@@ -55,7 +55,7 @@ aptos account transfer \
 ```bash
 aptos stake set-operator \
   --operator-address <new-operator-address> \ 
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Switch voter
@@ -63,7 +63,7 @@ aptos stake set-operator \
 ```bash
 aptos stake set-delegated-voter \
   --voter-address <new-voter-address> \ 
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Add stake
@@ -71,13 +71,13 @@ aptos stake set-delegated-voter \
 ```bash
 aptos stake add-stake \
   --amount <amount> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Increase stake lockup
 
 ```bash
-aptos stake increase-lockup --profile testnet-owner
+aptos stake increase-lockup --profile mainnet-owner
 ```
 
 ### Unlock stake
@@ -85,7 +85,7 @@ aptos stake increase-lockup --profile testnet-owner
 ```bash
 aptos stake unlock-stake \
   --amount <amount> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Withdraw stake
@@ -93,5 +93,5 @@ aptos stake unlock-stake \
 ```bash
 aptos stake withdraw-stake \
   --amount <amount> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
