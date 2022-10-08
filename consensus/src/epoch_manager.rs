@@ -660,7 +660,7 @@ impl EpochManager {
         self.round_manager_tx = Some(round_manager_tx.clone());
 
         counters::TOTAL_VOTING_POWER.set(epoch_state.verifier.total_voting_power() as f64);
-        counters::VOTING_POWER.set(
+        counters::VALIDATOR_VOTING_POWER.set(
             epoch_state
                 .verifier
                 .get_voting_power(&self.author)
