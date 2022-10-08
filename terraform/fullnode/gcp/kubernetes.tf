@@ -35,9 +35,9 @@ locals {
 
 resource "helm_release" "fullnode" {
   count            = var.num_fullnodes
-  name             = "${terraform.workspace}${count.index}"
+  name             = "pfn${count.index}"
   chart            = local.fullnode_helm_chart_path
-  max_history      = 100
+  max_history      = 10
   wait             = false
   namespace        = var.k8s_namespace
   create_namespace = true
@@ -60,6 +60,9 @@ resource "helm_release" "fullnode" {
       }
       service = {
         type = "LoadBalancer"
+        annotations = {
+          "external-dns.alpha.kubernetes.io/hostname" = "pfn${count.index}.${local.domain}"
+        }
       }
       backup = {
         # only enable backup for fullnode 0

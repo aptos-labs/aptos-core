@@ -13,6 +13,31 @@ variable "zone" {
   type        = string
 }
 
+variable "workspace_name_override" {
+  description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  default     = ""
+}
+
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
+variable "dns_prefix_name" {
+  description = "DNS prefix for fullnode url"
+  default     = "fullnode"
+}
+
+variable "zone_name" {
+  description = "Zone name of GCP Cloud DNS zone to create records in"
+  default     = ""
+}
+
+variable "zone_project" {
+  description = "GCP project which the DNS zone is in (if different)"
+  default     = ""
+}
+
 variable "helm_values" {
   description = "Map of values to pass to Helm"
   type        = any
