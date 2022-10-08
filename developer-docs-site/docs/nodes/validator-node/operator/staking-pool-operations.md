@@ -127,9 +127,6 @@ aptos node get-stake-pool \
 Example output:
 
 ```json
- Compiling aptos ...
-    Finished dev [unoptimized + debuginfo] target(s) in 32.89s
-     Running `target/debug/aptos node get-stake-pool --owner-address e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`
 {
   "Result": [
     {
