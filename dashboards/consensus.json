@@ -968,2409 +968,2404 @@
       "title": "Internal call",
       "transparent": false,
       "type": "row",
-      "panels": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 51 },
-          "id": 44,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Process proposal",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval]) / rate(consensus_duration_count{op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 51 },
-          "id": 118,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Process vote",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval]) / rate(consensus_duration_count{op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 51 },
-          "id": 119,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Process sync info",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 59 },
-          "id": 120,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Process local timeout",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 59 },
-          "id": 121,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Verify message",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='verify_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='verify_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 59 },
-          "id": 122,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Process different epoch message",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_different_epoch_consensus_msg', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_different_epoch_consensus_msg', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 67 },
-          "id": 123,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Process epoch proof",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_epoch_proof', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_epoch_proof', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 67 },
-          "id": 124,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Process epoch retrieval",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{op='process_epoch_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_epoch_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 67 },
-          "id": 125,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Await reconfig notification",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='reconfig', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='reconfig', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 75 },
-          "id": 126,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Process block retrieval",
-          "description": "",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "s", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 75 },
-          "id": 83,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Main Event Loop Current running function",
-          "description": "A sampled binary number indicating whether the node is currently in a function. (Useful when the node is stuck somewhere)",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=~\".*_running\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}: {{op}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "none", "logBase": 1, "min": 0, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 75 },
-          "id": 129,
-          "isNew": false,
-          "renderer": "flot",
-          "span": 0,
-          "title": "Buffer Manager Retry count",
-          "description": "A sampled binary number indicating whether the node is currently in a function. (Useful when the node is stuck somewhere)",
-          "transparent": false,
-          "type": "graph",
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 2,
-          "points": false,
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_consensus_buffer_manager_retry_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}: {{op}}",
-              "format": "time_series"
-            }
-          ],
-          "tooltip": { "shared": true, "value_type": "individual" },
-          "xaxis": { "format": "", "logBase": 0, "show": true },
-          "yaxes": [
-            { "format": "none", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "",
-              "color": { "mode": "" },
-              "thresholds": { "mode": "", "steps": null },
-              "custom": {
-                "axisPlacement": "",
-                "barAlignment": 0,
-                "drawStyle": "",
-                "fillOpacity": 0,
-                "gradientMode": "",
-                "lineInterpolation": "",
-                "lineWidth": 0,
-                "pointSize": 0,
-                "showPoints": "",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "" },
-                "stacking": { "group": "", "mode": "" },
-                "thresholdsStyle": { "mode": "" }
-              }
-            }
-          }
-        }
-      ],
-      "collapsed": true
+      "panels": [],
+      "collapsed": false
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 51 },
+      "id": 44,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process proposal",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval]) / rate(consensus_duration_count{op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 51 },
+      "id": 118,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process vote",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval]) / rate(consensus_duration_count{op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 51 },
+      "id": 119,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process sync info",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 59 },
+      "id": 120,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process local timeout",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 59 },
+      "id": 121,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Verify message",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='verify_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='verify_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 59 },
+      "id": 122,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process different epoch message",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_different_epoch_consensus_msg', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_different_epoch_consensus_msg', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 67 },
+      "id": 123,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process epoch proof",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_epoch_proof', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_epoch_proof', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 67 },
+      "id": 124,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process epoch retrieval",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{op='process_epoch_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='process_epoch_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 67 },
+      "id": 125,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Await reconfig notification",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='reconfig', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='reconfig', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 75 },
+      "id": 126,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process block retrieval",
+      "description": "",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 75 },
+      "id": 83,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Main Event Loop Current running function",
+      "description": "A sampled binary number indicating whether the node is currently in a function. (Useful when the node is stuck somewhere)",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=~\".*_running\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: {{op}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "none", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 75 },
+      "id": 129,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Buffer Manager Retry count",
+      "description": "A sampled binary number indicating whether the node is currently in a function. (Useful when the node is stuck somewhere)",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_consensus_buffer_manager_retry_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: {{op}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "none", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 83 },
       "id": 18,
       "isNew": false,
       "span": 0,
       "title": "RoundState",
       "transparent": false,
       "type": "row",
-      "panels": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 84 },
-          "id": 45,
-          "isNew": false,
-          "span": 0,
-          "title": "Current Round",
-          "description": "The current round consensus is at, the rate of this is roughly Committed blocks per sec.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_consensus_current_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "round #",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 84 },
-          "id": 14,
-          "isNew": false,
-          "span": 0,
-          "title": "QC round per sec",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_consensus_qc_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# rounds",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 84 },
-          "id": 16,
-          "isNew": false,
-          "span": 0,
-          "title": "Timeout rounds per sec",
-          "description": "The total number of rounds that have timeout certificate.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# timeout rounds",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 92 },
-          "id": 26,
-          "isNew": false,
-          "span": 0,
-          "title": "Total local timeout",
-          "description": "The total number a single node has timeout locally. When 2f+1 nodes have local timeout for the same round, a timeout round is formed.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_consensus_timeout_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# timeouts",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 92 },
-          "id": 27,
-          "isNew": false,
-          "span": 0,
-          "title": "Current Round timeout value",
-          "description": "The duration of a single round until it generates local timeout.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_consensus_round_timeout_s{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ms",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "timeout val",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        }
-      ],
-      "collapsed": true
+      "panels": [],
+      "collapsed": false
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 84 },
+      "id": 45,
+      "isNew": false,
+      "span": 0,
+      "title": "Current Round",
+      "description": "The current round consensus is at, the rate of this is roughly Committed blocks per sec.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_consensus_current_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "round #",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 84 },
+      "id": 14,
+      "isNew": false,
+      "span": 0,
+      "title": "QC round per sec",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_consensus_qc_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# rounds",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 84 },
+      "id": 16,
+      "isNew": false,
+      "span": 0,
+      "title": "Timeout rounds per sec",
+      "description": "The total number of rounds that have timeout certificate.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# timeout rounds",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 92 },
+      "id": 26,
+      "isNew": false,
+      "span": 0,
+      "title": "Total local timeout",
+      "description": "The total number a single node has timeout locally. When 2f+1 nodes have local timeout for the same round, a timeout round is formed.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_consensus_timeout_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# timeouts",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 92 },
+      "id": 27,
+      "isNew": false,
+      "span": 0,
+      "title": "Current Round timeout value",
+      "description": "The duration of a single round until it generates local timeout.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_consensus_round_timeout_s{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "timeout val",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 100 },
       "id": 59,
       "isNew": false,
       "span": 0,
       "title": "EpochState",
       "transparent": false,
       "type": "row",
-      "panels": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 85 },
-          "id": 60,
-          "isNew": false,
-          "span": 0,
-          "title": "Current Epoch",
-          "description": "The current epoch number the node is in, the number is bumped with reconfiguration event like key rotation, validator set change etc.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_consensus_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "Epoch #",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 85 },
-          "id": 61,
-          "isNew": false,
-          "span": 0,
-          "title": "Number of validators",
-          "description": "Number of validators for the current epoch.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_consensus_current_epoch_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# Validators",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 85 },
-          "id": 141,
-          "isNew": false,
-          "span": 0,
-          "title": "Total voting power",
-          "description": "Total voting power of the current epoch.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# Validators",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        }
-      ],
-      "collapsed": true
+      "panels": [],
+      "collapsed": false
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 101 },
+      "id": 60,
+      "isNew": false,
+      "span": 0,
+      "title": "Current Epoch",
+      "description": "The current epoch number the node is in, the number is bumped with reconfiguration event like key rotation, validator set change etc.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_consensus_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "Epoch #",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 101 },
+      "id": 61,
+      "isNew": false,
+      "span": 0,
+      "title": "Number of validators",
+      "description": "Number of validators for the current epoch.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_consensus_current_epoch_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# Validators",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 101 },
+      "id": 141,
+      "isNew": false,
+      "span": 0,
+      "title": "Total voting power",
+      "description": "Total voting power of the current epoch.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} / 100000000",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# Validators",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 109 },
       "id": 55,
       "isNew": false,
       "span": 0,
       "title": "BlockStore",
       "transparent": false,
       "type": "row",
-      "panels": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 110 },
-          "id": 8,
-          "isNew": false,
-          "span": 0,
-          "title": "Pending blocks",
-          "description": "Pending blocks in the block tree.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_consensus_num_blocks_in_tree{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} - 1",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# blocks",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 110 },
-          "id": 57,
-          "isNew": false,
-          "span": 0,
-          "title": "Transactions per block",
-          "description": "The average number of transactions of a block, can impact the execution time and overall latency.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_consensus_num_txns_per_block_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_consensus_num_txns_per_block_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# transactions / block",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 110 },
-          "id": 56,
-          "isNew": false,
-          "span": 0,
-          "title": "Wait duration per sec",
-          "description": "Total time the node has to wait before inserting the block",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_consensus_wait_duration_s_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 118 },
-          "id": 115,
-          "isNew": false,
-          "span": 0,
-          "title": "Pending blocks in pipeline",
-          "description": "Pending blocks in the pipeline",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_consensus_num_blocks_in_pipeline{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "intervalFactor": 1,
-              "legendFormat": "{{stage}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# blocks",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 118 },
-          "id": 130,
-          "isNew": false,
-          "span": 0,
-          "title": "Back pressure",
-          "description": "",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=\"back_pressure\"}",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# blocks",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 118 },
-          "id": 131,
-          "isNew": false,
-          "span": 0,
-          "title": "Sync only",
-          "description": "",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=\"sync_only\"}",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bool",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# blocks",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        }
-      ],
-      "collapsed": true
+      "panels": [],
+      "collapsed": false
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 110 },
+      "id": 8,
+      "isNew": false,
+      "span": 0,
+      "title": "Pending blocks",
+      "description": "Pending blocks in the block tree.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_consensus_num_blocks_in_tree{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} - 1",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# blocks",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 110 },
+      "id": 57,
+      "isNew": false,
+      "span": 0,
+      "title": "Transactions per block",
+      "description": "The average number of transactions of a block, can impact the execution time and overall latency.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_consensus_num_txns_per_block_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_consensus_num_txns_per_block_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# transactions / block",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 110 },
+      "id": 56,
+      "isNew": false,
+      "span": 0,
+      "title": "Wait duration per sec",
+      "description": "Total time the node has to wait before inserting the block",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(aptos_consensus_wait_duration_s_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 118 },
+      "id": 115,
+      "isNew": false,
+      "span": 0,
+      "title": "Pending blocks in pipeline",
+      "description": "Pending blocks in the pipeline",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_consensus_num_blocks_in_pipeline{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{stage}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# blocks",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 118 },
+      "id": 130,
+      "isNew": false,
+      "span": 0,
+      "title": "Back pressure",
+      "description": "",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=\"back_pressure\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# blocks",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 118 },
+      "id": 131,
+      "isNew": false,
+      "span": 0,
+      "title": "Sync only",
+      "description": "",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=\"sync_only\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bool",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# blocks",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 126 },
       "id": 4,
       "isNew": false,
       "span": 0,
       "title": "External call",
       "transparent": false,
       "type": "row",
-      "panels": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 127 },
-          "id": 79,
-          "isNew": false,
-          "span": 0,
-          "title": "Execute block Latency",
-          "description": "The average time to execute a block.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='execute_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='execute_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 127 },
-          "id": 80,
-          "isNew": false,
-          "span": 0,
-          "title": "Commit block Latency",
-          "description": "The average time to commit blocks (may commit more than 1 in a single call).",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='commit_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='commit_block',  kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 127 },
-          "id": 85,
-          "isNew": false,
-          "span": 0,
-          "title": "Safety rules Latency",
-          "description": "The average latency of talking to safety rules (of all calls).",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='safety_rules', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='safety_rules', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 135 },
-          "id": 86,
-          "isNew": false,
-          "span": 0,
-          "title": "Pull txn Latency",
-          "description": "The average latency of pulling the txn from mempool.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='pull_txn', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='pull_txn', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 135 },
-          "id": 87,
-          "isNew": false,
-          "span": 0,
-          "title": "Failed txn notify mempool Latency",
-          "description": "The average latency of notifying mempool about failed transactions.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_mempool', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_mempool', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 135 },
-          "id": 88,
-          "isNew": false,
-          "span": 0,
-          "title": "Notify state sync Latency",
-          "description": "The average latency of notifying state sync of committed txn.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_state_sync', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_state_sync', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 143 },
-          "id": 21,
-          "isNew": false,
-          "span": 0,
-          "title": "State sync count per sec",
-          "description": "The total count of call to sync to.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# state syncs",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 143 },
-          "id": 23,
-          "isNew": false,
-          "span": 0,
-          "title": "Total time spent on state sync",
-          "description": "The total time spent in the external sync_to function.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "total time",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 151 },
-          "id": 24,
-          "isNew": false,
-          "span": 0,
-          "title": "Block retrieval count per sec",
-          "description": "The total number of block retrieval the node sends. It's required when the node is missing some ancestors of the block to be executed.",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "# blocks",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editable": false,
-          "error": false,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 151 },
-          "id": 25,
-          "isNew": false,
-          "span": 0,
-          "title": "Total time spent on block retrieval",
-          "description": "Total time spent in retrieval the blocks from peers. (This is blocking RPC call)",
-          "transparent": false,
-          "type": "timeseries",
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-              "format": "time_series"
-            }
-          ],
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "color": { "mode": "palette-classic" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
-              "custom": {
-                "axisLabel": "total time",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "showPoints": "never",
-                "spanNulls": false,
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineStyle": { "fill": "" },
-                "scaleDistribution": { "type": "linear" },
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              }
-            }
-          }
-        }
-      ],
-      "collapsed": true
+      "panels": [],
+      "collapsed": false
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 55 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 127 },
+      "id": 79,
+      "isNew": false,
+      "span": 0,
+      "title": "Execute block Latency",
+      "description": "The average time to execute a block.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='execute_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='execute_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 127 },
+      "id": 80,
+      "isNew": false,
+      "span": 0,
+      "title": "Commit block Latency",
+      "description": "The average time to commit blocks (may commit more than 1 in a single call).",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='commit_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='commit_block',  kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 127 },
+      "id": 85,
+      "isNew": false,
+      "span": 0,
+      "title": "Safety rules Latency",
+      "description": "The average latency of talking to safety rules (of all calls).",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='safety_rules', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='safety_rules', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 135 },
+      "id": 86,
+      "isNew": false,
+      "span": 0,
+      "title": "Pull txn Latency",
+      "description": "The average latency of pulling the txn from mempool.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='pull_txn', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='pull_txn', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 135 },
+      "id": 87,
+      "isNew": false,
+      "span": 0,
+      "title": "Failed txn notify mempool Latency",
+      "description": "The average latency of notifying mempool about failed transactions.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_mempool', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_mempool', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 135 },
+      "id": 88,
+      "isNew": false,
+      "span": 0,
+      "title": "Notify state sync Latency",
+      "description": "The average latency of notifying state sync of committed txn.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_state_sync', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_state_sync', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 143 },
+      "id": 21,
+      "isNew": false,
+      "span": 0,
+      "title": "State sync count per sec",
+      "description": "The total count of call to sync to.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# state syncs",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 143 },
+      "id": 23,
+      "isNew": false,
+      "span": 0,
+      "title": "Total time spent on state sync",
+      "description": "The total time spent in the external sync_to function.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "total time",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 151 },
+      "id": 24,
+      "isNew": false,
+      "span": 0,
+      "title": "Block retrieval count per sec",
+      "description": "The total number of block retrieval the node sends. It's required when the node is missing some ancestors of the block to be executed.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "# blocks",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 151 },
+      "id": 25,
+      "isNew": false,
+      "span": 0,
+      "title": "Total time spent on block retrieval",
+      "description": "Total time spent in retrieval the blocks from peers. (This is blocking RPC call)",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisLabel": "total time",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 159 },
       "id": 52,
       "isNew": false,
       "span": 0,
@@ -3384,7 +3379,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 56 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 160 },
       "id": 28,
       "isNew": false,
       "span": 0,
@@ -3396,7 +3391,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_proposals_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_proposals_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -3442,7 +3437,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 56 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 160 },
       "id": 53,
       "isNew": false,
       "span": 0,
@@ -3500,7 +3495,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 64 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 168 },
       "id": 64,
       "isNew": false,
       "span": 0,
@@ -4619,7 +4614,7 @@
     {
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 65 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 169 },
       "id": 137,
       "isNew": false,
       "span": 0,
@@ -4633,7 +4628,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 66 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 170 },
       "id": 135,
       "isNew": false,
       "span": 0,
@@ -4688,7 +4683,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 66 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 170 },
       "id": 138,
       "isNew": false,
       "span": 0,
@@ -4743,7 +4738,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 66 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 170 },
       "id": 139,
       "isNew": false,
       "span": 0,
@@ -4798,7 +4793,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 74 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 178 },
       "id": 142,
       "isNew": false,
       "span": 0,
@@ -4853,7 +4848,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 74 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 178 },
       "id": 143,
       "isNew": false,
       "span": 0,
@@ -4866,7 +4861,7 @@
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "aptos_failed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} / clamp_min(aptos_failed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} + aptos_committed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}, 1)",
-          "legendFormat": "__auto"
+          "legendFormat": "{{kubernetes_pod_name}}"
         }
       ],
       "options": {
@@ -4908,7 +4903,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 82 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 186 },
       "id": 144,
       "isNew": false,
       "span": 0,
@@ -4984,7 +4979,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 82 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 186 },
       "id": 145,
       "isNew": false,
       "span": 0,
@@ -5232,7 +5227,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 62,
+  "version": 64,
   "links": [
     {
       "title": "aptos-core",
