@@ -104,8 +104,11 @@ When the next epoch change happens, the node will be moved into "active_validato
 aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active_validators' | grep <pool_address>
 ```
 
-
 ## Checking your stake pool information
+
+:::tip How validation works
+See [Validation on the Aptos blockchain](/concepts/staking#validation-on-the-aptos-blockchain).
+:::
 
 To check the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. 
 
@@ -177,18 +180,17 @@ Example output:
 
 
 **commission_not_yet_unlocked**
-- The amount of commission that is not yet unlocked. It will be unlocked at the `lockup_expiration_utc_time`. This is the total commission amount available to the operator, i.e., the staking rewards only to the operator. This does not include the staking rewards to the owner.
+- The amount of commission (amount of APT) that is not yet unlocked. It will be unlocked at the `lockup_expiration_utc_time`. This is the total commission amount available to the operator, i.e., the staking rewards only to the operator. This does not include the staking rewards to the owner.
 
 **lockup_expiration_utc_time**
 - The date when the commission that was locked up will unlock. However, this unlocked commission will not be auto-disbursed. It will only disburse when this command is called again.
 
 **epoch_info**
-- Use the [Epoch Converter](https://www.epochconverter.com/) to convert the `unix_time` into human readable time. Also see 
-
+- Use the [Epoch Converter](https://www.epochconverter.com/) to convert the `unix_time` into human readable time. 
 
 ## Requesting commission
 
-Either an owner or an operator can request commission. You can request commission once a month, i.e., at the end of a lockup period, by running the below command. Make sure to provide the operator and the owner addresses.
+Either an owner or an operator can request commission. You can request commission at the end of a lockup period, i.e., at the end of **lockup_expiration_utc_time**, by running the below command. Make sure to provide the operator and the owner addresses.
 
 ```bash
 aptos stake request-commission \
@@ -200,10 +202,11 @@ aptos stake request-commission \
 
 ### Checking your validator performance
 
-To see your validator performance in the current and past epochs and rewards earned, run the below command. The output will show the validator's performance in block proposals and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node analyze-validator-performance --help` to see default values used.
+To see your validator performance in the current and past epochs and rewards earned, run the below command. The output will show the validator's performance in block proposals and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node get-performance --help` to see default values used.
 
 ```bash
-aptos node analyze-validator-performance --analyze-mode all \
+aptos node get-performance \ 
+  --pool-address <pool address> \
   --url https://premainnet.aptosdev.com
 ```
 
@@ -243,6 +246,16 @@ Example output:
   }
 }
 ```
+
+where:
+
+**current_epoch_successful_proposals**
+- Successful leader-validator proposals during the current epoch. Also see [Validation on the Aptos blockchain](/concepts/staking#validation-on-the-aptos-blockchain) for the distinction between leader-validator and the voter-validator.
+
+**previous_epoch_rewards**
+- An ordered list of rewards earned (APT amounts) for the previous 10 epochs, starting with the 10 epoch in the past. In the above example, a reward of 12312716242 APT was earned 10 epochs past and a reward of 12313600288 APT was earned in the most recent epoch. If a reward is 0 for any epoch, then:
+  - Either the validator was not part of the validator set in that epoch (could have been in either inactive or pending_active validator state), or
+  - The validator missed all the leader proposals.
 
 ### Rotating the consensus key
 
