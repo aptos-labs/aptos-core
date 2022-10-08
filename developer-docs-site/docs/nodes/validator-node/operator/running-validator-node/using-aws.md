@@ -26,40 +26,40 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
 1. Create a working directory for your node configuration.
 
-    * Choose a workspace name, for example, `mainnet` for mainnet or `testnet` for testnet, and so on. **Note**: This defines the Terraform workspace name, which, in turn, is used to form the resource names.
+    * Choose a workspace name, for example, `mainnet` for mainnet, or `testnet` for testnet, and so on. **Note**: This defines the Terraform workspace name, which, in turn, is used to form the resource names.
 
-      ```
+      ```bash
       export WORKSPACE=mainnet
       ```
 
     * Create a directory for the workspace.
 
-      ```
+      ```bash
       mkdir -p ~/$WORKSPACE
       ```
     
     * Choose a username for your node, for example `alice`.
 
-      ```
+      ```bash
       export USERNAME=alice
       ```
 
 2. Create an S3 storage bucket for storing the Terraform state on AWS. You can do this on the AWS UI or by the below command: 
 
-      ```
+      ```bash
       aws s3 mb s3://<bucket name> --region <region name>
       ```
 
 3. Create a Terraform file called `main.tf` in your working directory:
 
-    ```
+    ```bash
     cd ~/$WORKSPACE
     vi main.tf
     ```
 
 4. Modify the `main.tf` file to configure Terraform and to create Aptos fullnode from the Terraform module. See below example content for `main.tf`:
 
-    ```
+    ```json
     terraform {
       required_version = "~> 1.2.0"
       backend "s3" {
@@ -91,14 +91,14 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
 5. Initialize Terraform in the `$WORKSPACE` directory where you created the `main.tf` file.
 
-  ```
+  ```bash
   terraform init
   ```
 This will download all the Terraform dependencies into the `.terraform` folder in your current working directory.
 
 6. Create a new Terraform workspace to isolate your environments:
 
-  ```
+  ```bash
   terraform workspace new $WORKSPACE
   # This command will list all workspaces
   terraform workspace list
@@ -106,7 +106,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 7. Apply the configuration.
 
-  ```
+  ```bash
   terraform apply
   ```
 
@@ -120,7 +120,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 9. Get your node IP information into your environment:
 
-    ```
+    ```bash
     export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-validator-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 
     export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-fullnode-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
@@ -128,7 +128,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 10. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
 
-    ```
+    ```bash
     aptos genesis generate-keys --output-dir ~/$WORKSPACE/keys
     ```
 
@@ -145,7 +145,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 11. Configure the validator information. 
 
-    ```
+    ```bash
     aptos genesis set-validator-configuration \
       --local-repository-dir ~/$WORKSPACE \
       --username $USERNAME \
@@ -176,7 +176,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 14. Insert `genesis.blob`, `waypoint.txt` and the identity files as secret into k8s cluster.
 
-    ```
+    ```bash
     kubectl create secret generic ${WORKSPACE}-aptos-node-0-genesis-e1 \
         --from-file=genesis.blob=genesis.blob \
         --from-file=waypoint.txt=waypoint.txt \
@@ -193,7 +193,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 15. Check that all the pods are running.
 
-    ```
+    ```bash
     kubectl get pods
 
     NAME                                        READY   STATUS    RESTARTS   AGE
@@ -202,4 +202,4 @@ This will download all the Terraform dependencies into the `.terraform` folder i
     node1-aptos-node-0-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have successfully completed setting up your node.
+Now you have successfully completed setting up your node. Make sure that you have set up one machine to run a validator node and a second machine to run a validator fullnode.
