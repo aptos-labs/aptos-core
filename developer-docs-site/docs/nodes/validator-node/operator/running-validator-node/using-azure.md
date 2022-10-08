@@ -62,7 +62,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
 4. Modify `main.tf` file to configure Terraform, and create fullnode from Terraform module. Example content for `main.tf`:
 
-  ```json
+  ```
   terraform {
     required_version = "~> 1.2.0"
     backend "azurerm" {
