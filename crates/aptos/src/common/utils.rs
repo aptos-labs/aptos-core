@@ -64,7 +64,8 @@ pub async fn to_common_result<T: Serialize>(
     let latency = start_time.elapsed();
     let is_err = result.is_err();
     let error = if let Err(ref error) = result {
-        Some(error.to_string())
+        // Only print the error type
+        Some(error.to_str())
     } else {
         None
     };
@@ -87,7 +88,7 @@ async fn send_telemetry_event(
     command: &str,
     latency: Duration,
     success: bool,
-    error: Option<String>,
+    error: Option<&str>,
 ) {
     // Collect the build information
     let build_information = cli_build_information();
