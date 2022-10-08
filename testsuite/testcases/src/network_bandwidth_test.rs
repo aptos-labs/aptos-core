@@ -8,7 +8,7 @@ pub struct NetworkBandwidthTest;
 
 // Bandwidth
 // Indicates the rate of bandwidth limit
-pub const RATE_MBPS: u64 = 100;
+pub const RATE_MBPS: u64 = 50;
 // Indicates the number of bytes waiting in queue
 pub const LIMIT_BYTES: u64 = 20971520;
 // Indicates the maximum number of bytes that can be sent instantaneously
