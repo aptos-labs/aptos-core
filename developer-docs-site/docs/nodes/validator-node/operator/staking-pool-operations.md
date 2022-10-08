@@ -11,24 +11,28 @@ This document describes how to perform staking pool operations. Note that you ca
 The current required minimum for staking is 1M APT tokens.
 :::
 
-## Initialize the stake pool
+## Initializing the stake pool
 
-Make sure that this step was performed by the owner. See [Initialize staking pool](/nodes/validator-node/owner/index#initialize-staking-pool) in the owner documentation section.
+Make sure that this initializing the stake pool step was performed by the owner. See [Initialize staking pool](/nodes/validator-node/owner/index#initialize-staking-pool) in the owner documentation section.
 
 ## Joining validator set
 
-:::tip Errors? 
+:::danger Errors? 
 If you run into any errors, see the [Issues and Workarounds](/docs/issues-and-workarounds.md).
 :::
 
 Follow these steps to setup the validator node using the operator account and join the validator set.
+
+:::tip Mainnet vs Testnet
+The below CLI command examples use mainnet. See the `--rest-url` value for testnet or devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
+:::
 
 1. Initialize Aptos CLI.
 
     ```bash
     aptos init --profile mainnet-operator \
     --private-key <operator_account_private_key> \
-    --rest-url https://testnet.aptoslabs.com \
+    --rest-url https://fullnode.mainnet.aptoslabs.com/v1 \
     --skip-faucet
     ```
     
@@ -78,15 +82,21 @@ Follow these steps to setup the validator node using the operator account and jo
       --profile mainnet-operator
     ```
 
-    The `ValidatorSet` will be updated at every epoch change, which is **once every 2 hours**. You will only see your node joining the validator set in the next epoch. Both validator and fullnode will start syncing once your validator is in the validator set.
+    The `ValidatorSet` will be updated at every epoch change. You will see your node joining the validator set only in the next epoch. Both validator and validator fullnode will start syncing once your validator is in the validator set.
 
-6. Check the validator set.
+    :::tip When is next epoch?
+    Click to find out [when the next epoch starts](/issues-and-workarounds#how-to-find-out-when-the-next-epoch-starts).
+    :::
+
+6. Check the validator set. 
+   
+    Run the below command to look for your validator in the "pending_active" list.
 
     ```bash
     aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.pending_active' | grep <pool_address>
     ```
     
-    You will see your validator node in "pending_active" list. When the next epoch change happens, the node will be moved into "active_validators" list. This will happen within one hour from the completion of previous step. **During this time you might see errors like "No connected AptosNet peers". This is normal.**
+    When the next epoch change happens, the node will be moved into "active_validators" list. **During this time you might see errors like "No connected AptosNet peers". This is normal.** Run the below command to see your validator in the "active_validators" list:
     
     ```bash
     aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active_validators' | grep <pool_address>
@@ -97,13 +107,7 @@ Follow these steps to setup the validator node using the operator account and jo
 
 To check the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. 
 
-:::tip Use CLI 0.3.8 or higher
-Make sure you use the CLI version 0.3.8 or higher. See [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md).
-- Type `aptos --help` to see the CLI version.
-- Type `aptos node get-stake-pool --help` for more on the command option for the below example.
-:::
-
-The below command is an example for Premainnet and an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`. For other networks, use the appropriate REST URL for the `--url` field. See [Aptos Blockchain Deployments](/nodes/aptos-deployments) for `--url` field values. 
+The below command is an example for Premainnet and an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`. For mainnet or testnet or devnet, see [Aptos Blockchain Deployments](/nodes/aptos-deployments) for `--url` field values. 
 
 ```bash
 aptos node get-stake-pool \
@@ -114,13 +118,13 @@ aptos node get-stake-pool \
 Example output:
 
 ```json
- Compiling aptos v0.3.8 (/Users/kevin/aptos-core/crates/aptos)
+ Compiling aptos ...
     Finished dev [unoptimized + debuginfo] target(s) in 32.89s
      Running `target/debug/aptos node get-stake-pool --owner-address e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`
 {
   "Result": [
     {
-      "state": "Active",
+      "state": "Active", 
       "pool_address": "25c3482850a188d8aa6edc5751846e1226a27863643f5ebc52be4f7d822264e3",
       "operator_address": "3bec5a529b023449dfc86e9a6b5b51bf75cec4a62bf21c15bbbef08a75f7038f",
       "voter_address": "3bec5a529b023449dfc86e9a6b5b51bf75cec4a62bf21c15bbbef08a75f7038f",
@@ -151,10 +155,38 @@ Example output:
 }
 ```
 
+### Description of key fields
 
-## Request commission
+**state**
+- "Active": Already in the validator set and proposing.
+- "Pending_active": Validator will be added to the validator set in the next epoch. Do not try to join the validator set again before the arrival of next epoch, or else you will receive an error. 
 
-As an operator, you can request commission once a month, i.e., at the end of a lockup period, by running the following command. Make sure to provide the operator and the owner addresses.
+**pool_address**
+- Use the "pool_address" (not the operator address) in the validator.yaml file. If you mistakenly used the operator address, you will receive the message: "Validator not in validator set". 
+
+**commission_percentage**
+- This can be set only by the stake pool owner. Operator receives the "commission_percentage" of the generated staking rewards. If you request the commission (you can do so by running the command `aptos stake request-commission`), after unlock (i.e., at the end of the `lockup_expiration_utc_time`) then the commission part of the rewards will go to the operator address while the rest will stay in the stake pool and belong to the owner. 
+
+  Here "the commission part of the rewards" means the unlocked commission amount at the time when unlock time expired, i.e., the value of **commission_not_yet_unlocked**. For example, for a lock up of one month, you call `aptos stake request-commission` every month, and this will pay out the commission that was accrued during the previous month but only when unlocked at the end of the previous month. Regardless of how often you run `aptos stake request-commission` during the month, the commission is only paid out upon the completion of `lockup_expiration_utc_time`.
+
+  :::tip Compounding
+  Note that if you do not request commission for multiple months, your commission will accrue more due to compounding of the **commission_percentage** during these months.
+  :::
+
+
+**commission_not_yet_unlocked**
+- The amount of commission that is not yet unlocked. It will be unlocked at the `lockup_expiration_utc_time`. This is the total commission amount available to the operator, i.e., the staking rewards only to the operator. This does not include the staking rewards to the owner.
+
+**lockup_expiration_utc_time**
+- The date when the commission that was locked up will unlock. However, this unlocked commission will not be auto-disbursed. It will only disburse when this command is called again.
+
+**epoch_info**
+- Use the [Epoch Converter](https://www.epochconverter.com/) to convert the `unix_time` into human readable time. Also see 
+
+
+## Requesting commission
+
+Either an owner or an operator can request commission. You can request commission once a month, i.e., at the end of a lockup period, by running the below command. Make sure to provide the operator and the owner addresses.
 
 ```bash
 aptos stake request-commission \
@@ -162,14 +194,14 @@ aptos stake request-commission \
   --owner-address 0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb
 ```
 
-## Misc
+## Frequently used staking operations commands
 
 ### Checking your validator performance
 
 To see your validator performance in the current and past epochs and rewards earned, run the below command. The output will show the validator's performance in block proposals and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node analyze-validator-performance --help` to see default values used.
 
 ```bash
-aptos node analyze-validator-performance --analyze-mode All \
+aptos node analyze-validator-performance --analyze-mode all \
   --url https://premainnet.aptosdev.com
 ```
 
@@ -221,7 +253,7 @@ aptos node update-consensus-key \
   --profile <profile>
   ```
 
-### Update addresses for validator and validator fullnode 
+### Updating addresses for validator and validator fullnode 
 
 You can update the address for the validator node and the validator fullnode by running the following command. Make sure to provide the pool address, the path to the `operator.yaml` file and the profile:
 
@@ -232,7 +264,7 @@ aptos node update-validator-network-addresses \
   --profile <profile>
   ```
 
-### Check performance for all epochs
+### Checking the performance for all epochs
 
 how can we receive performance for all epochs since Genesis? The command that you have provided early, only displays info for the latest period
 
