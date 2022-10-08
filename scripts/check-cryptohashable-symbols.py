@@ -22,8 +22,9 @@ import re
 print(f'Searching for structs/enums that implements CryptoHasher...')
 ST_INIT = 0
 ST_DERIVE_FOUND = 1
-
+total_match_count = 0
 def find_cryptohasher_implementors_in_path(path):
+    global total_match_count
     code = path.read_text()
     lines = code.split('\n')
     n = len(lines)
@@ -32,12 +33,13 @@ def find_cryptohasher_implementors_in_path(path):
     for i in range(n):
         line_number = i+1
         if st==ST_INIT:
-            match = re.match(r'#\[derive\(.*(CryptoHasher).*\)', lines[i])
+            match = re.match(r'\s*#\[derive\(.*(CryptoHasher).*\)', lines[i])
             if match:
                 st = ST_DERIVE_FOUND
         elif st==ST_DERIVE_FOUND:
             match = re.match(r'.*(struct|enum)\s+(\w+).*', lines[i])
             if match:
+                total_match_count+=1
                 symbol_name = match.group(2)
                 ret.add((symbol_name,line_number))
                 st = ST_INIT
@@ -54,6 +56,7 @@ for root, dirs, files in os.walk("."):
             for symbol,line_number in find_cryptohasher_implementors_in_path(file_path):
                 symbol_map[symbol].add(f'{file_path}:{line_number}')
 
+print(f'total_match_count={total_match_count}')
 print(f"The `CryptoHasher` derive are used by the following structs/enums.")
 pprint(symbol_map)
 print()
