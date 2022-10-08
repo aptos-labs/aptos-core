@@ -20,7 +20,7 @@ As explained in the [optimization principles](#optimization-principles) section,
 
 ## Instruction gas
 
-Instruction gas parameters are defined at [`instr.rs`] and include the following instruction types:
+Basic instruction gas parameters are defined at [`instr.rs`] and include the following instruction types:
 
 ### No-operation
 
@@ -119,21 +119,21 @@ Instruction gas parameters are defined at [`instr.rs`] and include the following
 
 ###  Bitwise
 
-| Parameter | Meaning           |
-|-----------|-------------------|
-| `bit_or`  | `OR`: <code>&#124;</code>         |
-| `bit_and` | `AND`: `&`        |
-| `xor`     | `XOR`: `^`        |
-| `shl`     | Shift left: `<<`  |
-| `shr`     | Shift right: `>>` |
+| Parameter | Meaning                   |
+|-----------|---------------------------|
+| `bit_or`  | `OR`: <code>&#124;</code> |
+| `bit_and` | `AND`: `&`                |
+| `xor`     | `XOR`: `^`                |
+| `shl`     | Shift left: `<<`          |
+| `shr`     | Shift right: `>>`         |
 
 ###  Boolean
 
-| Parameter | Meaning      |
-|-----------|--------------|
+| Parameter | Meaning                         |
+|-----------|---------------------------------|
 | `or`      | `OR`: <code>&#124;&#124;</code> |
-| `and`     | `AND`: `&&`  |
-| `not`     | `NOT`: `!`   |
+| `and`     | `AND`: `&&`                     |
+| `not`     | `NOT`: `!`                      |
 
 
 ###  Comparison
@@ -179,6 +179,8 @@ Instruction gas parameters are defined at [`instr.rs`] and include the following
 | `vec_unpack_base`              | Base cost to unpack a vector             |
 | `vec_unpack_per_expected_elem` | Base cost to unpack a vector per element |
 
+Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`], and other assorted source files in [`aptos-gas/src/`].
+
 ## Storage gas
 
 Storage gas is defined in [`storage_gas.move`], which is accompanied by a comprehensive and internally-linked DocGen file at [`storage_gas.md`].
@@ -210,86 +212,128 @@ Byte-wise fees are similarly assessed on vectors, which consume $\sum_{i = 0}^{n
 * $e_i$ is the size of element $i$
 * $b(n)$ is a "base size" which is a function of $n$
 
-See [#4540] for more information on vector base size, which is typically just one byte in practice, such that a vector of 100 `u8` elements accounts for $100 + 1 = 101$ bytes.
+See the [BCS sequence specification] for more information on vector base size (technically a `ULEB128`), which typically occupies just one byte in practice, such that a vector of 100 `u8` elements accounts for $100 + 1 = 101$ bytes.
 Hence per the item-wise read methodology described above, reading the last element of such a vector is treated as a 101-byte read.
 
 ## Payload gas
 
-Payload gas is defined in [`transaction.rs`], which incorporates storage gas with several payload-associated parameters:
+Payload gas is defined in [`transaction.rs`], which incorporates storage gas with several payload- and pricing-associated parameters:
 
 | Parameter                       | Meaning                                                                                |
 |---------------------------------|----------------------------------------------------------------------------------------|
-| `min_transaction_gas_units`     | Minimum amount of gas for a transaction, charged at start of execution                 |
+| `min_transaction_gas_units`     | Minimum internal gas units for a transaction, charged at the start of execution        |
 | `large_transaction_cutoff`      | Size, in bytes, above which transactions will be charged an additional amount per byte |
-| `intrinsic_gas_per_byte`        | Units of gas charged per byte for payloads above `large_transaction_cutoff`            |
-| `maximum_number_of_gas_units`   | Upper limit on gas that a transaction can require                                      |
-| `min_price_per_gas_unit`        | Minimum gas price allowed on a transaction                                             |
-| `max_price_per_gas_unit`        | Maximum gas price allowed on a transaction                                             |
+| `intrinsic_gas_per_byte`        | Internal gas units charged per byte for payloads above `large_transaction_cutoff`      |
+| `maximum_number_of_gas_units`   | Upper limit on internal gas units for a transaction                                    |
+| `min_price_per_gas_unit`        | Minimum gas price allowed for a transaction                                            |
+| `max_price_per_gas_unit`        | Maximum gas price allowed for a transaction                                            |
 | `max_transaction_size_in_bytes` | Maximum transaction payload size in bytes                                              |
-| `gas_unit_scaling_factor`       | Amount of gas units in one octal                                                       |
+| `gas_unit_scaling_factor`       | Conversion factor between internal gas units and external gas units                    |
+
+Here, "internal gas units" are defined as constants in source files like [`instr.rs`] and [`storage_gas.move`], which are more granular than "external gas units" by a factor of `gas_unit_scaling_factor`:
+to convert from internal gas units to external gas units, divide by `gas_unit_scaling_factor`.
+Then, to convert from external gas units to octas, multiply by the "gas price", which denotes the number of octas per unit of external gas.
 
 ## Optimization principles
 
+### Unit and pricing constants
+
+As of the time of this writing, `min_price_per_gas_unit` in [`transaction.rs`] is defined as [`aptos_global_constants`]`::GAS_UNIT_PRICE` (which is itself defined as 100), with other noteworthy [`transaction.rs`] constants as follows:
+
+| Constant                  | Value  |
+|---------------------------|--------|
+| `min_price_per_gas_unit`  | 100    |
+| `max_price_per_gas_unit`  | 10,000 |
+| `gas_unit_scaling_factor` | 10,000 |
+
+See [Payload gas](#payload-gas) for the meaning of these constants.
+
 ### Storage gas
 
-As of the time of this writing, [`initialize()`] sets the following minimum and maximum storage gas amounts:
+As of the time of this writing, [`initialize()`] sets the following minimum storage gas amounts:
 
-| Data style | Operation | Minimum gas | Maximum gas |
-|------------|-----------|-------------|-------------|
-| Per item   | Read      | 80000       | 8000000     |
-| Per item   | Create    | 2000000     | 200000000   |
-| Per item   | Write     | 400000      | 40000000    |
-| Per byte   | Read      | 40          | 4000        |
-| Per byte   | Create    | 1000        | 100000      |
-| Per byte   | Write     | 200         | 20000       |
+| Data style | Operation | Symbol | Minimum internal gas |
+|------------|-----------|--------|----------------------|
+| Per item   | Read      | $r_i$  | 300,000              |
+| Per item   | Create    | $c_i$  | 5,000,000            |
+| Per item   | Write     | $w_i$  | 300,000              |
+| Per byte   | Read      | $r_b$  | 300                  |
+| Per byte   | Create    | $c_b$  | 5,000                |
+| Per byte   | Write     | $w_b$  | 5,000                |
 
-Here, maximum amounts are 100 times the minimum amounts, which means that for a utilization ratio of 40% or less, total gas costs will be on the order of 1 to 1.5 times the minimum amount (see [`base_8192_exponential_curve()`] for supporting calculations).
+Maximum amounts are 100 times the minimum amounts, which means that for a utilization ratio of 40% or less, total gas costs will be on the order of 1 to 1.5 times the minimum amounts (see [`base_8192_exponential_curve()`] for supporting calculations).
+Hence, in terms of octas, initial mainnet gas costs can be estimated as follows (divide internal gas by scaling factor, then multiply by minimum gas price):
 
-Also as of the time of this writing, the `gas_unit_scaling_factor` specified in [`transaction.rs`] is 10,000; this means that in terms of octals, initial mainnet gas costs can be estimated as follows:
+| Operation       | Operation | Minimum octas |
+|-----------------|-----------|---------------|
+| Per-item read   | $r_i$     | 3000          |
+| Per-item create | $c_i$     | 50,000        |
+| Per-item write  | $w_i$     | 3000          |
+| Per-byte read   | $r_b$     | 3             |
+| Per-byte create | $c_b$     | 50            |
+| Per-byte write  | $w_b$     | 50            |
 
-| Operation       | Octals |
-|-----------------|--------|
-| Per-item read   | 8      |
-| Per-item create | 200    |
-| Per-item write  | 40     |
-| Per-byte read   | 0.004  |
-| Per-byte create | 0.1    |
-| Per-byte write  | 0.02   |
+Here, the most expensive per-item operation by far is creating a new item (via either `move_to<T>()` or adding to a table), which costs nearly 17 times as much as reading or overwriting an old item: $c_i = 16.\overline{6} r_i = 16.\overline{6} w_i$. Additionally:
 
-Here, the most expensive per-item operation by far is creating a new item (via either `move_to<T>()` or adding to a table), which costs five times as much as overwriting an old item and 25 times as much as reading an old item.
-The same ratios apply among per-byte costs, with the effect that per-item costs are 2000 times higher than per-byte costs.
+* Writes cost the same as reads on a per-item basis: $w_i = r_i$
+* On a per-byte basis, however, writes cost the same as creates: $w_b = c_b$
+* Per-byte writes and creates cost nearly 17 times as much as per-byte reads: $w_b = c_b = 16.\overline{6} r_b$
+* Per-item reads cost 1000 times as much as per-byte reads: $r_i = 1000 r_b$
+* Per-item creates cost 1000 times as much as per-byte creates: $c_i = 1000 c_b$
+* Per-item writes cost 60 times as much as per-byte writes: $w_i = 60 w_b$
 
-In the absence of a legitimate economic incentive to deallocate from global storage (via either `move_from<T>()` or by removing from a table), this means that the most effective strategy for minimizing gas costs involves:
+Hence per-item operations cost 1000 times more than per-byte operations for both reads and creates, but only 60 times more for writes.
 
-1. Minimizing per-item creations
-2. Tracking unused items and overwriting them, rather than creating new items, when possible
-3. Containing per-item writes to as few items as possible
-4. Reading, rather than writing, whenever possible
-5. Minimizing the number of bytes in any given operation, noting that per-item costs far outweigh optimizations at the per-byte level
+Thus, in the absence of a legitimate economic incentive to deallocate from global storage (via either `move_from<T>()` or by removing from a table), the most effective storage gas optimization strategy is as follows:
+
+1. Minimize per-item creations
+2. Track unused items and overwrite them, rather than creating new items, when possible
+3. Contain per-item writes to as few items as possible
+4. Read, rather than write, whenever possible
+5. Minimize the number of bytes in all operations, especially writes
 
 ### Instruction gas
 
-As of the time of this writing, by far the most expensive instruction gas operation defined in [`instr.rs`] is a function call, which requires 1500 gas units (.15 octals), some 53 times less gas than a single per-item read in global storage.
-Loading a constant costs 650 gas units (.065 octals), borrow operations cost 500 units (0.05 octals), reading or writing to a reference costs 200 gas units (0.02 octals), and loading a `u128` on the stack costs 80 gas units (0.008 octals).
-Hence pass-by-value is less expensive than pass-by-reference for a primitive type like `u64`, but more expensive for a larger data structure like a 40-byte `struct`.
+As of the time of this writing, all instruction gas operations are multiplied by the `EXECUTION_GAS_MULTIPLIER` defined in [`gas_meter.rs`], which is set to 20.
+Hence the following representative operations assume gas costs as follows (divide internal gas by scaling factor, then multiply by minimum gas price):
 
-Notably, instruction gas is completely dwarfed by storage costs; there is technically an incentive to reduce the number of function calls in a program, for example, but engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions (in nearly all cases).
+| Operation                    | Minimum octas |
+|------------------------------|---------------|
+| Table add/borrow/remove box  | 240           |
+| Function call                | 200           |
+| Load constant                | 130           |
+| Globally borrow              | 100           |
+| Read/write reference         | 40            |
+| Load `u128` on stack         | 16            |
+| Table box operation per byte | 2             |
 
-In extreme cases it is possible for instruction gas to outweigh storage gas, for example if a loopwise mathematical function takes 10,000 iterations to converge; but again this is an extreme case and for most applications storage gas has a larger impact on base gas than does instruction gas.
+(Note that per-byte table box operation instruction gas does not account for storage gas, which is assessed separately).
+
+For comparison, reading a 100-byte item costs $r_i + 100 * r_b = 3000 + 100 * 3 = 3300$ octas at minimum, some 16.5 times as much as a function call, and in general, instruction gas costs are largely dominated by storage gas costs.
+
+Notably, however, there is still technically an incentive to reduce the number of function calls in a program, but engineering efforts are more effectively dedicated to writing modular, decomposed code that is geared toward reducing storage gas costs, rather than attempting to write repetitive code blocks with fewer nested functions (in nearly all cases).
+
+In extreme cases it is possible for instruction gas to far outweigh storage gas, for example if a loopwise mathematical function takes 10,000 iterations to converge; but again this is an extreme case and for most applications storage gas has a larger impact on base gas than does instruction gas.
 
 ### Payload gas
 
-As of the time of this writing, [`transaction.rs`] defines the minimum amount of gas per transaction as 1,500,000 units (150 octals), an amount that increases by 2,000 units (0.2 octals) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
+As of the time of this writing, [`transaction.rs`] defines the minimum amount of internal gas per transaction as 1,500,000 internal units (15,000 octas at minimum), an amount that increases by 2,000 internal gas units (20 octas minimum) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
 Hence in practice, payload gas is unlikely to be a concern.
 
 <!--- Alphabetized reference links -->
 
 [#4540]:                           https://github.com/aptos-labs/aptos-core/pull/4540/files
+[`aptos-gas/src/`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/
+[`aptos_global_constants`]:        https://github.com/aptos-labs/aptos-core/blob/main/config/global-constants/src/lib.rs
 [`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
+[BCS sequence specification]:      https://github.com/diem/bcs#fixed-and-variable-length-sequences
+[`gas_meter.rs`]:                  https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/gas_meter.rs
 [`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_initialize
 [`instr.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/instr.rs
+[`move_stdlib.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/move_stdlib.rs
 [`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_on_reconfig
 [`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md
 [`storage_gas.move`]:              https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/storage_gas.move
 [`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_StorageGas
+[`table.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/table.rs
 [`transaction.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction.rs
