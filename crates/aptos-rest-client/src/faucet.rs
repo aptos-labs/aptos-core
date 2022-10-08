@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::FaucetClientError, Client, Result};
-use aptos_types::transaction::SignedTransaction;
+use aptos_crypto::HashValue;
 use move_core_types::account_address::AccountAddress;
 use reqwest::{Client as ReqwestClient, Url};
-use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
+
 
 pub struct FaucetClient {
     faucet_url: Url,
@@ -45,29 +46,37 @@ impl FaucetClient {
     pub async fn create_account(&self, address: AccountAddress) -> Result<()> {
         let mut url = self.faucet_url.clone();
         url.set_path("mint");
-        let query = format!("auth_key={}&amount=0&return_txns=true", address);
+        let query = format!("address=0x{}&amount=0", address);
         url.set_query(Some(&query));
 
+        // Faucet returns the transaction that creates the account and needs to be waited on before
+        // returning.
         let response = self
             .inner
             .post(url)
+            .header("content-type", "application/json; charset=utf-8")
+            .header("content-length", 68)
             .send()
             .await
             .map_err(FaucetClientError::request)?;
+
         let status_code = response.status();
         let body = response.text().await.map_err(FaucetClientError::decode)?;
         if !status_code.is_success() {
             return Err(anyhow::anyhow!("body: {}", body));
         }
 
-        let bytes = hex::decode(body).map_err(FaucetClientError::decode)?;
-        let txns: Vec<SignedTransaction> =
-            bcs::from_bytes(&bytes).map_err(FaucetClientError::decode)?;
+        let bytes = hex::decode(&body[2..body.len() - 2]).map_err(FaucetClientError::decode)?;
 
-        self.rest_client
-            .wait_for_signed_transaction(&txns[0])
-            .await
-            .map_err(FaucetClientError::unknown)?;
+        let hash = HashValue::new(bytes.try_into().unwrap());
+        let expiration_timestamp_secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs().checked_add(20).unwrap();
+
+        self.rest_client.wait_for_transaction_by_hash(
+            hash, 
+            expiration_timestamp_secs,
+            None,
+            None
+        ).await?;
 
         Ok(())
     }
@@ -76,7 +85,7 @@ impl FaucetClient {
     pub async fn fund(&self, address: AccountAddress, amount: u64) -> Result<()> {
         let mut url = self.faucet_url.clone();
         url.set_path("mint");
-        let query = format!("auth_key={}&amount={}&return_txns=true", address, amount);
+        let query = format!("address=0x{}&amount={}", address, amount);
         url.set_query(Some(&query));
 
         // Faucet returns the transaction that creates the account and needs to be waited on before
@@ -84,23 +93,29 @@ impl FaucetClient {
         let response = self
             .inner
             .post(url)
+            .header("content-type", "application/json; charset=utf-8")
+            .header("content-length", 68)
             .send()
             .await
             .map_err(FaucetClientError::request)?;
+
         let status_code = response.status();
         let body = response.text().await.map_err(FaucetClientError::decode)?;
         if !status_code.is_success() {
-            return Err(FaucetClientError::status(status_code.as_u16()).into());
+            return Err(anyhow::anyhow!("body: {}", body));
         }
 
-        let bytes = hex::decode(body).map_err(FaucetClientError::decode)?;
-        let txns: Vec<SignedTransaction> =
-            bcs::from_bytes(&bytes).map_err(FaucetClientError::decode)?;
+        let bytes = hex::decode(&body[2..body.len() - 2]).map_err(FaucetClientError::decode)?;
 
-        self.rest_client
-            .wait_for_signed_transaction(&txns[0])
-            .await
-            .map_err(FaucetClientError::unknown)?;
+        let hash = HashValue::new(bytes.try_into().unwrap());
+        let expiration_timestamp_secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs().checked_add(20).unwrap();
+
+        self.rest_client.wait_for_transaction_by_hash(
+            hash, 
+            expiration_timestamp_secs,
+            None,
+            None
+        ).await?;
 
         Ok(())
     }
