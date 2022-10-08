@@ -59,7 +59,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
 4. Modify the `main.tf` file to configure Terraform and to create Aptos fullnode from the Terraform module. See below example content for `main.tf`:
 
-    ```json
+    ```
     terraform {
       required_version = "~> 1.2.0"
       backend "s3" {
