@@ -224,7 +224,7 @@ Payload gas is defined in [`transaction.rs`], which incorporates storage gas wit
 | `min_transaction_gas_units`     | Minimum internal gas units for a transaction, charged at the start of execution        |
 | `large_transaction_cutoff`      | Size, in bytes, above which transactions will be charged an additional amount per byte |
 | `intrinsic_gas_per_byte`        | Internal gas units charged per byte for payloads above `large_transaction_cutoff`      |
-| `maximum_number_of_gas_units`   | Upper limit on internal gas units for a transaction                                    |
+| `maximum_number_of_gas_units`   | Upper limit on external gas units for a transaction                                    |
 | `min_price_per_gas_unit`        | Minimum gas price allowed for a transaction                                            |
 | `max_price_per_gas_unit`        | Maximum gas price allowed for a transaction                                            |
 | `max_transaction_size_in_bytes` | Maximum transaction payload size in bytes                                              |
