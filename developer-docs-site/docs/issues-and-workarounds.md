@@ -126,6 +126,14 @@ This likely means that the state of the install is out of sync with the saved te
   terraform state rm <state>
   ```
 
+### How to find chain ID of my node
+
+On your node, run this command to find out the chain ID of your node:
+
+```bash
+curl http://127.0.0.1:8080/v1
+```
+
 ### Fullnode "NoAvailablePeers" error
 
 #### Description

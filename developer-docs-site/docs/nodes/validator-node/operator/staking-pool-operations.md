@@ -67,6 +67,10 @@ aptos node update-validator-network-addresses  \
   --profile mainnet-operator
 ```
 
+:::tip Important notes
+The address updates and the consensus key rotation will be applied only at the end of the current epoch. However, the validator need not leave the validator set to make these updates. You can run the commands for address and key changes. For the rest of the current epoch your validator will still use the old key and addresses but when the epoch ends it will switch to the new key and addresses.
+:::
+
 ### 4. Rotate the validator consensus key on-chain
 
 ```bash
@@ -247,7 +251,7 @@ Example output:
 }
 ```
 
-where:
+#### Description of key fields
 
 **current_epoch_successful_proposals**
 - Successful leader-validator proposals during the current epoch. Also see [Validation on the Aptos blockchain](/concepts/staking#validation-on-the-aptos-blockchain) for the distinction between leader-validator and the voter-validator.
@@ -257,32 +261,13 @@ where:
   - Either the validator was not part of the validator set in that epoch (could have been in either inactive or pending_active validator state), or
   - The validator missed all the leader proposals.
 
-### Rotating the consensus key
-
-You can rotate the operator consensus key by running the following command. Make sure to provide the pool address, the path to the `config.yaml` file and the profile:
-
-```bash
-aptos node update-consensus-key \
-  --pool-address <pool address> \
-  --validator-config-file </path/to/config.yaml> \
-  --profile <profile>
-  ```
-
-### Updating addresses for validator and validator fullnode 
-
-You can update the address for the validator node and the validator fullnode by running the following command. Make sure to provide the pool address, the path to the `operator.yaml` file and the profile:
-
-```bash
-aptos node update-validator-network-addresses \
-  --pool-address <pool-address> \
-  --operator-config-file </path/to/operator.yaml> \
-  --profile <profile>
-  ```
-
 ### Checking the performance for all epochs
 
-how can we receive performance for all epochs since Genesis? The command that you have provided early, only displays info for the latest period
+To check the performance of all the epochs since the genesis, run the below command:
 
 ```bash
-aptos node analyze-validator-performance --analyze-mode=detailed-epoch-table '--url=https://premainnet.aptosdev.com' --start-epoch=0 | grep <pool address>
+aptos node analyze-validator-performance \
+  --analyze-mode=detailed-epoch-table \
+  --url=https://premainnet.aptosdev.com \
+  --start-epoch=0 | grep <pool address>
 ```

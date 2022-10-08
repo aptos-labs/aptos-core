@@ -15,6 +15,11 @@ Before you shutdown the node, make sure to first leave validator set first. This
 aptos node leave-validator-set --profile testnet-operator --pool-address <owner-address>
 ```
 
+:::danger Important
+If you leave and then rejoin in the same epoch, the rejoin would fail. This is because  when you leave, your validator state changes from "active" to "pending_inactive" but not actually "inactive". Hence the rejoin would fail.
+::: 
+
+
 After leaving the validator set, follow any one of the below sections to shut down your nodes. 
 
 ## Using source code
