@@ -244,7 +244,7 @@ class ScriptArgument:
     U128: int = 2
     ADDRESS: int = 3
     U8_VECTOR: int = 4
-    BOOL: int = (5,)
+    BOOL: int = 5
 
     variant: int
     value: typing.Any
