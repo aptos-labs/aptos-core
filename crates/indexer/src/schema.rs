@@ -60,6 +60,19 @@ diesel::table! {
         decimals -> Int4,
         transaction_created_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        supply_aggregator_table_handle -> Nullable<Varchar>,
+        supply_aggregator_table_key -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    coin_supply (transaction_version, coin_type_hash) {
+        transaction_version -> Int8,
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        supply -> Numeric,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -435,6 +448,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     coin_activities,
     coin_balances,
     coin_infos,
+    coin_supply,
     collection_datas,
     current_ans_lookup,
     current_coin_balances,
