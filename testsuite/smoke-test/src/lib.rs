@@ -22,8 +22,6 @@ mod indexer;
 #[cfg(test)]
 mod network;
 #[cfg(test)]
-mod nft_transaction;
-#[cfg(test)]
 mod rest_api;
 #[cfg(test)]
 mod rosetta;
