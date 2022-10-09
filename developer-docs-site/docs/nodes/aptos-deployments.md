@@ -3,7 +3,6 @@ title: "Aptos Blockchain Deployments"
 slug: "aptos-deployments"
 hide_table_of_contents: true
 ---
-import imageUrl from '/static/img/docs/1x1.png';
 
 # Aptos Blockchain Deployments
 
