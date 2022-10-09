@@ -3,6 +3,7 @@ title: "Aptos Blockchain Deployments"
 slug: "aptos-deployments"
 hide_table_of_contents: true
 ---
+import imageUrl from '/static/img/docs/1x1.png';
 
 # Aptos Blockchain Deployments
 
@@ -16,10 +17,11 @@ Make sure to see the row describing [**What not to do**](#what-not-to-do).
 
 |Description | Mainnet | Devnet | Long-lived Testnet | Aptos Incentivized Testnet (AIT)|
 |---|---|---|---|---|
-|**REST API URL**| https://fullnode.mainnet.aptoslabs.com/v1 |https://fullnode.devnet.aptoslabs.com/v1 | https://fullnode.testnet.aptoslabs.com/v1 | Available during AIT program. |
 |**Chain ID**| 1 |[Click here and **select Devnet from top right**](https://explorer.aptoslabs.com/?network=Devnet).| 2| Available during AIT program.|
+|**REST API URL**| https://fullnode.mainnet.aptoslabs.com/v1 |https://fullnode.devnet.aptoslabs.com/v1 | https://fullnode.testnet.aptoslabs.com/v1 | Available during AIT program. |
 |**Genesis blob and Waypoint**| In the `mainnet` directory on https://github.com/aptos-labs/aptos-genesis-waypoint |In the `devnet` directory on https://github.com/aptos-labs/aptos-genesis-waypoint  | In the `testnet` directory on https://github.com/aptos-labs/aptos-genesis-waypoint | Available during AIT program. |
 |**Faucet**| No Faucet |https://faucet.devnet.aptoslabs.com/ | https://faucet.testnet.aptoslabs.com/ |Available during AIT program.|
+|**Epoch**| 3600 seconds (set by governance) |--- | --- |Available during AIT program.|
 |**Network runs where**| Validators, validator fullnodes and public fullnodes are run by you (i.e., the Aptos community) and Aptos Labs. |Validators run on Aptos Labs servers. Fullnodes are run by both Aptos Labs and you (i.e., the Aptos community).|Validators run on Aptos Labs servers. Fullnodes are run by both Aptos Labs and you (i.e., the Aptos community). | Some Validators run on Aptos servers, others are run by the Aptos community. Fullnodes are run by Aptos Labs and the community.|
 |**Who is responsible for the network**| Fully decentralized. |Managed by Aptos Team. | Managed by Aptos Team. | Managed by Aptos Labs and the community.|
 |**Update release cadence**| Every month. |Every week. |Every 2 weeks. | Managed by Aptos Labs and the community.|
