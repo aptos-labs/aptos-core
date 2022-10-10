@@ -1,6 +1,7 @@
 CREATE TABLE marketplace_collections (
     creator_address VARCHAR(66) UNIQUE NOT NULL,
     collection_name TEXT UNIQUE NOT NULL,
+    creation_timestamp TIMESTAMP NOT NULL,
 
     PRIMARY KEY (
         creator_address,
