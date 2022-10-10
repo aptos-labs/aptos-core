@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
@@ -19,13 +16,13 @@ diesel::table! {
 }
 
 diesel::table! {
-    collection_datas (collection_data_id_hash, transaction_version) {
-        collection_data_id_hash -> Varchar,
-        transaction_version -> Int8,
+    collection_datas (creator_address, collection_name_hash, transaction_version) {
         creator_address -> Varchar,
-        collection_name -> Varchar,
+        collection_name_hash -> Varchar,
+        collection_name -> Text,
         description -> Text,
-        metadata_uri -> Varchar,
+        transaction_version -> Int8,
+        metadata_uri -> Text,
         supply -> Numeric,
         maximum -> Numeric,
         maximum_mutable -> Bool,
@@ -145,6 +142,50 @@ diesel::table! {
 }
 
 diesel::table! {
+    marketplace_bids (creator_address, collection_name) {
+        creator_address -> Varchar,
+        collection_name -> Text,
+        token_name -> Text,
+        property_version -> Int2,
+        price -> Int8,
+        maker -> Varchar,
+        timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
+    marketplace_collections (creator_address, collection_name) {
+        creator_address -> Varchar,
+        collection_name -> Text,
+    }
+}
+
+diesel::table! {
+    marketplace_offers (creator_address, collection_name) {
+        creator_address -> Varchar,
+        collection_name -> Text,
+        token_name -> Text,
+        property_version -> Int2,
+        price -> Int8,
+        seller -> Varchar,
+        timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
+    marketplace_orders (creator_address, collection_name) {
+        creator_address -> Varchar,
+        collection_name -> Text,
+        token_name -> Text,
+        property_version -> Int2,
+        price -> Int8,
+        quantity -> Int8,
+        maker -> Varchar,
+        timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
     move_modules (transaction_version, write_set_change_index) {
         transaction_version -> Int8,
         write_set_change_index -> Int8,
@@ -251,16 +292,17 @@ diesel::table! {
 }
 
 diesel::table! {
-    token_datas (token_data_id_hash, transaction_version) {
-        token_data_id_hash -> Varchar,
-        transaction_version -> Int8,
+    token_datas (creator_address, collection_name_hash, name_hash, transaction_version) {
         creator_address -> Varchar,
-        collection_name -> Varchar,
-        name -> Varchar,
+        collection_name_hash -> Varchar,
+        name_hash -> Varchar,
+        collection_name -> Text,
+        name -> Text,
+        transaction_version -> Int8,
         maximum -> Numeric,
         supply -> Numeric,
         largest_property_version -> Numeric,
-        metadata_uri -> Varchar,
+        metadata_uri -> Text,
         payee_address -> Varchar,
         royalty_points_numerator -> Numeric,
         royalty_points_denominator -> Numeric,
@@ -276,16 +318,17 @@ diesel::table! {
 }
 
 diesel::table! {
-    token_ownerships (token_data_id_hash, property_version, transaction_version, table_handle) {
-        token_data_id_hash -> Varchar,
+    token_ownerships (creator_address, collection_name_hash, name_hash, property_version, transaction_version, table_handle) {
+        creator_address -> Varchar,
+        collection_name_hash -> Varchar,
+        name_hash -> Varchar,
+        collection_name -> Text,
+        name -> Text,
         property_version -> Numeric,
         transaction_version -> Int8,
-        table_handle -> Varchar,
-        creator_address -> Varchar,
-        collection_name -> Varchar,
-        name -> Varchar,
         owner_address -> Nullable<Varchar>,
         amount -> Numeric,
+        table_handle -> Varchar,
         table_type -> Nullable<Text>,
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
@@ -293,13 +336,14 @@ diesel::table! {
 }
 
 diesel::table! {
-    tokens (token_data_id_hash, property_version, transaction_version) {
-        token_data_id_hash -> Varchar,
+    tokens (creator_address, collection_name_hash, name_hash, property_version, transaction_version) {
+        creator_address -> Varchar,
+        collection_name_hash -> Varchar,
+        name_hash -> Varchar,
+        collection_name -> Text,
+        name -> Text,
         property_version -> Numeric,
         transaction_version -> Int8,
-        creator_address -> Varchar,
-        collection_name -> Varchar,
-        name -> Varchar,
         token_properties -> Jsonb,
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
@@ -366,6 +410,10 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_token_pending_claims,
     events,
     ledger_infos,
+    marketplace_bids,
+    marketplace_collections,
+    marketplace_offers,
+    marketplace_orders,
     move_modules,
     move_resources,
     processor_statuses,
