@@ -9,6 +9,8 @@ import { derivePath } from "./utils/hd-key";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
 import { Memoize } from "./utils";
+import { bcsToBytes } from "./bcs/helper";
+import { AccountAddress } from "./aptos_types/account_address";
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -137,6 +139,27 @@ export class AptosAccount {
     return this.signBuffer(toSign);
   }
 
+    /**
+   * Takes source address and seeds and returns the resource account address
+   * @param sourceAddress Address used to derive the resource account
+   * @param seed The seeds need to be in hexadecimal format
+   * @returns The resource account address
+   */
+
+     static getResourceAccountAddress(sourceAddress: MaybeHexString, seed: Uint8Array): HexString {
+      const source = bcsToBytes(AccountAddress.fromHex(sourceAddress));
+  
+      const originBytes = new Uint8Array(source.length + seed.length);
+  
+      originBytes.set(source);
+      originBytes.set(seed, source.length);
+  
+      const hash = sha3Hash.create();
+      hash.update(originBytes);
+  
+      return HexString.fromUint8Array(hash.digest());
+    }
+
   /**
    * Derives account address, public key and private key
    * @returns AptosAccountObject instance.
@@ -157,4 +180,6 @@ export class AptosAccount {
       privateKeyHex: HexString.fromUint8Array(this.signingKey.secretKey.slice(0, 32)).hex(),
     };
   }
+
+
 }
