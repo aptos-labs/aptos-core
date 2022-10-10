@@ -28,7 +28,7 @@ use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
     LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
     ShowValidatorStake, StakePoolResult, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
-    ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
+    ValidatorConfig, ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
 use crate::stake::{
@@ -49,7 +49,6 @@ use aptos_sdk::move_types::identifier::Identifier;
 use aptos_sdk::move_types::language_storage::ModuleId;
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
-use aptos_types::validator_config::ValidatorConfig;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

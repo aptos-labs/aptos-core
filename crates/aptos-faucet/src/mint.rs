@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+// README: The aptos-faucet is deprecated in favor of the tap. Do not add new code
+// to this until you've spoken with the Ecosystem Platform team + dport.
+
 use crate::Service;
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};

@@ -21,6 +21,7 @@ use crate::{
     genesis::git::from_yaml,
 };
 use aptos_config::config::NodeConfig;
+use aptos_crypto::bls12381::PublicKey;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
@@ -32,7 +33,6 @@ use aptos_types::network_address::NetworkAddress;
 use aptos_types::on_chain_config::{ConfigurationResource, ConsensusScheme, ValidatorSet};
 use aptos_types::stake_pool::StakePool;
 use aptos_types::staking_contract::StakingContractStore;
-use aptos_types::validator_config::ValidatorConfig;
 use aptos_types::validator_info::ValidatorInfo;
 use aptos_types::validator_performances::ValidatorPerformances;
 use aptos_types::vesting::VestingAdminStore;
@@ -44,6 +44,7 @@ use backup_cli::storage::command_adapter::{config::CommandAdapterConfig, Command
 use backup_cli::utils::{
     ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
 };
+use bcs::Result;
 use cached_packages::aptos_stdlib;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
@@ -273,7 +274,7 @@ pub struct StakePoolResult {
     pub commission_percentage: u64,
     pub commission_not_yet_unlocked: u64,
     pub lockup_expiration_utc_time: DateTime<Utc>,
-    pub consensus_public_key: bls12381::PublicKey,
+    pub consensus_public_key: String,
     pub validator_network_addresses: Vec<NetworkAddress>,
     pub fullnode_network_addresses: Vec<NetworkAddress>,
     pub epoch_info: EpochInfo,
@@ -518,6 +519,14 @@ pub async fn get_stake_pool_info(
     let commission_not_yet_unlocked = (total_stake - principal) * commission_percentage / 100;
     let state = get_stake_pool_state(validator_set, &pool_address);
 
+    let consensus_public_key = if validator_config.consensus_public_key.is_empty() {
+        "".into()
+    } else {
+        PublicKey::try_from(&validator_config.consensus_public_key[..])
+            .unwrap()
+            .to_encoded_string()
+            .unwrap()
+    };
     Ok(StakePoolResult {
         state,
         pool_address,
@@ -528,9 +537,13 @@ pub async fn get_stake_pool_info(
         commission_percentage,
         commission_not_yet_unlocked,
         lockup_expiration_utc_time: Time::new_seconds(stake_pool.locked_until_secs).utc_time,
-        consensus_public_key: validator_config.consensus_public_key.clone(),
-        validator_network_addresses: validator_config.validator_network_addresses().unwrap(),
-        fullnode_network_addresses: validator_config.fullnode_network_addresses().unwrap(),
+        consensus_public_key,
+        validator_network_addresses: validator_config
+            .validator_network_addresses()
+            .unwrap_or_default(),
+        fullnode_network_addresses: validator_config
+            .fullnode_network_addresses()
+            .unwrap_or_default(),
         epoch_info,
         vesting_contract,
     })
@@ -873,27 +886,72 @@ impl TryFrom<&ValidatorInfo> for ValidatorInfoSummary {
     type Error = bcs::Error;
 
     fn try_from(info: &ValidatorInfo) -> Result<Self, Self::Error> {
+        let config = info.config();
+        let config = ValidatorConfig {
+            consensus_public_key: config.consensus_public_key.to_bytes().to_vec(),
+            validator_network_addresses: config.validator_network_addresses.clone(),
+            fullnode_network_addresses: config.fullnode_network_addresses.clone(),
+            validator_index: config.validator_index,
+        };
         Ok(ValidatorInfoSummary {
             account_address: info.account_address,
             consensus_voting_power: info.consensus_voting_power(),
-            config: info.config().try_into()?,
+            config: ValidatorConfigSummary::try_from(&config)?,
         })
     }
 }
 
 impl From<&ValidatorInfoSummary> for ValidatorInfo {
     fn from(summary: &ValidatorInfoSummary) -> Self {
+        let config = &summary.config;
         ValidatorInfo::new(
             summary.account_address,
             summary.consensus_voting_power,
-            (&summary.config).into(),
+            aptos_types::validator_config::ValidatorConfig::new(
+                PublicKey::from_encoded_string(&config.consensus_public_key).unwrap(),
+                bcs::to_bytes(&config.validator_network_addresses).unwrap(),
+                bcs::to_bytes(&config.fullnode_network_addresses).unwrap(),
+                config.validator_index,
+            ),
         )
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct ValidatorConfig {
+    pub consensus_public_key: Vec<u8>,
+    pub validator_network_addresses: Vec<u8>,
+    pub fullnode_network_addresses: Vec<u8>,
+    pub validator_index: u64,
+}
+
+impl ValidatorConfig {
+    pub fn new(
+        consensus_public_key: Vec<u8>,
+        validator_network_addresses: Vec<u8>,
+        fullnode_network_addresses: Vec<u8>,
+        validator_index: u64,
+    ) -> Self {
+        ValidatorConfig {
+            consensus_public_key,
+            validator_network_addresses,
+            fullnode_network_addresses,
+            validator_index,
+        }
+    }
+
+    pub fn fullnode_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
+        bcs::from_bytes(&self.fullnode_network_addresses)
+    }
+
+    pub fn validator_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
+        bcs::from_bytes(&self.validator_network_addresses)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ValidatorConfigSummary {
-    pub consensus_public_key: bls12381::PublicKey,
+    pub consensus_public_key: String,
     /// This is an bcs serialized Vec<NetworkAddress>
     pub validator_network_addresses: Vec<NetworkAddress>,
     /// This is an bcs serialized Vec<NetworkAddress>
@@ -905,8 +963,16 @@ impl TryFrom<&ValidatorConfig> for ValidatorConfigSummary {
     type Error = bcs::Error;
 
     fn try_from(config: &ValidatorConfig) -> Result<Self, Self::Error> {
+        let consensus_public_key = if config.consensus_public_key.is_empty() {
+            "".into()
+        } else {
+            PublicKey::try_from(&config.consensus_public_key[..])
+                .unwrap()
+                .to_encoded_string()
+                .unwrap()
+        };
         Ok(ValidatorConfigSummary {
-            consensus_public_key: config.consensus_public_key.clone(),
+            consensus_public_key,
             // TODO: We should handle if some of these are not parsable
             validator_network_addresses: config.validator_network_addresses()?,
             fullnode_network_addresses: config.fullnode_network_addresses()?,
@@ -917,8 +983,13 @@ impl TryFrom<&ValidatorConfig> for ValidatorConfigSummary {
 
 impl From<&ValidatorConfigSummary> for ValidatorConfig {
     fn from(summary: &ValidatorConfigSummary) -> Self {
+        let consensus_public_key = if summary.consensus_public_key.is_empty() {
+            vec![]
+        } else {
+            summary.consensus_public_key.as_bytes().to_vec()
+        };
         ValidatorConfig {
-            consensus_public_key: summary.consensus_public_key.clone(),
+            consensus_public_key,
             validator_network_addresses: bcs::to_bytes(&summary.validator_network_addresses)
                 .unwrap(),
             fullnode_network_addresses: bcs::to_bytes(&summary.fullnode_network_addresses).unwrap(),

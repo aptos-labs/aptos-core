@@ -490,10 +490,6 @@ pub trait DbReader: Send + Sync {
 }
 
 impl MoveStorage for &dyn DbReader {
-    fn fetch_resource(&self, access_path: AccessPath) -> Result<Vec<u8>> {
-        self.fetch_resource_by_version(access_path, self.fetch_latest_state_checkpoint_version()?)
-    }
-
     fn fetch_resource_by_version(
         &self,
         access_path: AccessPath,
