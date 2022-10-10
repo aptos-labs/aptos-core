@@ -13,4 +13,7 @@ pub const GCP_CLOUD_RUN_REVISION_ENV: &str = "K_REVISION";
 pub const GCP_CLOUD_RUN_SERVICE_ENV: &str = "K_SERVICE";
 /// GCP Project within which this service is running.
 /// This variable must be set by calling the metadata server
-pub const GCP_SERVICE_PROJECT_ID: &str = "GCP_METADATA_PROJECT_ID";
+pub const GCP_SERVICE_PROJECT_ID_ENV: &str = "GCP_METADATA_PROJECT_ID";
+/// Environment variable with the container identifier for this cloud run revision
+/// This variable must be set by calling the metadata server
+pub const GCP_CLOUD_RUN_INSTANCE_ID_ENV: &str = "GCP_CLOUD_RUN_INSTANCE_ID";
