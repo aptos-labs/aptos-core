@@ -3,7 +3,7 @@ module hello_blockchain::message {
     use std::signer;
     use std::string;
     use aptos_framework::account;
-    use aptos_std::event;
+    use aptos_framework::event;
 
 //:!:>resource
     struct MessageHolder has key {

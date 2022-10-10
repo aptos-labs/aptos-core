@@ -42,7 +42,6 @@ module aptos_framework::vesting {
     use std::string::{utf8, String};
     use std::vector;
 
-    use aptos_std::event::{EventHandle, emit_event};
     use aptos_std::pool_u64::{Self, Pool};
     use aptos_std::simple_map::{Self, SimpleMap};
 
@@ -50,6 +49,7 @@ module aptos_framework::vesting {
     use aptos_framework::aptos_account::assert_account_is_registered_for_apt;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
+    use aptos_framework::event::{EventHandle, emit_event};
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
     use aptos_framework::system_addresses;
