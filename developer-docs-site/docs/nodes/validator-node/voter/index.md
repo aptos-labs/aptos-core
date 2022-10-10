@@ -9,7 +9,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Voter 
 
 :::tip Petra on Chrome browser only
-The [Petra wallet extension](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) also work.
+The [Petra wallet extension](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) will also work.
 :::
 
 If you are a voter, then we recommend strongly that you do not store your Aptos voter keys with a custodian before the custodian supports this function. Until then, we suggest you store your voter keys in an Aptos wallet like [Petra](/docs/guides/install-petra-wallet.md) or [Martian](https://martianwallet.xyz/).
