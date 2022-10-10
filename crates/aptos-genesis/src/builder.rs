@@ -25,13 +25,8 @@ use aptos_crypto::{
 use aptos_framework::ReleaseBundle;
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
-use aptos_types::{
-    chain_id::ChainId,
-    on_chain_config::{GasScheduleV2, OnChainConsensusConfig},
-    transaction::Transaction,
-    waypoint::Waypoint,
-};
-use aptos_vm_genesis::default_gas_schedule;
+use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint,account_address::AccountAddressWithChecks};
+use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -41,6 +36,7 @@ use std::{
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
+    str::FromStr
 };
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
@@ -199,6 +195,7 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
             owner_account_public_key: private_identity.account_private_key.public_key(),
             operator_account_address: private_identity.account_address.into(),
             operator_account_public_key: private_identity.account_private_key.public_key(),
+            voter_account_address: AccountAddressWithChecks::from_str("0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb").unwrap(),
             voter_account_address: private_identity.account_address.into(),
             voter_account_public_key: private_identity.account_private_key.public_key(),
             consensus_public_key: Some(private_identity.consensus_private_key.public_key()),
@@ -433,7 +430,7 @@ impl Builder {
         Ok(Self {
             config_dir,
             framework,
-            num_validators: NonZeroUsize::new(1).unwrap(),
+            num_validators: NonZeroUsize::new(5).unwrap(),
             randomize_first_validator_ports: true,
             init_config: None,
             init_genesis_config: None,
