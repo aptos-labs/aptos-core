@@ -11,8 +11,11 @@ use clap::Parser;
 // TODO(greg): revisit after fixing gas estimation
 pub const DEFAULT_FUNDED_COINS: u64 = 500_000;
 
-/// Command to create a new account on-chain
+/// Create a new account on-chain
 ///
+/// An account can be created by transferring coins, or by making an explicit
+/// call to create an account.  This will create an account with no coins, and
+/// any coins will have to transferred afterwards.
 #[derive(Debug, Parser)]
 pub struct CreateAccount {
     /// Address of the new account

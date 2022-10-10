@@ -28,25 +28,36 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
 
-/// Command to rotate an account's authentication key
+/// Rotate an account's authentication key
 ///
+/// Rotating the account's authentication key allows you to use a new
+/// private key.  You must provide a new private key.  Once it is
+/// rotated you will need to use the original account address, with the
+/// new private key.  There is an interactive prompt to help you add it
+/// to a new profile.
 #[derive(Debug, Parser)]
 pub struct RotateKey {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 
-    /// File name that contains the new private key
+    /// File name that contains the new private key encoded in the type from `--encoding`
     #[clap(long, group = "new_private_key", parse(from_os_str))]
     pub(crate) new_private_key_file: Option<PathBuf>,
-    /// New private key encoded in a type as shown in `encoding`
+
+    /// New private key encoded in the type from `--encoding`
     #[clap(long, group = "new_private_key")]
     pub(crate) new_private_key: Option<String>,
 
     /// Name of the profile to save the new private key
+    ///
+    /// If not provided, it will interactively have you save a profile,
+    /// unless `--skip_saving_profile` is provided
     #[clap(long)]
     pub(crate) save_to_profile: Option<String>,
 
     /// Skip saving profile
+    ///
+    /// This skips the interactive profile saving after rotating the authentication key
     #[clap(long)]
     pub(crate) skip_saving_profile: bool,
 }
@@ -234,7 +245,7 @@ impl CliCommand<RotateSummary> for RotateKey {
     }
 }
 
-/// Command to lookup the account address through on-chain lookup table
+/// Lookup the account address through on-chain lookup table
 ///
 #[derive(Debug, Parser)]
 pub struct LookupAddress {
