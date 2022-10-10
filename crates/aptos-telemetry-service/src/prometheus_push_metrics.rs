@@ -157,6 +157,7 @@ fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<
     };
     vec![
         format!("role={}", claims.node_type),
+        format!("metrics_source={}", "telemetry-service"),
         chain_name,
         format!("namespace={}", "telemetry-service"),
         pod_name,
