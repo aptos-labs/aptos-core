@@ -90,15 +90,15 @@ Alice: 0x0baec07bfc42f8018ea304ddc307a359c1c6ab20fbce598065b6cb19acff7043
 Bob: 0xc98ceafadaa32e50d06d181842406dbbf518b6586ab67cfa2b736aaddeb7c74f
 
 === Initial Balances ===
-Alice: 20000
+Alice: 100000000
 Bob: 0
 
 === Intermediate Balances ===
-Alice: 18996
+Alice: 99972800
 Bob: 1000
 
 === Final Balances ===
-Alice: 17992
+Alice: 99945600
 Bob: 2000
 ```
 
@@ -109,9 +109,9 @@ The above output demonstrates that the `transfer-coin` example executes the foll
   * The funding and creation of Alice's account from a faucet.
   * The creation of Bob's account from a faucet.
 * The transferring of 1000 coins from Alice to Bob.
-* The 4 coins of gas paid for by Alice to make that transfer.
+* The 26200 coins of gas paid for by Alice to make that transfer.
 * Another transfer of 1000 coins from Alice to Bob.
-* The additional 4 coins of gas paid for by Alice to make that transfer.
+* The additional 26200 coins of gas paid for by Alice to make that transfer.
 
 Next, see below a walk-through of the SDK functions that are used to accomplish the above steps.
 
