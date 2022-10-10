@@ -59,6 +59,10 @@ This will show you the coin balance you have in the validator account. You will 
   }
 ```
 
+:::tip Already in validator set? Skip to Step 6
+If you know you are already in the validator set, then skip steps 3, 4, and 5 and go directly to step 6 to confirm it.
+:::
+
 ### 3. Update validator network addresses on-chain
 
 ```bash
