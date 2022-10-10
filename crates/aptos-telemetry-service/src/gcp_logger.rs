@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::constants::GCP_SERVICE_PROJECT_ID;
+use crate::constants::GCP_SERVICE_PROJECT_ID_ENV;
 
 use std::env;
 
@@ -9,7 +9,7 @@ pub fn gcp_trace_id() -> Option<String> {
     let current_span = tracing::Span::current();
     current_span
         .field("trace_id")
-        .zip(env::var(GCP_SERVICE_PROJECT_ID).ok())
+        .zip(env::var(GCP_SERVICE_PROJECT_ID_ENV).ok())
         .map(|(trace_id, project_id)| format!("projects/{}/traces/{}", project_id, trace_id))
 }
 
