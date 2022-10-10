@@ -10,7 +10,7 @@ export const FAUCET_URL = process.env.APTOS_FAUCET_URL!;
  * pass that along in the header in the format the faucet expects.
  */
 export function getFaucetClient(): FaucetClient {
-  let config: Partial<OpenAPIConfig> = {};
+  const config: Partial<OpenAPIConfig> = {};
   if (process.env.FAUCET_AUTH_TOKEN) {
     config.HEADERS = { Authorization: `Bearer ${process.env.FAUCET_AUTH_TOKEN}` };
   }

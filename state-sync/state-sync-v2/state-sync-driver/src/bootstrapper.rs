@@ -515,8 +515,10 @@ impl<
                     .config
                     .num_versions_to_skip_snapshot_sync
             {
-                info!(LogSchema::new(LogEntry::Bootstrapper)
-                    .message("The node is only {} versions behind, will skip bootstrapping."));
+                info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                    "The node is only {} versions behind, will skip bootstrapping.",
+                    num_versions_behind
+                )));
                 // We've already bootstrapped to an initial state snapshot. If this a fullnode, the
                 // continuous syncer will take control and get the node up-to-date. If this is a
                 // validator, consensus will take control and sync depending on how it sees fit.

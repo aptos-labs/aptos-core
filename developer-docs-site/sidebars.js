@@ -150,6 +150,7 @@ const sidebars = {
             },
             "nodes/validator-node/operator/node-liveness-criteria",
             "nodes/validator-node/operator/connect-to-aptos-network",
+            "nodes/validator-node/operator/staking-pool-operations",
             "nodes/validator-node/operator/shutting-down-nodes",
           ],
         },

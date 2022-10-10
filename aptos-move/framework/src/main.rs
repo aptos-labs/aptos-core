@@ -53,10 +53,14 @@ struct StandardRelease {
     /// some packages may be available in testnet, but aren't in mainnet.
     #[clap(long, default_value = "head")]
     target: ReleaseTarget,
+
+    /// Remove the source code from the release package to shrink its size.
+    #[clap(long)]
+    without_source_code: bool,
 }
 
 impl StandardRelease {
     fn execute(self) -> anyhow::Result<()> {
-        self.target.create_release(None)
+        self.target.create_release(!self.without_source_code, None)
     }
 }
