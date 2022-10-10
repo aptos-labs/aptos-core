@@ -1261,7 +1261,18 @@ impl TransactionSigningMessage {
 
 /// Struct holding the outputs of the estimate gas API
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct GasEstimation {
+pub struct GasEstimationBcs {
     /// The current estimate for the gas unit price
     pub gas_estimate: u64,
+}
+
+/// Struct holding the outputs of the estimate gas API
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct GasEstimation {
+    /// The deprioritized estimate for the gas unit price
+    pub deprioritized_gas_estimate: Option<u64>,
+    /// The current estimate for the gas unit price
+    pub gas_estimate: u64,
+    /// The prioritized estimate for the gas unit price
+    pub prioritized_gas_estimate: Option<u64>,
 }
