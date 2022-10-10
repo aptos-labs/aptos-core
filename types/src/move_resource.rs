@@ -6,9 +6,6 @@ use anyhow::Result;
 
 // TODO combine with ConfigStorage
 pub trait MoveStorage {
-    /// Returns a Move resources as a serialized byte array.
-    fn fetch_resource(&self, access_path: AccessPath) -> Result<Vec<u8>>;
-
     /// Returns a Move resources as serialized byte array from a
     /// specified version of the database.
     fn fetch_resource_by_version(
