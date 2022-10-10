@@ -1,18 +1,17 @@
 locals {
-  pfn_helm_chart_path        = "${path.module}/fullnode"
+  pfn_addons_helm_chart_path = "${path.module}/../../helm/pfn-addons"
   pfn_logger_helm_chart_path = "${path.module}/../../helm/logger"
   fullnode_helm_chart_path   = "${path.module}/../../helm/fullnode"
 }
 
-resource "helm_release" "pfn" {
-  name        = "aptos"
-  chart       = local.pfn_helm_chart_path
+resource "helm_release" "pfn-addons" {
+  name        = "pfn-addons"
+  chart       = local.pfn_addons_helm_chart_path
   max_history = 10
   wait        = false
 
   values = [
     jsonencode({
-      imageTag = local.image_tag
       service = {
         domain   = local.domain
         aws_tags = local.aws_tags
@@ -20,20 +19,11 @@ resource "helm_release" "pfn" {
           numFullnodes             = var.num_fullnodes
           loadBalancerSourceRanges = var.client_sources_ipv4
         }
-        monitoring = {
-          loadBalancerSourceRanges = var.admin_sources_ipv4
-        }
       }
       ingress = {
-        acm_certificate          = var.zone_id != "" ? aws_acm_certificate.ingress[0].arn : null
-        loadBalancerSourceRanges = var.client_sources_ipv4
-      }
-      monitoring = {
-        prometheus = {
-          storage = {
-            class = "gp2"
-          }
-        }
+        ingressClass             = "alb"
+        awsAlbAcmCertificateArn  = var.zone_id != "" ? aws_acm_certificate.ingress[0].arn : null
+        awsAlbLoadBalancerSourceRanges = var.client_sources_ipv4
       }
     }),
     jsonencode(var.pfn_helm_values),
@@ -42,7 +32,7 @@ resource "helm_release" "pfn" {
   # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
     name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.pfn_helm_chart_path, "**") : filesha1("${local.pfn_helm_chart_path}/${f}")]))
+    value = sha1(join("", [for f in fileset(local.pfn_addons_helm_chart_path, "**") : filesha1("${local.pfn_addons_helm_chart_path}/${f}")]))
   }
 }
 
@@ -57,6 +47,7 @@ resource "helm_release" "fullnode" {
 
   values = [
     jsonencode({
+      imageTag = var.image_tag
       chain = {
         era  = var.era
         name = var.chain_name
@@ -72,6 +63,14 @@ resource "helm_release" "fullnode" {
       }
       storage = {
         class = var.fullnode_storage_class
+      }
+      service = {
+        type = "LoadBalancer"
+        annotations = {
+          "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
+          "external-dns.alpha.kubernetes.io/hostname"         = "pfn${count.index}.${local.domain}"
+          "alb.ingress.kubernetes.io/healthcheck-path"        = "/v1/-/healthy"
+        }
       }
       backup = {
         enable = count.index == 0 ? var.enable_backup : false

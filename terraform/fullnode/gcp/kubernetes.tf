@@ -30,7 +30,40 @@ provider "helm" {
 }
 
 locals {
-  fullnode_helm_chart_path = "${path.module}/../../helm/fullnode"
+  fullnode_helm_chart_path   = "${path.module}/../../helm/fullnode"
+  pfn_addons_helm_chart_path = "${path.module}/../../helm/pfn-addons"
+}
+
+
+resource "helm_release" "pfn-addons" {
+  name        = "pfn-addons"
+  chart       = local.pfn_addons_helm_chart_path
+  max_history = 10
+  wait        = false
+
+  values = [
+    jsonencode({
+      service = {
+        domain   = local.domain
+        aws_tags = local.aws_tags
+        fullnode = {
+          numFullnodes             = var.num_fullnodes
+          loadBalancerSourceRanges = var.client_sources_ipv4
+        }
+      }
+      ingress = {
+        ingressClass             = "gce"
+        loadBalancerSourceRanges = var.client_sources_ipv4
+      }
+    }),
+    jsonencode(var.pfn_helm_values),
+  ]
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.pfn_addons_helm_chart_path, "**") : filesha1("${local.pfn_addons_helm_chart_path}/${f}")]))
+  }
 }
 
 resource "helm_release" "fullnode" {
@@ -44,6 +77,7 @@ resource "helm_release" "fullnode" {
 
   values = [
     jsonencode({
+      imageTag = var.image_tag
       chain = {
         era  = var.era
         name = var.chain_name
