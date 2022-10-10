@@ -157,6 +157,7 @@ fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<
     };
     vec![
         format!("role={}", claims.node_type),
+        format!("metrics_source={}", "telemetry-service"),
         chain_name,
         format!("namespace={}", "telemetry-service"),
         pod_name,
@@ -192,6 +193,7 @@ mod test {
             claims,
             vec![
                 "role=validator",
+                "metrics_source=telemetry-service",
                 "chain_name=25",
                 "namespace=telemetry-service",
                 "kubernetes_pod_name=peer_id:test_name//0x1",
@@ -213,6 +215,7 @@ mod test {
             claims,
             vec![
                 "role=validator",
+                "metrics_source=telemetry-service",
                 "chain_name=25",
                 "namespace=telemetry-service",
                 "kubernetes_pod_name=peer_id:0x1",
