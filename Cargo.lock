@@ -8822,6 +8822,7 @@ dependencies = [
  "framework",
  "futures",
  "hex",
+ "move-core-types",
  "move-deps",
  "num_cpus",
  "once_cell",

@@ -46,8 +46,9 @@ pub use transaction::{
     SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
     TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
     TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,
-    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
-    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
+    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest,
+    UserTransactionRequestInner, VersionedEvent, WriteModule, WriteResource, WriteSet,
+    WriteSetChange, WriteSetPayload, WriteTableItem,
 };
 pub use wrappers::{EventGuid, IdentifierWrapper};
 

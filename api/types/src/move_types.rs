@@ -631,7 +631,10 @@ impl FromStr for MoveType {
         // deserialize it using that same object.
         let inner = match parse_type_tag(s) {
             Ok(inner) => inner.into(),
-            Err(_e) => MoveType::Unparsable(s.to_string()),
+            Err(e) => {
+                println!("MoveType::Unparsable error : {:?}", e);
+                MoveType::Unparsable(s.to_string())
+            }
         };
         if is_ref {
             Ok(MoveType::Reference {

@@ -25,6 +25,7 @@ proptest = "1.0.0"
 reqwest = { version = "0.11.10", features = ["json"] }
 serde_json = "1.0.81"
 tokio = { version = "1.21.0", features = ["full"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4", features = ["address32"] }
 
 aptos = { path = "../../crates/aptos", features = ["fuzzing"] }
 aptos-config = { path = "../../config" }

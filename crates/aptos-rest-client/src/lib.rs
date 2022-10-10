@@ -7,6 +7,7 @@ pub mod aptos;
 pub mod error;
 pub mod faucet;
 
+use aptos_api_types::{SubmitTransactionRequest, TransactionSignature};
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
@@ -24,7 +25,7 @@ use crate::error::RestError;
 use anyhow::{anyhow, Result};
 use aptos_api_types::{
     deserialize_from_string,
-    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON},
     AptosError, BcsBlock, Block, Bytecode, ExplainVMStatus, GasEstimation, HexEncodedBytes,
     IndexResponse, MoveModuleId, TransactionData, TransactionOnChainData,
     TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
@@ -372,16 +373,39 @@ impl Client {
         &self,
         txn: &SignedTransaction,
     ) -> AptosResult<Response<PendingTransaction>> {
-        let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions")?;
 
-        let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
-            .body(txn_payload)
-            .send()
-            .await?;
+        let response =
+            if let aptos_types::transaction::TransactionPayload::Script(s) = txn.payload() {
+                let txn_payload = serde_json::to_vec(&SubmitTransactionRequest {
+                    user_transaction_request: aptos_api_types::UserTransactionRequestInner {
+                        sender: txn.sender().into(),
+                        sequence_number: txn.sequence_number().into(),
+                        max_gas_amount: txn.max_gas_amount().into(),
+                        gas_unit_price: txn.gas_unit_price().into(),
+                        expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
+                        payload: aptos_api_types::TransactionPayload::ScriptPayload(
+                            aptos_api_types::ScriptPayload::try_from(s.clone()).unwrap(),
+                        ),
+                    },
+                    signature: TransactionSignature::from(txn.authenticator()),
+                })?;
+
+                self.inner
+                    .post(url)
+                    .header(CONTENT_TYPE, JSON)
+                    .body(txn_payload)
+                    .send()
+                    .await?
+            } else {
+                let txn_payload = bcs::to_bytes(txn)?;
+                self.inner
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+                    .body(txn_payload)
+                    .send()
+                    .await?
+            };
 
         self.json(response).await
     }
