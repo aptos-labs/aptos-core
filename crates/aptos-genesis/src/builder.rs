@@ -25,7 +25,10 @@ use aptos_crypto::{
 use aptos_framework::ReleaseBundle;
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint,account_address::AccountAddressWithChecks};
+use aptos_types::{
+    account_address::AccountAddressWithChecks, chain_id::ChainId, transaction::Transaction,
+    waypoint::Waypoint,
+};
 use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
@@ -35,8 +38,8 @@ use std::{
     io::{Read, Write},
     num::NonZeroUsize,
     path::{Path, PathBuf},
+    str::FromStr,
     sync::Arc,
-    str::FromStr
 };
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
@@ -195,7 +198,10 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
             owner_account_public_key: private_identity.account_private_key.public_key(),
             operator_account_address: private_identity.account_address.into(),
             operator_account_public_key: private_identity.account_private_key.public_key(),
-            voter_account_address: AccountAddressWithChecks::from_str("0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb").unwrap(),
+            voter_account_address: AccountAddressWithChecks::from_str(
+                "0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb",
+            )
+            .unwrap(),
             voter_account_address: private_identity.account_address.into(),
             voter_account_public_key: private_identity.account_private_key.public_key(),
             consensus_public_key: Some(private_identity.consensus_private_key.public_key()),
