@@ -74,5 +74,5 @@ test(
     );
     expect(events2[0].type).toBe("0x1::coin::WithdrawEvent");
   },
-  30 * 1000,
+  60 * 1000,
 );

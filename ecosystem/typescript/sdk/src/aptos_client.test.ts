@@ -110,7 +110,7 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("717");
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -147,7 +147,7 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("400");
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -221,7 +221,7 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("123");
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -280,7 +280,7 @@ test(
     });
     await checkAptosCoin();
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -338,7 +338,7 @@ test(
     expect(account2AptosCoin).toHaveLength(1);
     await checkAptosCoin();
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -420,7 +420,7 @@ test(
     const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -455,7 +455,7 @@ test(
     const txn = await client.getTransactionByHash(txnHash);
     expect((txn as any).success).toBeTruthy();
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -482,7 +482,7 @@ test(
       HexString.fromUint8Array(bcsToBytes(aliceAddress)).hex(),
     );
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -493,7 +493,7 @@ test(
     const block = await client.getBlockByHeight(blockHeight);
     expect(block.block_height).toBe(blockHeight.toString());
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -505,7 +505,7 @@ test(
     expect(parseInt(block.first_version, 10)).toBeLessThanOrEqual(version);
     expect(parseInt(block.last_version, 10)).toBeGreaterThanOrEqual(version);
   },
-  30 * 1000,
+  60 * 1000,
 );
 
 test(
@@ -521,5 +521,5 @@ test(
 
     expect(maxGasAmount).toBeGreaterThan(BigInt(0));
   },
-  30 * 1000,
+  60 * 1000,
 );

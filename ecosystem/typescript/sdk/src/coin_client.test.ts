@@ -22,5 +22,5 @@ test(
 
     expect(await coinClient.checkBalance(bob)).toBe(BigInt(42));
   },
-  30 * 1000,
+  60 * 1000,
 );
