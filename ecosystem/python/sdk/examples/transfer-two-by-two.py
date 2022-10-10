@@ -1,10 +1,11 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
+import os
+
 from aptos_sdk.account import Account
 from aptos_sdk.client import FaucetClient, RestClient
 from aptos_sdk.transactions import Script, ScriptArgument, TransactionPayload
-import os
 
 from .common import FAUCET_URL, NODE_URL
 
@@ -30,7 +31,7 @@ if __name__ == "__main__":
 
     path = os.path.dirname(__file__)
     filepath = os.path.join(path, "two_by_two_transfer.mv")
-    with open(filepath, mode='rb') as file:
+    with open(filepath, mode="rb") as file:
         code = file.read()
 
     script_arguments = [
