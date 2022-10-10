@@ -8,7 +8,9 @@ use crate::response::{
     InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
 };
 use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
-use aptos_api_types::{AptosErrorCode, AsConverter, BcsBlock, LedgerInfo, TransactionOnChainData};
+use aptos_api_types::{
+    AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, TransactionOnChainData,
+};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
@@ -30,6 +32,7 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
 use futures::{channel::oneshot, SinkExt};
+use itertools::Itertools;
 use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::{
@@ -69,7 +72,9 @@ impl Context {
             gas_estimation: Arc::new(RwLock::new(GasEstimationCache {
                 last_updated_version: None,
                 min_gas_price: 0,
+                deprioritized_gas_price: 0,
                 median_gas_price: 0,
+                prioritized_gas_price: 0,
             })),
             gas_schedule_cache: Arc::new(RwLock::new(GasScheduleCache {
                 last_updated_epoch: None,
@@ -623,7 +628,10 @@ impl Context {
         }
     }
 
-    pub fn estimate_gas_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
+    pub fn estimate_gas_price<E: InternalError>(
+        &self,
+        ledger_info: &LedgerInfo,
+    ) -> Result<GasEstimation, E> {
         // The search size
         const SEARCH_SIZE: u64 = 100_000;
         let oldest_search_version = std::cmp::max(
@@ -638,7 +646,7 @@ impl Context {
             if gas_estimation.last_updated_version.is_some()
                 && gas_estimation.last_updated_version.unwrap() > oldest_search_version
             {
-                return Ok(gas_estimation.median_gas_price);
+                return Ok(gas_estimation.gas_estimate());
             }
         }
 
@@ -650,7 +658,7 @@ impl Context {
             if gas_estimation.last_updated_version.is_some()
                 && gas_estimation.last_updated_version.unwrap() > oldest_search_version
             {
-                return Ok(gas_estimation.median_gas_price);
+                return Ok(gas_estimation.gas_estimate());
             }
             let mut gas_prices: Vec<u64> = self
                 .db
@@ -677,7 +685,47 @@ impl Context {
                 gas_prices[mid]
             };
 
-            Ok(gas_estimation.median_gas_price)
+            // There must be at least 1 buckets
+            assert!(!self.node_config.mempool.broadcast_buckets.is_empty());
+            let median_gas_price = gas_estimation.median_gas_price;
+
+            // TODO: Buckets are assumed to be ordered
+            let bucket_index = self
+                .node_config
+                .mempool
+                .broadcast_buckets
+                .iter()
+                .sorted()
+                .enumerate()
+                .find_map(|(index, current_bucket)| {
+                    if median_gas_price >= *current_bucket {
+                        Some(index)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default();
+
+            // Previous bucket could be the same as the minimum price (if too low)
+            let previous_bucket_price = self
+                .node_config
+                .mempool
+                .broadcast_buckets
+                .get(bucket_index.saturating_sub(1))
+                .copied()
+                .unwrap_or(gas_estimation.min_gas_price);
+            // Next bucket could be the same as the current gas price, but we increase by 1 for the estimation
+            let next_bucket_price = self
+                .node_config
+                .mempool
+                .broadcast_buckets
+                .get(bucket_index.saturating_add(1))
+                .copied()
+                .unwrap_or_else(|| median_gas_price.saturating_add(1));
+            gas_estimation.deprioritized_gas_price = previous_bucket_price;
+            gas_estimation.prioritized_gas_price = next_bucket_price;
+
+            Ok(gas_estimation.gas_estimate())
         }
     }
 
@@ -777,7 +825,19 @@ impl Context {
 pub struct GasEstimationCache {
     last_updated_version: Option<u64>,
     min_gas_price: u64,
+    deprioritized_gas_price: u64,
     median_gas_price: u64,
+    prioritized_gas_price: u64,
+}
+
+impl GasEstimationCache {
+    pub fn gas_estimate(&self) -> GasEstimation {
+        GasEstimation {
+            deprioritized_gas_estimate: Some(self.deprioritized_gas_price),
+            gas_estimate: self.median_gas_price,
+            prioritized_gas_estimate: Some(self.prioritized_gas_price),
+        }
+    }
 }
 
 pub struct GasScheduleCache {
