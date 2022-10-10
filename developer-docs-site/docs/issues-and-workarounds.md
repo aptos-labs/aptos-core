@@ -25,7 +25,7 @@ Receive this error from a validator node:
 
 #### Workaround
 
-Delete the `secure-data.json` file because very likely you are using an older version of it. See [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node) for the location of this file. 
+Delete the `secure-data.json` file because very likely you are using an older version of it.  Check your `validator.yaml` file and you will see something like `path: /opt/aptos/data/secure-data.json`. Or see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node) for the location of this file. For Docker, you can delete this file by `docker` commands such as: `docker-compose down --volumes` (check the `docker-compose` help). Finally, **remember to restart the node. **
 
 ### How to find out when the next epoch starts
 
@@ -35,7 +35,7 @@ The Aptos current epoch duration is 1 hour.
 
 To track epoch changes, follow these steps:
 
-1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure **Premainnet** is selected at the top right.
+1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
 1. Switch to **RESOURCES** tab.
 1. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `last_reconfiguration_time`. You will find the last epoch transition timestamp in microseconds. The text display looks like this:
   ```json
@@ -56,11 +56,11 @@ To track epoch changes, follow these steps:
 
 4. Go to https://www.epochconverter.com/ and include the epoch timestamp to convert it to a human-readable date. 
 
-### How to check if a validator address is in validator set
+### How to check if a validator address is in the validator set
 
-You can check if a validator address is in the Aptos validator set at the command line or by using the Aptos Explorer.
+You can check if a validator address is in the Aptos validator set either on the command line or by using the Aptos Explorer.
 
-#### CLI 
+**CLI** 
 
 Run the below command:
 ```bash
@@ -69,23 +69,23 @@ aptos node show-validator-set --profile operator | jq -r '.Result.active_validat
 
 And ensure you see the validator in the output.
 
-#### Aptos Explorer
+**Aptos Explorer**
 
 Follow these steps on the Aptos Explorer:
 
 1. Go to account [`0x1`](https://explorer.aptoslabs.com/account/0x1) page on the Aptos Explorer.
-1. Select **Premainnet** in the top-right drop-down menu.
-2. Switch to the **RESOURCES** tab below.
-2. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for the validator address. 
+1. Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
+2. Switch to the **RESOURCES** tab.
+3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for the validator address. 
 
 ### How to find stake pool address
 
-To find out which stake pool address to use (for example, to bootstrap your node), run the below command. This example is for Premainnet. For other networks, use the appropriate REST URL for the `--url` field. See [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node):
+To find out which stake pool address to use (for example, to bootstrap your node), run the below command. This example is for mainnet. See the `--url` value for testnet or devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md). Also see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node):
 
 ```bash
 aptos node get-stake-pool \
   --owner-address 0x0756c80f0597fc221fe043d5388949b34151a4efe5753965bbfb0ed7d0be08ea \
-  --url https://premainnet.aptosdev.com
+  --url https://fullnode.mainnet.aptoslabs.com/v1
 ```
 
 ### How to check if an address is the correct stake pool address or a correct validator address
@@ -93,17 +93,17 @@ aptos node get-stake-pool \
 Follow these steps on the Aptos Explorer:
 
 1. Go to account [`0x1`](https://explorer.aptoslabs.com/account/0x1) page on the Aptos Explorer.
-1. Select **Premainnet** in the top-right drop-down menu.
-1. Switch to **RESOURCES** tab below.
-1. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `StakePool`. The address with the `StakePool` resource is the correct stake pool address.
-1. You can double-check by searching for the operator and seeing if that’s your operator address. 
+1.  Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
+2. Switch to **RESOURCES** tab.
+3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `StakePool`. The address with the `StakePool` resource is the correct stake pool address.
+4. You can double-check by searching for the operator and seeing if that’s your operator address. 
 
 ### How to see previous epoch rewards
 
 To see the previous epoch rewards for a given pool address, click on a URL of the below format. This example is for Premainnet and for the pool address `0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4`. Use the network and pool address of your choice in this place:
 
 ```html
-https://premainnet.aptosdev.com/v1/accounts/0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4/events/10
+https://fullnode.mainnet.aptoslabs.com/v1/accounts/0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4/events/10
 ```
 
 ### Terraform "Connection Refused" error
@@ -125,6 +125,14 @@ This likely means that the state of the install is out of sync with the saved te
 
   terraform state rm <state>
   ```
+
+### How to find chain ID of my node
+
+On your node, run this command to find out the chain ID of your node:
+
+```bash
+curl http://127.0.0.1:8080/v1
+```
 
 ### Fullnode "NoAvailablePeers" error
 
@@ -194,9 +202,6 @@ If your validator node is facing persistent issues, for example, it is unable to
    level: DEBUG
 ```
 - Make sure to also include any other information you think might be useful and whether or not restarting your validator helps.
-
-
-
 
 
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
