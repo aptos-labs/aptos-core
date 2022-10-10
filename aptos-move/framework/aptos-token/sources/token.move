@@ -462,6 +462,23 @@ module aptos_token::token {
         *opt_in_flag = opt_in;
     }
 
+    /// Transfers `amount` of tokens from `from` to `to`.
+    public entry fun transfer_with_opt_in(
+        from: &signer,
+        creator: address,
+        collection_name: String,
+        token_name: String,
+        token_property_version: u64,
+        to: address,
+        amount: u64,
+    ) acquires TokenStore {
+        let token_id = create_token_id_raw(creator, collection_name, token_name, token_property_version);
+        let opt_in_transfer = borrow_global<TokenStore>(to).direct_transfer;
+        assert!(opt_in_transfer, error::permission_denied(EUSER_NOT_OPT_IN_DIRECT_TRANSFER));
+        let token = withdraw_token(from, token_id, amount);
+        direct_deposit(to, token);
+    }
+
     /// Burn a token by creator when the token's BURNABLE_BY_CREATOR is true
     /// The token is owned at address owner
     public entry fun burn_by_creator(
