@@ -88,12 +88,14 @@ impl ReplayVerifyCoordinator {
         } else {
             metadata_view.select_state_snapshot(self.start_version.wrapping_sub(1))?
         };
-        let replay_transactions_from_version = state_snapshot
-            .as_ref()
-            .map(|b| b.version.wrapping_add(1))
-            .unwrap_or(0);
-        let transactions = metadata_view
-            .select_transaction_backups(replay_transactions_from_version, self.end_version)?;
+        let replay_transactions_from_version =
+            state_snapshot.as_ref().map(|b| b.version).unwrap_or(0);
+        let transactions = metadata_view.select_transaction_backups(
+            // transaction info at the snapshot must be restored otherwise the db will be confused
+            // about the latest version after snapshot is restored.
+            replay_transactions_from_version.saturating_sub(1),
+            self.end_version,
+        )?;
 
         let global_opt = GlobalRestoreOptions {
             target_version: self.end_version,

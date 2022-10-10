@@ -216,7 +216,7 @@
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "MJnqIFmVk" },
-          "expr": "aptos_state_sync_version{type=\"synced\", role=\"validator\", kubernetes_pod_name=~\".*\", chain_name=~\"3\", namespace=~\"telemetry-service\"}",
+          "expr": "aptos_state_sync_version{type=\"synced\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "intervalFactor": 1,
           "format": "time_series"
         }
@@ -1750,7 +1750,7 @@
         "multiFormat": "",
         "query": "prometheus",
         "regex": "",
-        "current": { "text": ["VictoriaMetrics Global"], "value": "VictoriaMetrics Global" },
+        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -1761,9 +1761,9 @@
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "refresh": 1,
         "options": [],
-        "includeAll": false,
+        "includeAll": true,
         "allFormat": "",
-        "allValue": "",
+        "allValue": ".*",
         "multi": false,
         "multiFormat": "",
         "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
@@ -1786,7 +1786,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
         "regex": "",
-        "current": { "text": ["premainnet"], "value": "premainnet" },
+        "current": { "text": ["3"], "value": "3" },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -1909,7 +1909,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 5,
+  "version": 8,
   "links": [
     {
       "title": "aptos-core",
