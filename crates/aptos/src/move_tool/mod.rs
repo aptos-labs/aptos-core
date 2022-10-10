@@ -903,6 +903,7 @@ impl CliCommand<TransactionSummary> for RunScript {
 #[derive(Clone, Debug)]
 pub(crate) enum FunctionArgType {
     Address,
+    VecAddress,
     Bool,
     Hex,
     HexArray,
@@ -956,6 +957,18 @@ impl FunctionArgType {
                     .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?;
                 Ok(raw)
             }
+            FunctionArgType::VecAddress => {
+                let mut encoded = vec![];
+                for sub_arg in arg.split(',') {
+                    encoded.push(load_account_arg(sub_arg).map_err(|err| {
+                        CliError::UnableToParse(
+                            "vec<address>",
+                            format!("Failed to parse vec address: {:?}", err.to_string()),
+                        )
+                    })?);
+                }
+                bcs::to_bytes(&encoded)
+            }
         }
         .map_err(|err| CliError::BCS("arg", err))
     }
@@ -966,6 +979,7 @@ impl FromStr for FunctionArgType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "address" => Ok(FunctionArgType::Address),
+            "vector<address>" => Ok(FunctionArgType::VecAddress),
             "bool" => Ok(FunctionArgType::Bool),
             "hex" => Ok(FunctionArgType::Hex),
             "string" => Ok(FunctionArgType::String),
@@ -1064,6 +1078,10 @@ impl TryInto<TransactionArgument> for ArgWithType {
             FunctionArgType::Raw => Ok(TransactionArgument::U8Vector(txn_arg_parser(
                 &self.arg, "raw",
             )?)),
+            arg_type => Err(CliError::CommandArgumentError(format!(
+                "Arg type {:?} is not supported for scripts",
+                arg_type
+            ))),
         }
     }
 }
