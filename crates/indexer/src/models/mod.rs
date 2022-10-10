@@ -4,6 +4,7 @@
 pub mod block_metadata_transactions;
 pub mod events;
 pub mod ledger_info;
+pub mod marketplace_models;
 pub mod move_modules;
 pub mod move_resources;
 pub mod move_tables;
