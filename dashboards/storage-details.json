@@ -161,8 +161,8 @@
             {
               "refId": "A",
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Ok\", api_name=~\"$api_name\"}[1m])) / sum by (kubernetes_pod_name, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", api_name=~\"$api_name\"}[1m]))",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
+              "expr": "sum by (kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Ok\", api_name=~\"$api_name\"}[1m])) / sum by (kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",  role=~\"$role\", api_name=~\"$api_name\"}[1m]))",
+              "legendFormat": "{{kubernetes_pod_name}}"
             }
           ],
           "tooltip": { "shared": true, "value_type": "individual" },
@@ -216,7 +216,7 @@
             {
               "refId": "A",
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (kubernetes_pod_name, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", api_name=\"$api_name\", result=\"Ok\"}[1m])) / sum by (kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", api_name=\"$api_name\"}[1m]))",
               "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
             }
           ],
@@ -402,123 +402,124 @@
       "title": "AptosDB API Error per Second by api_name",
       "transparent": false,
       "type": "row",
-      "panels": [],
-      "collapsed": false
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
-      "id": 2678,
-      "isNew": false,
-      "span": 0,
-      "title": "TOTAL",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
+      "panels": [
         {
-          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", api_name=~\"$api_name\", result=\"Err\"}[1m]))",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+          "id": 2678,
+          "isNew": false,
+          "span": 0,
+          "title": "TOTAL",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "sum by (kubernetes_pod_name, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", api_name=~\"$api_name\", result=\"Err\"}[1m]))",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
           },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
           }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 12 },
-      "id": 1316,
-      "isNew": false,
-      "renderer": "flot",
-      "repeat": "api_name",
-      "span": 0,
-      "title": "$api_name",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 1,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
+        },
         {
-          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 12 },
+          "id": 1316,
+          "isNew": false,
+          "renderer": "flot",
+          "repeat": "api_name",
+          "span": 0,
+          "title": "$api_name",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 1,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "short", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ]
         }
       ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ]
+      "collapsed": true
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 82 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
       "id": 328,
       "isNew": false,
       "span": 0,
@@ -613,7 +614,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 83 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
       "id": 444,
       "isNew": false,
       "span": 0,
@@ -787,7 +788,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 84 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
       "id": 2957,
       "isNew": false,
       "span": 0,
@@ -959,7 +960,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 85 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
       "id": 356,
       "isNew": false,
       "span": 0,
@@ -1054,7 +1055,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 86 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
       "id": 481,
       "isNew": false,
       "span": 0,
@@ -1228,7 +1229,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 87 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
       "id": 3159,
       "isNew": false,
       "span": 0,
@@ -1402,7 +1403,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 88 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
       "id": 1908,
       "isNew": false,
       "span": 0,
@@ -1636,7 +1637,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 89 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
       "id": 750,
       "isNew": false,
       "span": 0,
@@ -1730,7 +1731,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 90 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
       "id": 16,
       "isNew": false,
       "span": 0,
@@ -1906,576 +1907,577 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 91 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
       "id": 104,
       "isNew": false,
       "span": 0,
       "title": "Data Structure Insights",
       "transparent": false,
       "type": "row",
-      "panels": [],
-      "collapsed": false
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 92 },
-      "id": 67,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Number of Accounts vs Internal Nodes",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
+      "panels": [
         {
-          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_leaves\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_leaves\"}",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} accounts"
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 14 },
+          "id": 67,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Number of Accounts vs Internal Nodes",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_leaves\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_leaves\"}",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} accounts"
+            },
+            {
+              "refId": "B",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_nodes\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_nodes\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"new_state_leaves\"} + ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_leaves\"}",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} internal_nodes"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "none", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
+          }
         },
         {
-          "refId": "B",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_nodes\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_nodes\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"new_state_leaves\"} + ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_leaves\"}",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} internal_nodes"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "none", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 14 },
+          "id": 256,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Next Block Epoch",
+          "description": "On the version that wraps up an epoch, the \"next block epoch\" is the current epoch plus one.\n",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "none", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
           }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 92 },
-      "id": 256,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Next Block Epoch",
-      "description": "On the version that wraps up an epoch, the \"next block epoch\" is the current epoch plus one.\n",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "none", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 92 },
-      "id": 1090,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Jellyfish Tree Disk Size vs Calculated Size",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} rocksdb"
         },
         {
-          "refId": "B",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_schemadb_put_bytes_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}[10m]) / rate(aptos_schemadb_put_bytes_count[10m]) * ignoring(cf_name) ((aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"new_state_nodes\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_nodes\"}) + 1000000 * (log2(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"new_state_leaves\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_leaves\"}) / 2 - 1))",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} calculated"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "decbytes", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 14 },
+          "id": 1090,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Jellyfish Tree Disk Size vs Calculated Size",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} rocksdb"
+            },
+            {
+              "refId": "B",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_schemadb_put_bytes_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}[10m]) / rate(aptos_schemadb_put_bytes_count[10m]) * ignoring(cf_name) ((aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"new_state_nodes\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_nodes\"}) + 1000000 * (log2(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"new_state_leaves\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"stale_state_leaves\"}) / 2 - 1))",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} calculated"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "decbytes", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
           }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 100 },
-      "id": 70,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Avg Account Updates per Transaction",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
+        },
         {
-          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "irate(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_leaves\"}[1m]) / ignoring(type) irate(aptos_storage_latest_transaction_version[1m])",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "decimals": 2, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 22 },
+          "id": 70,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Avg Account Updates per Transaction",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "irate(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_leaves\"}[1m]) / ignoring(type) irate(aptos_storage_latest_transaction_version[1m])",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "short", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "decimals": 2, "show": true }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
           }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 100 },
-      "id": 71,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Avg Events Emits per Transaction",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
+        },
         {
-          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "irate(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"events_created\"}[1m]) / on(kubernetes_pod_name, kubernetes_pod_name) irate(aptos_storage_latest_transaction_version[1m])",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "decimals": 2, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 22 },
+          "id": 71,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Avg Events Emits per Transaction",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "irate(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"events_created\"}[1m]) / on(kubernetes_pod_name, kubernetes_pod_name) irate(aptos_storage_latest_transaction_version[1m])",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "short", "logBase": 1, "decimals": 2, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
           }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 100 },
-      "id": 52,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Record size (key + value) by Column Family",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
+        },
         {
-          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "avg by(cf_name)(irate(aptos_schemadb_put_bytes_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])) / avg by(cf_name)(irate(aptos_schemadb_put_bytes_count[1m]))",
-          "intervalFactor": 1,
-          "legendFormat": "{{cf_name}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual", "sort": 2 },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "decbytes", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 22 },
+          "id": 52,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Record size (key + value) by Column Family",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "avg by(cf_name)(irate(aptos_schemadb_put_bytes_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])) / avg by(cf_name)(irate(aptos_schemadb_put_bytes_count[1m]))",
+              "intervalFactor": 1,
+              "legendFormat": "{{cf_name}}",
+              "format": "time_series"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual", "sort": 2 },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "decbytes", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
           }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 108 },
-      "id": 98,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Avg Internal Node Updates per Account Update",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
+        },
         {
-          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "irate(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_nodes\"}[1m]) / ignoring(type) irate(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"new_state_leaves\"}[1m]) - 1",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "decimals": 2, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 30 },
+          "id": 98,
+          "isNew": false,
+          "renderer": "flot",
+          "span": 0,
+          "title": "Avg Internal Node Updates per Account Update",
+          "transparent": false,
+          "type": "graph",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "irate(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_nodes\"}[1m]) / ignoring(type) irate(aptos_storage_ledger{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"new_state_leaves\"}[1m]) - 1",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}"
+            }
+          ],
+          "tooltip": { "shared": true, "value_type": "individual" },
+          "xaxis": { "format": "", "logBase": 0, "show": true },
+          "yaxes": [
+            { "format": "short", "logBase": 1, "decimals": 2, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "",
+              "color": { "mode": "" },
+              "thresholds": { "mode": "", "steps": null },
+              "custom": {
+                "axisPlacement": "",
+                "barAlignment": 0,
+                "drawStyle": "",
+                "fillOpacity": 0,
+                "gradientMode": "",
+                "lineInterpolation": "",
+                "lineWidth": 0,
+                "pointSize": 0,
+                "showPoints": "",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "" },
+                "stacking": { "group": "", "mode": "" },
+                "thresholdsStyle": { "mode": "" }
+              }
+            }
           }
         }
-      }
+      ],
+      "collapsed": true
     }
   ],
   "rows": null,
@@ -2694,7 +2696,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 35,
+  "version": 40,
   "links": [
     {
       "title": "aptos-core",

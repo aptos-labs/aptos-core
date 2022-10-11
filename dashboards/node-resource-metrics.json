@@ -15,21 +15,35 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 11, "w": 8, "x": 0, "y": 0 },
-      "id": 6,
+      "id": 25,
       "isNew": false,
       "span": 0,
-      "title": "Overall Node CPU Usage (Non Linux Only)",
+      "title": "Overall Node CPU Usage (Linux Only)",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "MJnqIFmVk" },
-          "expr": "node_system_cpu_usage{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", cpu_id=\"cpu\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "format": "time_series"
-        }
+          "refId": "Idle",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "hide": true,
+          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"idle_ms|iowait_ms\"}[$__rate_interval]))",
+          "legendFormat": "__auto"
+        },
+        {
+          "refId": "Total",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "hide": true,
+          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "__auto"
+        },
+        {
+          "refId": "Guest",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "hide": true,
+          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"guest_ms|guest_nice_ms\"}[$__rate_interval]))",
+          "legendFormat": "__auto"
+        },
+        { "refId": "%", "datasource": { "name": "Expression", "type": "__expr__", "uid": "__expr__" } }
       ],
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
@@ -37,7 +51,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "percentunit",
           "min": 0,
           "color": { "mode": "palette-classic" },
           "thresholds": {
@@ -406,35 +420,37 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 11, "w": 8, "x": 8, "y": 22 },
-      "id": 25,
+      "id": 27,
       "isNew": false,
       "span": 0,
-      "title": "Overall Node CPU Usage (Linux Only)",
+      "title": "Write IO Operations (Linux Only)",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
-          "refId": "Idle",
+          "refId": "B",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "hide": true,
-          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"idle_ms|iowait_ms\"}[$__rate_interval]))",
-          "legendFormat": "__auto"
+          "expr": "quantile(0.5, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P50"
         },
         {
-          "refId": "Total",
+          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "hide": true,
-          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
-          "legendFormat": "__auto"
+          "expr": "quantile(0.75, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P75"
         },
         {
-          "refId": "Guest",
+          "refId": "C",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "hide": true,
-          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"guest_ms|guest_nice_ms\"}[$__rate_interval]))",
-          "legendFormat": "__auto"
+          "expr": "quantile(0.9, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P90"
         },
-        { "refId": "%", "datasource": { "name": "Expression", "type": "__expr__", "uid": "__expr__" } }
+        {
+          "refId": "D",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "quantile(0.99, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "legendFormat": "P99"
+        }
       ],
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
@@ -442,7 +458,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "iops",
           "min": 0,
           "color": { "mode": "palette-classic" },
           "thresholds": {
@@ -476,7 +492,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 33 },
+      "gridPos": { "h": 11, "w": 8, "x": 16, "y": 22 },
       "id": 26,
       "isNew": false,
       "span": 0,
@@ -549,37 +565,21 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 11, "w": 8, "x": 8, "y": 33 },
-      "id": 27,
+      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 33 },
+      "id": 6,
       "isNew": false,
       "span": 0,
-      "title": "Write IO Operations (Linux Only)",
+      "title": "Overall Node CPU Usage (Non Linux Only)",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
-          "refId": "B",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "quantile(0.5, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
-          "legendFormat": "P50"
-        },
-        {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "quantile(0.75, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
-          "legendFormat": "P75"
-        },
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "quantile(0.9, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
-          "legendFormat": "P90"
-        },
-        {
-          "refId": "D",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "quantile(0.99, rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
-          "legendFormat": "P99"
+          "datasource": { "type": "prometheus", "uid": "MJnqIFmVk" },
+          "expr": "node_system_cpu_usage{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", cpu_id=\"cpu\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}",
+          "format": "time_series"
         }
       ],
       "options": {
@@ -588,7 +588,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "iops",
+          "unit": "percent",
           "min": 0,
           "color": { "mode": "palette-classic" },
           "thresholds": {
@@ -766,7 +766,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 27,
+  "version": 28,
   "links": [
     {
       "title": "aptos core ",

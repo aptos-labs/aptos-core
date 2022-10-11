@@ -7,6 +7,10 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
 };
 
+// TODO(Gas): This test has been disabled since the particularly attack it uses can no longer
+//            be carried out due to the increase in execution costs.
+//            Revisit and decide whether we should remove this test or rewrite it in another way.
+/*
 #[test]
 fn push_u128s_onto_vector() {
     let mut h = MoveHarness::new();
@@ -37,6 +41,7 @@ fn push_u128s_onto_vector() {
         TransactionStatus::Keep(ExecutionStatus::ExecutionFailure { .. })
     ));
 }
+*/
 
 #[test]
 fn clone_large_vectors() {

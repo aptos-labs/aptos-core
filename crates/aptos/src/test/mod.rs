@@ -28,7 +28,7 @@ use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
     LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
     ShowValidatorStake, StakePoolResult, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
-    ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
+    ValidatorConfig, ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
 use crate::stake::{
@@ -49,7 +49,6 @@ use aptos_sdk::move_types::identifier::Identifier;
 use aptos_sdk::move_types::language_storage::ModuleId;
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
-use aptos_types::validator_config::ValidatorConfig;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -361,7 +360,11 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<TransactionSummary> {
+    pub async fn add_stake(
+        &self,
+        index: usize,
+        amount: u64,
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         AddStake {
             txn_options: self.transaction_options(
                 index,
@@ -381,7 +384,7 @@ impl CliTestFramework {
         &self,
         index: usize,
         amount: u64,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         UnlockStake {
             txn_options: self.transaction_options(index, None),
             amount,
@@ -403,7 +406,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<TransactionSummary> {
+    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<Vec<TransactionSummary>> {
         IncreaseLockup {
             txn_options: self.transaction_options(index, None),
         }
@@ -472,6 +475,7 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             profile_options: Default::default(),
             analyze_mode: AnalyzeMode::All,
+            pool_addresses: vec![],
         }
         .execute()
         .await
@@ -580,7 +584,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         operator_index: usize,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         SetOperator {
             txn_options: self.transaction_options(owner_index, None),
             operator_address: self.account_id(operator_index),
@@ -593,7 +597,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         voter_index: usize,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         SetDelegatedVoter {
             txn_options: self.transaction_options(owner_index, None),
             voter_address: self.account_id(voter_index),

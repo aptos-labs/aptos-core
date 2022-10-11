@@ -24,11 +24,11 @@ module aptos_framework::stake {
     use std::signer;
     use std::vector;
     use aptos_std::bls12381;
-    use aptos_std::event::{Self, EventHandle};
     use aptos_std::math64::min;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin, MintCapability};
+    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
     use aptos_framework::staking_config::{Self, StakingConfig};

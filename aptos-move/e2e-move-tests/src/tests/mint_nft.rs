@@ -6,7 +6,8 @@ use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::SigningKey;
 use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
-    account_address::AccountAddress, event::EventHandle, state_store::state_key::StateKey,
+    account_address::create_resource_address, account_address::AccountAddress, event::EventHandle,
+    state_store::state_key::StateKey,
 };
 use move_deps::move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
@@ -49,8 +50,7 @@ fn mint_nft_e2e() {
     let mut h = MoveHarness::new();
 
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let resource_address =
-        aptos_types::account_address::create_resource_address(*acc.address(), vec![].as_slice());
+    let resource_address = create_resource_address(*acc.address(), &[]);
 
     // give a named address to the `mint_nft` module
     let mut build_options = framework::BuildOptions::default();
@@ -139,4 +139,68 @@ fn mint_nft_e2e() {
     // read_state_value() will only be successful if the nft receiver's token store has this token id
     let state_key = &StateKey::table_item(token_store_table, bcs::to_bytes(&token_id).unwrap());
     h.read_state_value(state_key).unwrap();
+}
+
+/// samples two signatures for testing `verify_proof_of_knowledge` in move-examples/mint_nft/sources/minting.move
+#[test]
+fn sample_mint_nft_signature() {
+    let mut h = MoveHarness::new();
+
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let resource_address = create_resource_address(*acc.address(), &[]);
+
+    let resource_accoount = h.new_account_at(resource_address);
+    let nft_receiver1 = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+    let nft_receiver2 = h.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap());
+
+    // construct the token_data_id and mint_proof, which are required to mint the nft
+    let token_data_id1 = TokenDataId {
+        creator: resource_address,
+        collection: String::from("Collection name").into_bytes(),
+        name: String::from("Token name").into_bytes(),
+    };
+
+    let token_data_id2 = TokenDataId {
+        creator: resource_address,
+        collection: String::from("Collection name").into_bytes(),
+        name: String::from("Token name").into_bytes(),
+    };
+
+    let mint_proof1 = MintProofChallenge {
+        account_address: resource_address,
+        module_name: String::from("minting"),
+        struct_name: String::from("MintProofChallenge"),
+        receiver_account_sequence_number: 0,
+        receiver_account_address: *nft_receiver1.address(),
+        token_data_id: token_data_id1,
+    };
+
+    let mint_proof2 = MintProofChallenge {
+        account_address: resource_address,
+        module_name: String::from("minting"),
+        struct_name: String::from("MintProofChallenge"),
+        receiver_account_sequence_number: 0,
+        receiver_account_address: *nft_receiver2.address(),
+        token_data_id: token_data_id2,
+    };
+
+    // sign the MintProofChallenge using the resource account's private key
+    let mint_proof_msg1 = bcs::to_bytes(&mint_proof1);
+    let mint_proof_signature1 = resource_accoount
+        .privkey
+        .sign_arbitrary_message(&mint_proof_msg1.unwrap());
+
+    let mint_proof_msg2 = bcs::to_bytes(&mint_proof2);
+    let mint_proof_signature2 = resource_accoount
+        .privkey
+        .sign_arbitrary_message(&mint_proof_msg2.unwrap());
+
+    println!(
+        "Mint Proof Signature for NFT receiver 1: {:?}",
+        mint_proof_signature1
+    );
+    println!(
+        "Mint Proof Signature for NFT receiver 2: {:?}",
+        mint_proof_signature2
+    );
 }
