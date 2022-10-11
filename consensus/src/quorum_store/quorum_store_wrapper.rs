@@ -61,6 +61,7 @@ pub struct QuorumStoreWrapper {
     db: Arc<dyn BatchIdDB>,
     // temp variable for debug the txn seq number too new issue
     max_batch_id: u64,
+    last_batch_id: u64,
 }
 
 impl QuorumStoreWrapper {
@@ -103,6 +104,7 @@ impl QuorumStoreWrapper {
             last_end_batch_time: Instant::now(),
             db,
             max_batch_id: 0,
+            last_batch_id: 0,
         }
     }
 
@@ -231,12 +233,16 @@ impl QuorumStoreWrapper {
     ) {
         match msg {
             Ok((proof, batch_id)) => {
-                if self.max_batch_id >= batch_id {
-                    debug!("QS: batch id out of order: max_batch_id {} batch_id {}", self.max_batch_id, batch_id);
+                if self.max_batch_id >= batch_id && batch_id > 0 {
+                    debug!("QS: batch id out of order: Ok max_batch_id {} batch_id {}", self.max_batch_id, batch_id);
                 } else {
                     self.max_batch_id = batch_id;
                 }
-                self.max_batch_id = batch_id;
+                if self.last_batch_id+1 != batch_id && batch_id > 0 {
+                    debug!("QS: batch id not sequential: Ok last_batch_id {} batch_id {}", self.last_batch_id, batch_id);
+                }
+                self.last_batch_id = batch_id;
+
                 debug!(
                     "QS: received proof of store for batch id {}, digest {}",
                     batch_id,
@@ -252,11 +258,16 @@ impl QuorumStoreWrapper {
                 // Quorum store measurements
                 counters::TIMEOUT_BATCHES_COUNT.inc();
 
-                if self.max_batch_id >= batch_id {
-                    debug!("QS: batch id out of order: max_batch_id {} batch_id {}", self.max_batch_id, batch_id);
+                if self.max_batch_id >= batch_id && batch_id > 0 {
+                    debug!("QS: batch id out of order: Timeout max_batch_id {} batch_id {}", self.max_batch_id, batch_id);
                 } else {
                     self.max_batch_id = batch_id;
                 }
+                if self.last_batch_id+1 != batch_id && batch_id > 0 {
+                    debug!("QS: batch id not sequential: Timeout last_batch_id {} batch_id {}", self.last_batch_id, batch_id);
+                }
+                self.last_batch_id = batch_id;
+
                 debug!(
                     "QS: received timeout for proof of store, batch id = {}",
                     batch_id
