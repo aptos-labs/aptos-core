@@ -5,7 +5,8 @@ use field_count::FieldCount;
 use crate::{
     database::{execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection},
     models::marketplace_models::{
-        collections::MarketplaceCollection, offers::MarketplaceOffer, orders::MarketplaceOrder,
+        bids::MarketplaceBids, collections::MarketplaceCollection, offers::MarketplaceOffer,
+        orders::MarketplaceOrder,
     },
     schema,
 };
@@ -75,6 +76,22 @@ fn insert_orders(
             conn,
             diesel::insert_into(schema::marketplace_orders::table)
                 .values(&orders[start_index..end_index]),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+fn insert_bids(
+    conn: &mut PgPoolConnection,
+    bids: &[MarketplaceBids],
+) -> Result<(), diesel::result::Error> {
+    let chunks = get_chunks(bids.len(), MarketplaceOffer::field_count());
+    for (start_index, end_index) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::marketplace_bids::table)
+                .values(&bids[start_index..end_index]),
             None,
         )?;
     }
