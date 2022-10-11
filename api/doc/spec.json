@@ -9333,6 +9333,17 @@
             "required": false,
             "deprecated": false,
             "explode": true
+          },
+          {
+            "name": "estimate_prioritized_gas_unit_price",
+            "schema": {
+              "type": "boolean"
+            },
+            "in": "query",
+            "description": "If set to true, the transaction will use a higher price than the original\nestimate.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
           }
         ],
         "requestBody": {
@@ -11125,10 +11136,20 @@
           "gas_estimate"
         ],
         "properties": {
+          "deprioritized_gas_estimate": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The deprioritized estimate for the gas unit price"
+          },
           "gas_estimate": {
             "type": "integer",
             "format": "uint64",
             "description": "The current estimate for the gas unit price"
+          },
+          "prioritized_gas_estimate": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The prioritized estimate for the gas unit price"
           }
         }
       },
