@@ -1171,8 +1171,8 @@ impl Client {
 
     pub async fn estimate_gas_price(&self) -> AptosResult<Response<GasEstimation>> {
         let url = self.build_path("estimate_gas_price")?;
-        let response = self.get_bcs(url).await?;
-        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+        let response = self.inner.get(url).send().await?;
+        self.json(response).await
     }
 
     pub async fn set_failpoint(&self, name: String, actions: String) -> AptosResult<String> {
