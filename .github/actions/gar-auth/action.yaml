@@ -11,7 +11,7 @@ runs:
   steps:
     - id: auth
       name: "Authenticate to Google Cloud"
-      uses: "google-github-actions/auth@v0"
+      uses: "google-github-actions/auth@dac4e13deb3640f22e3ffe758fd3f95e6e89f712" # pin@v0
       with:
         create_credentials_file: false
         token_format: "access_token"
@@ -19,7 +19,7 @@ runs:
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
 
     - name: Login to Google Artifact Registry
-      uses: docker/login-action@v2
+      uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
       with:
         registry: us-west1-docker.pkg.dev
         username: oauth2accesstoken
