@@ -53,42 +53,6 @@ impl MetadataBackend for MockHistory {
     }
 }
 
-struct TestBlockBuilder {
-    epoch: u64,
-    round: Round,
-}
-
-impl TestBlockBuilder {
-    fn new() -> Self {
-        Self { epoch: 0, round: 0 }
-    }
-
-    fn new_epoch(&mut self) -> &mut Self {
-        self.epoch += 1;
-        self.round = 0;
-        self
-    }
-
-    fn create_block(
-        &mut self,
-        proposer: Author,
-        voters: Vec<bool>,
-        failed_proposers: Vec<u64>,
-    ) -> NewBlockEvent {
-        self.round += 1 + failed_proposers.len() as u64;
-        NewBlockEvent::new(
-            AccountAddress::random(),
-            self.epoch,
-            self.round,
-            self.round,
-            BitVec::from(voters).into(),
-            proposer,
-            failed_proposers,
-            self.round * 3600,
-        )
-    }
-}
-
 /// #### NewBlockEventAggregation tests ####
 
 #[test]
@@ -146,16 +110,12 @@ fn test_aggregation_indices_to_authors_out_of_index() {
 struct Example1 {
     validators0: Vec<Author>,
     validators1: Vec<Author>,
-    block_builder: TestBlockBuilder,
-    history_ascending: Vec<NewBlockEvent>,
+    aptos_db: Arc<MockDbReader>,
+    backend: AptosDBBackend,
 }
 
 impl Example1 {
-    fn history(&self) -> Vec<NewBlockEvent> {
-        self.history_ascending.cloned().iter().rev().collect()
-    }
-
-    fn new() -> Self {
+    fn new(window_size: usize) -> Self {
         let mut sorted_validators: Vec<Author> =
             (0..5).into_iter().map(|_| Author::random()).collect();
         sorted_validators.sort();
@@ -165,66 +125,52 @@ impl Example1 {
         let mut validators1: Vec<Author> = validators0[..3].to_vec();
         validators1.push(sorted_validators[4]);
 
+        let aptos_db = Arc::new(MockDbReader::new());
+        let backend = AptosDBBackend::new(window_size, 0, aptos_db.clone());
+
         Self {
             validators0,
             validators1,
-            block_builder: TestBlockBuilder::new(),
-            history_ascending: vec![],
+            aptos_db,
+            backend,
         }
     }
 
+    fn history(&self) -> Vec<NewBlockEvent> {
+        self.backend.get_block_metadata(5, 0)
+    }
+
     fn step1(&mut self) {
-        self.history_ascending.push(self.block_builder.create_block(
-            self.validators0[0],
-            vec![false, true, true, false],
-            vec![3],
-        ));
-        self.history_ascending.push(self.block_builder.create_block(
-            self.validators0[0],
-            vec![false, true, true, false],
-            vec![],
-        ));
-        self.history_ascending.push(self.block_builder.create_block(
-            self.validators0[1],
-            vec![true, false, true, false],
-            vec![2],
-        ));
-        self.history_ascending.push(self.block_builder.create_block(
-            self.validators0[2],
-            vec![true, true, false, false],
-            vec![],
-        ));
+        self.aptos_db
+            .add_event_with_data(self.validators0[0], &[1, 2], vec![3]);
+        self.aptos_db
+            .add_event_with_data(self.validators0[0], &[1, 2], vec![]);
+        self.aptos_db
+            .add_event_with_data(self.validators0[1], &[0, 2], vec![2]);
+        self.aptos_db
+            .add_event_with_data(self.validators0[2], &[0, 1], vec![]);
     }
 
     fn step2(&mut self) {
-        self.history_ascending.push(self.block_builder.create_block(
-            self.validators0[3],
-            vec![true, true, false, false],
-            vec![1],
-        ));
-        self.history_ascending.push(self.block_builder.create_block(
-            self.validators0[3],
-            vec![true, true, false, false],
-            vec![1],
-        ));
+        self.aptos_db
+            .add_event_with_data(self.validators0[3], &[0, 1], vec![1]);
+        self.aptos_db
+            .add_event_with_data(self.validators0[3], &[0, 1], vec![1]);
     }
 
     fn step3(&mut self) {
-        self.block_builder.new_epoch();
-        self.history_ascending.push(self.block_builder.create_block(
-            self.validators1[3],
-            vec![true, true, false, false],
-            vec![0],
-        ));
+        self.aptos_db.new_epoch();
+        self.aptos_db
+            .add_event_with_data(self.validators1[3], &[0, 1], vec![0]);
     }
 }
 
 #[test]
 fn test_aggregation_counting() {
-    let mut example1 = Example1::new();
+    let mut example1 = Example1::new(5);
     let validators0 = example1.validators0.clone();
     let epoch_to_validators = HashMap::from([(0u64, validators0.clone())]);
-    let aggregation = NewBlockEventAggregation::new(2, 5);
+    let aggregation = NewBlockEventAggregation::new(2, 5, false);
 
     example1.step1();
 
@@ -319,10 +265,11 @@ fn test_aggregation_counting() {
 
 #[test]
 fn test_proposer_and_voter_heuristic() {
-    let mut example1 = Example1::new();
+    let mut example1 = Example1::new(5);
     let validators0 = example1.validators0.clone();
     let epoch_to_validators0 = HashMap::from([(0u64, validators0.clone())]);
-    let heuristic = ProposerAndVoterHeuristic::new(example1.validators0[0], 100, 10, 1, 49, 2, 5);
+    let heuristic =
+        ProposerAndVoterHeuristic::new(example1.validators0[0], 100, 10, 1, 49, 2, 5, false);
 
     example1.step1();
     assert_eq!(
@@ -379,20 +326,17 @@ fn test_api() {
 
     let mut selected = [0; 5].to_vec();
     for epoch in 1..1000 {
-        block_builder.new_epoch();
-        let history = vec![
-            block_builder.create_block(proposers[0], vec![false, true, true, false, false], vec![]),
-            block_builder.create_block(
-                proposers[0],
-                vec![false, false, false, true, false],
-                vec![],
-            ),
-        ];
+        let aptos_db = Arc::new(MockDbReader::new());
+        let backend = AptosDBBackend::new(1, 0, aptos_db.clone());
+
+        aptos_db.new_epoch();
+        aptos_db.add_event_with_data(proposers[0], vec![1, 2], vec![]);
+        aptos_db.add_event_with_data(proposers[0], vec![3], vec![]);
         let leader_reputation = LeaderReputation::new(
             epoch,
             HashMap::from([(epoch, proposers.clone())]),
             voting_powers.clone(),
-            Box::new(MockHistory::new(1, history)),
+            backend,
             Box::new(ProposerAndVoterHeuristic::new(
                 proposers[0],
                 active_weight,
@@ -401,6 +345,7 @@ fn test_api() {
                 10,
                 proposers.len(),
                 proposers.len(),
+                false,
             )),
             4,
         );
@@ -445,7 +390,9 @@ struct MockDbReader {
     random_address: Author,
     last_timestamp: Mutex<u64>,
     idx: Mutex<u64>,
-    to_add_event_after_call: Mutex<Option<(u64, Round)>>,
+    epoch: Mutex<u64>,
+    round: Mutex<u64>,
+    to_add_event_after_call: Mutex<Option<()>>,
 
     fetched: Mutex<usize>,
 }
@@ -457,17 +404,30 @@ impl MockDbReader {
             random_address: Author::random(),
             last_timestamp: Mutex::new(100000),
             idx: Mutex::new(0),
+            epoch: Mutex::new(0),
+            round: Mutex::new(0),
             to_add_event_after_call: Mutex::new(None),
             fetched: Mutex::new(0),
         }
     }
 
-    pub fn add_event(&self, epoch: u64, round: Round) {
+    pub fn add_event(&self) {
+        self.add_event_with_votes(epoch, round, self.random_address, vec![], vec![0])
+    }
+
+    pub fn add_event_with_data(&self, proposer: Author, votes: &[u16], failed_proposers: Vec<u64>) {
         let mut idx = self.idx.lock();
         *idx += 1;
 
-        let mut votes = BitVec::with_num_bits(1);
-        votes.set(0);
+        let mut round = self.round.lock();
+        *round += 1 + failed_proposers.len() as u64;
+
+        let epoch = self.epoch.lock();
+
+        let mut votes_bitvec = BitVec::with_num_bits(1);
+        for vote in votes {
+            votes.set(vote);
+        }
 
         self.events.lock().push(EventWithVersion::new(
             *idx,
@@ -477,12 +437,12 @@ impl MockDbReader {
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 bcs::to_bytes(&NewBlockEvent::new(
                     AccountAddress::random(),
-                    epoch,
-                    round,
-                    round,
-                    votes.into(),
-                    self.random_address,
-                    vec![],
+                    *epoch,
+                    *round,
+                    *round,
+                    votes_bitvec,
+                    proposer,
+                    failed_proposers,
                     *self.last_timestamp.lock(),
                 ))
                 .unwrap(),
@@ -491,12 +451,21 @@ impl MockDbReader {
         *self.last_timestamp.lock() += 100;
     }
 
+    pub fn next_epoch(&self) {
+        *self.epoch.lock() += 1;
+        *self.round.lock() = 0;
+    }
+
+    pub fn skip_rounds(&self, to_skip: u64) {
+        *self.round.lock() += to_skip;
+    }
+
     pub fn add_another_transaction(&self) {
         *self.idx.lock() += 1;
     }
 
     pub fn add_event_after_call(&self, epoch: u64, round: Round) {
-        *self.to_add_event_after_call.lock() = Some((epoch, round));
+        *self.to_add_event_after_call.lock() = Some(());
     }
 
     fn fetched(&self) -> usize {
@@ -530,8 +499,8 @@ impl DbReader for MockDbReader {
     fn get_latest_version(&self) -> anyhow::Result<Version> {
         let version = *self.idx.lock();
         let mut to_add = self.to_add_event_after_call.lock();
-        if let Some((epoch, round)) = *to_add {
-            self.add_event(epoch, round);
+        if let Some(()) = *to_add {
+            self.add_event();
             *to_add = None;
         }
         Ok(version)
@@ -543,9 +512,12 @@ fn backend_wrapper_test() {
     let aptos_db = Arc::new(MockDbReader::new());
     let backend = AptosDBBackend::new(3, 3, aptos_db.clone());
 
-    aptos_db.add_event(0, 1);
+    aptos_db.skip_rounds(1);
+    aptos_db.add_event();
+    aptos_db.next_epoch();
+    aptos_db.skip_rounds(2);
     for i in 2..6 {
-        aptos_db.add_event(1, i);
+        aptos_db.add_event();
     }
     let mut fetch_count = 0;
 
@@ -571,22 +543,23 @@ fn backend_wrapper_test() {
     assert_history(6, vec![5, 4, 3], false);
 
     // as soon as history change, we fetch again
-    aptos_db.add_event(1, 6);
+    aptos_db.add_event();
     assert_history(6, vec![6, 5, 4], true);
-    aptos_db.add_event(1, 7);
+    aptos_db.add_event();
     assert_history(6, vec![6, 5, 4], false);
-    aptos_db.add_event(1, 8);
+    aptos_db.add_event();
     assert_history(6, vec![6, 5, 4], false);
 
     assert_history(9, vec![8, 7, 6], true);
-    aptos_db.add_event(1, 10);
+    aptos_db.skip_rounds(1);
+    aptos_db.add_event();
     // we need to refetch, as we don't know if round that arrived is for 9 or not.
     assert_history(9, vec![8, 7, 6], true);
     assert_history(9, vec![8, 7, 6], false);
-    aptos_db.add_event(1, 11);
+    aptos_db.add_event();
     // since we already saw round 10, and are asking for round 9, no need to fetch again.
     assert_history(9, vec![8, 7, 6], false);
-    aptos_db.add_event(1, 12);
+    aptos_db.add_event();
     assert_history(9, vec![8, 7, 6], false);
 
     // last time we fetched, we saw 10, so we don't need to fetch for 10
@@ -622,12 +595,17 @@ fn backend_test_cross_epoch() {
     let aptos_db = Arc::new(MockDbReader::new());
     let backend = AptosDBBackend::new(3, 3, aptos_db.clone());
 
-    aptos_db.add_event(0, 1);
-    aptos_db.add_event(1, 1);
-    aptos_db.add_event(1, 2);
-    aptos_db.add_event(1, 3);
-    aptos_db.add_event(2, 1);
-    aptos_db.add_event(2, 2);
+    aptos_db.skip_rounds(1);
+    aptos_db.add_event();
+    aptos_db.next_epoch();
+    aptos_db.skip_rounds(1);
+    aptos_db.add_event();
+    aptos_db.add_event();
+    aptos_db.add_event();
+    aptos_db.next_epoch();
+    aptos_db.skip_rounds(1);
+    aptos_db.add_event();
+    aptos_db.add_event();
 
     let mut fetch_count = 0;
 
@@ -647,7 +625,9 @@ fn backend_test_cross_epoch() {
     assert_history(2, 2, vec![(2, 2), (2, 1), (1, 3)], true);
     assert_history(2, 1, vec![(2, 1), (1, 3), (1, 2)], false);
 
-    aptos_db.add_event(3, 1);
+    aptos_db.next_epoch();
+    aptos_db.skip_rounds(1);
+    aptos_db.add_event();
 
     assert_history(3, 2, vec![(3, 1), (2, 2), (2, 1)], true);
 }

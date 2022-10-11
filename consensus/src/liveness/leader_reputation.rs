@@ -248,7 +248,7 @@ impl NewBlockEventAggregation {
         window_size: usize,
         wrong_order: bool,
     ) -> impl Iterator<Item = &'a NewBlockEvent> {
-        if wrong_order {
+        let sub_history = if wrong_order {
             let start = if history.len() > window_size {
                 history.len() - window_size
             } else {
@@ -256,8 +256,6 @@ impl NewBlockEventAggregation {
             };
 
             (&history[start..])
-                .iter()
-                .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
         } else {
             if !history.is_empty() {
                 assert!(
@@ -277,9 +275,10 @@ impl NewBlockEventAggregation {
             };
 
             (&history[..end])
-                .iter()
-                .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
-        }
+        };
+        sub_history
+            .iter()
+            .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
     }
 
     pub fn get_aggregated_metrics(
