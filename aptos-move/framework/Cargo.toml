@@ -42,26 +42,26 @@ aptos-sdk-builder = { path = "../aptos-sdk-builder" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 gas-algebra-ext =  { path = "../gas-algebra-ext" }
-move-binary-format = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
 
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
-move-compiler ={ git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
-move-core-types ={ git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4", features = ["address32"] }
-move-model ={ git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
-move-package ={ git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
-move-table-extension ={ git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
-move-vm-runtime ={ git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
-move-vm-types ={ git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
+move-compiler ={ git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
+move-core-types ={ git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826", features = ["address32"] }
+move-model ={ git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
+move-package ={ git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
+move-table-extension ={ git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
+move-vm-runtime ={ git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
+move-vm-types ={ git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
 
 [dev-dependencies]
 claims = "0.7"
 
 aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["testing"] }
-move-cli = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
-move-prover = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
+move-cli = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
+move-prover = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
 
-move-unit-test = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
 
 [features]
 default = []
