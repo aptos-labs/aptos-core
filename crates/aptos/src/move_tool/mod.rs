@@ -77,6 +77,7 @@ pub enum MoveTool {
     Download(DownloadPackage),
     List(ListPackage),
     Clean(CleanPackage),
+    VerifyPackage(VerifyPackage),
     Run(RunFunction),
     RunScript(RunScript),
     Test(TestPackage),
@@ -93,6 +94,7 @@ impl MoveTool {
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::List(tool) => tool.execute_serialized().await,
             MoveTool::Clean(tool) => tool.execute_serialized().await,
+            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
@@ -615,6 +617,67 @@ impl CliCommand<&'static str> for DownloadPackage {
             package_path.display()
         );
         Ok("Download succeeded")
+    }
+}
+
+/// Downloads a package and verifies that the bytecode matches a local compilation of the code
+#[derive(Parser)]
+pub struct VerifyPackage {
+    /// Address of the account containing the package
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) account: AccountAddress,
+
+    /// Artifacts to be generated when building this package.
+    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
+    pub(crate) included_artifacts: IncludedArtifacts,
+
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for VerifyPackage {
+    fn command_name(&self) -> &'static str {
+        "DownloadPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        // First build the package locally to get the package metadata
+        let build_options = BuildOptions {
+            install_dir: self.move_options.output_dir.clone(),
+            ..self
+                .included_artifacts
+                .build_options(self.move_options.named_addresses())
+        };
+        let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+        let compiled_metadata = pack.extract_metadata()?;
+
+        // Now pull the compiled package
+        let url = self.rest_options.url(&self.profile_options)?;
+        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let package = registry
+            .get_package(pack.name())
+            .await
+            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+
+        // We can't check the arbitrary, because it could change on us
+        if package.upgrade_policy() == UpgradePolicy::arbitrary() {
+            return Err(CliError::CommandArgumentError(
+                "A package with upgrade policy `arbitrary` cannot be downloaded \
+                since it is not safe to depend on such packages."
+                    .to_owned(),
+            ));
+        }
+
+        // Verify that the source digest matches
+        package.verify(&compiled_metadata)?;
+
+        Ok("Successfully verified source of package")
     }
 }
 

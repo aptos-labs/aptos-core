@@ -386,8 +386,11 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (result, _) =
-            ParallelAptosVM::execute_block(txn_block, &self.data_store, num_cpus::get())?;
+        let (result, _) = ParallelAptosVM::execute_block(
+            txn_block,
+            &self.data_store,
+            usize::min(4, num_cpus::get()),
+        )?;
 
         Ok(result)
     }

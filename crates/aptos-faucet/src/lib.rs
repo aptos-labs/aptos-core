@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+// README: The aptos-faucet is deprecated in favor of the tap. Do not add new code
+// to this until you've spoken with the Ecosystem Platform team + dport.
+
 //! This crate provides the Faucet service for creating and funding accounts on the Aptos Network.
 //!
 //! THIS SERVICE SHOULD NEVER BE DEPLOYED TO MAINNET.

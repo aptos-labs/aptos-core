@@ -133,7 +133,7 @@ crate::params::define_gas_parameters!(
         [
             maximum_number_of_gas_units: Gas,
             "maximum_number_of_gas_units",
-            10_000_000
+            2_000_000
         ],
         // The minimum gas price that a transaction can be submitted with.
         // TODO(Gas): should probably change this to something > 0
@@ -146,7 +146,7 @@ crate::params::define_gas_parameters!(
         [
             max_price_per_gas_unit: FeePerGasUnit,
             "max_price_per_gas_unit",
-            10_000
+            10_000_000_000
         ],
         [
             max_transaction_size_in_bytes: NumBytes,

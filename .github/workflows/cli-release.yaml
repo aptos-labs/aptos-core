@@ -28,7 +28,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh
+        run: scripts/cli/build_cli_release.sh "Ubuntu"
       - name: Upload Binary
         uses: actions/upload-artifact@v3
         with:
@@ -43,7 +43,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh
+        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04"
       - name: Upload Binary
         uses: actions/upload-artifact@v3
         with:
@@ -58,7 +58,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh
+        run: scripts/cli/build_cli_release.sh "MacOSX"
       - name: Upload Binary
         uses: actions/upload-artifact@v3
         with:

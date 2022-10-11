@@ -83,6 +83,28 @@ module aptos_token::property_map {
         properties
     }
 
+    /// Create property map directly from key and property value
+    public fun new_with_key_and_property_value(
+        keys: vector<String>,
+        values: vector<PropertyValue>
+    ): PropertyMap {
+        let length = vector::length(&keys);
+        assert!(length <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(EPROPERTY_NUMBER_EXCEED_LIMIT));
+        assert!(length == vector::length(&values), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
+
+        let properties = empty();
+
+        let i = 0;
+        while (i < length) {
+            let key = *vector::borrow(&keys, i);
+            let val = *vector::borrow(&values, i);
+            assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
+            add(&mut properties, key, val);
+            i = i + 1;
+        };
+        properties
+    }
+
     public fun empty(): PropertyMap {
         PropertyMap {
             map: simple_map::create<String, PropertyValue>(),
@@ -304,5 +326,15 @@ module aptos_token::property_map {
         let pm = create_property_list();
         add(&mut pm, string::utf8(b"addr"), pv);
         assert!(read_address(&pm, &string::utf8(b"addr")) == data, 1)
+    }
+
+    #[test]
+    fun test_create_property_map_from_key_value_pairs() {
+        let data1: address = @0xcafe;
+        let data2: bool = false;
+        let pvs = vector<PropertyValue>[create_property_value(&data1), create_property_value(&data2)];
+        let keys = vector<String>[string::utf8(b"addr"), string::utf8(b"flag")];
+        let pm = new_with_key_and_property_value(keys, pvs);
+        assert!(length(&pm) == 2, 1);
     }
 }
