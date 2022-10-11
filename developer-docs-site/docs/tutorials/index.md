@@ -29,4 +29,4 @@ Learn the Aptos `token` interface and how to use it. This interface is defined i
 
 ### [Your First Coin](first-coin.md)
 
-Learn how to deploy and managed a coin. The `coin` interface is defined in the [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) Move module.
+Learn how to deploy and manage a coin. The `coin` interface is defined in the [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) Move module.
