@@ -2,13 +2,13 @@ module aptos_names::domains {
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
+    use aptos_framework::event;
     use aptos_framework::timestamp;
     use aptos_names::config;
     use aptos_names::price_model;
     use aptos_names::time_helper;
     use aptos_names::token_helper;
     use aptos_names::utf8_utils;
-    use aptos_std::event;
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::Self;
     use aptos_token::token::{Self, TokenId};

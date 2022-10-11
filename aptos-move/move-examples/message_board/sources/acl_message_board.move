@@ -14,7 +14,7 @@ module message_board::acl_based_mb {
     use std::signer;
     use std::vector;
     use aptos_framework::account;
-    use aptos_std::event::{Self, EventHandle};
+    use aptos_framework::event::{Self, EventHandle};
 
     // Error map
     const EACCOUNT_NOT_IN_ACL: u64 = 1;
