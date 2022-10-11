@@ -9,6 +9,8 @@ use aptos_rest_client::{
 use aptos_types::account_address::AccountAddress;
 use std::str::FromStr;
 
+const MAX_FETCH_BATCH_SIZE: u16 = 1000;
+
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub struct ValidatorInfo {
     pub address: AccountAddress,
@@ -71,7 +73,7 @@ impl FetchMetadata {
         }
     }
 
-    async fn get_transactions(
+    async fn get_transactions_in_range(
         client: &RestClient,
         start: u64,
         last: u64,
@@ -79,13 +81,20 @@ impl FetchMetadata {
         let mut result = Vec::new();
         let mut cursor = start;
         while cursor < last {
-            let limit = std::cmp::min(1000, last - cursor);
+            let limit = std::cmp::min(MAX_FETCH_BATCH_SIZE as u64, last - cursor) as u16;
             let mut current = client
                 .get_transactions(Some(cursor), Some(limit as u16))
                 .await?
                 .into_inner();
+            if current.is_empty() {
+                return Err(anyhow!(
+                    "No transactions returned with start={} and limit={}",
+                    cursor,
+                    limit
+                ));
+            }
+            cursor += current.len() as u64;
             result.append(&mut current);
-            cursor += limit
         }
         Ok(result)
     }
@@ -197,7 +206,6 @@ impl FetchMetadata {
             }
         }
 
-        let batch: u16 = 100;
         let mut batch_index = 0;
 
         println!(
@@ -215,15 +223,15 @@ impl FetchMetadata {
 
         let mut cursor = start_seq_num;
         loop {
-            let events = client
-                .get_new_block_events_bcs(Some(cursor), Some(batch))
+            let response = client
+                .get_new_block_events_bcs(Some(cursor), Some(MAX_FETCH_BATCH_SIZE))
                 .await;
 
-            if events.is_err() {
+            if response.is_err() {
                 println!(
                     "Failed to read new_block_events beyond {}, stopping. {:?}",
                     cursor,
-                    events.unwrap_err()
+                    response.unwrap_err()
                 );
                 assert!(!validators.is_empty());
                 result.push(EpochInfo {
@@ -234,8 +242,20 @@ impl FetchMetadata {
                 });
                 return Ok(result);
             }
+            let events = response.unwrap().into_inner();
 
-            for event in events.unwrap().into_inner() {
+            if events.is_empty() {
+                return Err(anyhow!(
+                    "No transactions returned with start={} and limit={}",
+                    cursor,
+                    MAX_FETCH_BATCH_SIZE
+                ));
+            }
+
+            cursor += events.len() as u64;
+            batch_index += 1;
+
+            for event in events {
                 if event.event.epoch() > epoch {
                     if epoch == 0 {
                         epoch = event.event.epoch();
@@ -243,7 +263,7 @@ impl FetchMetadata {
                     } else {
                         let last = current.last().cloned();
                         if let Some(last) = last {
-                            let transactions = FetchMetadata::get_transactions(
+                            let transactions = FetchMetadata::get_transactions_in_range(
                                 client,
                                 last.version,
                                 event.version,
@@ -291,8 +311,6 @@ impl FetchMetadata {
                 current.push(event);
             }
 
-            cursor += u64::from(batch);
-            batch_index += 1;
             if batch_index % 100 == 0 {
                 println!(
                     "Fetched {} epochs (in epoch {} with {} blocks) from {} NewBlockEvents",

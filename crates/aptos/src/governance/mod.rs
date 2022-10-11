@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, PromptOptions, TransactionOptions,
-    TransactionSummary,
+    CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, ProfileOptions, PromptOptions,
+    RestOptions, TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
 #[cfg(feature = "no-upload-proposal")]
@@ -12,11 +12,13 @@ use crate::move_tool::{FrameworkPackageArgs, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::U64;
+use aptos_rest_client::aptos_api_types::{Address, HexEncodedBytes, U128, U64};
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::move_types::language_storage::CORE_CODE_ADDRESS;
+use aptos_types::event::EventHandle;
 use aptos_types::governance::VotingRecords;
 use aptos_types::stake_pool::StakePool;
+use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Script, TransactionPayload},
@@ -42,6 +44,9 @@ use tempfile::TempDir;
 pub enum GovernanceTool {
     Propose(SubmitProposal),
     Vote(SubmitVote),
+    ShowProposal(ViewProposal),
+    ListProposals(ListProposals),
+    VerifyProposal(VerifyProposal),
     ExecuteProposal(ExecuteProposal),
     GenerateUpgradeProposal(GenerateUpgradeProposal),
 }
@@ -54,8 +59,197 @@ impl GovernanceTool {
             Vote(tool) => tool.execute_serialized().await,
             ExecuteProposal(tool) => tool.execute_serialized().await,
             GenerateUpgradeProposal(tool) => tool.execute_serialized_success().await,
+            ShowProposal(tool) => tool.execute_serialized().await,
+            ListProposals(tool) => tool.execute_serialized().await,
+            VerifyProposal(tool) => tool.execute_serialized().await,
         }
     }
+}
+
+/// Command to view a known onchain governance proposal
+///
+/// This command will return the proposal requested as well as compute
+/// the hash of the metadata to determine whether it was verified or not.
+#[derive(Parser)]
+pub struct ViewProposal {
+    /// The identifier of the onchain governance proposal
+    #[clap(long)]
+    proposal_id: u64,
+
+    #[clap(flatten)]
+    rest_options: RestOptions,
+    #[clap(flatten)]
+    profile: ProfileOptions,
+}
+
+#[async_trait]
+impl CliCommand<VerifiedProposal> for ViewProposal {
+    fn command_name(&self) -> &'static str {
+        "ViewProposal"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<VerifiedProposal> {
+        // Get proposal
+        let client = self.rest_options.client(&self.profile)?;
+        let forum = client
+            .get_account_resource_bcs::<VotingForum>(
+                AccountAddress::ONE,
+                "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",
+            )
+            .await?
+            .into_inner();
+        let voting_table = forum.table_handle.0;
+
+        let proposal: Proposal = get_proposal(&client, voting_table, self.proposal_id)
+            .await?
+            .into();
+
+        let metadata_hash = proposal.metadata.get("metadata_hash").unwrap();
+        let metadata_url = proposal.metadata.get("metadata_location").unwrap();
+
+        // Compute the hash and verify accordingly
+        let mut verified = false;
+        let mut actual_metadata_hash = "Unable to fetch metadata url".to_string();
+        let mut actual_metadata = None;
+        if let Ok(url) = Url::parse(metadata_url) {
+            if let Ok(bytes) = get_metadata_from_url(&url).await {
+                let hash = HashValue::sha3_256_of(&bytes);
+                verified = metadata_hash == &hash.to_hex();
+                actual_metadata_hash = hash.to_hex();
+                if let Ok(metadata) = String::from_utf8(bytes) {
+                    actual_metadata = Some(metadata);
+                }
+            }
+        }
+
+        Ok(VerifiedProposal {
+            verified,
+            actual_metadata_hash,
+            actual_metadata,
+            proposal,
+        })
+    }
+}
+
+/// Command to list the last 100 visible onchain proposals
+///
+/// Note, if the full node you are talking to is pruning data, it may not have some of the
+/// proposals show here
+#[derive(Parser)]
+pub struct ListProposals {
+    #[clap(flatten)]
+    rest_options: RestOptions,
+    #[clap(flatten)]
+    profile: ProfileOptions,
+}
+
+#[async_trait]
+impl CliCommand<Vec<ProposalSummary>> for ListProposals {
+    fn command_name(&self) -> &'static str {
+        "ListProposals"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<Vec<ProposalSummary>> {
+        // List out known proposals based on events
+        let client = self.rest_options.client(&self.profile)?;
+
+        let events = client
+            .get_account_events_bcs(
+                AccountAddress::ONE,
+                "0x1::aptos_governance::GovernanceEvents",
+                "create_proposal_events",
+                None,
+                Some(100),
+            )
+            .await?
+            .into_inner();
+        let mut proposals = vec![];
+
+        for event in events {
+            let event = bcs::from_bytes::<CreateProposalFullEvent>(event.event.event_data())?;
+            proposals.push(event.into());
+        }
+
+        // TODO: Show more information about proposal?
+        Ok(proposals)
+    }
+}
+
+/// Command to verify a proposal given the source of the script
+///
+/// The script's bytecode or source can be provided and it will
+/// verify whether the hash matches the onchain hash
+#[derive(Parser)]
+pub struct VerifyProposal {
+    /// The id of the onchain proposal
+    #[clap(long)]
+    proposal_id: u64,
+
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileScriptFunction,
+    #[clap(flatten)]
+    rest_options: RestOptions,
+    #[clap(flatten)]
+    profile: ProfileOptions,
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<VerifyProposalResponse> for VerifyProposal {
+    fn command_name(&self) -> &'static str {
+        "VerifyProposal"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<VerifyProposalResponse> {
+        // Compile local first to get the hash
+        let (_, hash) = self
+            .compile_proposal_args
+            .compile("SubmitProposal", self.prompt_options)?;
+
+        // Retrieve the onchain proposal
+        let client = self.rest_options.client(&self.profile)?;
+        let forum = client
+            .get_account_resource_bcs::<VotingForum>(
+                AccountAddress::ONE,
+                "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",
+            )
+            .await?
+            .into_inner();
+        let voting_table = forum.table_handle.0;
+
+        let proposal: Proposal = get_proposal(&client, voting_table, self.proposal_id)
+            .await?
+            .into();
+
+        // Compare the hashes
+        let computed_hash = hash.to_hex();
+        let onchain_hash = proposal.execution_hash;
+
+        Ok(VerifyProposalResponse {
+            verified: computed_hash == onchain_hash,
+            computed_hash,
+            onchain_hash,
+        })
+    }
+}
+
+async fn get_proposal(
+    client: &aptos_rest_client::Client,
+    voting_table: AccountAddress,
+    proposal_id: u64,
+) -> CliTypedResult<JsonProposal> {
+    let json = client
+        .get_table_item(
+            voting_table,
+            "u64",
+            "0x1::voting::Proposal<0x1::governance_proposal::GovernanceProposal>",
+            format!("{}", proposal_id),
+        )
+        .await?
+        .into_inner();
+    serde_json::from_value(json)
+        .map_err(|err| CliError::CommandArgumentError(format!("Failed to parse proposal {}", err)))
 }
 
 /// Submit proposal to other validators to be proposed on
@@ -229,7 +423,7 @@ pub struct SubmitVote {
 
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Comma separated list of pool addresses.
+    /// Space separated list of pool addresses.
     #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) pool_addresses: Vec<AccountAddress>,
 }
@@ -247,7 +441,7 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
             (_, _) => {
                 return Err(CliError::CommandArgumentError(
                     "Must choose either --yes or --no".to_string(),
-                ))
+                ));
             }
         };
 
@@ -512,7 +706,7 @@ impl CompileScriptFunction {
 #[derive(Parser)]
 pub struct GenerateUpgradeProposal {
     /// Address of the account which the proposal addresses.
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
     /// Where to store the generated proposal
@@ -553,4 +747,164 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         release.generate_script_proposal(account, output)?;
         Ok(())
     }
+}
+
+/// Response for `verify proposal`
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyProposalResponse {
+    verified: bool,
+    computed_hash: String,
+    onchain_hash: String,
+}
+
+/// Voting forum onchain type
+///
+/// TODO: Move to a shared location
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VotingForum {
+    table_handle: TableHandle,
+    events: VotingEvents,
+    next_proposal_id: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VotingEvents {
+    create_proposal_events: EventHandle,
+    register_forum_events: EventHandle,
+    resolve_proposal_events: EventHandle,
+    vote_events: EventHandle,
+}
+
+/// Summary of proposal from the listing events for `ListProposals`
+#[derive(Serialize, Deserialize, Debug)]
+struct ProposalSummary {
+    proposer: AccountAddress,
+    stake_pool: AccountAddress,
+    proposal_id: u64,
+    execution_hash: String,
+    proposal_metadata: BTreeMap<String, String>,
+}
+
+impl From<CreateProposalFullEvent> for ProposalSummary {
+    fn from(event: CreateProposalFullEvent) -> Self {
+        let proposal_metadata = event
+            .proposal_metadata
+            .into_iter()
+            .map(|(key, value)| (key, String::from_utf8(value).unwrap()))
+            .collect();
+        ProposalSummary {
+            proposer: event.proposer,
+            stake_pool: event.stake_pool,
+            proposal_id: event.proposal_id,
+            execution_hash: hex::encode(event.execution_hash),
+            proposal_metadata,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct CreateProposalFullEvent {
+    proposer: AccountAddress,
+    stake_pool: AccountAddress,
+    proposal_id: u64,
+    execution_hash: Vec<u8>,
+    proposal_metadata: BTreeMap<String, Vec<u8>>,
+}
+
+/// A proposal and the verified information about it
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifiedProposal {
+    verified: bool,
+    actual_metadata_hash: String,
+    actual_metadata: Option<String>,
+    proposal: Proposal,
+}
+
+/// A reformatted type that has human readable version of the proposal onchain
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Proposal {
+    proposer: AccountAddress,
+    metadata: BTreeMap<String, String>,
+    creation_time_secs: u64,
+    execution_hash: String,
+    min_vote_threshold: u128,
+    expiration_secs: u64,
+    early_resolution_vote_threshold: Option<u128>,
+    yes_votes: u128,
+    no_votes: u128,
+    is_resolved: bool,
+    resolution_time_secs: u64,
+}
+
+impl From<JsonProposal> for Proposal {
+    fn from(proposal: JsonProposal) -> Self {
+        let metadata = proposal
+            .metadata
+            .data
+            .into_iter()
+            .map(|pair| {
+                let value = match pair.key.as_str() {
+                    "metadata_hash" => String::from_utf8(pair.value.0)
+                        .unwrap_or_else(|_| "Failed to parse utf8".to_string()),
+                    "metadata_location" => String::from_utf8(pair.value.0)
+                        .unwrap_or_else(|_| "Failed to parse utf8".to_string()),
+                    "RESOLVABLE_TIME_METADATA_KEY" => bcs::from_bytes::<u64>(pair.value.inner())
+                        .map(|inner| inner.to_string())
+                        .unwrap_or_else(|_| "Failed to parse u64".to_string()),
+                    _ => pair.value.to_string(),
+                };
+                (pair.key, value)
+            })
+            .collect();
+
+        Proposal {
+            proposer: proposal.proposer.into(),
+            metadata,
+            creation_time_secs: proposal.creation_time_secs.into(),
+            execution_hash: format!("{:x}", proposal.execution_hash),
+            min_vote_threshold: proposal.min_vote_threshold.into(),
+            expiration_secs: proposal.expiration_secs.into(),
+            early_resolution_vote_threshold: proposal
+                .early_resolution_vote_threshold
+                .vec
+                .first()
+                .map(|inner| inner.0),
+            yes_votes: proposal.yes_votes.into(),
+            no_votes: proposal.no_votes.into(),
+            is_resolved: proposal.is_resolved,
+            resolution_time_secs: proposal.resolution_time_secs.into(),
+        }
+    }
+}
+
+/// An ugly JSON parsing version for from the JSON API
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonProposal {
+    creation_time_secs: U64,
+    early_resolution_vote_threshold: JsonEarlyResolutionThreshold,
+    execution_hash: aptos_rest_client::aptos_api_types::HashValue,
+    expiration_secs: U64,
+    is_resolved: bool,
+    min_vote_threshold: U128,
+    no_votes: U128,
+    resolution_time_secs: U64,
+    yes_votes: U128,
+    proposer: Address,
+    metadata: JsonMetadata,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonEarlyResolutionThreshold {
+    vec: Vec<U128>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonMetadata {
+    data: Vec<JsonMetadataPair>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonMetadataPair {
+    key: String,
+    value: HexEncodedBytes,
 }
