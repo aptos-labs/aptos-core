@@ -26,7 +26,7 @@ pub(crate) enum ProofBuilderCommand {
 }
 
 pub(crate) type ProofReturnChannel =
-oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+    oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
 struct IncrementalProofState {
     info: SignedDigestInfo,
@@ -45,27 +45,28 @@ impl IncrementalProofState {
         }
     }
 
-    fn add_signature(
-        &mut self,
-        signed_digest: SignedDigest,
-    ) -> Result<(), SignedDigestError> {
+    fn add_signature(&mut self, signed_digest: SignedDigest) -> Result<(), SignedDigestError> {
         if signed_digest.info != self.info {
             return Err(SignedDigestError::WrongInfo);
         }
 
-        if self.aggregated_signature.contains_key(&signed_digest.peer_id) {
+        if self
+            .aggregated_signature
+            .contains_key(&signed_digest.peer_id)
+        {
             return Err(SignedDigestError::DuplicatedSignature);
         }
 
-        self.aggregated_signature.insert(signed_digest.peer_id, signed_digest.signature);
+        self.aggregated_signature
+            .insert(signed_digest.peer_id, signed_digest.signature);
         Ok(())
     }
 
     fn ready(&self, validator_verifier: &ValidatorVerifier, my_peer_id: PeerId) -> bool {
         self.aggregated_signature.contains_key(&my_peer_id)
             && validator_verifier
-            .check_voting_power(self.aggregated_signature.keys())
-            .is_ok()
+                .check_voting_power(self.aggregated_signature.keys())
+                .is_ok()
     }
 
     fn take(
@@ -159,9 +160,9 @@ impl ProofBuilder {
             // quorum store measurements
             let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
                 - self
-                .digest_to_time
-                .get(&digest)
-                .expect("Batch created without recording the time!");
+                    .digest_to_time
+                    .get(&digest)
+                    .expect("Batch created without recording the time!");
             counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
 
             tx.send(Ok((proof, batch_id)))

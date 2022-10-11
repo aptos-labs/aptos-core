@@ -45,7 +45,12 @@ pub struct SignedDigestInfo {
 
 impl SignedDigestInfo {
     pub fn new(digest: HashValue, expiration: LogicalTime, num_txns: u64, num_bytes: u64) -> Self {
-        Self { digest, expiration, num_txns, num_bytes }
+        Self {
+            digest,
+            expiration,
+            num_txns,
+            num_bytes,
+        }
     }
 }
 
@@ -110,7 +115,9 @@ impl ProofOfStore {
         }
     }
 
-    pub fn info(&self) -> &SignedDigestInfo { &self.info }
+    pub fn info(&self) -> &SignedDigestInfo {
+        &self.info
+    }
 
     pub fn digest(&self) -> &HashValue {
         &self.info.digest

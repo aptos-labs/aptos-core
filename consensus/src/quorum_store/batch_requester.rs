@@ -3,9 +3,11 @@
 
 use crate::network::QuorumStoreSender;
 use crate::quorum_store::{counters, types::Batch, utils::DigestTimeouts};
+use aptos_crypto::hash::DefaultHasher;
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_types::{transaction::SignedTransaction, PeerId};
+use bcs::to_bytes;
 use executor_types::*;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
@@ -143,9 +145,20 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
 
     pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Vec<SignedTransaction>) {
         if self.digest_to_state.contains_key(&digest) {
-            debug!("QS: serving batch digest = {}", digest);
-            let state = self.digest_to_state.remove(&digest).unwrap();
-            state.serve_request(digest, Some(payload));
+            let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
+            let serialized_payload: Vec<u8> = payload
+                .iter()
+                .map(|txn| to_bytes(txn).unwrap())
+                .flatten()
+                .collect();
+            hasher.update(&serialized_payload);
+            if hasher.finish() == digest {
+                debug!("QS: serving batch digest = {}", digest);
+                let state = self.digest_to_state.remove(&digest).unwrap();
+                state.serve_request(digest, Some(payload));
+            } else {
+                debug!("Payload does not fit digest")
+            }
         }
     }
 }
