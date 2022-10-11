@@ -12,7 +12,7 @@ Start here to get into the core concepts of the Aptos blockchain.
 - ### [Creating a Signed Transaction](sign-a-transaction.md)
 - ### [Interacting with the Aptos blockchain](interacting-with-the-blockchain.md)
 - ### [State Synchronization](state-sync.md)
-- ### [Data Retention](data-retention.md)
+- ### [Data Pruning](data-pruning.md)
 - ### [Building your own wallet](building-your-own-wallet.md)
 - ### [Install Petra Extension](install-petra-wallet-extension)
 - ### [Building the Wallet Extension](building-wallet-extension.md)
