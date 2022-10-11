@@ -15,7 +15,7 @@ CREATE TABLE marketplace_offers (
     creator_address VARCHAR(66) NOT NULL,
     collection_name TEXT NOT NULL,
     token_name TEXT NOT NULL,
-    property_version SMALLINT NOT NULL,
+    property_version INTEGER NOT NULL,
     price BIGINT NOT NULL,
     seller VARCHAR(66) NOT NULL,
     "timestamp" TIMESTAMP NOT NULL,
