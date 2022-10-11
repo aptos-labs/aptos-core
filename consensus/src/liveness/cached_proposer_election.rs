@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 use aptos_infallible::Mutex;
 use consensus_types::common::{Author, Round};
 
+use crate::counters::PROPOSER_ELECTION_DURATION;
+
 use super::proposer_election::ProposerElection;
 
 // Wrapper around ProposerElection.
@@ -42,8 +44,9 @@ impl ProposerElection for CachedProposerElection {
             *recent_elections = recent_elections.split_off(&(round - self.window as u64));
         }
 
-        *recent_elections
-            .entry(round)
-            .or_insert_with(|| self.proposer_election.get_valid_proposer(round))
+        *recent_elections.entry(round).or_insert_with(|| {
+            let _timer = PROPOSER_ELECTION_DURATION.start_timer();
+            self.proposer_election.get_valid_proposer(round)
+        })
     }
 }
