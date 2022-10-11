@@ -448,7 +448,7 @@ impl TransactionsApi {
         // If estimate max gas amount is provided, we will just make it the maximum value
         let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
             // Retrieve max possible gas units
-            let gas_params = self.context.get_gas_schedule(&ledger_info)?;
+            let (_, gas_params) = self.context.get_gas_schedule(&ledger_info)?;
             let min_number_of_gas_units = u64::from(gas_params.txn.min_transaction_gas_units)
                 / u64::from(gas_params.txn.gas_unit_scaling_factor);
             let max_number_of_gas_units = u64::from(gas_params.txn.maximum_number_of_gas_units);

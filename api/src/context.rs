@@ -71,7 +71,7 @@ impl Context {
             node_config,
             gas_estimation: Arc::new(RwLock::new(GasEstimationCache {
                 last_updated_version: None,
-                min_gas_price: 0,
+                last_updated_epoch: None,
                 deprioritized_gas_price: 0,
                 median_gas_price: 0,
                 prioritized_gas_price: 0,
@@ -642,9 +642,12 @@ impl Context {
         // If it's cached, let's use that
         {
             let gas_estimation = self.gas_estimation.read().unwrap();
+            let (last_updated_epoch, _) = self.get_gas_schedule(ledger_info)?;
 
+            // Cache includes if there was an update on the gas schedule due to epoch changes
             if gas_estimation.last_updated_version.is_some()
                 && gas_estimation.last_updated_version.unwrap() > oldest_search_version
+                && last_updated_epoch == gas_estimation.last_updated_epoch.unwrap_or_default()
             {
                 return Ok(gas_estimation.gas_estimate());
             }
@@ -653,10 +656,12 @@ impl Context {
         // Otherwise, get the estimated amount from storage
         {
             let mut gas_estimation = self.gas_estimation.write().unwrap();
+            let (last_updated_epoch, gas_schedule) = self.get_gas_schedule(ledger_info)?;
 
             // If this has been updated by a different thread, use that instead
             if gas_estimation.last_updated_version.is_some()
                 && gas_estimation.last_updated_version.unwrap() > oldest_search_version
+                && last_updated_epoch == gas_estimation.last_updated_epoch.unwrap_or_default()
             {
                 return Ok(gas_estimation.gas_estimate());
             }
@@ -674,17 +679,36 @@ impl Context {
             // When there's no gas prices in the last 100k transactions, we're going to set it to
             // the lowest gas price because the transaction should get through with any amount
             gas_estimation.last_updated_version = Some(ledger_info.ledger_version.0);
-            gas_estimation.median_gas_price = if gas_prices.is_empty() {
-                // Pull the min gas price
-                let gas_schedule = self.get_gas_schedule(ledger_info)?;
-                gas_estimation.min_gas_price = gas_schedule.txn.min_price_per_gas_unit.into();
-                gas_estimation.min_gas_price
+            gas_estimation.last_updated_epoch = Some(last_updated_epoch);
+            let min_gas_price = gas_schedule.txn.min_price_per_gas_unit.into();
+            let max_gas_price = gas_schedule.txn.max_price_per_gas_unit.into();
+
+            let observed_gas_median = if gas_prices.is_empty() {
+                // This will make it always pick the minimum gas price
+                0
             } else {
+                // Sort and take the median of the gas prices
                 gas_prices.sort();
+
+                // Median is the center if it's odd, average of the two middle if even
                 let mid = gas_prices.len() / 2;
-                gas_prices[mid]
+                if gas_prices.len() % 2 == 0 {
+                    let lower = gas_prices.get(mid.saturating_sub(1)).unwrap();
+                    let upper = gas_prices.get(mid).unwrap();
+
+                    upper.saturating_add(*lower).saturating_div(2)
+                } else {
+                    *gas_prices.get(mid).unwrap()
+                }
             };
 
+            // Ensure the price is within the min/max bounds
+            gas_estimation.median_gas_price = std::cmp::min(
+                max_gas_price,
+                std::cmp::max(min_gas_price, observed_gas_median),
+            );
+
+            // Handle prices for "prioritized" and "deprioritized"
             // There must be at least 1 buckets
             assert!(!self.node_config.mempool.broadcast_buckets.is_empty());
             let median_gas_price = gas_estimation.median_gas_price;
@@ -713,7 +737,7 @@ impl Context {
                 .broadcast_buckets
                 .get(bucket_index.saturating_sub(1))
                 .copied()
-                .unwrap_or(gas_estimation.min_gas_price);
+                .unwrap_or(min_gas_price);
             // Next bucket could be the same as the current gas price, but we increase by 1 for the estimation
             let next_bucket_price = self
                 .node_config
@@ -722,8 +746,10 @@ impl Context {
                 .get(bucket_index.saturating_add(1))
                 .copied()
                 .unwrap_or_else(|| median_gas_price.saturating_add(1));
-            gas_estimation.deprioritized_gas_price = previous_bucket_price;
-            gas_estimation.prioritized_gas_price = next_bucket_price;
+            // Ensure that bucket prices are within the bounds
+            gas_estimation.deprioritized_gas_price =
+                std::cmp::max(min_gas_price, previous_bucket_price);
+            gas_estimation.prioritized_gas_price = std::cmp::min(max_gas_price, next_bucket_price);
 
             Ok(gas_estimation.gas_estimate())
         }
@@ -732,7 +758,7 @@ impl Context {
     pub fn get_gas_schedule<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
-    ) -> Result<AptosGasParameters, E> {
+    ) -> Result<(u64, AptosGasParameters), E> {
         // If it's the same epoch, used the cached results
         {
             let cache = self.gas_schedule_cache.read().unwrap();
@@ -740,7 +766,10 @@ impl Context {
                 (cache.last_updated_epoch, &cache.gas_schedule_params)
             {
                 if *last_updated_epoch == ledger_info.epoch.0 {
-                    return Ok(gas_params.clone());
+                    return Ok((
+                        cache.last_updated_epoch.unwrap_or_default(),
+                        gas_params.clone(),
+                    ));
                 }
             }
         }
@@ -753,7 +782,10 @@ impl Context {
                 (cache.last_updated_epoch, &cache.gas_schedule_params)
             {
                 if *last_updated_epoch == ledger_info.epoch.0 {
-                    return Ok(gas_params.clone());
+                    return Ok((
+                        cache.last_updated_epoch.unwrap_or_default(),
+                        gas_params.clone(),
+                    ));
                 }
             }
 
@@ -789,7 +821,10 @@ impl Context {
             // Update the cache
             cache.gas_schedule_params = Some(gas_schedule_params.clone());
             cache.last_updated_epoch = Some(ledger_info.epoch.0);
-            Ok(gas_schedule_params)
+            Ok((
+                cache.last_updated_epoch.unwrap_or_default(),
+                gas_schedule_params,
+            ))
         }
     }
 
@@ -824,7 +859,7 @@ impl Context {
 
 pub struct GasEstimationCache {
     last_updated_version: Option<u64>,
-    min_gas_price: u64,
+    last_updated_epoch: Option<u64>,
     deprioritized_gas_price: u64,
     median_gas_price: u64,
     prioritized_gas_price: u64,
