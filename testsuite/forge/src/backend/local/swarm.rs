@@ -99,6 +99,8 @@ pub struct LocalSwarm {
     guard: ActiveNodesGuard,
 }
 
+const LOCAL_SWARM_TCP_BUFFER_SIZE: u32 = 200 * 1024; // 200K for tests
+
 impl LocalSwarm {
     pub fn build<R>(
         rng: R,
@@ -145,6 +147,28 @@ impl LocalSwarm {
                             .state_sync
                             .state_sync_driver
                             .max_connection_deadline_secs = 1;
+                    }
+
+                    if let Some(network_config) = &mut config.validator_network {
+                        network_config.inbound_rx_buffer_size_bytes =
+                            Some(LOCAL_SWARM_TCP_BUFFER_SIZE);
+                        network_config.inbound_tx_buffer_size_bytes =
+                            Some(LOCAL_SWARM_TCP_BUFFER_SIZE);
+                        network_config.outbound_rx_buffer_size_bytes =
+                            Some(LOCAL_SWARM_TCP_BUFFER_SIZE);
+                        network_config.outbound_tx_buffer_size_bytes =
+                            Some(LOCAL_SWARM_TCP_BUFFER_SIZE);
+                    }
+
+                    for network_config in &mut config.full_node_networks {
+                        network_config.inbound_rx_buffer_size_bytes =
+                            Some(LOCAL_SWARM_TCP_BUFFER_SIZE);
+                        network_config.inbound_tx_buffer_size_bytes =
+                            Some(LOCAL_SWARM_TCP_BUFFER_SIZE);
+                        network_config.outbound_rx_buffer_size_bytes =
+                            Some(LOCAL_SWARM_TCP_BUFFER_SIZE);
+                        network_config.outbound_tx_buffer_size_bytes =
+                            Some(LOCAL_SWARM_TCP_BUFFER_SIZE);
                     }
 
                     if let Some(init_config) = &init_config {
