@@ -1,9 +1,9 @@
 ---
-title: "Data Retention"
-slug: "data-retention"
+title: "Data Pruning"
+slug: "data-pruning"
 ---
 
-# Data Retention
+# Data Pruning
 
 When a validator node is running, it participates in the consensus to generate new data to the ledger, or sync the new data from the other nodes via [State Sync](/guides/state-sync). With the ledger growing fast, storage disk space can be managed by pruning the old ledger data. By default pruning is enabled on the node, with a default pruning window. This document describes how you can change these settings. 
 
