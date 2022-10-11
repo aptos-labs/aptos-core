@@ -28,6 +28,6 @@ aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
 storage-interface = { path = "../../storage/storage-interface" }
 
-move-binary-format = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4", features = ["address32"] }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "e61c8d7c5e9c8085ce2602ef9a5ae9b2500dbfa4" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826", features = ["address32"] }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826" }

@@ -6,9 +6,9 @@ module aptos_framework::coin {
     use std::signer;
 
     use aptos_framework::account;
+    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
-    use aptos_std::event::{Self, EventHandle};
 
     use aptos_std::type_info;
 

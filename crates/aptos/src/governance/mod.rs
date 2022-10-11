@@ -423,7 +423,7 @@ pub struct SubmitVote {
 
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Comma separated list of pool addresses.
+    /// Space separated list of pool addresses.
     #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) pool_addresses: Vec<AccountAddress>,
 }

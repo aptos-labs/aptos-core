@@ -146,7 +146,7 @@ crate::params::define_gas_parameters!(
         [
             max_price_per_gas_unit: FeePerGasUnit,
             "max_price_per_gas_unit",
-            10_000
+            10_000_000_000
         ],
         [
             max_transaction_size_in_bytes: NumBytes,

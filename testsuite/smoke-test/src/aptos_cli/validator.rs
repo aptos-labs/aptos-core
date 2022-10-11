@@ -8,7 +8,7 @@ use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos::test::ValidatorPerformance;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::{bls12381, x25519};
+use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{Client, State};
@@ -520,6 +520,10 @@ async fn test_register_and_update_validator() {
     assert_eq!(
         validator_config.consensus_public_key,
         keys.consensus_public_key()
+            .to_encoded_string()
+            .unwrap()
+            .as_bytes()
+            .to_vec()
     );
 
     let new_port = 5678;
