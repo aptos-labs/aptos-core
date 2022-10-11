@@ -308,6 +308,30 @@ impl TestContext {
         self.create_user_account_by(&mut tc, account)
     }
 
+    pub fn mint_user_account(&self, account: &LocalAccount) -> SignedTransaction {
+        let mut tc = self.root_account();
+        let factory = self.transaction_factory();
+        tc.sign_with_transaction_builder(
+            factory
+                .account_transfer(account.address(), 10_000_000)
+                .expiration_timestamp_secs(u64::MAX),
+        )
+    }
+
+    pub fn account_transfer(
+        &self,
+        sender: &mut LocalAccount,
+        receiver: &LocalAccount,
+        amount: u64,
+    ) -> SignedTransaction {
+        let factory = self.transaction_factory();
+        sender.sign_with_transaction_builder(
+            factory
+                .account_transfer(receiver.address(), amount)
+                .expiration_timestamp_secs(u64::MAX),
+        )
+    }
+
     pub fn create_user_account_by(
         &self,
         creator: &mut LocalAccount,
