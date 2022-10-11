@@ -66,6 +66,10 @@ module aptos_framework::code {
         policy: u8
     }
 
+    struct ModulePublishingPermissions has key {
+        allowed: bool,
+    }
+
     /// Package contains duplicate module names with existing modules publised in other packages on this address
     const EMODULE_NAME_CLASH: u64 = 0x1;
 
@@ -89,6 +93,9 @@ module aptos_framework::code {
 
     /// Creating a package with incompatible upgrade policy is disabled.
     const EINCOMPATIBLE_POLICY_DISABLED: u64 = 0x8;
+
+    /// Publishing a module has been disabled and is not allowed.
+    const EMODULE_PUBLISHING_NOT_ALLOWED: u64 = 0x9;
 
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
     /// publication mode should only be used for modules which aren't shared with user others.
@@ -135,6 +142,7 @@ module aptos_framework::code {
             pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy,
             error::invalid_argument(EINCOMPATIBLE_POLICY_DISABLED),
         );
+        assert!(is_publish_allowed(), error::invalid_state(EMODULE_PUBLISHING_NOT_ALLOWED));
 
         let addr = signer::address_of(owner);
         if (!exists<PackageRegistry>(addr)) {
@@ -188,6 +196,20 @@ module aptos_framework::code {
     public entry fun publish_package_txn(owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>)
     acquires PackageRegistry {
         publish_package(owner, util::from_bytes<PackageMetadata>(metadata_serialized), code)
+    }
+
+    public fun set_publish_allowed(aptos_framework: &signer, allowed: bool) acquires ModulePublishingPermissions {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (!exists<ModulePublishingPermissions>(@aptos_framework)) {
+            move_to(aptos_framework, ModulePublishingPermissions { allowed });
+        } else {
+            borrow_global_mut<ModulePublishingPermissions>(@aptos_framework).allowed = allowed;
+        };
+    }
+
+    fun is_publish_allowed() acquires ModulePublishingPermissions {
+        !exists<ModulePublishingPermissions>(@aptos_framework) ||
+            borrow_global<ModulePublishingPermissions>(@aptos_framework).allowed
     }
 
     // Helpers

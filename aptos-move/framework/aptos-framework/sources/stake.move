@@ -74,6 +74,8 @@ module aptos_framework::stake {
     const EINELIGIBLE_VALIDATOR: u64 = 17;
     /// Cannot update stake pool's lockup to earlier than current lockup.
     const EINVALID_LOCKUP: u64 = 18;
+    /// Specified validator list contains an address that's already in the allowed list.
+    const EVALIDATOR_ALREADY_ALLOWED: u64 = 19;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -740,11 +742,12 @@ module aptos_framework::stake {
     public entry fun join_validator_set(
         operator: &signer,
         pool_address: address
-    ) acquires StakePool, ValidatorConfig, ValidatorSet {
+    ) acquires AllowedValidators, StakePool, ValidatorConfig, ValidatorSet {
         assert!(
             staking_config::get_allow_validator_set_change(&staking_config::get()),
             error::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
         );
+        assert!(is_allowed(pool_address), error::not_found(EINELIGIBLE_VALIDATOR));
 
         join_validator_set_internal(operator, pool_address);
     }
@@ -1274,14 +1277,61 @@ module aptos_framework::stake {
         accounts: vector<address>,
     }
 
-    public fun configure_allowed_validators(aptos_framework: &signer, accounts: vector<address>) acquires AllowedValidators {
-        let aptos_framework_address = signer::address_of(aptos_framework);
+    public fun configure_allowed_validators(
+        aptos_framework: &signer,
+        accounts: vector<address>,
+    ) acquires AllowedValidators {
         system_addresses::assert_aptos_framework(aptos_framework);
-        if (!exists<AllowedValidators>(aptos_framework_address)) {
-            move_to(aptos_framework, AllowedValidators { accounts });
-        } else {
-            let allowed = borrow_global_mut<AllowedValidators>(aptos_framework_address);
-            allowed.accounts = accounts;
+        initialize_allowed_validators_if_not_exists(aptos_framework);
+        let allowed_validators = borrow_global_mut<AllowedValidators>(@aptos_framework);
+        allowed_validators.accounts = accounts;
+    }
+
+    public fun add_allowed_validators(aptos_framework: &signer, accounts: vector<address>) acquires AllowedValidators {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        initialize_allowed_validators_if_not_exists(aptos_framework);
+        let allowed_validators = borrow_global_mut<AllowedValidators>(@aptos_framework);
+        let i = 0;
+        let len = vector::length(&accounts);
+        while (i < len) {
+            let validator = vector::borrow(&accounts, i);
+            if (!vector::contains(&allowed_validators.accounts, validator)) {
+                vector::push_back(&mut allowed_validators.accounts, *validator);
+            };
+            i = i + 1;
+        };
+    }
+
+    public fun remove_allowed_validators(aptos_framework: &signer, accounts: vector<address>) acquires AllowedValidators {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (!exists<AllowedValidators>(@aptos_framework)) {
+            return
+        };
+
+        let allowed_validators = borrow_global_mut<AllowedValidators>(@aptos_framework);
+        let i = 0;
+        let len = vector::length(&accounts);
+        while (i < len) {
+            let validator = vector::borrow(&accounts, i);
+            let (found, index) = vector::index_of(&allowed_validators.accounts, validator);
+            if (found) {
+                vector::swap_remove(&mut allowed_validators.accounts, index);
+            };
+            i = i + 1;
+        };
+    }
+
+    public fun disable_allowed_validators(aptos_framework: &signer) acquires AllowedValidators {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (!exists<AllowedValidators>(@aptos_framework)) {
+            return
+        };
+        let AllowedValidators { accounts: _ } = move_from<AllowedValidators>(@aptos_framework);
+    }
+
+    fun initialize_allowed_validators_if_not_exists(aptos_framework: &signer) {
+        if (!exists<AllowedValidators>(signer::address_of(aptos_framework))) {
+            move_to(aptos_framework, AllowedValidators { accounts: vector::empty() });
         }
     }
 
@@ -1328,7 +1378,7 @@ module aptos_framework::stake {
         operator: &signer,
         pool_address: address,
         should_end_epoch: bool,
-    ) acquires AptosCoinCapabilities, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+    ) acquires AllowedValidators, AptosCoinCapabilities, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         rotate_consensus_key(operator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
         join_validator_set(operator, pool_address);
         if (should_end_epoch) {
@@ -1646,6 +1696,33 @@ module aptos_framework::stake {
         assert!(get_validator_state(validator_address) == VALIDATOR_STATUS_ACTIVE, 2);
         assert!(get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS / 2 - EPOCH_DURATION, 3);
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    public entry fun test_validator_can_join_validator_set_if_allowed(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test(aptos_framework);
+        initialize_test_validator(validator, 100, false, false);
+        let validator_address = signer::address_of(validator);
+        add_allowed_validators(aptos_framework, vector[validator_address]);
+        join_validator_set(validator, validator_address);
+        end_epoch();
+        assert!(get_validator_state(validator_address) == VALIDATOR_STATUS_ACTIVE, 2);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x60011)]
+    public entry fun test_validator_cannot_join_validator_set_if_not_allowed(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test(aptos_framework);
+        initialize_test_validator(validator, 100, false, false);
+        let validator_address = signer::address_of(validator);
+        add_allowed_validators(aptos_framework, vector[]);
+        join_validator_set(validator, validator_address);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -2479,7 +2556,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, validator = @0x123)]
-    public entry fun test_allowed_validators(
+    public entry fun test_configure_allowed_validators(
         aptos_framework: &signer,
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
@@ -2492,12 +2569,55 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, validator = @0x123)]
-    #[expected_failure(abort_code = 0x60011)]
-    public entry fun test_not_allowed_validators(
+    public entry fun test_add_allowed_validators(
         aptos_framework: &signer,
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
         configure_allowed_validators(aptos_framework, vector[]);
+        let addr = signer::address_of(validator);
+        add_allowed_validators(aptos_framework, vector[addr]);
+
+        account::create_account_for_test(addr);
+        coin::register<AptosCoin>(validator);
+        initialize_stake_owner(validator, 0, addr, addr);
+    }
+
+    #[test(aptos_framework = @0x1, validator = @0x123)]
+    #[expected_failure(abort_code = 0x60011)]
+    public entry fun test_remove_allowed_validators(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
+        let addr = signer::address_of(validator);
+        configure_allowed_validators(aptos_framework, vector[addr]);
+        remove_allowed_validators(aptos_framework, vector[addr]);
+
+        account::create_account_for_test(addr);
+        coin::register<AptosCoin>(validator);
+        initialize_stake_owner(validator, 0, addr, addr);
+    }
+
+    #[test(aptos_framework = @0x1, validator = @0x123)]
+    #[expected_failure(abort_code = 0x60011)]
+    public entry fun test_configure_allowed_validators_as_empty(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
+        configure_allowed_validators(aptos_framework, vector[]);
+
+        let addr = signer::address_of(validator);
+        account::create_account_for_test(addr);
+        coin::register<AptosCoin>(validator);
+        initialize_stake_owner(validator, 0, addr, addr);
+    }
+
+    #[test(aptos_framework = @0x1, validator = @0x123)]
+    public entry fun test_disable_allowed_validators(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
+        configure_allowed_validators(aptos_framework, vector[]);
+        disable_allowed_validators(aptos_framework);
 
         let addr = signer::address_of(validator);
         account::create_account_for_test(addr);
