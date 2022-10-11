@@ -800,19 +800,19 @@ impl EpochManager {
             // TODO: grab config.
             // TODO: think about these numbers
             let config = QuorumStoreConfig {
-                channel_size: 1000,
-                proof_timeout_ms: 60000,
+                channel_size: 100,
+                proof_timeout_ms: 600000,
                 batch_request_num_peers: 2,
                 end_batch_ms: 500,
                 max_batch_bytes: 100000,
-                batch_request_timeout_ms: 60000,
+                batch_request_timeout_ms: 5000,
                 max_batch_expiry_round_gap: 20,
                 batch_expiry_grace_rounds: 5,
                 memory_quota: 100000000,
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
-                num_nodes_per_worker_handles: 5,
+                num_nodes_per_worker_handles: 2,
             };
 
             // update the number of network_listener workers when start a new round_manager
