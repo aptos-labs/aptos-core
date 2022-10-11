@@ -81,7 +81,7 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-5. Download the genesis blob and waypoint for the network you want to connect to. See [Node Files](/nodes/node-files.md) for a full list of files you should download and the download commands. 
+5. Download the `genesis.blob`, `waypoint.txt`, `haproxy.cfg` and `blocked.ips` files by following the download commands on the [Node Files](/nodes/node-files.md) page. 
 
 6. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
 

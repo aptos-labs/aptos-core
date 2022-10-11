@@ -105,7 +105,7 @@ With your development environment ready, now you can start to setup your validat
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-9. Download the genesis blob and waypoint for the network you want to connect to. See [Node Files](/nodes/node-files.md) for a full list of files you should download and the download commands. 
+9. Download the `genesis.blob`, `waypoint.txt`, `haproxy.cfg` and `blocked.ips` files by following the download commands on the [Node Files](/nodes/node-files.md) page. 
 
 10. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
     ```bash
