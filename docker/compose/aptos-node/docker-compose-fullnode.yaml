@@ -15,15 +15,20 @@ services:
     networks:
       - shared
     expose:
+      # Public fullnode access
       - 6182
-      - 9101
-      - 9102
+      # REST API
       - 80
+      # Fullnode metrics
+      - 9101
+      # Haproxy stats page
+      - 9102
     ports:
       - "6182:6182"
       - "80:80"
-      - "9101:9101"
-      - "9102:9102"
+      # Only expose these internally
+      - "127.0.0.1:9101:9101"
+      - "127.0.0.1:9102:9102"
 
   fullnode:
     image: "${VALIDATOR_IMAGE_REPO:-aptoslabs/validator}:${IMAGE_TAG:-testnet}"
@@ -48,8 +53,11 @@ services:
     command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
     restart: unless-stopped
     expose:
+      # Public fullnode access
       - 6182
+      # REST API
       - 80
+      # Validator metrics
       - 9101
 
 networks:
