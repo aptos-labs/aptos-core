@@ -181,13 +181,19 @@ pub struct NewBlockEventAggregation {
     // dependig on how many failures we have.
     voter_window_size: usize,
     proposer_window_size: usize,
+    reputation_window_wrong_order: bool,
 }
 
 impl NewBlockEventAggregation {
-    pub fn new(voter_window_size: usize, proposer_window_size: usize) -> Self {
+    pub fn new(
+        voter_window_size: usize,
+        proposer_window_size: usize,
+        reputation_window_wrong_order: bool,
+    ) -> Self {
         Self {
             voter_window_size,
             proposer_window_size,
+            reputation_window_wrong_order,
         }
     }
 
@@ -240,16 +246,40 @@ impl NewBlockEventAggregation {
         history: &'a [NewBlockEvent],
         epoch_to_candidates: &'a HashMap<u64, Vec<Author>>,
         window_size: usize,
+        wrong_order: bool,
     ) -> impl Iterator<Item = &'a NewBlockEvent> {
-        let start = if history.len() > window_size {
-            history.len() - window_size
-        } else {
-            0
-        };
+        if wrong_order {
+            let start = if history.len() > window_size {
+                history.len() - window_size
+            } else {
+                0
+            };
 
-        (&history[start..])
-            .iter()
-            .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
+            (&history[start..])
+                .iter()
+                .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
+        } else {
+            if !history.is_empty() {
+                assert!(
+                    (
+                        history.first().unwrap().epoch(),
+                        history.first().unwrap().round()
+                    ) >= (
+                        history.last().unwrap().epoch(),
+                        history.last().unwrap().round()
+                    )
+                );
+            }
+            let end = if history.len() > window_size {
+                window_size
+            } else {
+                history.len()
+            };
+
+            (&history[..end])
+                .iter()
+                .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
+        }
     }
 
     pub fn get_aggregated_metrics(
@@ -282,15 +312,21 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::count_votes_custom(epoch_to_candidates, history, self.voter_window_size)
+        Self::count_votes_custom(
+            epoch_to_candidates,
+            history,
+            self.voter_window_size,
+            self.reputation_window_wrong_order,
+        )
     }
 
     pub fn count_votes_custom(
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
         window_size: usize,
+        wrong_order: bool,
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch_to_candidates, window_size).fold(
+        Self::history_iter(history, epoch_to_candidates, window_size, wrong_order).fold(
             HashMap::new(),
             |mut map, meta| {
                 match Self::bitvec_to_voters(
@@ -322,15 +358,21 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::count_proposals_custom(epoch_to_candidates, history, self.proposer_window_size)
+        Self::count_proposals_custom(
+            epoch_to_candidates,
+            history,
+            self.proposer_window_size,
+            self.reputation_window_wrong_order,
+        )
     }
 
     pub fn count_proposals_custom(
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
         window_size: usize,
+        wrong_order: bool,
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch_to_candidates, window_size).fold(
+        Self::history_iter(history, epoch_to_candidates, window_size, wrong_order).fold(
             HashMap::new(),
             |mut map, meta| {
                 let count = map.entry(meta.proposer()).or_insert(0);
@@ -345,28 +387,34 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch_to_candidates, self.proposer_window_size).fold(
-            HashMap::new(),
-            |mut map, meta| {
-                match Self::indices_to_validators(&epoch_to_candidates[&meta.epoch()], meta.failed_proposer_indices()) {
-                    Ok(failed_proposers) => {
-                        for &failed_proposer in failed_proposers {
-                            let count = map.entry(failed_proposer).or_insert(0);
-                            *count += 1;
-                        }
-                    }
-                    Err(msg) => {
-                        error!(
-                            "Failed proposer conversion from indices failed at epoch {}, round {}: {}",
-                            meta.epoch(),
-                            meta.round(),
-                            msg
-                        )
+        Self::history_iter(
+            history,
+            epoch_to_candidates,
+            self.proposer_window_size,
+            self.reputation_window_wrong_order,
+        )
+        .fold(HashMap::new(), |mut map, meta| {
+            match Self::indices_to_validators(
+                &epoch_to_candidates[&meta.epoch()],
+                meta.failed_proposer_indices(),
+            ) {
+                Ok(failed_proposers) => {
+                    for &failed_proposer in failed_proposers {
+                        let count = map.entry(failed_proposer).or_insert(0);
+                        *count += 1;
                     }
                 }
-                map
-            },
-        )
+                Err(msg) => {
+                    error!(
+                        "Failed proposer conversion from indices failed at epoch {}, round {}: {}",
+                        meta.epoch(),
+                        meta.round(),
+                        msg
+                    )
+                }
+            }
+            map
+        })
     }
 }
 
@@ -410,6 +458,7 @@ impl ProposerAndVoterHeuristic {
         failure_threshold_percent: u32,
         voter_window_size: usize,
         proposer_window_size: usize,
+        reputation_window_wrong_order: bool,
     ) -> Self {
         Self {
             author,
@@ -417,7 +466,11 @@ impl ProposerAndVoterHeuristic {
             inactive_weight,
             failed_weight,
             failure_threshold_percent,
-            aggregation: NewBlockEventAggregation::new(voter_window_size, proposer_window_size),
+            aggregation: NewBlockEventAggregation::new(
+                voter_window_size,
+                proposer_window_size,
+                reputation_window_wrong_order,
+            ),
         }
     }
 }
@@ -505,6 +558,7 @@ impl LeaderReputation {
                     &self.epoch_to_proposers,
                     history,
                     *participants_window_size,
+                    false,
                 )
                 .into_keys()
                 .chain(
@@ -512,6 +566,7 @@ impl LeaderReputation {
                         &self.epoch_to_proposers,
                         history,
                         *participants_window_size,
+                        false,
                     )
                     .into_keys(),
                 )

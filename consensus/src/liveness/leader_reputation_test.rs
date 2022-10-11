@@ -147,10 +147,14 @@ struct Example1 {
     validators0: Vec<Author>,
     validators1: Vec<Author>,
     block_builder: TestBlockBuilder,
-    history: Vec<NewBlockEvent>,
+    history_ascending: Vec<NewBlockEvent>,
 }
 
 impl Example1 {
+    fn history(&self) -> Vec<NewBlockEvent> {
+        self.history_ascending.cloned().iter().rev().collect()
+    }
+
     fn new() -> Self {
         let mut sorted_validators: Vec<Author> =
             (0..5).into_iter().map(|_| Author::random()).collect();
@@ -165,27 +169,27 @@ impl Example1 {
             validators0,
             validators1,
             block_builder: TestBlockBuilder::new(),
-            history: vec![],
+            history_ascending: vec![],
         }
     }
 
     fn step1(&mut self) {
-        self.history.push(self.block_builder.create_block(
+        self.history_ascending.push(self.block_builder.create_block(
             self.validators0[0],
             vec![false, true, true, false],
             vec![3],
         ));
-        self.history.push(self.block_builder.create_block(
+        self.history_ascending.push(self.block_builder.create_block(
             self.validators0[0],
             vec![false, true, true, false],
             vec![],
         ));
-        self.history.push(self.block_builder.create_block(
+        self.history_ascending.push(self.block_builder.create_block(
             self.validators0[1],
             vec![true, false, true, false],
             vec![2],
         ));
-        self.history.push(self.block_builder.create_block(
+        self.history_ascending.push(self.block_builder.create_block(
             self.validators0[2],
             vec![true, true, false, false],
             vec![],
@@ -193,12 +197,12 @@ impl Example1 {
     }
 
     fn step2(&mut self) {
-        self.history.push(self.block_builder.create_block(
+        self.history_ascending.push(self.block_builder.create_block(
             self.validators0[3],
             vec![true, true, false, false],
             vec![1],
         ));
-        self.history.push(self.block_builder.create_block(
+        self.history_ascending.push(self.block_builder.create_block(
             self.validators0[3],
             vec![true, true, false, false],
             vec![1],
@@ -207,7 +211,7 @@ impl Example1 {
 
     fn step3(&mut self) {
         self.block_builder.new_epoch();
-        self.history.push(self.block_builder.create_block(
+        self.history_ascending.push(self.block_builder.create_block(
             self.validators1[3],
             vec![true, true, false, false],
             vec![0],
@@ -225,7 +229,7 @@ fn test_aggregation_counting() {
     example1.step1();
 
     assert_eq!(
-        aggregation.count_proposals(&epoch_to_validators, &example1.history),
+        aggregation.count_proposals(&epoch_to_validators, &example1.history()),
         HashMap::from([
             (validators0[0], 2),
             (validators0[1], 1),
@@ -233,11 +237,11 @@ fn test_aggregation_counting() {
         ])
     );
     assert_eq!(
-        aggregation.count_failed_proposals(&epoch_to_validators, &example1.history),
+        aggregation.count_failed_proposals(&epoch_to_validators, &example1.history()),
         HashMap::from([(validators0[2], 1), (validators0[3], 1),])
     );
     assert_eq!(
-        aggregation.count_votes(&epoch_to_validators, &example1.history),
+        aggregation.count_votes(&epoch_to_validators, &example1.history()),
         HashMap::from([
             (validators0[0], 2),
             (validators0[1], 1),
@@ -248,7 +252,7 @@ fn test_aggregation_counting() {
     example1.step2();
 
     assert_eq!(
-        aggregation.count_proposals(&epoch_to_validators, &example1.history),
+        aggregation.count_proposals(&epoch_to_validators, &example1.history()),
         HashMap::from([
             (validators0[0], 1),
             (validators0[1], 1),
@@ -257,11 +261,11 @@ fn test_aggregation_counting() {
         ])
     );
     assert_eq!(
-        aggregation.count_failed_proposals(&epoch_to_validators, &example1.history),
+        aggregation.count_failed_proposals(&epoch_to_validators, &example1.history()),
         HashMap::from([(validators0[2], 1), (validators0[1], 2),])
     );
     assert_eq!(
-        aggregation.count_votes(&epoch_to_validators, &example1.history),
+        aggregation.count_votes(&epoch_to_validators, &example1.history()),
         HashMap::from([(validators0[0], 2), (validators0[1], 2),])
     );
 
@@ -271,15 +275,15 @@ fn test_aggregation_counting() {
     let epoch_to_validators = HashMap::from([(1u64, validators1.clone())]);
 
     assert_eq!(
-        aggregation.count_proposals(&epoch_to_validators, &example1.history),
+        aggregation.count_proposals(&epoch_to_validators, &example1.history()),
         HashMap::from([(validators1[3], 1),])
     );
     assert_eq!(
-        aggregation.count_failed_proposals(&epoch_to_validators, &example1.history),
+        aggregation.count_failed_proposals(&epoch_to_validators, &example1.history()),
         HashMap::from([(validators1[0], 1),])
     );
     assert_eq!(
-        aggregation.count_votes(&epoch_to_validators, &example1.history),
+        aggregation.count_votes(&epoch_to_validators, &example1.history()),
         HashMap::from([(validators1[0], 1), (validators1[1], 1),])
     );
 
@@ -289,7 +293,7 @@ fn test_aggregation_counting() {
     assert_ne!(validators0[3], validators1[3]);
 
     assert_eq!(
-        aggregation.count_proposals(&epoch_to_validators, &example1.history),
+        aggregation.count_proposals(&epoch_to_validators, &example1.history()),
         HashMap::from([
             (validators1[1], 1),
             (validators1[2], 1),
@@ -298,7 +302,7 @@ fn test_aggregation_counting() {
         ])
     );
     assert_eq!(
-        aggregation.count_failed_proposals(&epoch_to_validators, &example1.history),
+        aggregation.count_failed_proposals(&epoch_to_validators, &example1.history()),
         HashMap::from([
             (validators1[0], 1),
             (validators1[2], 1),
@@ -306,7 +310,7 @@ fn test_aggregation_counting() {
         ])
     );
     assert_eq!(
-        aggregation.count_votes(&epoch_to_validators, &example1.history),
+        aggregation.count_votes(&epoch_to_validators, &example1.history()),
         HashMap::from([(validators1[0], 2), (validators1[1], 2),])
     );
 }
@@ -322,13 +326,13 @@ fn test_proposer_and_voter_heuristic() {
 
     example1.step1();
     assert_eq!(
-        heuristic.get_weights(0, &epoch_to_validators0, &example1.history),
+        heuristic.get_weights(0, &epoch_to_validators0, &example1.history()),
         vec![100, 100, 1, 1]
     );
 
     example1.step2();
     assert_eq!(
-        heuristic.get_weights(0, &epoch_to_validators0, &example1.history),
+        heuristic.get_weights(0, &epoch_to_validators0, &example1.history()),
         vec![100, 1, 1, 100]
     );
 
@@ -337,13 +341,13 @@ fn test_proposer_and_voter_heuristic() {
     let validators1 = example1.validators1.clone();
     let epoch_to_validators1 = HashMap::from([(1u64, validators1.clone())]);
     assert_eq!(
-        heuristic.get_weights(1, &epoch_to_validators1, &example1.history),
+        heuristic.get_weights(1, &epoch_to_validators1, &example1.history()),
         vec![1, 100, 10, 100]
     );
 
     let epoch_to_validators01 = HashMap::from([(0u64, validators0), (1u64, validators1)]);
     assert_eq!(
-        heuristic.get_weights(1, &epoch_to_validators01, &example1.history),
+        heuristic.get_weights(1, &epoch_to_validators01, &example1.history()),
         vec![1, 1, 1, 100]
     );
 }

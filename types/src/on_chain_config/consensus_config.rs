@@ -99,7 +99,7 @@ impl Default for ConsensusConfigV1 {
             back_pressure_limit: 10,
             exclude_round: 20,
             max_failed_authors_to_store: 10,
-            proposer_election_type: ProposerElectionType::LeaderReputation(
+            proposer_election_type: ProposerElectionType::LeaderReputationV2(
                 LeaderReputationType::ProposerAndVoter(ProposerAndVoterConfig {
                     active_weight: 1000,
                     inactive_weight: 10,
@@ -128,8 +128,10 @@ pub enum ProposerElectionType {
     // Round robin rotation of proposers
     // with specified param contiguous_rounds
     RotatingProposer(u32),
-    // Committed history based proposer election
+    // Committed history based proposer election, with wrong window order
     LeaderReputation(LeaderReputationType),
+    // Committed history based proposer election, with correct window order
+    LeaderReputationV2(LeaderReputationType),
     // Pre-specified proposers for each round,
     // or default proposer if round proposer not
     // specified

@@ -203,7 +203,8 @@ impl EpochManager {
                 let proposer = choose_leader(proposers);
                 Box::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
             }
-            ProposerElectionType::LeaderReputation(leader_reputation_type) => {
+            ProposerElectionType::LeaderReputation(leader_reputation_type)
+            | ProposerElectionType::LeaderReputationV2(leader_reputation_type) => {
                 let (
                     heuristic,
                     window_size,
@@ -224,6 +225,10 @@ impl EpochManager {
                                 proposer_and_voter_config.failure_threshold_percent,
                                 voter_window_size,
                                 proposer_window_size,
+                                matches!(
+                                    onchain_config.proposer_election_type(),
+                                    ProposerElectionType::LeaderReputation(_)
+                                ),
                             ));
                         (
                             heuristic,
