@@ -23,19 +23,12 @@ Most Aptos users will want to have the Aptos CLI installed. [Install](../cli-too
 
 In addition to installing the CLI, [download/clone](#clone-the-Aptos-core-repo) and [review](https://github.com/aptos-labs/aptos-core) the Aptos repository if you will:
 
-* [Run a fullnode](../nodes/full-node/public-fullnode.md) or [validator node](../nodes/validator-node/validators.md).
+* [Run a fullnode](../nodes/full-node/public-fullnode.md).
+* Run a [validator node](../nodes/validator-node/validators.md).
 * [Take the starter tutorials](../tutorials/aptos-quickstarts.md), many of which rely upon Aptos source code.
-* [Customize](Run a Local Testnet
+* 
 
-Interact with the network
-Example use cases
-Recommended next steps
-
-Download and review Aptos source code
-
-Develop on the network
-Example uses cases
-Recommended next steps
+Although Docker options exist for many of these configurations, you should download the Aptos source to become familiar with the innerworkings of the blockchain. Note, the source files themselves also contain a wealth of information in docs comments worth reviewing.
 
 ## Install the CLI
 
