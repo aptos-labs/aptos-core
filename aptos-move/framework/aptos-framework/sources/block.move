@@ -136,10 +136,12 @@ module aptos_framework::block {
         };
         emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
 
-        // Distribute collected transaction fees from the previous block, if it exists. Also, set
-        // the receiver of the fees for the new block.
         if (features::collect_and_distribute_gas_fees()) {
+            // Distribute fees collected from the previous block. Nothing happens if there are no
+            // fees or it is the first block.
             fee_destribution::maybe_distribute_fees(&vm);
+            // Set the receiver of the fees for this block, so that the next time `block_prologue`
+            // is called the fees are sent to the right account.
             fee_destribution::set_receiver(&vm, proposer);
         };
 
