@@ -10,6 +10,39 @@ import TabItem from '@theme/TabItem';
 
 To kickstart your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section. See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for the supported operating systems.
 
+## Summary
+
+Install and use Aptos CLI
+
+Interact with the network
+Example use cases
+Recommended next steps
+
+Download and review Aptos source code
+
+Develop on the network
+Example uses cases
+Recommended next steps
+
+## Install the CLI
+
+[Install Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. 
+
+## Install tools for macOS
+
+Make sure you have the below tools installed on your computer if running macOS. You will need them for running the [Developer Tutorials](/docs/tutorials/index.md), in the order specified:
+
+- **Homebrew**: [https://brew.sh/](https://brew.sh/)
+- **Node.js**: Install [Node.js](https://nodejs.org/en/download/), which will install `npm` and `npx`, by executing the below command on your Terminal:
+    ```bash
+    brew install node
+    ```
+- **Yarn**: Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) by executing the below command on your Terminal:
+    ```bash
+    brew install yarn
+    ```
+- **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
+
 ## Clone the Aptos-core repo
 
 Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
@@ -61,25 +94,6 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     ```
     </TabItem>
     </Tabs>
-
-## Install the CLI
-
-Install the Aptos CLI following the [Installing Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli.md) guide. 
-
-## Install tools for macOS
-
-Make sure you have the below tools installed on your computer if running macOS. You will need them for running the [Developer Tutorials](/docs/tutorials/index.md), in the order specified:
-
-- **Homebrew**: [https://brew.sh/](https://brew.sh/)
-- **Node.js**: Install [Node.js](https://nodejs.org/en/download/), which will install `npm` and `npx`, by executing the below command on your Terminal:
-    ```bash
-    brew install node
-    ```
-- **Yarn**: Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) by executing the below command on your Terminal:
-    ```bash
-    brew install yarn
-    ```
-- **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
 
 Now your basic Aptos development environment is ready.
 
