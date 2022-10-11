@@ -429,7 +429,6 @@ impl TxnEmitter {
             let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
             {
                 TransactionType::P2P => Box::new(P2PTransactionGeneratorCreator::new(
-                    self.from_rng(),
                     txn_factory.clone(),
                     SEND_AMOUNT,
                     all_addresses.clone(),
@@ -445,7 +444,6 @@ impl TxnEmitter {
                 )),
                 TransactionType::NftMintAndTransfer => Box::new(
                     NFTMintAndTransferGeneratorCreator::new(
-                        self.from_rng(),
                         txn_factory.clone(),
                         root_account,
                         req.rest_clients[0].clone(),
