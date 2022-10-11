@@ -1,8 +1,9 @@
 module aptos_framework::transaction_fee {
-    use aptos_framework::coin::{Self, BurnCapability};
+    use aptos_framework::coin::{Self, BurnCapability, Coin};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::system_addresses;
 
+    friend aptos_framework::fee_destribution;
     friend aptos_framework::genesis;
     friend aptos_framework::transaction_validation;
 
@@ -15,6 +16,14 @@ module aptos_framework::transaction_fee {
         coin::burn_from<AptosCoin>(
             account,
             fee,
+            &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
+        );
+    }
+
+    /// Burn collected transaction fees if fee distribution fails.
+    public(friend) fun burn_collected_fee(coin: Coin<AptosCoin>) acquires AptosCoinCapabilities {
+        coin::burn<AptosCoin>(
+            coin,
             &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
         );
     }

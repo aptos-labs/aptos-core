@@ -57,6 +57,9 @@ module aptos_framework::coin {
     /// Symbol of the coin is too long
     const ECOIN_SYMBOL_TOO_LONG: u64 = 13;
 
+    /// The value of aggregator coin does not fit in u64.
+    const EAGGREGATOR_COIN_VALUE_TOO_LARGE: u64 = 14;
+
     //
     // Constants
     //
@@ -77,6 +80,9 @@ module aptos_framework::coin {
         /// Amount of aggregator coin this address has.
         value: Aggregator,
     }
+
+    /// Maximum possible aggregatable coin value.
+    const MAX_U64: u128 = 18446744073709551615;
 
     /// A holder of a specific coin types and associated event handles.
     /// These are kept in a single resource to ensure locality of data.
@@ -153,11 +159,51 @@ module aptos_framework::coin {
 
     /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
     /// only be called by Aptos Framework (0x1) account for now becuase of `create_aggregator`.
-    public fun initialize_aggregator_coin<CoinType>(aptos_framework: &signer, limit: u128): AggregatorCoin<CoinType> {
-        let aggregator = aggregator_factory::create_aggregator(aptos_framework, limit);
+    public fun initialize_aggregator_coin<CoinType>(aptos_framework: &signer): AggregatorCoin<CoinType> {
+        let aggregator = aggregator_factory::create_aggregator(aptos_framework, MAX_U64);
         AggregatorCoin<CoinType> {
             value: aggregator,
         }
+    }
+
+    /// Returns true if the value of aggregatable coin is zero.
+    public fun is_zero<CoinType>(coin: &AggregatorCoin<CoinType>): bool {
+        let amount = aggregator::read(&coin.value);
+        amount == 0
+    }
+
+    /// Drains the aggregatable coin, setting it to zero and returning a standard coin.
+    public fun drain<CoinType>(coin: &mut AggregatorCoin<CoinType>): Coin<CoinType> {
+        let amount = aggregator::read(&coin.value);
+        assert!(amount <= MAX_U64, error::out_of_range(EAGGREGATOR_COIN_VALUE_TOO_LARGE));
+
+        aggregator::sub(&mut coin.value, amount);
+        Coin<CoinType> {
+            value: (amount as u64),
+        }
+    }
+
+    /// Aggregates `coin` into aggregatable coin (`dst_coin`).
+    public fun aggregate<CoinType>(dst_coin: &mut AggregatorCoin<CoinType>, coin: Coin<CoinType>) {
+        let Coin { value } = coin;
+        let amount = (value as u128);
+        aggregator::add(&mut dst_coin.value, amount);
+    }
+
+    /// Collects a specified amount form an account to aggregatable coin.
+    public fun collect_from<CoinType>(
+        account_addr: address,
+        amount: u64,
+        dst_coin: &mut AggregatorCoin<CoinType>,
+    ) acquires CoinStore {
+        // Skip collecting if amount is zero.
+        if (amount == 0) {
+            return
+        };
+
+        let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        let collected_coin = extract(&mut coin_store.coin, amount);
+        aggregate(dst_coin, collected_coin);
     }
 
     //
@@ -512,9 +558,6 @@ module aptos_framework::coin {
     public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
         let BurnCapability<CoinType> {} = burn_cap;
     }
-
-    #[test_only]
-    use aptos_framework::aggregator_factory;
 
     #[test_only]
     struct FakeMoney {}

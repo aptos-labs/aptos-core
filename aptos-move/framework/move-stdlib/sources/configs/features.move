@@ -47,6 +47,17 @@ module std::features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
 
+    // --------------------------------------------------------------------------------------------
+    // Gas Fees Distribution
+
+    /// Whether gas fees are collected and distributed to block proposer.
+    /// Lifetime: transient
+    const COLLECT_GAS_FEES: u64 = 3;
+    public fun collect_gas_fees(): bool acquires Features {
+        is_enabled(COLLECT_GAS_FEES)
+    }
+
+
     // ============================================================================================
     // Feature Flag Implementation
 
