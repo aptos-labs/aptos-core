@@ -1,9 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_config::config::DEFAULT_BROADCAST_BUCKETS;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_histogram, register_histogram_vec,
+    histogram_opts, op_counters::DurationHistogram, register_histogram, register_histogram_vec,
     register_int_counter, register_int_counter_vec, register_int_gauge_vec, Histogram,
     HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
@@ -87,6 +88,11 @@ pub const E2E_LABEL: &str = "e2e";
 pub const INSERT_LABEL: &str = "insert";
 pub const REMOVE_LABEL: &str = "remove";
 
+// Histogram buckets that make more sense at larger timescales than DEFAULT_BUCKETS
+const LARGER_LATENCY_BUCKETS: &[f64; 11] = &[
+    0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 40.0, 80.0, 160.0, 320.0,
+];
+
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -152,28 +158,39 @@ pub fn core_mempool_txn_commit_latency(
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
 static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
+    let histogram_opts = histogram_opts!(
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
-        &["stage", "scope"]
+        LARGER_LATENCY_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["stage", "scope"]).unwrap()
+});
+
+pub fn core_mempool_txn_ranking_bucket(stage: &'static str, status: &str, bucket: &str) {
+    CORE_MEMPOOL_TXN_RANKING_SCORE
+        .with_label_values(&[stage, status, bucket])
+        .inc();
+}
+
+static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_core_mempool_txn_ranking_score",
+        "Ranking score of txn reaching various stages in core mempool",
+        &["stage", "status", "bucket"]
     )
     .unwrap()
 });
 
-pub fn core_mempool_txn_ranking_score(stage: &'static str, status: &str, ranking_score: u64) {
-    CORE_MEMPOOL_TXN_RANKING_SCORE
+pub fn update_mempool_txn_ranking_score(
+    histogram: &HistogramVec,
+    stage: &'static str,
+    status: &str,
+    ranking_score: u64,
+) {
+    histogram
         .with_label_values(&[stage, status])
         .observe(ranking_score as f64);
 }
-
-static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_core_mempool_txn_ranking_score",
-        "Ranking score of txn reaching various stages in core mempool",
-        &["stage", "status"]
-    )
-    .unwrap()
-});
 
 /// Counter for number of periodic garbage-collection (=GC) events that happen, regardless of
 /// how many txns were actually cleaned up in this GC event
@@ -537,3 +554,48 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         .unwrap(),
     )
 });
+
+fn config_to_prometheus_broadcast_buckets(config_buckets: &Vec<u64>) -> Vec<f64> {
+    let config_buckets = if config_buckets.len() <= 1 {
+        DEFAULT_BROADCAST_BUCKETS
+    } else {
+        config_buckets
+    };
+
+    config_buckets
+        .iter()
+        .skip(1)
+        .map(|lt| (lt - 1) as f64)
+        .collect()
+}
+
+#[cfg(test)]
+mod test {
+    use crate::counters::config_to_prometheus_broadcast_buckets;
+
+    #[test]
+    fn test_config_to_prometheus_broadcast_buckets() {
+        let input = vec![0, 151, 301, 901, 2001, 10001];
+        let expected = vec![150.0, 300.0, 900.0, 2000.0, 10000.0];
+        let output = config_to_prometheus_broadcast_buckets(&input);
+        assert_eq!(expected, output);
+    }
+
+    #[test]
+    fn test_config_to_prometheus_broadcast_buckets_default() {
+        let input = vec![];
+        config_to_prometheus_broadcast_buckets(&input);
+        let input = vec![0];
+        config_to_prometheus_broadcast_buckets(&input);
+    }
+}
+
+pub fn register_histogram_counter(config_buckets: &Vec<u64>) -> HistogramVec {
+    let buckets = config_to_prometheus_broadcast_buckets(config_buckets);
+    let opts = histogram_opts!(
+        "aptos_core_mempool_txn_ranking_score",
+        "Ranking score of txn reaching various stages in core mempool",
+        buckets
+    );
+    register_histogram_vec!(opts, &["stage", "status"]).unwrap()
+}

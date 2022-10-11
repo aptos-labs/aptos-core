@@ -53,10 +53,10 @@ impl Mempool {
         );
         self.log_latency(*sender, sequence_number, counters::COMMIT_ACCEPTED_LABEL);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
-            counters::core_mempool_txn_ranking_score(
+            counters::core_mempool_txn_ranking_bucket(
                 REMOVE_LABEL,
                 counters::COMMIT_ACCEPTED_LABEL,
-                ranking_score,
+                self.transactions.get_bucket(ranking_score),
             );
         }
 
@@ -76,10 +76,10 @@ impl Mempool {
         );
         self.log_latency(*sender, sequence_number, counters::COMMIT_REJECTED_LABEL);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
-            counters::core_mempool_txn_ranking_score(
+            counters::core_mempool_txn_ranking_bucket(
                 REMOVE_LABEL,
                 counters::COMMIT_REJECTED_LABEL,
-                ranking_score,
+                self.transactions.get_bucket(ranking_score),
             );
         }
 
@@ -146,10 +146,10 @@ impl Mempool {
         );
 
         let status = self.transactions.insert(txn_info);
-        counters::core_mempool_txn_ranking_score(
+        counters::core_mempool_txn_ranking_bucket(
             INSERT_LABEL,
             status.code.to_string().as_str(),
-            ranking_score,
+            self.transactions.get_bucket(ranking_score),
         );
         status
     }
@@ -222,10 +222,10 @@ impl Mempool {
                 }
                 total_bytes += txn_size;
                 block.push(txn);
-                counters::core_mempool_txn_ranking_score(
+                counters::core_mempool_txn_ranking_bucket(
                     CONSENSUS_PULLED_LABEL,
                     CONSENSUS_PULLED_LABEL,
-                    ranking_score,
+                    self.transactions.get_bucket(ranking_score),
                 );
             }
         }
