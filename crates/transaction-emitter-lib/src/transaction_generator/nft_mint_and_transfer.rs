@@ -7,6 +7,9 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib::aptos_token_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use rand::prelude::StdRng;
+use rand::Rng;
+use rand_core::{OsRng, SeedableRng};
 use std::collections::HashMap;
 
 use crate::emitter::{account_minter::create_and_fund_account_request, RETRY_POLICY};
@@ -14,7 +17,6 @@ use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
 use aptos_sdk::types::account_address::AccountAddress;
 use async_trait::async_trait;
-use rand::rngs::StdRng;
 use rand::thread_rng;
 use std::{sync::Arc, time::Duration};
 
@@ -260,12 +262,11 @@ pub struct NFTMintAndTransferGeneratorCreator {
 
 impl NFTMintAndTransferGeneratorCreator {
     pub async fn new(
-        mut rng: StdRng,
         txn_factory: TransactionFactory,
         root_account: &mut LocalAccount,
         rest_client: RestClient,
     ) -> Self {
-        let mut creator_account = LocalAccount::generate(&mut rng);
+        let mut creator_account = LocalAccount::generate(&mut StdRng::from_seed(OsRng.gen()));
         let collection_name = "collection name".to_owned().into_bytes();
         let token_name = "token name".to_owned().into_bytes();
         initialize_nft_collection(
