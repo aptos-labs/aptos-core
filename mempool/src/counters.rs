@@ -38,6 +38,9 @@ pub const GC_PARKED_TXN_LABEL: &str = "parked";
 
 // Mempool service request type labels
 pub const GET_BLOCK_LABEL: &str = "get_block";
+pub const GET_BLOCK_LOCK_LABEL: &str = "get_block_lock";
+pub const GET_BLOCK_GC_LABEL: &str = "get_block_gc";
+pub const GET_BLOCK_GET_BATCH_LABEL: &str = "get_block_get_batch";
 pub const COMMIT_STATE_SYNC_LABEL: &str = "commit_accepted";
 pub const COMMIT_CONSENSUS_LABEL: &str = "commit_rejected";
 
@@ -246,6 +249,12 @@ pub fn mempool_service_latency(label: &'static str, result: &str, duration: Dura
     MEMPOOL_SERVICE_LATENCY
         .with_label_values(&[label, result])
         .observe(duration.as_secs_f64());
+}
+
+pub fn mempool_service_start_latency_timer(label: &'static str, result: &str) -> HistogramTimer {
+    MEMPOOL_SERVICE_LATENCY
+        .with_label_values(&[label, result])
+        .start_timer()
 }
 
 /// Counter for types of network messages received by shared mempool
