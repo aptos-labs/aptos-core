@@ -92,6 +92,26 @@ const LARGER_LATENCY_BUCKETS: &[f64; 11] = &[
     0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 40.0, 80.0, 160.0, 320.0,
 ];
 
+// Histogram buckets for tracking ranking score (see below test for the formula)
+const RANKING_SCORE_BUCKETS: &[f64] = &[
+    100.0, 147.0, 215.0, 316.0, 464.0, 681.0, 1000.0, 1468.0, 2154.0, 3162.0, 4642.0, 6813.0,
+    10000.0, 14678.0, 21544.0, 31623.0, 46416.0, 68129.0, 100000.0, 146780.0, 215443.0,
+];
+
+#[cfg(test)]
+mod test {
+    use crate::counters::RANKING_SCORE_BUCKETS;
+
+    #[test]
+    fn generate_ranking_score_buckets() {
+        let buckets: Vec<f64> = (0..21)
+            .map(|n| 100.0 * (10.0_f64.powf(n as f64 / 6.0)))
+            .map(|f| f.round())
+            .collect();
+        assert_eq!(RANKING_SCORE_BUCKETS, &buckets);
+    }
+}
+
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -165,19 +185,36 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(histogram_opts, &["stage", "scope"]).unwrap()
 });
 
-pub fn core_mempool_txn_ranking_bucket(stage: &'static str, status: &str, bucket: &str) {
-    CORE_MEMPOOL_TXN_RANKING_SCORE
+pub fn core_mempool_txn_ranking_score(
+    stage: &'static str,
+    status: &str,
+    bucket: &str,
+    ranking_score: u64,
+) {
+    CORE_MEMPOOL_TXN_RANKING_BUCKET
         .with_label_values(&[stage, status, bucket])
         .inc();
+    CORE_MEMPOOL_TXN_RANKING_SCORE
+        .with_label_values(&[stage, status])
+        .observe(ranking_score as f64);
 }
 
-static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<IntCounterVec> = Lazy::new(|| {
+static CORE_MEMPOOL_TXN_RANKING_BUCKET: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_core_mempool_txn_ranking_score",
-        "Ranking score of txn reaching various stages in core mempool",
+        "aptos_core_mempool_txn_ranking_bucket",
+        "Ranking bucket of txn reaching various stages in core mempool",
         &["stage", "status", "bucket"]
     )
     .unwrap()
+});
+
+static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
+        "aptos_core_mempool_txn_ranking_score",
+        "Ranking score of txn reaching various stages in core mempool",
+        RANKING_SCORE_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["stage", "status"]).unwrap()
 });
 
 /// Counter for number of periodic garbage-collection (=GC) events that happen, regardless of

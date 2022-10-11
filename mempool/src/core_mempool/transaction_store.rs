@@ -408,10 +408,11 @@ impl TransactionStore {
                                     E2E_LABEL,
                                     time_delta,
                                 );
-                                counters::core_mempool_txn_ranking_bucket(
+                                counters::core_mempool_txn_ranking_score(
                                     BROADCAST_READY_LABEL,
                                     BROADCAST_READY_LABEL,
                                     self.timeline_index.get_bucket(txn.ranking_score),
+                                    txn.ranking_score,
                                 );
                             } else {
                                 counters::core_mempool_txn_commit_latency(
@@ -420,10 +421,11 @@ impl TransactionStore {
                                     time_delta,
                                 );
                             }
-                            counters::core_mempool_txn_ranking_bucket(
+                            counters::core_mempool_txn_ranking_score(
                                 CONSENSUS_READY_LABEL,
                                 CONSENSUS_READY_LABEL,
                                 self.timeline_index.get_bucket(txn.ranking_score),
+                                txn.ranking_score,
                             );
                         }
 
@@ -589,10 +591,11 @@ impl TransactionStore {
                                 E2E_LABEL,
                                 time_delta,
                             );
-                            counters::core_mempool_txn_ranking_bucket(
+                            counters::core_mempool_txn_ranking_score(
                                 BROADCAST_BATCHED_LABEL,
                                 BROADCAST_BATCHED_LABEL,
                                 self.timeline_index.get_bucket(txn.ranking_score),
+                                txn.ranking_score,
                             );
                         }
                     }
