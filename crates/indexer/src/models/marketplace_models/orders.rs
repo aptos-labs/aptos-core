@@ -5,22 +5,23 @@ use aptos_api_types::{TransactionPayload, UserTransaction};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-use crate::{schema::marketplace_offers, util::parse_timestamp};
+use crate::{schema::marketplace_orders, util::parse_timestamp};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
 #[diesel(primary_key(creator_address, collection_name))]
-#[diesel(table_name = marketplace_offers)]
-pub struct MarketplaceOffer {
+#[diesel(table_name = marketplace_orders)]
+pub struct MarketplaceOrder {
     creator_address: String,
     collection_name: String,
     token_name: String,
     property_version: i32,
     price: i64,
-    seller: String,
+    quantity: i64,
+    maker: String,
     timestamp: chrono::NaiveDateTime,
 }
 
-impl MarketplaceOffer {
+impl MarketplaceOrder {
     pub fn from_transaction(txn: &UserTransaction) -> Option<Self> {
         let version = txn.info.version.0;
         match txn.request.payload {
@@ -34,7 +35,8 @@ impl MarketplaceOffer {
                     .try_into()
                     .unwrap(),
                 price: payload.arguments[0]["price"].as_i64().unwrap(),
-                seller: txn.request.sender.inner().to_hex_literal(),
+                quantity: payload.arguments[0]["quantity"].as_i64().unwrap(),
+                maker: txn.request.sender.inner().to_hex_literal(),
                 timestamp: parse_timestamp(txn.timestamp.0, version.try_into().unwrap()),
             }),
             _ => None,
