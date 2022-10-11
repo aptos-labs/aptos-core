@@ -433,29 +433,6 @@
       "title": "Participating Stake ",
       "transparent": false,
       "type": "gauge",
-      "title": "Participating Stake ",
-      "type": "gauge",
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "9.1.1",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editorMode": "code",
-          "expr": "quantile(0.5, aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
-          "interval": "10s",
-          "intervalFactor": 1,
-          "range": true,
-          "refId": "A",
-          "step": 10
-        }
-      ],
-      "maxDataPoints": 100,
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -477,8 +454,31 @@
         "overrides": []
       },
       "gridPos": { "h": 5, "w": 4, "x": 9, "y": 6 },
+      "links": [],
+      "pluginVersion": "9.1.1",
+      "title": "Participating Stake ",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "id": 74,
-      "links": []
+      "maxDataPoints": 100,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, aptos_chain_health_participating_voting_power_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
+          "interval": "10s",
+          "intervalFactor": 1,
+          "range": true,
+          "refId": "A",
+          "step": 10
+        }
+      ]
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -491,19 +491,6 @@
       "title": "Participating Validators ",
       "transparent": false,
       "type": "gauge",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editorMode": "code",
-          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
-          "interval": "10s",
-          "intervalFactor": 1,
-          "range": true,
-          "refId": "A",
-          "step": 10
-        }
-      ],
-      "title": "Participating Validators ",
       "type": "gauge",
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "fieldConfig": {
@@ -526,17 +513,30 @@
         },
         "overrides": []
       },
-      "id": 75,
-      "maxDataPoints": 100,
-      "pluginVersion": "9.1.1",
       "gridPos": { "h": 5, "w": 4, "x": 13, "y": 6 },
-      "links": [],
+      "maxDataPoints": 100,
       "options": {
         "orientation": "auto",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "showThresholdLabels": false,
         "showThresholdMarkers": true
-      }
+      },
+      "pluginVersion": "9.1.1",
+      "title": "Participating Validators ",
+      "id": 75,
+      "links": [],
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
+          "interval": "10s",
+          "intervalFactor": 1,
+          "range": true,
+          "refId": "A",
+          "step": 10
+        }
+      ]
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
