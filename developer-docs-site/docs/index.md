@@ -143,7 +143,7 @@ Or simply [create a pull request](https://github.com/aptos-labs/aptos-core/pulls
 We are excited that you are here, and we look forward to getting to know you. Welcome to the Aptos community! Find out more about us at:
 
 * [AptosLabs.com](https://www.aptoslabs.com/)
-* [Forum](https://forum.aptoslabs.com/_
+* [Forum](https://forum.aptoslabs.com/)
 * [Discord](https://discord.gg/aptoslabs)
 * [Medium](https://medium.com/aptoslabs)
 * [Telegram](https://t.me/aptos_official)
