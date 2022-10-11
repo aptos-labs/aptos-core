@@ -44,7 +44,7 @@ impl Default for MempoolConfig {
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             shared_mempool_validator_broadcast: true,
-            broadcast_buckets: vec![0, 151, 301, 901, 2001, 10001], // (1, 1.5, 3, 9, 20, 100)
+            broadcast_buckets: vec![0, 150, 300, 500, 700, 1000, 3000, 5000, 7000, 9000],
         }
     }
 }
