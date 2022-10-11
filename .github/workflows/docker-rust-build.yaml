@@ -34,7 +34,7 @@ jobs:
   rust-all:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ env.GIT_SHA }}
 
@@ -44,7 +44,7 @@ jobs:
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Login to ECR
-        uses: docker/login-action@v2
+        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
         with:
           registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
           username: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -52,7 +52,7 @@ jobs:
 
       - uses: ./.github/actions/docker-buildx-setup
 
-      - uses: imjasonh/setup-crane@v0.1
+      - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
 
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
