@@ -37,10 +37,13 @@ services:
 
 
   validator:
-    image: "${VALIDATOR_IMAGE_REPO:-aptoslabs/validator}:${IMAGE_TAG:-testnet}"
+    image: debian:latest
     networks:
       shared:
     volumes:
+      - type: bind
+        source: aptos-node
+        target: /usr/local/bin/aptos-node
       - type: volume
         source: aptos-validator
         target: /opt/aptos/data
