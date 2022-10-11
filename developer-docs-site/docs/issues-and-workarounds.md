@@ -33,11 +33,41 @@ Delete the `secure-data.json` file because very likely you are using an older ve
 The Aptos current epoch duration is 1 hour.
 :::
 
-To track epoch changes, follow these steps:
+You can find out when the next epoch starts in multiple ways: 
+
+**Use the CLI**
+```bash
+aptos node show-epoch-info --url https://fullnode.premainnet.aptoslabs.com/v1
+```
+which produces an output like below (example output for premainnet):
+```json
+{
+  "Result": {
+    "epoch": 692,
+    "epoch_interval_secs": 3600,
+    "current_epoch_start_time": {
+      "unix_time": 1665429258117522,
+      "utc_time": "2022-10-10T19:14:18.117522Z"
+    },
+    "next_epoch_start_time": {
+      "unix_time": 1665436458117522,
+      "utc_time": "2022-10-10T21:14:18.117522Z"
+    }
+  }
+}
+```
+
+**Find it in your stake pool information output**
+
+You can see when the next epoch starts in the output of the command `aptos node get-stake-pool`. See [Checking your stake pool information](/nodes/validator-node/operator/staking-pool-operations/#checking-your-stake-pool-information).
+
+Finally, you can use Aptos Explorer and an online epoch converter to find out when the next epoch starts. See below:
+
+**You can use the Aptos Explorer and epoch converter**
 
 1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
-1. Switch to **RESOURCES** tab.
-1. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `last_reconfiguration_time`. You will find the last epoch transition timestamp in microseconds. The text display looks like this:
+2. Switch to **RESOURCES** tab.
+3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `last_reconfiguration_time`. You will find the last epoch transition timestamp in microseconds. The text display looks like this:
   ```json
   {
     "epoch": "25",
