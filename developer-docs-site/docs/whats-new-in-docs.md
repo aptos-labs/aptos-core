@@ -7,7 +7,7 @@ slug: "whats-new-in-docs"
 
 ## 11 October 2022
 
-- Added a 
+- Added [Data Retention](/docs/guides/data-retention.md) document that describes how to change the data pruning settings.
 
 ## 10 October 2022
 
