@@ -23,6 +23,14 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 10 October 2022
+
+- Added [Staking Pool Operations](/docs/nodes/validator-node/operator/staking-pool-operations.md) document.
+
+## 06 October 2022
+
+- Added [Node Files](/docs/nodes/node-files.md) document that lists all the files required during node deployment process. Includes commands to download each file.
+
 ## 03 October 2022
 
 - [How Base Gas Works](/docs/concepts/base-gas.md) describes the types of gas involved in Aptos transactions and offers optimizations for your use.
