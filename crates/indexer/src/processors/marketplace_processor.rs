@@ -4,7 +4,7 @@ use field_count::FieldCount;
 
 use crate::{
     database::{execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection},
-    models::marketplace_models::collections::MarketplaceCollection,
+    models::marketplace_models::{collections::MarketplaceCollection, offers::MarketplaceOffer},
     schema,
 };
 
@@ -41,6 +41,22 @@ fn insert_collections(
             conn,
             diesel::insert_into(schema::marketplace_collections::table)
                 .values(&collections[start_index..end_index]),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+fn insert_offers(
+    conn: &mut PgPoolConnection,
+    offers: &[MarketplaceOffer],
+) -> Result<(), diesel::result::Error> {
+    let chunks = get_chunks(offers.len(), MarketplaceOffer::field_count());
+    for (start_index, end_index) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::marketplace_offers::table)
+                .values(&offers[start_index..end_index]),
             None,
         )?;
     }
