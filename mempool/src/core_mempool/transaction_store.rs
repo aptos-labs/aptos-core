@@ -173,6 +173,11 @@ impl TransactionStore {
         None
     }
 
+    #[inline]
+    pub(crate) fn get_bucket(&self, ranking_score: u64) -> &str {
+        self.timeline_index.get_bucket(ranking_score)
+    }
+
     pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
         self.sequence_numbers.get(address)
     }
