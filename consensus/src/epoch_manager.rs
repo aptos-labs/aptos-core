@@ -801,7 +801,7 @@ impl EpochManager {
             // TODO: think about these numbers
             let config = QuorumStoreConfig {
                 channel_size: 100,
-                proof_timeout_ms: 600000,
+                proof_timeout_ms: 300000,
                 batch_request_num_peers: 2,
                 end_batch_ms: 500,
                 max_batch_bytes: 100000,
