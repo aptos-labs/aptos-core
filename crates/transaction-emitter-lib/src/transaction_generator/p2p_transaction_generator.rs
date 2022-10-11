@@ -8,12 +8,13 @@ use aptos_sdk::{
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
+use rand::SeedableRng;
 use rand::{
     distributions::{Distribution, Standard},
     prelude::{SliceRandom, StdRng},
     Rng,
 };
-use rand_core::RngCore;
+use rand_core::{OsRng, RngCore};
 use std::{cmp::max, sync::Arc};
 
 pub struct P2PTransactionGenerator {
@@ -65,46 +66,35 @@ impl P2PTransactionGenerator {
         sender: &mut LocalAccount,
         receiver: &AccountAddress,
         reqs: &[SignedTransaction],
+        gas_price: u64,
     ) -> SignedTransaction {
         let mut invalid_account = LocalAccount::generate(rng);
         let invalid_address = invalid_account.address();
         match Standard.sample(rng) {
             InvalidTransactionType::ChainId => {
                 let txn_factory = &self.txn_factory.clone().with_chain_id(ChainId::new(255));
-                self.gen_single_txn(
-                    sender,
-                    receiver,
-                    self.send_amount,
-                    txn_factory,
-                    self.gas_price,
-                )
+                self.gen_single_txn(sender, receiver, self.send_amount, txn_factory, gas_price)
             }
             InvalidTransactionType::Sender => self.gen_single_txn(
                 &mut invalid_account,
                 receiver,
                 self.send_amount,
                 &self.txn_factory,
-                self.gas_price,
+                gas_price,
             ),
             InvalidTransactionType::Receiver => self.gen_single_txn(
                 sender,
                 &invalid_address,
                 self.send_amount,
                 &self.txn_factory,
-                self.gas_price,
+                gas_price,
             ),
             InvalidTransactionType::Duplication => {
                 // if this is the first tx, default to generate invalid tx with wrong chain id
                 // otherwise, make a duplication of an exist valid tx
                 if reqs.is_empty() {
                     let txn_factory = &self.txn_factory.clone().with_chain_id(ChainId::new(255));
-                    self.gen_single_txn(
-                        sender,
-                        receiver,
-                        self.send_amount,
-                        txn_factory,
-                        self.gas_price,
-                    )
+                    self.gen_single_txn(sender, receiver, self.send_amount, txn_factory, gas_price)
                 } else {
                     let random_index = rng.gen_range(0, reqs.len());
                     reqs[random_index].clone()
@@ -143,6 +133,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
     ) -> Vec<SignedTransaction> {
+        let gas_price = (self.gas_price as f64 * 120_f64.powf(self.rng.gen_range(0.0, 1.0))) as u64;
         let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
         let invalid_size = if self.invalid_transaction_ratio != 0 {
             // if enable mix invalid tx, at least 1 invalid tx per batch
@@ -173,7 +164,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         receiver,
                         self.send_amount,
                         &self.txn_factory,
-                        self.gas_price,
+                        gas_price,
                     )
                 } else {
                     self.generate_invalid_transaction(
@@ -181,6 +172,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         sender,
                         receiver,
                         &requests,
+                        gas_price,
                     )
                 };
                 requests.push(request);
@@ -191,7 +183,6 @@ impl TransactionGenerator for P2PTransactionGenerator {
 }
 
 pub struct P2PTransactionGeneratorCreator {
-    rng: StdRng,
     txn_factory: TransactionFactory,
     amount: u64,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
@@ -201,7 +192,6 @@ pub struct P2PTransactionGeneratorCreator {
 
 impl P2PTransactionGeneratorCreator {
     pub fn new(
-        rng: StdRng,
         txn_factory: TransactionFactory,
         amount: u64,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
@@ -209,7 +199,6 @@ impl P2PTransactionGeneratorCreator {
         gas_price: u64,
     ) -> Self {
         Self {
-            rng,
             txn_factory,
             amount,
             all_addresses,
@@ -223,7 +212,7 @@ impl P2PTransactionGeneratorCreator {
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
     async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(P2PTransactionGenerator::new(
-            self.rng.clone(),
+            StdRng::from_seed(OsRng.gen()),
             self.amount,
             self.txn_factory.clone(),
             self.all_addresses.clone(),
