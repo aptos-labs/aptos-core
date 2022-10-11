@@ -166,7 +166,7 @@ diesel::table! {
         creator_address -> Varchar,
         collection_name -> Text,
         token_name -> Text,
-        property_version -> Int2,
+        property_version -> Int4,
         price -> Int8,
         seller -> Varchar,
         timestamp -> Timestamp,
