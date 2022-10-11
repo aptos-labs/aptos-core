@@ -236,6 +236,11 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 # R
 
+## Resource Account
+
+- A resource account can be created only once. An entity may call `create_account` in an attempt to claim an account ahead of the creation of a resource account. But if a resource account is found, Aptos will transition ownership of the account over to the resource account. This is done by validating that the account has yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a collision where someone has legitimately produced a private key that maps to a resource account address is improbably low.
+- See the "resource account" references in [account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/account.move) for more details.
+
 ## REST Service
 
 - The REST Service component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
