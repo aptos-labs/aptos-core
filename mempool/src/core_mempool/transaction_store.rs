@@ -408,6 +408,11 @@ impl TransactionStore {
                                     E2E_LABEL,
                                     time_delta,
                                 );
+                                counters::core_mempool_txn_ranking_bucket(
+                                    BROADCAST_READY_LABEL,
+                                    BROADCAST_READY_LABEL,
+                                    self.timeline_index.get_bucket(txn.ranking_score),
+                                );
                             } else {
                                 counters::core_mempool_txn_commit_latency(
                                     CONSENSUS_READY_LABEL,
@@ -415,6 +420,11 @@ impl TransactionStore {
                                     time_delta,
                                 );
                             }
+                            counters::core_mempool_txn_ranking_bucket(
+                                CONSENSUS_READY_LABEL,
+                                CONSENSUS_READY_LABEL,
+                                self.timeline_index.get_bucket(txn.ranking_score),
+                            );
                         }
 
                         // Remove txn from parking lot after it has been promoted to
@@ -578,6 +588,11 @@ impl TransactionStore {
                                 BROADCAST_BATCHED_LABEL,
                                 E2E_LABEL,
                                 time_delta,
+                            );
+                            counters::core_mempool_txn_ranking_bucket(
+                                BROADCAST_BATCHED_LABEL,
+                                BROADCAST_BATCHED_LABEL,
+                                self.timeline_index.get_bucket(txn.ranking_score),
                             );
                         }
                     }
