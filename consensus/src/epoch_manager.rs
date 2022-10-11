@@ -225,6 +225,7 @@ impl EpochManager {
                                 proposer_and_voter_config.failure_threshold_percent,
                                 voter_window_size,
                                 proposer_window_size,
+                                leader_reputation_type.use_reputation_window_from_stale_end(),
                             ));
                         (
                             heuristic,
