@@ -1,4 +1,5 @@
-#Aptos NFT marketplace Standard
+Aptos NFT marketplace Standard
+------------
 
 Introduction
 ------------
@@ -48,6 +49,7 @@ Meanwhile, we will enhance the token store in our token standard to provide opti
 
 We will continuously collect new common features from the community and add them to the contracts in a backward-compatible way.
 
-**what is the plan for this package?**
+**What is the plan for this package?**
+
 We plan to have these contracts in the move-example and collect the feedbacks from community.
 Once we have gone through enough iterations and be confident that it is beneficial to the token ecosystem, we will propose it to include them in the 0x3 aptos-token package.
