@@ -2,10 +2,12 @@
 #![allow(clippy::unused_unit)]
 
 use aptos_api_types::{TransactionPayload, UserTransaction};
+use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 
 use crate::{schema::marketplace_collections, util::parse_timestamp};
 
-#[derive(Queryable, Identifiable, Insertable)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
 #[diesel(primary_key(creator_address, collection_name))]
 #[diesel(table_name = marketplace_collections)]
 pub struct MarketplaceCollection {
