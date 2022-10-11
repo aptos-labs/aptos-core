@@ -5,6 +5,7 @@ use anyhow::{format_err, Context, Result};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
+use core::panic;
 use forge::success_criteria::{StateProgressThreshold, SuccessCriteria};
 use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
 use forge::{ForgeConfig, Options, *};
@@ -185,6 +186,11 @@ fn main() -> Result<()> {
     let args = Args::from_args();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
+
+    if suite_name == "compat" {
+        panic!()
+    }
+    let suite_name = "graceful_overload";
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -553,7 +559,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             // something to potentially improve upon.
             .with_initial_fullnode_count(8)
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 15000 }))
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 10000 }))
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))

@@ -44,6 +44,10 @@ impl P2PTransactionGenerator {
         }
     }
 
+    fn get_gas_price(&self, rng: &mut StdRng) -> u64 {
+        (self.gas_price as f64 * 101_f64.powf(rng.gen_range(0.0, 1.0))) as u64
+    }
+
     fn gen_single_txn(
         &self,
         from: &mut LocalAccount,
@@ -76,7 +80,7 @@ impl P2PTransactionGenerator {
                     receiver,
                     self.send_amount,
                     txn_factory,
-                    self.gas_price,
+                    self.get_gas_price(rng),
                 )
             }
             InvalidTransactionType::Sender => self.gen_single_txn(
@@ -84,14 +88,14 @@ impl P2PTransactionGenerator {
                 receiver,
                 self.send_amount,
                 &self.txn_factory,
-                self.gas_price,
+                self.get_gas_price(rng),
             ),
             InvalidTransactionType::Receiver => self.gen_single_txn(
                 sender,
                 &invalid_address,
                 self.send_amount,
                 &self.txn_factory,
-                self.gas_price,
+                self.get_gas_price(rng),
             ),
             InvalidTransactionType::Duplication => {
                 // if this is the first tx, default to generate invalid tx with wrong chain id
@@ -103,7 +107,7 @@ impl P2PTransactionGenerator {
                         receiver,
                         self.send_amount,
                         txn_factory,
-                        self.gas_price,
+                        self.get_gas_price(rng),
                     )
                 } else {
                     let random_index = rng.gen_range(0, reqs.len());
@@ -173,7 +177,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         receiver,
                         self.send_amount,
                         &self.txn_factory,
-                        self.gas_price,
+                        self.get_gas_price(&mut self.rng.clone()),
                     )
                 } else {
                     self.generate_invalid_transaction(
@@ -183,6 +187,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         &requests,
                     )
                 };
+                self.rng.next_u64();
                 requests.push(request);
             }
         }
