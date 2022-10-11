@@ -1,11 +1,13 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
     use std::error;
+    use std::features;
     use std::vector;
     use std::option;
 
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::fee_destribution;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
@@ -133,6 +135,11 @@ module aptos_framework::block {
             time_microseconds: timestamp,
         };
         emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
+
+        // Distribute collected transaction fees from the previous block, if it exists.
+        if (features::collect_and_distribute_gas_fees()) {
+            fee_destribution::distribute(&vm);
+        };
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
