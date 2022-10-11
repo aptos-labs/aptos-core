@@ -5,20 +5,12 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use std::collections::HashMap;
-
 use super::coin_utils::{CoinInfoType, CoinResource};
-use crate::schema::coin_infos;
-use anyhow::Context;
-use aptos_api_types::{WriteResource as APIWriteResource, WriteTableItem as APIWriteTableItem};
-use bigdecimal::BigDecimal;
+use crate::{database::PgPoolConnection, schema::coin_infos};
+use aptos_api_types::WriteResource as APIWriteResource;
+use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-pub type TableHandle = String;
-pub type TableKey = String;
-pub type Supply = BigDecimal;
-pub type CoinSupplyLookup = HashMap<(TableHandle, TableKey), Supply>;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(coin_type_hash))]
@@ -32,6 +24,25 @@ pub struct CoinInfo {
     pub symbol: String,
     pub decimals: i32,
     pub transaction_created_timestamp: chrono::NaiveDateTime,
+    pub supply_aggregator_table_handle: Option<String>,
+    pub supply_aggregator_table_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[diesel(primary_key(coin_type_hash))]
+#[diesel(table_name = coin_infos)]
+pub struct CoinInfoQuery {
+    pub coin_type_hash: String,
+    pub coin_type: String,
+    pub transaction_version_created: i64,
+    pub creator_address: String,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: i32,
+    pub transaction_created_timestamp: chrono::NaiveDateTime,
+    pub inserted_at: chrono::NaiveDateTime,
+    pub supply_aggregator_table_handle: Option<String>,
+    pub supply_aggregator_table_key: Option<String>,
 }
 
 impl CoinInfo {
@@ -47,6 +58,10 @@ impl CoinInfo {
                     &write_resource.data.typ.generic_type_params[0],
                     txn_version,
                 )?;
+                let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner
+                    .get_aggregator_metadata()
+                    .map(|agg| (Some(agg.handle), Some(agg.key)))
+                    .unwrap_or((None, None));
 
                 Ok(Some(Self {
                     coin_type_hash: coin_info_type.to_hash(),
@@ -57,38 +72,23 @@ impl CoinInfo {
                     symbol: inner.get_symbol_trunc(),
                     decimals: inner.decimals,
                     transaction_created_timestamp: txn_timestamp,
+                    supply_aggregator_table_handle,
+                    supply_aggregator_table_key,
                 }))
             }
             _ => Ok(None),
         }
     }
+}
 
-    pub fn get_aggregator_supply_lookup(
-        table_item: &APIWriteTableItem,
-    ) -> anyhow::Result<CoinSupplyLookup> {
-        if let Some(data) = &table_item.data {
-            if data.key_type == "address" && data.value_type == "u128" {
-                let value_str = data
-                    .value
-                    .as_str()
-                    .map(|s| s.parse::<BigDecimal>())
-                    .context(format!(
-                        "value is not a string: {:?}, table_item {:?}",
-                        data.value, table_item
-                    ))?
-                    .context(format!("cannot parse string as u128: {:?}", data.value))?;
-                return Ok(HashMap::from([(
-                    (
-                        table_item.handle.to_string(),
-                        data.key
-                            .as_str()
-                            .context(format!("key is not a string: {:?}", data.key))?
-                            .to_string(),
-                    ),
-                    value_str,
-                )]));
-            }
-        }
-        Ok(HashMap::new())
+impl CoinInfoQuery {
+    pub fn get_by_coin_type(
+        coin_type: String,
+        conn: &mut PgPoolConnection,
+    ) -> diesel::QueryResult<Option<Self>> {
+        coin_infos::table
+            .filter(coin_infos::coin_type.eq(coin_type))
+            .first::<Self>(conn)
+            .optional()
     }
 }

@@ -175,8 +175,7 @@ fn insert_tokens(
             diesel::insert_into(schema::tokens::table)
                 .values(&tokens_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, property_version, transaction_version))
-                .do_update()
-                .set((collection_data_id_hash.eq(excluded(collection_data_id_hash)),)),
+                .do_nothing(),
             None,
         )?;
     }
@@ -204,11 +203,7 @@ fn insert_token_ownerships(
                     transaction_version,
                     table_handle,
                 ))
-                .do_update()
-                .set((
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    table_type.eq(excluded(table_type)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -229,7 +224,7 @@ fn insert_token_datas(
                 .values(&token_datas_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, transaction_version))
                 .do_update()
-                .set((collection_data_id_hash.eq(excluded(collection_data_id_hash)),)),
+                .set((description.eq(excluded(description)),)),
             None,
         )?;
     }
@@ -252,8 +247,7 @@ fn insert_collection_datas(
             diesel::insert_into(schema::collection_datas::table)
                 .values(&collection_datas_to_insert[start_ind..end_ind])
                 .on_conflict((collection_data_id_hash, transaction_version))
-                .do_update()
-                .set((table_handle.eq(excluded(table_handle)),)),
+                .do_nothing(),
             None,
         )?;
     }
@@ -325,6 +319,7 @@ fn insert_current_token_datas(
                     default_properties.eq(excluded(default_properties)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    description.eq(excluded(description)),
                 )),
             Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
