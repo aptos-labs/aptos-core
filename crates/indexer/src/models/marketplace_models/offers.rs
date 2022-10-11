@@ -34,7 +34,7 @@ impl MarketplaceOffer {
                     .try_into()
                     .unwrap(),
                 price: payload.arguments[0]["price"].as_i64().unwrap(),
-                seller: payload.arguments[0]["seller"].to_string(),
+                seller: txn.request.sender.inner().to_hex_literal(),
                 timestamp: parse_timestamp(txn.timestamp.0, version.try_into().unwrap()),
             }),
             _ => None,
