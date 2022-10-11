@@ -65,46 +65,35 @@ impl P2PTransactionGenerator {
         sender: &mut LocalAccount,
         receiver: &AccountAddress,
         reqs: &[SignedTransaction],
+        gas_price: u64,
     ) -> SignedTransaction {
         let mut invalid_account = LocalAccount::generate(rng);
         let invalid_address = invalid_account.address();
         match Standard.sample(rng) {
             InvalidTransactionType::ChainId => {
                 let txn_factory = &self.txn_factory.clone().with_chain_id(ChainId::new(255));
-                self.gen_single_txn(
-                    sender,
-                    receiver,
-                    self.send_amount,
-                    txn_factory,
-                    self.gas_price,
-                )
+                self.gen_single_txn(sender, receiver, self.send_amount, txn_factory, gas_price)
             }
             InvalidTransactionType::Sender => self.gen_single_txn(
                 &mut invalid_account,
                 receiver,
                 self.send_amount,
                 &self.txn_factory,
-                self.gas_price,
+                gas_price,
             ),
             InvalidTransactionType::Receiver => self.gen_single_txn(
                 sender,
                 &invalid_address,
                 self.send_amount,
                 &self.txn_factory,
-                self.gas_price,
+                gas_price,
             ),
             InvalidTransactionType::Duplication => {
                 // if this is the first tx, default to generate invalid tx with wrong chain id
                 // otherwise, make a duplication of an exist valid tx
                 if reqs.is_empty() {
                     let txn_factory = &self.txn_factory.clone().with_chain_id(ChainId::new(255));
-                    self.gen_single_txn(
-                        sender,
-                        receiver,
-                        self.send_amount,
-                        txn_factory,
-                        self.gas_price,
-                    )
+                    self.gen_single_txn(sender, receiver, self.send_amount, txn_factory, gas_price)
                 } else {
                     let random_index = rng.gen_range(0, reqs.len());
                     reqs[random_index].clone()
@@ -143,6 +132,8 @@ impl TransactionGenerator for P2PTransactionGenerator {
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
     ) -> Vec<SignedTransaction> {
+        let gas_price = (self.gas_price as f64 * 120_f64.powf(self.rng.gen_range(0.0, 1.0))) as u64;
+
         let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
         let invalid_size = if self.invalid_transaction_ratio != 0 {
             // if enable mix invalid tx, at least 1 invalid tx per batch
@@ -173,7 +164,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         receiver,
                         self.send_amount,
                         &self.txn_factory,
-                        self.gas_price,
+                        gas_price,
                     )
                 } else {
                     self.generate_invalid_transaction(
@@ -181,6 +172,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         sender,
                         receiver,
                         &requests,
+                        gas_price,
                     )
                 };
                 requests.push(request);
