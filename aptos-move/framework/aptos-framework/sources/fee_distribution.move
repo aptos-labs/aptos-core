@@ -42,9 +42,17 @@ module aptos_framework::fee_destribution {
         coin::collect_from(account, fee, dst_coin);
     }
 
+    /// Sets the receiver of the collected fees for the next block.
+    public fun set_receiver(vm: &signer, receiver_addr: address) acquires DistributionInfo {
+        // Can only be called by the VM.
+        system_addresses::assert_vm(vm);
+        let distribution_info = borrow_global_mut<DistributionInfo>(@aptos_framework);
+        let _ = option::swap_or_fill(&mut distribution_info.receiver, receiver_addr);
+    }
+
     /// Distributes collected transaction fees to the receiver. Should be called
     /// at the beginning of each block.
-    public fun distribute(vm: &signer) acquires DistributionInfo {
+    public fun maybe_distribute_fees(vm: &signer) acquires DistributionInfo {
         // Can only be called by the VM.
         system_addresses::assert_vm(vm);
         let distribution_info = borrow_global_mut<DistributionInfo>(@aptos_framework);
