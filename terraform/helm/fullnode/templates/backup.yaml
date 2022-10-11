@@ -64,7 +64,7 @@ spec:
           value: {{ include "backup.loggingAddress" $ | quote }}
         {{- if (include "backup.pushGateway" $) }}
         - name: PUSH_METRICS_ENDPOINT
-          value: "{{- include "backup.pushGateway" $ }}/metrics/job/{{- .jobName | default "db_backup" }}"
+          value: "{{- include "backup.pushGateway" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup" }}"
         {{- end }}
         {{- include "backup.backupEnvironment" (dict "config" .config "era" $.Values.chain.era) | nindent 8 }}
         volumeMounts:
