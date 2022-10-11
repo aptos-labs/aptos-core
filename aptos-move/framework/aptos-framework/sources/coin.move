@@ -6,6 +6,8 @@ module aptos_framework::coin {
     use std::signer;
 
     use aptos_framework::account;
+    use aptos_framework::aggregator_factory;
+    use aptos_framework::aggregator::{Self, Aggregator};
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
@@ -68,6 +70,12 @@ module aptos_framework::coin {
     struct Coin<phantom CoinType> has store {
         /// Amount of coin this address has.
         value: u64,
+    }
+
+    /// Structure representing aggregatable coin.
+    struct AggregatorCoin<phantom CoinType> has store {
+        /// Amount of aggregator coin this address has.
+        value: Aggregator,
     }
 
     /// A holder of a specific coin types and associated event handles.
@@ -137,6 +145,19 @@ module aptos_framework::coin {
         system_addresses::assert_aptos_framework(aptos_framework);
         let allow_upgrades = &mut borrow_global_mut<SupplyConfig>(@aptos_framework).allow_upgrades;
         *allow_upgrades = allowed;
+    }
+
+    //
+    //  Aggregator coin functions
+    //
+
+    /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
+    /// only be called by Aptos Framework (0x1) account for now becuase of `create_aggregator`.
+    public fun initialize_aggregator_coin<CoinType>(aptos_framework: &signer, limit: u128): AggregatorCoin<CoinType> {
+        let aggregator = aggregator_factory::create_aggregator(aptos_framework, limit);
+        AggregatorCoin<CoinType> {
+            value: aggregator,
+        }
     }
 
     //
