@@ -8,11 +8,24 @@ import TabItem from '@theme/TabItem';
 
 # Getting Started
 
-To kickstart your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section. See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for the supported operating systems.
+To kickstart your journey in the Aptos ecosystem, set up your environment as needed by your role. To simply interact with Aptos, you may simply [install the Aptos command line interface (CLI)](#install-the-cli). To develop Aptos itself, you will need to [clone the Aptos-core repository](#clone-the-Aptos-core-repo).
+
+See the [Summary](#summary) for use cases associated with each path.
 
 ## Summary
 
-Install and use Aptos CLI
+Most Aptos users will want to have the Aptos CLI installed. [Install](../cli-tools/aptos-cli-tool/install-aptos-cli.md) and [use](../cli-tools/aptos-cli-tool/use-aptos-cli) the Aptos CLI if you will:
+
+* [Run a local testnet](../nodes/local-testnet/using-cli-to-run-a-local-testnet.md).
+* [Manage accounts](../cli-tools/aptos-cli-tool/use-aptos-cli.md#account-examples).
+* [Generate keys](../cli-tools/aptos-cli-tool/use-aptos-cli.md#key-examples).
+* [Compile Move packages](../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples).
+
+In addition to installing the CLI, [download/clone](#clone-the-Aptos-core-repo) and [review](https://github.com/aptos-labs/aptos-core) the Aptos repository if you will:
+
+* [Run a fullnode](../nodes/full-node/public-fullnode.md) or [validator node](../nodes/validator-node/validators.md).
+* [Take the starter tutorials](../tutorials/aptos-quickstarts.md), many of which rely upon Aptos source code.
+* [Customize](Run a Local Testnet
 
 Interact with the network
 Example use cases
@@ -26,7 +39,9 @@ Recommended next steps
 
 ## Install the CLI
 
-[Install Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. 
+[Install Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network.
+
+as a developer in the Aptos ecosystem, set up your development environment as described in this section. See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for the supported operating systems.
 
 ## Install tools for macOS
 
