@@ -42,13 +42,15 @@ Aptos supports the following ways to index the Aptos blockchain.
 2. Run your own indexer-enabled Aptos fullnode. With this option, the indexer supports, in addition to the above coin and token modules, basic transactions, i.e., each write set, events and signatures. 
 3. Lastly, you can define your own data model (”Business Logic” in the above diagram) and set up the database for the index. 
 
+A detailed documentation for each option is presented below.
+
 ## Use the Aptos-provided indexing service
 
 TBD: Provide GraphQL query examples showing how to use this service. 
 
 ## Run an indexer-enabled fullnode
 
-Port this document to aptos.dev: [https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer#installation-guide-for-apple-sillicon](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer#installation-guide-for-apple-sillicon) 
+See [Indexer Fullnode](/nodes/indexer-fullnode).
 
 ## Define your own data model
 
