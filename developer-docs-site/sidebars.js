@@ -72,7 +72,7 @@ const sidebars = {
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
         "guides/state-sync",
-        "guides/data-retention",
+        "guides/data-pruning",
         "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
