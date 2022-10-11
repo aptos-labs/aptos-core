@@ -808,7 +808,7 @@ impl EpochManager {
                 batch_request_timeout_ms: 2000,
                 max_batch_expiry_round_gap: 20,
                 batch_expiry_grace_rounds: 5,
-                memory_quota: 0,
+                memory_quota: 100000000,
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
