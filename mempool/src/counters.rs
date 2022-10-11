@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::DEFAULT_BROADCAST_BUCKETS;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
     histogram_opts, op_counters::DurationHistogram, register_histogram, register_histogram_vec,
@@ -180,17 +179,6 @@ static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-pub fn update_mempool_txn_ranking_score(
-    histogram: &HistogramVec,
-    stage: &'static str,
-    status: &str,
-    ranking_score: u64,
-) {
-    histogram
-        .with_label_values(&[stage, status])
-        .observe(ranking_score as f64);
-}
 
 /// Counter for number of periodic garbage-collection (=GC) events that happen, regardless of
 /// how many txns were actually cleaned up in this GC event
@@ -554,48 +542,3 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         .unwrap(),
     )
 });
-
-fn config_to_prometheus_broadcast_buckets(config_buckets: &Vec<u64>) -> Vec<f64> {
-    let config_buckets = if config_buckets.len() <= 1 {
-        DEFAULT_BROADCAST_BUCKETS
-    } else {
-        config_buckets
-    };
-
-    config_buckets
-        .iter()
-        .skip(1)
-        .map(|lt| (lt - 1) as f64)
-        .collect()
-}
-
-#[cfg(test)]
-mod test {
-    use crate::counters::config_to_prometheus_broadcast_buckets;
-
-    #[test]
-    fn test_config_to_prometheus_broadcast_buckets() {
-        let input = vec![0, 151, 301, 901, 2001, 10001];
-        let expected = vec![150.0, 300.0, 900.0, 2000.0, 10000.0];
-        let output = config_to_prometheus_broadcast_buckets(&input);
-        assert_eq!(expected, output);
-    }
-
-    #[test]
-    fn test_config_to_prometheus_broadcast_buckets_default() {
-        let input = vec![];
-        config_to_prometheus_broadcast_buckets(&input);
-        let input = vec![0];
-        config_to_prometheus_broadcast_buckets(&input);
-    }
-}
-
-pub fn register_histogram_counter(config_buckets: &Vec<u64>) -> HistogramVec {
-    let buckets = config_to_prometheus_broadcast_buckets(config_buckets);
-    let opts = histogram_opts!(
-        "aptos_core_mempool_txn_ranking_score",
-        "Ranking score of txn reaching various stages in core mempool",
-        buckets
-    );
-    register_histogram_vec!(opts, &["stage", "status"]).unwrap()
-}
