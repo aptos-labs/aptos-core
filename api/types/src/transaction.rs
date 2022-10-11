@@ -330,6 +330,10 @@ pub struct TransactionInfo {
     #[oai(skip)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_height: Option<U64>,
+    /// Epoch of the transaction belongs in, this field will not be present through the API
+    #[oai(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<U64>,
 }
 
 /// A transaction waiting in mempool

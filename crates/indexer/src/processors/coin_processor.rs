@@ -12,11 +12,13 @@ use crate::{
     models::coin_models::{
         coin_activities::{CoinActivity, CurrentCoinBalancePK},
         coin_balances::{CoinBalance, CurrentCoinBalance},
-        coin_infos::CoinInfo,
+        coin_infos::{CoinInfo, CoinInfoQuery},
+        coin_supply::CoinSupply,
     },
     schema,
 };
 use aptos_api_types::Transaction as APITransaction;
+use aptos_types::APTOS_COIN_TYPE;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -50,11 +52,13 @@ fn insert_to_db_impl(
     coin_infos: &[CoinInfo],
     coin_balances: &[CoinBalance],
     current_coin_balances: &[CurrentCoinBalance],
+    coin_supply: &[CoinSupply],
 ) -> Result<(), diesel::result::Error> {
     insert_coin_activities(conn, coin_activities)?;
     insert_coin_infos(conn, coin_infos)?;
     insert_coin_balances(conn, coin_balances)?;
     insert_current_coin_balances(conn, current_coin_balances)?;
+    insert_coin_supply(conn, coin_supply)?;
     Ok(())
 }
 
@@ -67,6 +71,7 @@ fn insert_to_db(
     coin_infos: Vec<CoinInfo>,
     coin_balances: Vec<CoinBalance>,
     current_coin_balances: Vec<CurrentCoinBalance>,
+    coin_supply: Vec<CoinSupply>,
 ) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         name = name,
@@ -84,6 +89,7 @@ fn insert_to_db(
                 &coin_infos,
                 &coin_balances,
                 &current_coin_balances,
+                &coin_supply,
             )
         }) {
         Ok(_) => Ok(()),
@@ -102,6 +108,7 @@ fn insert_to_db(
                     &coin_infos,
                     &coin_balances,
                     &current_coin_balances,
+                    &coin_supply,
                 )
             }),
     }
@@ -125,17 +132,7 @@ fn insert_coin_activities(
                     event_creation_number,
                     event_sequence_number,
                 ))
-                .do_update()
-                .set((
-                    owner_address.eq(excluded(owner_address)),
-                    coin_type.eq(excluded(coin_type)),
-                    amount.eq(excluded(amount)),
-                    activity_type.eq(excluded(activity_type)),
-                    is_gas_fee.eq(excluded(is_gas_fee)),
-                    is_transaction_success.eq(excluded(is_transaction_success)),
-                    entry_function_id_str.eq(excluded(entry_function_id_str)),
-                    transaction_timestamp.eq(excluded(transaction_timestamp)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -163,6 +160,8 @@ fn insert_coin_infos(
                     symbol.eq(excluded(symbol)),
                     decimals.eq(excluded(decimals)),
                     transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
+                    supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
+                    supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
                 )),
             Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
         )?;
@@ -183,11 +182,7 @@ fn insert_coin_balances(
             diesel::insert_into(schema::coin_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, owner_address, coin_type_hash))
-                .do_update()
-                .set((
-                    amount.eq(excluded(amount)),
-                    transaction_timestamp.eq(excluded(transaction_timestamp)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -219,6 +214,27 @@ fn insert_current_coin_balances(
     Ok(())
 }
 
+fn insert_coin_supply(
+    conn: &mut PgConnection,
+    item_to_insert: &[CoinSupply],
+) -> Result<(), diesel::result::Error> {
+    use schema::coin_supply::dsl::*;
+
+    let chunks = get_chunks(item_to_insert.len(), CoinSupply::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::coin_supply::table)
+                .values(&item_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, coin_type_hash))
+                .do_update()
+                .set((transaction_epoch.eq(excluded(transaction_epoch)),)),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl TransactionProcessor for CoinTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -231,17 +247,30 @@ impl TransactionProcessor for CoinTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
+        let mut conn = self.get_conn();
+        // get aptos_coin info for supply tracking
+        // TODO: This only needs to be fetched once. Need to persist somehow
+        let maybe_aptos_coin_info =
+            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE.to_string(), &mut conn).unwrap();
+
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];
         let mut all_coin_infos: HashMap<String, CoinInfo> = HashMap::new();
         let mut all_current_coin_balances: HashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
             HashMap::new();
+        let mut all_coin_supply = vec![];
 
         for txn in &transactions {
-            let (mut coin_activities, mut coin_balances, coin_infos, current_coin_balances) =
-                CoinActivity::from_transaction(txn);
+            let (
+                mut coin_activities,
+                mut coin_balances,
+                coin_infos,
+                current_coin_balances,
+                mut coin_supply,
+            ) = CoinActivity::from_transaction(txn, maybe_aptos_coin_info);
             all_coin_activities.append(&mut coin_activities);
             all_coin_balances.append(&mut coin_balances);
+            all_coin_supply.append(&mut coin_supply);
             // For coin infos, we only want to keep the first version, so insert only if key is not present already
             for (key, value) in coin_infos {
                 all_coin_infos.entry(key).or_insert(value);
@@ -259,7 +288,6 @@ impl TransactionProcessor for CoinTransactionProcessor {
             (&a.owner_address, &a.coin_type).cmp(&(&b.owner_address, &b.coin_type))
         });
 
-        let mut conn = self.get_conn();
         let tx_result = insert_to_db(
             &mut conn,
             self.name(),
@@ -269,6 +297,7 @@ impl TransactionProcessor for CoinTransactionProcessor {
             all_coin_infos,
             all_coin_balances,
             all_current_coin_balances,
+            all_coin_supply,
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

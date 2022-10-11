@@ -7,7 +7,8 @@
 
 use super::{
     coin_balances::{CoinBalance, CurrentCoinBalance},
-    coin_infos::{CoinInfo, CoinSupplyLookup},
+    coin_infos::{CoinInfo, CoinInfoQuery},
+    coin_supply::CoinSupply,
     coin_utils::{CoinEvent, EventGuidResource},
 };
 use crate::{
@@ -59,17 +60,6 @@ pub struct CoinActivity {
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-/// Coin information is mostly in Resources but some pieces are in table items (e.g. supply from aggregator table)
-pub struct CoinSupply {
-    pub coin_type: String,
-    pub transaction_version_created: i64,
-    pub creator_address: String,
-    pub name: String,
-    pub symbol: String,
-    pub decimals: i32,
-    pub supply: BigDecimal,
-}
-
 impl CoinActivity {
     /// There are different objects containing different information about balances and coins.
     /// Events: Withdraw and Deposit event containing amounts. There is no coin type so we need to get that from Resources. (from event guid)
@@ -79,11 +69,13 @@ impl CoinActivity {
     /// Note, we're not currently tracking supply
     pub fn from_transaction(
         transaction: &APITransaction,
+        maybe_aptos_coin_info: &Option<CoinInfoQuery>,
     ) -> (
         Vec<Self>,
         Vec<CoinBalance>,
         HashMap<CoinType, CoinInfo>,
         HashMap<CurrentCoinBalancePK, CurrentCoinBalance>,
+        Vec<CoinSupply>,
     ) {
         let mut coin_activities = Vec::new();
         let mut coin_balances = Vec::new();
@@ -91,6 +83,7 @@ impl CoinActivity {
         let mut current_coin_balances: HashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
             HashMap::new();
         let mut all_event_to_coin_type: EventToCoinType = HashMap::new();
+        let mut all_coin_supply = Vec::new();
 
         let (txn_info, writesets, events, maybe_user_request, txn_timestamp) = match &transaction {
             APITransaction::GenesisTransaction(inner) => (
@@ -112,6 +105,7 @@ impl CoinActivity {
 
         // Get coin info, then coin balances. We can leverage coin balances to get the metadata required for events
         let txn_version = txn_info.version.0 as i64;
+        let txn_epoch = txn_info.epoch.unwrap().0 as i64;
         let mut entry_function_id_str = None;
         if let Some(user_request) = maybe_user_request {
             entry_function_id_str = match &user_request.payload {
@@ -127,14 +121,6 @@ impl CoinActivity {
                 &entry_function_id_str,
                 txn_timestamp,
             ));
-        }
-        // First we need to make a pass to get all tables that potentially contains coin supply information
-        let mut supply_lookup: CoinSupplyLookup = HashMap::new();
-        for wsc in writesets {
-            if let APIWriteSetChange::WriteTableItem(table_item) = &wsc {
-                let item = CoinInfo::get_aggregator_supply_lookup(table_item).unwrap();
-                supply_lookup.extend(item);
-            }
         }
 
         for wsc in writesets {
@@ -153,6 +139,20 @@ impl CoinActivity {
                 } else {
                     (None, None)
                 };
+
+            let maybe_coin_supply = if let APIWriteSetChange::WriteTableItem(table_item) = &wsc {
+                CoinSupply::from_write_table_item(
+                    table_item,
+                    maybe_aptos_coin_info,
+                    txn_version,
+                    txn_timestamp,
+                    txn_epoch,
+                )
+                .unwrap()
+            } else {
+                None
+            };
+
             if let Some(coin_info) = maybe_coin_info {
                 coin_infos.insert(coin_info.coin_type.clone(), coin_info);
             }
@@ -168,6 +168,9 @@ impl CoinActivity {
                 );
                 coin_balances.push(coin_balance);
                 all_event_to_coin_type.extend(event_to_coin_type);
+            }
+            if let Some(coin_supply) = maybe_coin_supply {
+                all_coin_supply.push(coin_supply);
             }
         }
         for event in events {
@@ -191,6 +194,7 @@ impl CoinActivity {
             coin_balances,
             coin_infos,
             current_coin_balances,
+            all_coin_supply,
         )
     }
 
