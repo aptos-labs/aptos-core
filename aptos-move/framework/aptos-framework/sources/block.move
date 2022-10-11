@@ -3,9 +3,9 @@ module aptos_framework::block {
     use std::error;
     use std::vector;
     use std::option;
-    use aptos_std::event::{Self, EventHandle};
 
     use aptos_framework::account;
+    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
