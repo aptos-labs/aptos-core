@@ -28,7 +28,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 05 October 2022
 
-- Related Aptos resources (aptoslabs.com, Twitter, Discord, and more) can be found in the [Have fun](index.md/#have-fun) section of the Aptos.dev landing page.
+- Related Aptos resources (aptoslabs.com, Twitter, Discord, and more) can be found in the [Have fun](https://aptos.dev/#have-fun) section of the Aptos.dev landing page.
 
 ## 03 October 2022
 
