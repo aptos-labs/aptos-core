@@ -28,7 +28,8 @@ full_node_networks:
   max_inbound_connections: {{ . }}
   {{ end }}
   {{ with .seeds }}
-  seeds: {{ . }}
+  seeds:
+    {{ . | toYaml | nindent 4 }}
   {{ end }}
   {{ end }}
 - network_id:
