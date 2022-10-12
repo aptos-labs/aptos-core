@@ -239,19 +239,12 @@ impl StateComputer for ExecutionProxy {
         // when requested to sync.
         let res = monitor!(
             "sync_to",
-            self.state_sync_notifier.sync_to_target(target.clone()).await
+            self.state_sync_notifier.sync_to_target(target).await
         );
 
         // Similarly, after the state synchronization, we have to reset the cache
         // of BlockExecutor to guarantee the latest committed state is up to date.
         self.executor.reset()?;
-
-        // update the logical time for quorum store during state sync
-        self.async_commit_notifier
-            .clone()
-            .send((target.ledger_info().epoch(), target.ledger_info().round(), Vec::new()))
-            .await
-            .expect("Failed to send async commit notification in fast_sync_forward");
 
         res.map_err(|error| {
             let anyhow_error: anyhow::Error = error.into();
