@@ -151,6 +151,7 @@ dependencies = [
  "futures",
  "hex",
  "hyper",
+ "itertools",
  "mime",
  "move-core-types",
  "once_cell",
@@ -603,7 +604,7 @@ dependencies = [
  "aptos-types",
  "async-stream",
  "async-trait",
- "bigdecimal",
+ "bigdecimal 0.3.0",
  "bytes",
  "chrono",
  "clap 3.2.22",
@@ -1080,6 +1081,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1374191e2dd25f9ae02e3aa95041ed5d747fc77b3c102b49fe2dd9a8117a6244"
 dependencies = [
  "num-bigint 0.2.6",
+ "num-integer",
+ "num-traits 0.2.15",
+]
+
+[[package]]
+name = "bigdecimal"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6aaf33151a6429fe9211d1b276eafdf70cdff28b071e76c0b0e1503221ea3744"
+dependencies = [
+ "num-bigint 0.4.3",
  "num-integer",
  "num-traits 0.2.15",
  "serde 1.0.145",
@@ -1848,7 +1860,7 @@ version = "1.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b28135ecf6b7d446b43e27e225622a038cc4e2930a1022f51cdb97ada19b8e4d"
 dependencies = [
- "bigdecimal",
+ "bigdecimal 0.1.2",
  "bitflags",
  "byteorder",
  "chrono",

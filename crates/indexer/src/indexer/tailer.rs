@@ -368,6 +368,7 @@ mod test {
                "event_root_hash":"0xcbdbb1b830d1016d45a828bb3171ea81826e8315f14140acfbd7886f49fbcb40",
                "gas_used":"0",
                "block_height":"0",
+               "epoch":"0",
                "success":true,
                "vm_status":"Executed successfully",
                "accumulator_root_hash":"0x6a527d06063dfd42c6b3a862574d5f3ec1660afb8058135edda5072712bfdb51",
@@ -567,7 +568,7 @@ mod test {
             .unwrap();
 
         // A block_metadata_transaction
-        let block_metadata_transaction: Transaction = serde_json::from_value(json!(
+        let mut block_metadata_transaction: Transaction = serde_json::from_value(json!(
             {
               "type": "block_metadata_transaction",
               "version": "69158",
@@ -643,6 +644,10 @@ mod test {
               ]
             }
         )).unwrap();
+        // This is needed because deserializer only parses epoch once so info.epoch is always None
+        if let Transaction::BlockMetadataTransaction(ref mut bmt) = block_metadata_transaction {
+            bmt.info.epoch = Some(aptos_api_types::U64::from(1));
+        }
 
         tailer
             .processor
@@ -674,6 +679,7 @@ mod test {
               "type": "user_transaction",
               "version": "691595",
               "block_height": "100",
+              "epoch":"1",
               "hash": "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb",
               "state_change_hash": "0xebfe1eb7aa5321e7a7d741d927487163c34c821eaab60646ae0efd02b286c97c",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
@@ -799,6 +805,7 @@ mod test {
               "type": "user_transaction",
               "version": "260885",
               "block_height": "100",
+              "epoch":"3",
               "hash": "0xb8bbd3936b05e3643f4b4f910bb00c9b6fa817c1935c74b9a16b5b7a2c8a69a3",
               "state_change_hash": "0xde91b595abbeef217fb0be956df0909c1459ba8d82ed12b983e226ecbf0a4ec5",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
