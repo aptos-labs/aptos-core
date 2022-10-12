@@ -831,7 +831,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
-            helm_values["chain"]["epoch_duration_secs"] = 6000.into();
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         // .with_emit_job(
         //     EmitJobRequest::default()

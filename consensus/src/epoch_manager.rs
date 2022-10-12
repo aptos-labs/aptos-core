@@ -801,11 +801,11 @@ impl EpochManager {
             // TODO: think about these numbers
             let config = QuorumStoreConfig {
                 channel_size: 100,
-                proof_timeout_ms: 300000,
+                proof_timeout_ms: 10000,
                 batch_request_num_peers: 2,
                 end_batch_ms: 500,
                 max_batch_bytes: 100000,
-                batch_request_timeout_ms: 5000,
+                batch_request_timeout_ms: 10000,
                 max_batch_expiry_round_gap: 20,
                 batch_expiry_grace_rounds: 5,
                 memory_quota: 100000000,
