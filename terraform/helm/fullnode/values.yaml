@@ -1,3 +1,6 @@
+# -- Default image tag to use for all validator and fullnode images
+imageTag: devnet
+
 chain:
   era: 1
   name: devnet
@@ -57,6 +60,7 @@ storage:
 service:
   # Change this to LoadBalancer to expose the REST API, aptosnet endpoint externally
   type: ClusterIP
+  exposeApi: true
   externalTrafficPolicy:
   loadBalancerSourceRanges: []
   annotations: {}
@@ -84,7 +88,7 @@ logging:
 backup:
   image:
     repo: aptoslabs/tools
-    tag: devnet
+    tag:
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -126,7 +130,7 @@ backup_verify:
 restore:
   image:
     repo: aptoslabs/tools
-    tag: devnet
+    tag:
     pullPolicy: IfNotPresent
   resources:
     limits:
