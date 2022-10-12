@@ -302,10 +302,36 @@ async fn simulate_transaction(
     let mut transaction_factory = TransactionFactory::new(chain_id);
 
     // If we have a gas unit price, let's not estimate
-    let mut estimate_gas_price = true;
     if let Some(gas_unit_price) = options.gas_price_per_unit.as_ref() {
-        estimate_gas_price = false;
         transaction_factory = transaction_factory.with_gas_unit_price(gas_unit_price.0);
+    } else {
+        let gas_estimation = rest_client.estimate_gas_price().await?.into_inner();
+
+        // Get the priorities, for backwards compatibility, if the API doesn't have the prioritized ones, use the normal one
+        let mut gas_price = match options.gas_price_priority.unwrap_or_default() {
+            GasPricePriority::Low => gas_estimation
+                .deprioritized_gas_estimate
+                .unwrap_or(gas_estimation.gas_estimate),
+            GasPricePriority::Normal => gas_estimation.gas_estimate,
+            GasPricePriority::High => gas_estimation
+                .prioritized_gas_estimate
+                .unwrap_or(gas_estimation.gas_estimate),
+        };
+
+        // We can also provide the multiplier at this point, we mulitply times it, and divide by 100
+        if let Some(gas_multiplier) = options.gas_price_multiplier {
+            let gas_multiplier = gas_multiplier as u64;
+            if let Some(multiplied_price) = gas_price.checked_mul(gas_multiplier) {
+                gas_price = multiplied_price.saturating_div(100)
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Gas price multiplier {} causes overflow on the price",
+                    gas_multiplier
+                ))));
+            }
+        }
+
+        transaction_factory = transaction_factory.with_gas_unit_price(gas_price);
     }
 
     // Build up the transaction
@@ -345,7 +371,7 @@ async fn simulate_transaction(
     // 2. The used gas price (provided or estimated) * the maximum possible gas is can't be paid e.g. there is no
     //    way for this user to ever pay for this transaction (at that gas price)
     let response = rest_client
-        .simulate_bcs_with_gas_estimation(&signed_transaction, true, estimate_gas_price)
+        .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
         .await?;
 
     let simulated_txn = response.inner();
@@ -948,6 +974,8 @@ async fn construction_preprocess(
         }
     }
 
+    // Check gas input options
+
     let public_keys = request
         .metadata
         .as_ref()
@@ -989,6 +1017,14 @@ async fn construction_preprocess(
                 .metadata
                 .as_ref()
                 .and_then(|inner| inner.public_keys.clone()),
+            gas_price_multiplier: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.gas_price_multiplier),
+            gas_price_priority: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.gas_price_priority),
         },
         required_public_keys,
     })
