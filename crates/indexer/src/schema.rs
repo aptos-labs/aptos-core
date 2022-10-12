@@ -142,7 +142,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    marketplace_bids (creator_address, collection_name) {
+    marketplace_bids (token_name, property_version, price, maker) {
         creator_address -> Varchar,
         collection_name -> Text,
         token_name -> Text,
@@ -162,7 +162,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    marketplace_offers (creator_address, collection_name) {
+    marketplace_offers (token_name, property_version, price, seller) {
         creator_address -> Varchar,
         collection_name -> Text,
         token_name -> Text,
@@ -174,7 +174,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    marketplace_orders (creator_address, collection_name) {
+    marketplace_orders (token_name, property_version, price, quantity, maker) {
         creator_address -> Varchar,
         collection_name -> Text,
         token_name -> Text,
