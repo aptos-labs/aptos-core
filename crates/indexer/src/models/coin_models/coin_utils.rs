@@ -4,7 +4,6 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::coin_infos::CoinSupplyLookup;
 use crate::{
     models::move_resources::MoveResource,
     util::{hash_str, truncate_str},
@@ -36,14 +35,10 @@ impl CoinInfoResource {
         truncate_str(&self.symbol, 10)
     }
 
-    /// In case we do want to track supply
-    pub fn _get_supply(&self, supply_lookup: &CoinSupplyLookup) -> Option<BigDecimal> {
+    /// Getting the table item location of the supply aggregator
+    pub fn get_aggregator_metadata(&self) -> Option<AggregatorResource> {
         if let Some(inner) = self.supply.vec.get(0) {
-            let mut maybe_supply = inner.integer._get_supply();
-            if maybe_supply.is_none() {
-                maybe_supply = inner.aggregator._get_supply(supply_lookup);
-            }
-            maybe_supply
+            inner.aggregator.get_aggregator_metadata()
         } else {
             None
         }
@@ -68,14 +63,8 @@ pub struct AggregatorWrapperResource {
 
 impl AggregatorWrapperResource {
     /// In case we do want to track supply
-    pub fn _get_supply(&self, supply_lookup: &CoinSupplyLookup) -> Option<BigDecimal> {
-        if let Some(aggregator) = self.vec.get(0) {
-            let table_handle = aggregator.handle.clone();
-            let table_key = aggregator.key.clone();
-            supply_lookup.get(&(table_handle, table_key)).cloned()
-        } else {
-            None
-        }
+    pub fn get_aggregator_metadata(&self) -> Option<AggregatorResource> {
+        self.vec.get(0).cloned()
     }
 }
 
