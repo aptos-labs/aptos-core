@@ -22,10 +22,10 @@ When you are deploying an Aptos node, you will need the following files. These c
 ## validator.yaml
 
 - **Git repo:** `aptos-core`
-- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Git branch:** `mainnet_deployment` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O validator.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/validator.yaml
+  wget -O validator.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet_deployment/docker/compose/aptos-node/validator.yaml
   ```
 
 ## genesis.blob 
@@ -49,28 +49,28 @@ When you are deploying an Aptos node, you will need the following files. These c
 ## docker-compose-src.yaml
 
 - **Git repo:** `aptos-core`
-- **Git branch:** `main` on https://github.com/aptos-labs/aptos-core
+- **Git branch:** `mainnet_deployment` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O docker-compose-src.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose-src.yaml
+  wget -O docker-compose-src.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet_deployment/docker/compose/aptos-node/docker-compose-src.yaml
   ```
 
 ## haproxy.cfg
 
 - **Git repo:** `aptos-core`
-- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Git branch:** `mainnet_deployment` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O haproxy.cfg https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/haproxy.cfg
+  wget -O haproxy.cfg https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet_deployment/docker/compose/aptos-node/haproxy.cfg
   ```
 
 ## blocked.ips 
 
 - **Git repo:** `aptos-core`
-- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Git branch:** `mainnet_deployment` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O blocked.ips https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/blocked.ips
+  wget -O blocked.ips https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet_deployment/docker/compose/aptos-node/blocked.ips
   ```
 
 ## docker-compose-fullnode.yaml (fullnode only)
@@ -93,17 +93,17 @@ Fullnode means either a validator fullnode or a public fullnode.
 :::
 
 - **Git repo:** `aptos-core`
-- **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
+- **Git branch:** `mainnet_deployment` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O fullnode.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/fullnode.yaml
+  wget -O fullnode.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet_deployment/docker/compose/aptos-node/fullnode.yaml
   ```
 
 ## haproxy-fullnode.cfg (fullnode only)
 
 - **Git repo:** `aptos-core`
-- **Git branch:** `main` on https://github.com/aptos-labs/aptos-core
+- **Git branch:** `mainnet_deployment` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O haproxy-fullnode.cfg https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/haproxy-fullnode.cfg
+  wget -O haproxy-fullnode.cfg https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet_deployment/docker/compose/aptos-node/haproxy-fullnode.cfg
   ```
