@@ -61,6 +61,15 @@ jobs:
       - run: yarn lint
         working-directory: developer-docs-site
 
+  rust-cryptohasher-check:
+    runs-on: unbuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - run: cargo doc --workspace --document-private-items
+      - run: python3 scripts/check-cryptohasher-symbols.py
+
   rust-lint:
     runs-on: high-perf-docker
     steps:
