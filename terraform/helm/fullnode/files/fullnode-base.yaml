@@ -1,0 +1,71 @@
+base:
+  role: "full_node"
+  waypoint:
+    from_file: "/opt/aptos/genesis/waypoint.txt"
+
+execution:
+  genesis_file_location: "/opt/aptos/genesis/genesis.blob"
+
+full_node_networks:
+- network_id: "public"
+  discovery_method: "onchain"
+  listen_address: "/ip4/0.0.0.0/tcp/6182"
+  # be backwards compatible with the old identity config
+  {{ with index $.Values.fullnode.config.full_node_networks 0 }}
+  {{- if $.Values.fullnode_identity }}
+  identity:
+  {{- $.Values.fullnode_identity | toYaml | nindent 6 }}
+  {{- else }}
+  {{ with .identity }}
+  identity: 
+    {{ . | toYaml | nindent 4 }}
+  {{ end }}
+  {{- end }}
+
+  # be backwards compatible with the old seeds config
+  {{- if (get $.Values.aptos_chains $.Values.chain.name).seeds}}
+  seeds:
+    {{- (get $.Values.aptos_chains $.Values.chain.name).seeds | default dict | toYaml | nindent 6 }}
+  {{- else }}
+  {{ with .seeds }}
+  seeds:
+    {{ . | toYaml | nindent 4 }}
+  {{ end }}
+  {{- end }}
+
+  # be backwards compatible with the old inbound_rate_limit_config config
+  {{- if $.Values.fullnode_inbound_rate_limit }}
+  inbound_rate_limit_config:
+    {{- $.Values.fullnode_inbound_rate_limit | toYaml | nindent 6 }}
+  {{- else}}
+  {{ with .inbound_rate_limit_config }}
+  inbound_rate_limit_config: {{ . }}
+  {{ end }}
+  {{- end }}
+
+  # be backwards compatible with the old outbound_rate_limit_config config
+  {{- if $.Values.fullnode_outbound_rate_limit }}
+  outbound_rate_limit_config:
+    {{- $.Values.fullnode_outbound_rate_limit | toYaml | nindent 6 }}
+  {{- else}}
+  {{ with .outbound_rate_limit_config }}
+  outbound_rate_limit_config: {{ . }}
+  {{ end }}
+  {{- end }}
+
+  # be backwards compatible with the old outbound_rate_limit_config config
+  {{- if $.Values.fullnode_max_inbound_connections }}
+  max_inbound_connections: {{ $.Values.fullnode_max_inbound_connections }}
+  {{- else}}
+  {{ with .max_inbound_connections }}
+  max_inbound_connections: {{ . }}
+  {{ end }}
+  {{- end }}
+
+  {{ end }}
+
+storage:
+  backup_service_address: "0.0.0.0:6186"
+
+api:
+  address: "0.0.0.0:8080"
