@@ -21,17 +21,25 @@ import re
 
 # False positives that needs to be skipped for now.
 whitelisted_symbols = set([
-    'A',
-    'Sea',
-    'Sip',
     'TestAptosCrypto',
-    'VoteProposal',
 ])
+
+ignored_crates = set([
+    'ahash',
+    'aptos_sdk',
+    'seahash',
+    'siphasher',
+])
+
+assert os.path.exists('target/doc')
+
 symbol_to_paths_map = defaultdict(set)
 for root, dirs, files in os.walk("./target/doc"):
-    path_pieces = root.split('/')[3:]
-    if path_pieces and path_pieces[0] == 'aptos_sdk': continue
-    relative_parent_path = '::'.join(path_pieces)# ./target/doc/foo/bar -> foo::bar
+    path_items = root.split('/')
+    assert path_items[:3] == ['.', 'target', 'doc']
+    crate_name = path_items[3] if len(path_items)>=4 else None
+    if crate_name in ignored_crates: continue
+    relative_parent_path = '::'.join(path_items[3:])   # ./target/doc/foo/bar -> foo::bar
     for file in files:
         if not file.endswith('Hasher.html'): continue
         match = re.match(r'(?P<symbol_type>struct|enum)\.(?P<symbol_name>\w+)Hasher.html', file)
@@ -43,10 +51,15 @@ for root, dirs, files in os.walk("./target/doc"):
 print(f"The `CryptoHasher` derive are used by the following structs/enums.")
 pprint(symbol_to_paths_map)
 print()
-suspicious_symbols = {k:v for k,v in symbol_to_paths_map.items() if len(v)>=2 and k not in whitelisted_symbols}
-if suspicious_symbols:
-    print(f'WARNING: the struct/enum names below are used in 2+ places. Please rename them to avoid potential hash input collision across domains.')
-    pprint(suspicious_symbols)
+
+if len(symbol_to_paths_map)==0:
+    print(f'WARNING: no CryptoHasher derive usage found. `CryptoHasher` macro may have been updated and this check needs a rework.')
     exit(1)
-else:
-    print(f'No potential hash input collision across domains detected.')
+    
+reused_symbol_names = {k:v for k,v in symbol_to_paths_map.items() if len(v)>=2 and k not in whitelisted_symbols}
+if reused_symbol_names:
+    print(f'WARNING: the symbol name(s) below are used by 2+ structs/enums that implement `CryptoHasher`. Please ensure unique symbol names to avoid potential hash input collision across domains.')
+    pprint(reused_symbol_names)
+    exit(2)
+
+print(f'No potential hash input collision across domains detected.')
