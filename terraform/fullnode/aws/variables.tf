@@ -68,8 +68,13 @@ variable "chain_name" {
   default     = "devnet"
 }
 
+variable "fullnode_name" {
+  description = "Name of the fullnode node owner"
+  type        = string
+}
+
 variable "pfn_helm_values" {
-  description = "Map of values to pass to testnet Helm"
+  description = "Map of values to pass to pfn-addons Helm"
   type        = any
   default     = {}
 }
@@ -145,4 +150,25 @@ variable "fullnode_storage_class" {
     condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
     error_message = "Supported storage classes are gp3, io1, io2"
   }
+}
+
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  default     = false
 }
