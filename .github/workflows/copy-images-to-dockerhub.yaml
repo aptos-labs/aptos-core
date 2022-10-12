@@ -60,4 +60,4 @@ jobs:
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
-        run: ./docker/release_images.sh
+        run: ./docker/release-images.sh
