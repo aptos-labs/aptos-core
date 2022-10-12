@@ -105,13 +105,21 @@ With your development environment ready, now you can start to setup your validat
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-9. Download the genesis blob and waypoint for the network you want to connect to. See [Node Files](/nodes/node-files.md) for a full list of files you should download and the download commands. 
+9. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page: 
+   - `validator.yaml`
+   - `fullnode.yaml`
+   - `genesis.blob`
+   - `waypoint.txt`
+   - `haproxy.cfg`
+   - `haproxy-fullnode.cfg` and
+   - `blocked.ips`
+   - `docker-compose-src.yaml`
 
-10. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
+10. Copy the `validator.yaml`, `fullnode.yaml` files into ~/$WORKSPACE/config/ directory.
     ```bash
     mkdir ~/$WORKSPACE/config
-    cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/config/validator.yaml
-    cp docker/compose/aptos-node/fullnode.yaml ~/$WORKSPACE/config/fullnode.yaml
+    cp validator.yaml ~/$WORKSPACE/config/validator.yaml
+    cp fullnode.yaml ~/$WORKSPACE/config/fullnode.yaml
     ```
 
     Modify the config files to update the data directory, key path, genesis file path, waypoint path. User must have write access to data directory.
