@@ -32,28 +32,30 @@ provider "helm" {
 locals {
   fullnode_helm_chart_path   = "${path.module}/../../helm/fullnode"
   pfn_addons_helm_chart_path = "${path.module}/../../helm/pfn-addons"
+  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
 }
 
 
 resource "helm_release" "pfn-addons" {
+  depends_on = [
+    helm_release.fullnode
+  ]
   name        = "pfn-addons"
   chart       = local.pfn_addons_helm_chart_path
   max_history = 10
   wait        = false
+  namespace   = var.k8s_namespace
 
   values = [
     jsonencode({
       service = {
-        domain   = local.domain
-        aws_tags = local.aws_tags
-        fullnode = {
-          numFullnodes             = var.num_fullnodes
-          loadBalancerSourceRanges = var.client_sources_ipv4
-        }
+        domain = local.domain
       }
       ingress = {
-        ingressClass             = "gce"
-        loadBalancerSourceRanges = var.client_sources_ipv4
+        class                           = "gce"
+        gce_managed_certificate         = var.create_google_managed_ssl_certificate ? "aptos-${local.workspace_name}-ingress" : null
+        gce_managed_certificate_domains = var.create_google_managed_ssl_certificate ? join(",", concat([for x in range(var.num_fullnodes) : "pfn${x}.${local.domain}"], [local.domain], var.tls_sans)) : ""
+        # loadBalancerSourceRanges = var.client_sources_ipv4 # not supported yet
       }
     }),
     jsonencode(var.pfn_helm_values),
@@ -133,3 +135,48 @@ resource "helm_release" "fullnode" {
   }
 }
 
+
+
+resource "helm_release" "monitoring" {
+  count       = var.enable_monitoring ? 1 : 0
+  name        = "aptos-monitoring"
+  chart       = local.monitoring_helm_chart_path
+  max_history = 5
+  wait        = false
+  namespace   = var.k8s_namespace
+
+
+  values = [
+    jsonencode({
+      chain = {
+        name = var.chain_name
+      }
+      fullnode = {
+        name = var.fullnode_name
+      }
+      service = {
+        domain = trimsuffix(local.domain, ".")
+      }
+      kube-state-metrics = {
+        enabled = var.enable_kube_state_metrics
+      }
+      prometheus-node-exporter = {
+        enabled = var.enable_prometheus_node_exporter
+      }
+      monitoring = {
+        prometheus = {
+          storage = {
+            class = "standard"
+          }
+        }
+      }
+    }),
+    jsonencode(var.monitoring_helm_values),
+  ]
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
+  }
+}
