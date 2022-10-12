@@ -98,4 +98,6 @@ async fn test_error_report() {
         "TRANSACTION_EXPIRED",
     )
     .await;
+
+    panic!("BCHO inject")
 }
