@@ -55,7 +55,7 @@ full_node_networks:
 
   # be backwards compatible with the old outbound_rate_limit_config config
   {{- if $.Values.fullnode_max_inbound_connections }}
-  max_inbound_connections: {{ .Values.fullnode_max_inbound_connections }}
+  max_inbound_connections: {{ $.Values.fullnode_max_inbound_connections }}
   {{- else}}
   {{ with .max_inbound_connections }}
   max_inbound_connections: {{ . }}
