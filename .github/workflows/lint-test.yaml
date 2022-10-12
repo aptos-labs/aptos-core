@@ -64,7 +64,10 @@ jobs:
   rust-cryptohasher-domain-separation-check:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
+        with:
+          python-version: '3.10'
       - uses: ./.github/actions/rust-setup
       - run: cargo doc --workspace --document-private-items
       - run: python3 scripts/check-cryptohasher-symbols.py
