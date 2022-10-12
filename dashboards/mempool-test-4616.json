@@ -3904,8 +3904,8 @@
         "datasource": null,
         "refresh": 2,
         "options": [
-          { "text": "auto", "value": "$__auto_interval_interval", "selected": false },
-          { "text": "1m", "value": "1m", "selected": true },
+          { "text": "auto", "value": "$__auto_interval_interval", "selected": true },
+          { "text": "1m", "value": "1m", "selected": false },
           { "text": "5m", "value": "5m", "selected": false },
           { "text": "10m", "value": "10m", "selected": false },
           { "text": "30m", "value": "30m", "selected": false },
@@ -3975,7 +3975,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 9,
+  "version": 13,
   "links": [
     {
       "title": "Other Dashboards",
