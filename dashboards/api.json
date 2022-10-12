@@ -474,7 +474,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 74 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 34 },
       "id": 18,
       "isNew": false,
       "repeat": "operation_id",
@@ -559,7 +559,7 @@
         "multiFormat": "",
         "query": "prometheus",
         "regex": "",
-        "current": { "text": null, "value": null },
+        "current": { "text": ["[TEST] TELEMETRY"], "value": "[TEST] TELEMETRY" },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -767,7 +767,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 8,
+  "version": 13,
   "links": [
     {
       "title": "aptos-core",

@@ -4903,6 +4903,61 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 178 },
+      "id": 146,
+      "isNew": false,
+      "span": 0,
+      "title": "Proposal failure count (in window)",
+      "description": "Proposal failure rate in leader election window. Value goes back to 0 once node is not asked to propose at all in the window",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "aptos_failed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} ",
+          "legendFormat": "{{kubernetes_pod_name}}"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 186 },
       "id": 144,
       "isNew": false,
@@ -5227,7 +5282,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 66,
+  "version": 71,
   "links": [
     {
       "title": "aptos-core",
