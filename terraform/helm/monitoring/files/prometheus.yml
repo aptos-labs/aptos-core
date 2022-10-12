@@ -39,7 +39,13 @@ scrape_configs:
     action: drop
     regex: '(.+)_request_duration_seconds_bucket'
   - target_label: owner
+    {{- if .Values.validator.name }}
     replacement: {{ .Values.validator.name }}
+    {{- else if .Values.fullnode.name  }}
+    replacement: {{ .Values.fullnode.name }}
+    {{- else }}
+    replacement: {{ .Release.Name }}
+    {{- end }}
 {{ end }}
 
 - job_name: 'kubernetes-nodes'

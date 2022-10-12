@@ -1,18 +1,21 @@
 locals {
-  pfn_helm_chart_path        = "${path.module}/fullnode"
+  pfn_addons_helm_chart_path = "${path.module}/../../helm/pfn-addons"
   pfn_logger_helm_chart_path = "${path.module}/../../helm/logger"
   fullnode_helm_chart_path   = "${path.module}/../../helm/fullnode"
+  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
 }
 
-resource "helm_release" "pfn" {
-  name        = "aptos"
-  chart       = local.pfn_helm_chart_path
+resource "helm_release" "pfn-addons" {
+  depends_on = [
+    helm_release.fullnode
+  ]
+  name        = "pfn-addons"
+  chart       = local.pfn_addons_helm_chart_path
   max_history = 10
   wait        = false
 
   values = [
     jsonencode({
-      imageTag = local.image_tag
       service = {
         domain   = local.domain
         aws_tags = local.aws_tags
@@ -20,20 +23,11 @@ resource "helm_release" "pfn" {
           numFullnodes             = var.num_fullnodes
           loadBalancerSourceRanges = var.client_sources_ipv4
         }
-        monitoring = {
-          loadBalancerSourceRanges = var.admin_sources_ipv4
-        }
       }
       ingress = {
+        class                    = "alb"
         acm_certificate          = var.zone_id != "" ? aws_acm_certificate.ingress[0].arn : null
         loadBalancerSourceRanges = var.client_sources_ipv4
-      }
-      monitoring = {
-        prometheus = {
-          storage = {
-            class = "gp2"
-          }
-        }
       }
     }),
     jsonencode(var.pfn_helm_values),
@@ -42,7 +36,7 @@ resource "helm_release" "pfn" {
   # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
     name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.pfn_helm_chart_path, "**") : filesha1("${local.pfn_helm_chart_path}/${f}")]))
+    value = sha1(join("", [for f in fileset(local.pfn_addons_helm_chart_path, "**") : filesha1("${local.pfn_addons_helm_chart_path}/${f}")]))
   }
 }
 
@@ -57,6 +51,7 @@ resource "helm_release" "fullnode" {
 
   values = [
     jsonencode({
+      imageTag = var.image_tag
       chain = {
         era  = var.era
         name = var.chain_name
@@ -72,6 +67,14 @@ resource "helm_release" "fullnode" {
       }
       storage = {
         class = var.fullnode_storage_class
+      }
+      service = {
+        type = "LoadBalancer"
+        annotations = {
+          "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
+          "external-dns.alpha.kubernetes.io/hostname"         = "pfn${count.index}.${local.domain}"
+          "alb.ingress.kubernetes.io/healthcheck-path"        = "/v1/-/healthy"
+        }
       }
       backup = {
         enable = count.index == 0 ? var.enable_backup : false
@@ -131,5 +134,47 @@ resource "helm_release" "pfn-logger" {
   set {
     name  = "chart_sha1"
     value = sha1(join("", [for f in fileset(local.pfn_logger_helm_chart_path, "**") : filesha1("${local.pfn_logger_helm_chart_path}/${f}")]))
+  }
+}
+
+resource "helm_release" "monitoring" {
+  count       = var.enable_monitoring ? 1 : 0
+  name        = "aptos-monitoring"
+  chart       = local.monitoring_helm_chart_path
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({
+      chain = {
+        name = var.chain_name
+      }
+      fullnode = {
+        name = var.fullnode_name
+      }
+      service = {
+        domain = local.domain
+      }
+      kube-state-metrics = {
+        enabled = var.enable_kube_state_metrics
+      }
+      prometheus-node-exporter = {
+        enabled = var.enable_prometheus_node_exporter
+      }
+      monitoring = {
+        prometheus = {
+          storage = {
+            class = "gp3"
+          }
+        }
+      }
+    }),
+    jsonencode(var.monitoring_helm_values),
+  ]
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
   }
 }

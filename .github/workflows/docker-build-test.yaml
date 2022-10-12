@@ -27,18 +27,18 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
     # For most PRs run workflows from main, not the PR commit for security
     paths-ignore:
-      - 'documentation/**'
-      - 'developer-docs-site/**'
-      - '.github/**'
+      - "documentation/**"
+      - "developer-docs-site/**"
+      - ".github/**"
   # For PR that modify .github, run from that PR
   # This will fail to get secrets if you are not from aptos
   pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
     paths:
-      - '.github/workflows/docker-build-test.yaml'
-      - '.github/workflows/run-forge.yaml'
-      - '.github/workflows/docker-rust-build.yaml'
-      - '.github/workflows/sdk-release.yaml'
+      - ".github/workflows/docker-build-test.yaml"
+      - ".github/workflows/run-forge.yaml"
+      - ".github/workflows/docker-rust-build.yaml"
+      - ".github/workflows/sdk-release.yaml"
   push:
     branches:
       - main
@@ -102,7 +102,7 @@ jobs:
   # for the subsequent docker builds. Reusable workflows do not currently have the "env" context: https://github.com/orgs/community/discussions/26671
   determine-docker-build-metadata:
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       - name: collect metadata
         run: |
           echo "GIT_SHA: ${{ env.GIT_SHA }}"
