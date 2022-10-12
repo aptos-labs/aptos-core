@@ -63,13 +63,18 @@ To run an indexer fullnode, these are the steps in summary:
 9. Edit the `./fullnode.yaml` and add the following configuration:
     ```yaml
     storage:
-    enable_indexer: true
+        enable_indexer: true
+        # This is to avoid the node being pruned
+        storage_pruner_config:
+            ledger_pruner_config:
+                enable: false
+    
     indexer:
-    enabled: true
-    postgres_uri: "postgres://postgres@localhost:5432/postgres"
-    processor: "default_processor"
-    check_chain_id: true
-    emit_every: 500
+        enabled: true
+        postgres_uri: "postgres://postgres@localhost:5432/postgres"
+        processor: "default_processor"
+        check_chain_id: true
+        emit_every: 500
     ```
 
 10. Run the indexer fullnode with:
