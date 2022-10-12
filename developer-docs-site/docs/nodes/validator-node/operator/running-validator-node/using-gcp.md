@@ -149,7 +149,12 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the `genesis.blob`, `waypoint.txt`, `haproxy.cfg` and `blocked.ips` files by following the download commands on the [Node Files](/nodes/node-files.md) page. 
+12. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page:
+    - `genesis.blob`
+    - `waypoint.txt`
+    - `haproxy.cfg`
+    - `haproxy-fullnode.cfg`
+    - `blocked.ips`
 
 13. To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).
