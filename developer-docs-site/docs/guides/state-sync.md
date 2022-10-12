@@ -77,6 +77,15 @@ requires the node to start from an empty state (i.e., not have any existing
 storage data).
 :::
 
+:::caution Proceed with caution
+Fast sync should only be used as a last resort for validators and
+validator fullnodes. This is because fast sync skips all of the blockchain
+history and as a result: (i) reduces the data availability in the network;
+and (ii) may hinder validator consensus performance if too much data has
+been skipped. Thus, validator and validator fullnode operators should be
+careful to consider alternate ways of syncing before resorting to fast sync.
+:::
+
 To download the latest blockchain state and continue to apply new
 transaction outputs as transactions are committed, add the following to your
 node configuration file:
