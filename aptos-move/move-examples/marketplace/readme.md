@@ -1,4 +1,4 @@
-Aptos NFT marketplace Standard
+Exploratory Aptos NFT Marketplace
 ------------
 
 Introduction
@@ -12,11 +12,11 @@ The package contains 2 parts:
 Design principles
 -----------------
 
-We want to have a minimal required standard to improve the liquidity of the token ecosystem
+We want to have a minimal required example to improve the liquidity of the token ecosystem
 
--   Provide standard Listing so that the same listing can be used across different marketplaces and aggregators.
--   Provide standard buy and bid functions so that people can buy or bid for listed NFT across different marketplaces
--   Provide standardized events so that downstream applications can have a clear overview of what is happening in the token ecosystem across all marketplaces
+-   Provide a unified Listing so that the same listing can be used across different marketplaces and aggregators.
+-   Provide a unified buy and bid functions so that people can buy or bid for listed NFT across different marketplaces
+-   Provide unified events so that downstream applications can have a clear overview of what is happening in the token ecosystem across all marketplaces
 
 We want app developers to be creative with how they run their marketplace and auction house.
 
@@ -45,7 +45,7 @@ To check whether the listed token is available, there are many ways to handle th
 
 Meanwhile, we will enhance the token store in our token standard to provide options to lock the token so that these tokens cannot be transferred out during the locking period.
 
-**How to support new features in the marketplace standard?**
+**How to support new features in this marketplace?**
 
 We will continuously collect new common features from the community and add them to the contracts in a backward-compatible way.
 
