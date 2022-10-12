@@ -45,8 +45,12 @@ Aptos supports the following ways to index the Aptos blockchain.
 A detailed documentation for each option is presented below.
 
 ## Use the Aptos-provided indexing service
-Aptos offers a rate-limited graphql API for public use. 
-[Testnet Link Here](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql)
+
+Aptos offers a rate-limited GraphQL API for public use. See below a few examples.
+
+**Aptos indexer GraphQL server**: 
+[https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql)
+
 ### Example token queries
 
 Getting all tokens currently in account
@@ -54,14 +58,8 @@ Getting all tokens currently in account
 ```graphql
 query CurrentTokens($owner_address: String, $offset: Int) {
   current_token_ownerships(
-    where: {
-      owner_address: {_eq: $owner_address},
-      amount: {_gt: "0"},
-      table_type: {_eq: "0x3::token::TokenStore"}
-    }
-    # Needed for pagination
+    where: {owner_address: {_eq: $owner_address}, amount: {_gt: "0"}, table_type: {_eq: "0x3::token::TokenStore"}}
     order_by: {last_transaction_version: desc}
-    # Optional for pagination
     offset: $offset
   ) {
     token_data_id_hash
