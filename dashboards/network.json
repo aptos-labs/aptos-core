@@ -3812,7 +3812,7 @@
         "multiFormat": "",
         "query": "prometheus",
         "regex": "",
-        "current": { "text": ["Prometheus"], "value": "Prometheus" },
+        "current": { "text": ["VictoriaMetrics Global"], "value": "VictoriaMetrics Global" },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -3830,7 +3830,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
         "regex": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -3848,7 +3848,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
         "regex": "",
-        "current": { "text": ["aptos-devnet"], "value": "aptos-devnet" },
+        "current": { "text": ["3"], "value": "3" },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -3866,7 +3866,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(network_id)", "refId": "Prometheus-network_id-Variable-Query" },
         "regex": "",
-        "current": { "text": ["Public"], "value": ["Public"] },
+        "current": { "text": ["Validator"], "value": ["Validator"] },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -3884,7 +3884,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(role_type)", "refId": "Prometheus-role_type-Variable-Query" },
         "regex": "",
-        "current": { "text": ["full_node"], "value": ["full_node"] },
+        "current": { "text": ["validator"], "value": ["validator"] },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -4004,7 +4004,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 6,
+  "version": 11,
   "links": [
     {
       "title": "aptos core",
