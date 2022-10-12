@@ -302,7 +302,7 @@ const sidebars = {
       value: "Tools",
       className: "sidebar-title",
     },
-    "use-aptos-explorer",
+    "guides/use-aptos-explorer",
     {
       type: "category",
       label: "SDKs",
