@@ -5,6 +5,10 @@ slug: "whats-new-in-docs"
 
 # Whats New in Docs
 
+## 12 October 2022
+
+- Added [Node Connections](/docs/nodes/node-connections.md) document that describes how to configure node network connections.
+
 ## 11 October 2022
 
 - Added [Data Pruning](/docs/guides/data-pruning.md) document that describes how to change the data pruning settings.
