@@ -25,9 +25,6 @@ fi
 set -e
 set -x
 
-cargo doc --workspace --document-private-items
-python3 scripts/check-cryptohashable-symbols.py
-
 cargo xclippy
 cargo fmt $CHECK_ARG
 cargo sort --grouped --workspace $CHECK_ARG
