@@ -12,7 +12,10 @@ use aptos_sdk::{
     types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
+        transaction::{
+            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
+            SignedTransaction,
+        },
         LocalAccount,
     },
 };
@@ -245,17 +248,22 @@ pub async fn reconfig(
     root_account: &mut LocalAccount,
 ) -> State {
     let aptos_version = client.get_aptos_version().await.unwrap();
-    let (current, state) = aptos_version.into_parts();
+    let current = aptos_version.into_inner();
     let current_version = *current.major.inner();
     let txn = root_account.sign_with_transaction_builder(
         transaction_factory
             .clone()
             .payload(aptos_stdlib::version_set_version(current_version + 1)),
     );
+    submit_and_wait_reconfig(client, txn).await
+}
+
+pub async fn submit_and_wait_reconfig(client: &RestClient, txn: SignedTransaction) -> State {
+    let state = client.get_ledger_information().await.unwrap().into_inner();
     let result = client.submit_and_wait(&txn).await;
     if let Err(e) = result {
         let last_transactions = client
-            .get_account_transactions(root_account.address(), None, None)
+            .get_account_transactions(txn.sender(), None, None)
             .await
             .map(|result| {
                 result
@@ -277,7 +285,7 @@ pub async fn reconfig(
         panic!(
             "Couldn't execute {:?}, for account {:?}, error {:?}, last account transactions: {:?}",
             txn,
-            root_account,
+            txn.sender(),
             e,
             last_transactions.unwrap_or_default()
         )
@@ -291,13 +299,8 @@ pub async fn reconfig(
         .unwrap();
 
     info!(
-        "Changed aptos version from {} (epoch={}, ledger_v={}), to {}, (epoch={}, ledger_v={})",
-        current_version,
-        state.epoch,
-        state.version,
-        current_version + 1,
-        new_state.epoch,
-        new_state.version
+        "Applied reconfig from (epoch={}, ledger_v={}), to (epoch={}, ledger_v={})",
+        state.epoch, state.version, new_state.epoch, new_state.version
     );
     assert_ne!(state.epoch, new_state.epoch);
 
