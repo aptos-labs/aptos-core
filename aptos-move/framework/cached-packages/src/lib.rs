@@ -5,7 +5,6 @@ use framework::ReleaseBundle;
 use once_cell::sync::Lazy;
 
 pub mod aptos_framework_sdk_builder;
-pub mod aptos_names_sdk_builder;
 pub mod aptos_stdlib;
 pub mod aptos_token_sdk_builder;
 

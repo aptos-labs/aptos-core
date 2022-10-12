@@ -22,6 +22,7 @@ pub struct ExecutionConfig {
     pub num_proof_reading_threads: u16,
     pub paranoid_type_verification: bool,
     pub paranoid_hot_potato_verification: bool,
+    pub processed_transactions_detailed_counters: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -50,6 +51,7 @@ impl Default for ExecutionConfig {
             num_proof_reading_threads: 32,
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,
+            processed_transactions_detailed_counters: false,
         }
     }
 }

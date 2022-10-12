@@ -404,12 +404,29 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 .collect();
             let txns;
             {
+                let lock_timer = counters::mempool_service_start_latency_timer(
+                    counters::GET_BLOCK_LOCK_LABEL,
+                    counters::REQUEST_SUCCESS_LABEL,
+                );
                 let mut mempool = smp.mempool.lock();
-                // gc before pulling block as extra protection against txns that may expire in consensus
-                // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
-                let curr_time = aptos_infallible::duration_since_epoch();
-                mempool.gc_by_expiration_time(curr_time);
+                lock_timer.observe_duration();
+
+                {
+                    let _gc_timer = counters::mempool_service_start_latency_timer(
+                        counters::GET_BLOCK_GC_LABEL,
+                        counters::REQUEST_SUCCESS_LABEL,
+                    );
+                    // gc before pulling block as extra protection against txns that may expire in consensus
+                    // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
+                    let curr_time = aptos_infallible::duration_since_epoch();
+                    mempool.gc_by_expiration_time(curr_time);
+                }
+
                 let max_txns = cmp::max(max_txns, 1);
+                let _get_batch_timer = counters::mempool_service_start_latency_timer(
+                    counters::GET_BLOCK_GET_BATCH_LABEL,
+                    counters::REQUEST_SUCCESS_LABEL,
+                );
                 txns = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
             }
 

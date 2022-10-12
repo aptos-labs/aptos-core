@@ -29,13 +29,13 @@ module aptos_framework::voting {
     use std::string::{String, utf8};
     use std::vector;
 
-    use aptos_std::event::{Self, EventHandle};
     use aptos_std::from_bcs::to_u64;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
 
     use aptos_framework::account;
+    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
 

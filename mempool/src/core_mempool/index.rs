@@ -367,6 +367,15 @@ impl MultiBucketTimelineIndex {
             .map(|(bucket_min, timeline)| (bucket_min.as_str(), timeline.size()))
             .collect()
     }
+
+    #[inline]
+    pub(crate) fn get_bucket(&self, ranking_score: u64) -> &str {
+        let index = self
+            .bucket_mins
+            .binary_search(&ranking_score)
+            .unwrap_or_else(|i| i - 1);
+        self.bucket_mins_to_string[index].as_str()
+    }
 }
 
 /// ParkingLotIndex keeps track of "not_ready" transactions, e.g., transactions that

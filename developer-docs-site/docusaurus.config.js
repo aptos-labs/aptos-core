@@ -345,6 +345,10 @@ const config = {
             to: "/issues-and-workarounds",
             from: "/nodes/full-node/troubleshooting-fullnode-setup",
           },
+          {
+            to: "/guides/state-sync",
+            from: "/concepts/state-sync",
+          },
         ],
       },
     ],

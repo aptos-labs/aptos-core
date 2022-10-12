@@ -73,6 +73,7 @@ use std::{
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
+static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 
 /// Remove this once the bundle is removed from the code.
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
@@ -151,6 +152,20 @@ impl AptosVM {
         match NUM_PROOF_READING_THREADS.get() {
             Some(num_threads) => *num_threads,
             None => 32,
+        }
+    }
+
+    /// Sets addigional details in counters when invoked the first time.
+    pub fn set_processed_transactions_detailed_counters() {
+        // Only the first call succeeds, due to OnceCell semantics.
+        PROCESSED_TRANSACTIONS_DETAILED_COUNTERS.set(true).ok();
+    }
+
+    /// Get whether we should capture additional details in counters
+    pub fn get_processed_transactions_detailed_counters() -> bool {
+        match PROCESSED_TRANSACTIONS_DETAILED_COUNTERS.get() {
+            Some(value) => *value,
+            None => false,
         }
     }
 

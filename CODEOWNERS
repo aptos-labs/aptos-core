@@ -20,9 +20,6 @@
 /aptos-move/parallel-executor/ @gelash @zekun000
 /aptos-move/vm-genesis/ @davidiw @movekevin
 
-# Aptos Names
-/aptos-move/framework/aptos-names @aptos-labs/web-platform
-
 # Owner for logger config
 /config/src/config/logger_config.rs @markuze
 
