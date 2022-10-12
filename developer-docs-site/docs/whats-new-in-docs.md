@@ -8,6 +8,7 @@ slug: "whats-new-in-docs"
 ## 12 October 2022
 
 - Added [Node Connections](/docs/nodes/full-node/fullnode-network-connections.md) document that describes how to configure node network connections.
+This page shows the key updates to the developer documentation on this site.
 
 ## 11 October 2022
 
@@ -17,11 +18,17 @@ slug: "whats-new-in-docs"
 
 - Added [Staking Pool Operations](/docs/nodes/validator-node/operator/staking-pool-operations.md) document.
 
+## 07 October 2022
+
+- [Using the Petra Wallet](https://petra.app/docs/use) covers common use cases of the Petra Wallet Chrome browser extension and can be found from [Install Petra Extension](guides/install-petra-wallet.md) on Aptos.dev.
+
 ## 06 October 2022
 
 - Added [Node Files](/docs/nodes/node-files-all-networks/node-files.md) document that lists all the files required during node deployment process. Includes commands to download each file.
 
-This page shows the key updates to the developer documentation on this site.
+## 05 October 2022
+
+- Related Aptos resources (aptoslabs.com, Twitter, Discord, and more) can be found in the [Have fun](index.md/#have-fun) section of the Aptos.dev landing page.
 
 ## 03 October 2022
 
