@@ -21,8 +21,10 @@ CREATE TABLE marketplace_offers (
     "timestamp" TIMESTAMP NOT NULL,
 
     PRIMARY KEY (
-        creator_address,
-        collection_name
+        token_name,
+        property_version,
+        price,
+        seller
     ),
 
     CONSTRAINT FK_creator_address_offers
@@ -45,8 +47,11 @@ CREATE TABLE marketplace_orders (
     "timestamp" TIMESTAMP NOT NULL,
 
     PRIMARY KEY (
-        creator_address,
-        collection_name
+        token_name,
+        property_version,
+        price,
+        quantity,
+        maker
     ),
 
     CONSTRAINT FK_creator_address_orders
@@ -68,8 +73,10 @@ CREATE TABLE marketplace_bids (
     "timestamp" TIMESTAMP NOT NULL,
 
     PRIMARY KEY (
-        creator_address,
-        collection_name
+        token_name,
+        property_version,
+        price,
+        maker
     ),
 
     CONSTRAINT FK_creator_address_bids 
