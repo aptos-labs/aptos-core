@@ -115,12 +115,6 @@ sources={{
 
 Otherwise, click anywhere else in the row of the desired transaction to load its [Transaction details](#transaction-details) page.
 
-TODO: Find out the differences of and purposes for the regular transaction details page and the one specific to the hash:
-
-https://explorer.aptoslabs.com/txn/159716025
-
-https://explorer.aptoslabs.com/txn/0xf48137d98f00b9f574801c22ca33842795df8b4e7753260bd40c2b7677b93846
-
 Use the controls at the bottom of the list to navigate back through transactions historically.
 
 ### Transaction details
@@ -153,9 +147,6 @@ The Transaction details *Payload* tab presents the transaction's actual code use
 
 The Transaction details *Changes* tab shows the addresses, state key hashes, and data for each index in the transaction.
 
-TODO: Determine if state key hash and state root hash are the same and if so link to:
-https://aptos.dev/reference/glossary/#state-root-hash
-
 ### Accounts
 
 The *Accounts* page aggregates all transactions, tokens, and other resources in a single set of views starting with its default *Transactions* tab:
@@ -169,8 +160,6 @@ sources={{
   }}
 />
 </center>
-
-TODO: Find out if the page is findable in nav.
 
 You can load your acccount page by apending your account addresss to:
 https://explorer.aptoslabs.com/account/
