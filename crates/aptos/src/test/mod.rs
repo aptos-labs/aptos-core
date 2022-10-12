@@ -17,12 +17,13 @@ use crate::common::types::{
     PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
 
-#[cfg(feature = "cli-framework-test-move")]
 use crate::common::utils::write_to_file;
 
+use crate::governance::CompileScriptFunction;
 use crate::move_tool::{
     ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
-    IncludedArtifactsArgs, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
+    IncludedArtifactsArgs, InitPackage, MemberId, PublishPackage, RunFunction, RunScript,
+    TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
@@ -54,6 +55,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
+use tempfile::TempDir;
+use thiserror::private::PathAsDisplay;
 
 #[cfg(feature = "cli-framework-test-move")]
 use thiserror::private::PathAsDisplay;
@@ -142,6 +145,16 @@ impl CliTestFramework {
 
     pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
         let address = account_address_from_public_key(&private_key.public_key());
+        self.account_addresses.push(address);
+        self.account_keys.push(private_key);
+        self.account_keys.len() - 1
+    }
+
+    pub fn add_account_with_address_to_cli(
+        &mut self,
+        private_key: Ed25519PrivateKey,
+        address: AccountAddress,
+    ) -> usize {
         self.account_addresses.push(address);
         self.account_keys.push(private_key);
         self.account_keys.len() - 1
@@ -884,6 +897,50 @@ impl CliTestFramework {
         }
         .execute()
         .await
+    }
+
+    pub async fn run_script(
+        &self,
+        index: usize,
+        script_contents: &str,
+    ) -> CliTypedResult<TransactionSummary> {
+        // Make a temporary directory for compilation
+        let temp_dir = TempDir::new().map_err(|err| {
+            CliError::UnexpectedError(format!("Failed to create temporary directory {}", err))
+        })?;
+
+        let source_path = temp_dir.path().join("script.move");
+        write_to_file(
+            source_path.as_path(),
+            &source_path.as_display().to_string(),
+            script_contents.as_bytes(),
+        )
+        .unwrap();
+
+        RunScript {
+            txn_options: self.transaction_options(index, None),
+            compile_proposal_args: CompileScriptFunction {
+                script_path: Some(source_path),
+                compiled_script_path: None,
+                framework_package_args: FrameworkPackageArgs {
+                    framework_git_rev: None,
+                    framework_local_dir: Some(Self::aptos_framework_dir()),
+                },
+            },
+            args: Vec::new(),
+            type_args: Vec::new(),
+        }
+        .execute()
+        .await
+    }
+
+    fn aptos_framework_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("aptos-move")
+            .join("framework")
+            .join("aptos-framework")
     }
 
     pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
