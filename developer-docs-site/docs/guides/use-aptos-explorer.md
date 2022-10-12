@@ -17,7 +17,7 @@ The Aptos Explorer gives you a near real-time view into the status of the networ
 
 * App developers understand the behavior of the smart contracts and sender-receiver transaction flows.
 * General users view and analyze Aptos blockchain activity on key entities - transactions, blocks, accounts, and resources.
-* *ode operators check the health of the network and maximize the value of operating the node.
+* Node operators check the health of the network and maximize the value of operating the node.
 * Token holders find the best node operator to delegate the tokens and earn a staking reward.
 
 ## Common tasks
