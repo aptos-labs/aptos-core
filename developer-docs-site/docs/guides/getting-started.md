@@ -57,7 +57,7 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     Check out the `testnet` branch using:
 
     ```
-    git checkout --track origin/testnet-stable
+    git checkout --track origin/testnet
     ```
     </TabItem>
     </Tabs>
