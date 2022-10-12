@@ -180,59 +180,104 @@ module aptos_token::token_transfers {
         );
     }
 
-    #[test(creator = @0x1, owner = @0x2)]
-    public fun test_nft(creator: signer, owner: signer) acquires PendingClaims {
-        let token_id = create_token(&creator, 1);
+    #[test(creator = @0x1, owner = @0x2, aptos_token = @aptos_token)]
+    public fun test_nft(
+        creator: &signer,
+        owner: &signer,
+        aptos_token: &signer
+    ) acquires PendingClaims {
+        use std::option;
 
-        let creator_addr = signer::address_of(&creator);
-        let owner_addr = signer::address_of(&owner);
+        let token_id = create_token(creator, 1, aptos_token);
+        assert!(token::is_latest_owner(signer::address_of(creator), token_id), 1);
+
+        let creator_addr = signer::address_of(creator);
+        let owner_addr = signer::address_of(owner);
         aptos_framework::account::create_account_for_test(owner_addr);
-        offer(&creator, owner_addr, token_id, 1);
-        claim(&owner, creator_addr, token_id);
 
+        offer(creator, owner_addr, token_id, 1);
+        assert!(option::is_none(&token::latest_owner_of(token_id)), 1);
 
-        offer(&owner, creator_addr, token_id, 1);
-        cancel_offer(&owner, creator_addr, token_id);
+        claim(owner, creator_addr, token_id);
+        assert!(token::is_latest_owner(signer::address_of(owner), token_id), 1);
+        assert!(!token::is_latest_owner(signer::address_of(creator), token_id), 1);
+
+        offer(owner, creator_addr, token_id, 1);
+        assert!(option::is_none(&token::latest_owner_of(token_id)), 1);
+
+        cancel_offer(owner, creator_addr, token_id);
+        assert!(token::is_latest_owner(signer::address_of(owner), token_id), 1);
+        assert!(!token::is_latest_owner(signer::address_of(creator), token_id), 1);
     }
 
-    #[test(creator = @0x1, owner0 = @0x2, owner1 = @0x3)]
+    #[test(creator = @0x1, owner0 = @0x2, owner1 = @0x3, aptos_token = @aptos_token)]
     public fun test_editions(
-        creator: signer,
-        owner0: signer,
-        owner1: signer,
+        creator: &signer,
+        owner0: &signer,
+        owner1: &signer,
+        aptos_token: &signer
     ) acquires PendingClaims {
-        let token_id = create_token(&creator, 2);
+        use std::option;
 
-        let creator_addr = signer::address_of(&creator);
-        let owner0_addr = signer::address_of(&owner0);
+        let token_id = create_token(creator, 2, aptos_token);
+        assert!(token::is_latest_owner(signer::address_of(creator), token_id), 1);
+
+        let creator_addr = signer::address_of(creator);
+        let owner0_addr = signer::address_of(owner0);
         aptos_framework::account::create_account_for_test(owner0_addr);
-        let owner1_addr = signer::address_of(&owner1);
+        let owner1_addr = signer::address_of(owner1);
         aptos_framework::account::create_account_for_test(owner1_addr);
 
-        offer(&creator, owner0_addr, token_id, 1);
-        offer(&creator, owner1_addr, token_id, 1);
+        offer(creator, owner0_addr, token_id, 1);
+        assert!(token::is_latest_owner(signer::address_of(creator), token_id), 1);
 
-        assert!(token::balance_of(signer::address_of(&creator), token_id) == 0, 1);
-        claim(&owner0, creator_addr, token_id);
-        assert!(token::balance_of(signer::address_of(&owner0), token_id) == 1, 1);
-        claim(&owner1, creator_addr, token_id);
-        assert!(token::balance_of(signer::address_of(&owner1), token_id) == 1, 1);
+        offer(creator, owner1_addr, token_id, 1);
+        assert!(option::is_none(&token::latest_owner_of(token_id)), 1);
+        assert!(token::balance_of(signer::address_of(creator), token_id) == 0, 1);
 
-        offer(&owner0, owner1_addr, token_id, 1);
-        claim(&owner1, owner0_addr, token_id);
+        claim(owner0, creator_addr, token_id);
+        assert!(token::is_latest_owner(signer::address_of(owner0), token_id), 1);
+        assert!(token::balance_of(signer::address_of(owner0), token_id) == 1, 1);
 
-        offer(&owner1, creator_addr, token_id, 1);
-        offer(&owner1, creator_addr, token_id, 1);
-        claim(&creator, owner1_addr, token_id);
+        claim(owner1, creator_addr, token_id);
+        assert!(!token::is_latest_owner(signer::address_of(creator), token_id), 1);
+        assert!(!token::is_latest_owner(signer::address_of(owner0), token_id), 1);
+        assert!(token::is_latest_owner(signer::address_of(owner1), token_id), 1);
+        assert!(token::balance_of(signer::address_of(owner1), token_id) == 1, 1);
+
+        offer(owner0, owner1_addr, token_id, 1);
+        assert!(option::is_none(&token::latest_owner_of(token_id)), 1);
+
+        claim(owner1, owner0_addr, token_id);
+        assert!(token::is_latest_owner(signer::address_of(owner1), token_id), 1);
+        assert!(token::balance_of(signer::address_of(owner1), token_id) == 2, 1);
+
+        offer(owner1, creator_addr, token_id, 1);
+        offer(owner1, creator_addr, token_id, 1);
+        assert!(option::is_none(&token::latest_owner_of(token_id)), 1);
+
+        claim(creator, owner1_addr, token_id);
+        assert!(token::balance_of(signer::address_of(creator), token_id) == 2, 1);
+        assert!(token::is_latest_owner(signer::address_of(creator), token_id), 1);
+        assert!(token::balance_of(signer::address_of(owner0), token_id) == 0, 1);
+        assert!(!token::is_latest_owner(signer::address_of(owner0), token_id), 1);
+        assert!(token::balance_of(signer::address_of(owner1), token_id) == 0, 1);
+        assert!(!token::is_latest_owner(signer::address_of(owner1), token_id), 1);
     }
 
     #[test_only]
-    public entry fun create_token(creator: &signer, amount: u64): TokenId {
+    public entry fun create_token(
+        creator: &signer,
+        amount: u64,
+        aptos_token: &signer
+    ): TokenId {
         use std::string::{Self, String};
 
         let collection_name = string::utf8(b"Hello, World");
         let collection_mutation_setting = vector<bool>[false, false, false];
         aptos_framework::account::create_account_for_test(signer::address_of(creator));
+
+        token::initialize_for_test(aptos_token);
 
         token::create_collection(
             creator,
