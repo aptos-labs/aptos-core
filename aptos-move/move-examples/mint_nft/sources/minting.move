@@ -70,7 +70,7 @@ module mint_nft::minting {
     const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 6;
 
     /// Initialize this module: create a resource account, a collection, and a token data id
-    fun init_module(resource_account: &signer) {
+    fun init_module(resource_account: &signer, aptos_token: &signer) {
         let collection_name = string::utf8(b"Collection name");
         let description = string::utf8(b"Description");
         let collection_uri = string::utf8(b"Collection uri");
@@ -82,6 +82,9 @@ module mint_nft::minting {
         // create the resource account that we'll use to create tokens
         let resource_signer_cap = resource_account::retrieve_resource_account_cap(resource_account, @0xcafe);
         let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
+
+        // initialize aptos_token
+        token::initialize(aptos_token);
 
         // create the nft collection
         let maximum_supply = 0;
@@ -204,7 +207,7 @@ module mint_nft::minting {
     const INVALID_SIGNATURE: vector<u8> = x"5c5dc472f0c7f05384a8d01c8eaf573570d2c21c5b06dcb6783faa0de1959269ba3ef8c21a8166335d950b857ae63a7f375509f262bda9926bdbafd07e89ab06";
 
     #[test_only]
-    public fun set_up_test(origin_account: signer, collection_token_minter: &signer, aptos_framework: signer, nft_receiver: &signer, timestamp: u64) {
+    public fun set_up_test(origin_account: signer, collection_token_minter: &signer, aptos_framework: signer, nft_receiver: &signer, timestamp: u64, aptos_token: &signer) {
         // set up global time for testing purpose
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         timestamp::update_global_time_for_test_secs(timestamp);
@@ -214,14 +217,14 @@ module mint_nft::minting {
         // create a resource account from the origin account, mocking the module publishing process
         resource_account::create_resource_account(&origin_account, vector::empty<u8>(), vector::empty<u8>());
 
-        init_module(collection_token_minter);
+        init_module(collection_token_minter, aptos_token);
 
         create_account_for_test(signer::address_of(nft_receiver));
     }
 
-    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, nft_receiver2 = @0x234, aptos_framework = @aptos_framework)]
-    public entry fun test_happy_path(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, nft_receiver2: signer, aptos_framework: signer) acquires CollectionTokenMinter {
-        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10);
+    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, nft_receiver2 = @0x234, aptos_framework = @aptos_framework, aptos_token = @aptos_token)]
+    public entry fun test_happy_path(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, nft_receiver2: signer, aptos_framework: signer, aptos_token: signer) acquires CollectionTokenMinter {
+        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10, &aptos_token);
 
         // mint nft to this nft receiver
         mint_nft(&nft_receiver, VALID_SIGNATURE);
@@ -245,35 +248,35 @@ module mint_nft::minting {
         token::deposit_token(&nft_receiver2, new_token2);
     }
 
-    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework, aptos_token = @aptos_token)]
     #[expected_failure(abort_code = 327682)]
-    public entry fun test_minting_expired(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, aptos_framework: signer) acquires CollectionTokenMinter {
-        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10000000);
+    public entry fun test_minting_expired(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, aptos_framework: signer, aptos_token: signer) acquires CollectionTokenMinter {
+        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10000000, &aptos_token);
         mint_nft(&nft_receiver, VALID_SIGNATURE);
     }
 
-    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework, aptos_token = @aptos_token)]
     #[expected_failure(abort_code = 327682)]
-    public entry fun test_update_expiration_time(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, aptos_framework: signer) acquires CollectionTokenMinter {
-        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10);
+    public entry fun test_update_expiration_time(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, aptos_framework: signer, aptos_token: signer) acquires CollectionTokenMinter {
+        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10, &aptos_token);
         // set the expiration time of the minting to be earlier than the current time
         set_timestamp(&collection_token_minter, 5);
         mint_nft(&nft_receiver, VALID_SIGNATURE);
     }
 
-    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework, aptos_token = @aptos_token)]
     #[expected_failure(abort_code = 327683)]
-    public entry fun test_update_minting_enabled(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, aptos_framework: signer) acquires CollectionTokenMinter {
-        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10);
+    public entry fun test_update_minting_enabled(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, aptos_framework: signer, aptos_token: signer) acquires CollectionTokenMinter {
+        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10, &aptos_token);
         // disable token minting
         set_minting_enabled(&collection_token_minter, false);
         mint_nft(&nft_receiver, VALID_SIGNATURE);
     }
 
-    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (origin_account = @0xcafe, collection_token_minter = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework, aptos_token = @aptos_token)]
     #[expected_failure(abort_code = 65542)]
-    public entry fun test_invalid_signature(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, aptos_framework: signer) acquires CollectionTokenMinter {
-        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10);
+    public entry fun test_invalid_signature(origin_account: signer, collection_token_minter: signer, nft_receiver: signer, aptos_framework: signer, aptos_token: signer) acquires CollectionTokenMinter {
+        set_up_test(origin_account, &collection_token_minter, aptos_framework, &nft_receiver, 10, &aptos_token);
         mint_nft(&nft_receiver, INVALID_SIGNATURE);
     }
 }
