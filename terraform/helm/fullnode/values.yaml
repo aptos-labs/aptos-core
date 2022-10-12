@@ -9,12 +9,8 @@ aptos_chains:
     waypoint_txt_url: https://devnet.aptoslabs.com/waypoint.txt
     genesis_blob_url: https://devnet.aptoslabs.com/genesis.blob
   testnet:
-    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/waypoint.txt
-    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/genesis.blob
-  ait3:
-    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-ait3/main/waypoint.txt
-    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-ait3/main/genesis.blob
-
+    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/waypoint.txt
+    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob
 # fullnode network config
 fullnode_identity:
   # Set this to start fullnode from an existing key.
