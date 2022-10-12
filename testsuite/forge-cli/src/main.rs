@@ -186,6 +186,12 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    if suite_name == "compat" {
+        panic!();
+    }
+    let suite_name = "changing_working_quorum_test";
+    let duration = Duration::from_secs(1200);
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -617,21 +623,21 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             },
         ),
         "changing_working_quorum_test" => changing_working_quorum_test(
-            20,
-            120,
+            10,
+            300,
             100,
             70,
             &ChangingWorkingQuorumTest {
                 min_tps: 15,
                 always_healthy_nodes: 0,
-                max_down_nodes: 20,
+                max_down_nodes: 1,
                 num_large_validators: 0,
                 add_execution_delay: false,
                 // Check that every 27s all nodes make progress,
                 // without any failures.
                 // (make epoch length (120s) and this duration (27s) not be multiples of one another,
                 // to test different timings)
-                check_period_s: 27,
+                check_period_s: 120,
             },
         ),
         "changing_working_quorum_test_high_load" => changing_working_quorum_test(

@@ -109,7 +109,7 @@ impl Default for ConsensusConfigV1 {
                     // and large number of validators. So the window for
                     // the proposers needs to be significantly larger
                     // to have enough useful statistics.
-                    proposer_window_num_validators_multiplier: 10,
+                    proposer_window_num_validators_multiplier: 500,
                     voter_window_num_validators_multiplier: 1,
                     weight_by_voting_power: true,
                     use_history_from_previous_epoch_max_count: 5,
