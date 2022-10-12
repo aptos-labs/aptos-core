@@ -30,20 +30,20 @@ When you are deploying an Aptos node, you will need the following files. These c
 
 ## genesis.blob 
 
-- **Git repo:** `aptos-genesis-waypoint`
-- **Git branch:** `main` on https://github.com/aptos-labs/aptos-genesis-waypoint
+- **Git repo:** `aptos-networks`
+- **Git branch:** `main` on https://github.com/aptos-labs/aptos-networks
 - **Command to download:**
   ```bash
-  wget -O genesis.blob https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/genesis.blob
+  wget -O genesis.blob https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/premainnet/genesis.blob
   ```
 
 ## waypoint.txt
 
-- **Git repo:** `aptos-genesis-waypoint`
-- **Git branch:** `main` on https://github.com/aptos-labs/aptos-genesis-waypoint
+- **Git repo:** `aptos-networks`
+- **Git branch:** `main` on https://github.com/aptos-labs/aptos-networks
 - **Command to download:**
   ```bash
-  wget -O waypoint.txt https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/premainnet/waypoint.txt
+  wget -O waypoint.txt https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/premainnet/waypoint.txt
   ```
 
 ## blocked.ips 
