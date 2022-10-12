@@ -29,7 +29,7 @@ aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
 scratchpad = { path = "../scratchpad" }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "00b0a80e216155760b4fd2a1086ea34ddffac826", features = ["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "c49400cff7851bf126de8105d0ea645d6b1cead2", features = ["address32"] }
 
 [dev-dependencies]
 assert_unordered = "0.1.1"

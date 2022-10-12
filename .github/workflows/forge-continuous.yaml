@@ -5,8 +5,8 @@ on:
     - cron: "0 * * * *"
   pull_request:
     paths:
-      - '.github/workflows/forge-continuous.yaml'
-      - '.github/workflows/run-forge.yaml'
+      - ".github/workflows/forge-continuous.yaml"
+      - ".github/workflows/run-forge.yaml"
 
 # cancel redundant builds
 concurrency:

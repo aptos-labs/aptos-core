@@ -6,7 +6,7 @@ on:
     # every day at 9am PST
     - cron: "0 16 * * *"
   pull_request:
-    types: [labeled, opened, synchronize, reopened]
+    types: [ labeled, opened, synchronize, reopened ]
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -24,19 +24,19 @@ jobs:
     timeout-minutes: 120
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
       - run: rustup component add llvm-tools-preview
-      - uses: taiki-e/install-action@v1.5.6
+      - uses: taiki-e/install-action@6f1ebcd9e21315fc37d7f7bc851dfcc8356d7da3 # pin@v1.5.6
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude testcases --lcov --jobs 32 --output-path lcov_unit.info
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
         with:
           name: lcov_unit
           path: lcov_unit.info
@@ -46,37 +46,37 @@ jobs:
     timeout-minutes: 120
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
       - run: rustup component add llvm-tools-preview
-      - uses: taiki-e/install-action@v1.5.6
+      - uses: taiki-e/install-action@6f1ebcd9e21315fc37d7f7bc851dfcc8356d7da3 # pin@v1.5.6
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       - run: cargo llvm-cov --ignore-run-fail --package smoke-test --lcov --output-path lcov_smoke.info
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
         with:
           name: lcov_smoke
           path: lcov_smoke.info
 
   upload-to-codecov:
     if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')) && !cancelled()
-    needs: [rust-unit-coverage, rust-smoke-coverage]
+    needs: [ rust-unit-coverage, rust-smoke-coverage ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
         with:
           name: lcov_unit
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
         with:
           name: lcov_smoke
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
         with:
           files: lcov_unit.info,lcov_smoke.info
           fail_ci_if_error: true
