@@ -116,7 +116,7 @@ aptos node get-stake-pool \
 ## Verify node connections
 
 :::tip Node Liveness Definition
-See [node liveness defined here](https://aptos.dev/reference/node-liveness-criteria/#verifying-the-liveness-of-your-node). 
+See [node liveness defined here](node-liveness-criteria.md#verifying-the-liveness-of-your-node). 
 :::
 
 After your validator node joined the validator set, you can verify the correctness following those steps:
