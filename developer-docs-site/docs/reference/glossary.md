@@ -183,9 +183,9 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ## Merkle Accumulator
 
-- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ Merkle tree that the Aptos blockchain uses to store the ledger.
+- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) that the Aptos blockchain uses to store the ledger.
 - Merkle accumulators can provide proofs that a transaction was included in the chain (“proof of inclusion”).
-- They are also called ["history trees"](http://people.cs.vt.edu/danfeng/courses/cs6204/sp10-papers/crosby.pdf) in literature.
+- They are also called "history trees" in literature.
 
 ## Move
 
