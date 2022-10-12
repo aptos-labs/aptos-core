@@ -8757,6 +8757,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-faucet",

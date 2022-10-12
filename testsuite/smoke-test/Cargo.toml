@@ -30,6 +30,7 @@ serde_json = "1.0.81"
 tokio = { version = "1.21.0", features = ["full"] }
 
 aptos = { path = "../../crates/aptos", features = ["fuzzing"] }
+aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-faucet = { path = "../../crates/aptos-faucet" }

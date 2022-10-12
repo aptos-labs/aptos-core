@@ -7,6 +7,8 @@ use aptos::node::analyze::analyze_validators::{AnalyzeValidators, EpochStats};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos::test::ValidatorPerformance;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
+use aptos_bitvec::BitVec;
+use aptos_config::config::ConsensusConfig;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::HostAndPort;
@@ -14,11 +16,17 @@ use aptos_keygen::KeyGen;
 use aptos_rest_client::{Client, State};
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::network_address::DnsName;
-use aptos_types::on_chain_config::ValidatorSet;
+use aptos_types::on_chain_config::{
+    ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
+    ValidatorSet,
+};
+use aptos_types::transaction::Script;
 use aptos_types::PeerId;
-use forge::{reconfig, NodeExt, Swarm, SwarmExt};
+use diesel::IntoSql;
+use forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -74,6 +82,214 @@ async fn test_show_validator_set() {
             .account_address(),
         &swarm.validators().next().unwrap().peer_id()
     );
+}
+
+async fn check_vote_to_elected(swarm: &mut LocalSwarm) -> (Option<u64>, Option<u64>) {
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    let (address_off, rest_client_off) = swarm
+        .validators()
+        .skip(1)
+        .next()
+        .map(|v| (v.peer_id(), v.rest_client()))
+        .unwrap();
+
+    rest_client_off
+        .set_failpoint("consensus::send::any".to_string(), "100%return".to_string())
+        .await
+        .unwrap();
+
+    tokio::time::sleep(Duration::from_secs(20)).await;
+
+    let mut epoch = 0;
+    for _ in 0..7 {
+        epoch = reconfig(
+            &rest_client,
+            &transaction_factory,
+            swarm.chain_info().root_account(),
+        )
+        .await
+        .epoch;
+    }
+
+    rest_client_off
+        .set_failpoint("consensus::send::any".to_string(), "off".to_string())
+        .await
+        .unwrap();
+
+    tokio::time::sleep(Duration::from_secs(20)).await;
+    let events = FetchMetadata::fetch_new_block_events(&rest_client, Some(epoch as i64), None)
+        .await
+        .unwrap();
+    assert_eq!(events.len(), 1);
+
+    let info = events.first().unwrap();
+    let off_index = info
+        .validators
+        .iter()
+        .filter(|v| v.address == address_off)
+        .next()
+        .unwrap()
+        .validator_index;
+    let mut first_vote = None;
+    let mut first_elected = None;
+    for (i, event) in info.blocks.iter().enumerate() {
+        let previous_block_votes_bitvec: BitVec =
+            event.event.previous_block_votes_bitvec().clone().into();
+        if first_vote.is_none() && previous_block_votes_bitvec.is_set(off_index as u16) {
+            first_vote = Some(event.event.round());
+        }
+
+        if first_elected.is_none() && event.event.proposer() == address_off {
+            first_elected = Some(event.event.round());
+        }
+    }
+    (first_vote, first_elected)
+}
+
+#[tokio::test]
+async fn test_onchain_config_change() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_init_config(Arc::new(|_, conf, _| {
+            // reduce timeout, as we will have dead node during rounds
+            conf.consensus.round_initial_timeout_ms = 200;
+            conf.consensus.quorum_store_poll_count = 4;
+            conf.api.failpoints_enabled = true;
+        }))
+        .with_aptos()
+        .build_with_cli(0)
+        .await;
+
+    let root_cli_index = cli.add_account_with_address_to_cli(
+        swarm.root_key(),
+        swarm.chain_info().root_account().address(),
+    );
+
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::consensus_config::ConsensusConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+    .unwrap();
+
+    let OnChainConsensusConfig::V1(inner) = current_consensus_config;
+    let leader_reputation_type =
+        if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
+            inner.proposer_election_type
+        {
+            leader_reputation_type
+        } else {
+            panic!()
+        };
+    let proposer_and_voter_config = match &leader_reputation_type {
+        LeaderReputationType::ProposerAndVoter(_) => panic!(),
+        LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
+            proposer_and_voter_config
+        }
+    };
+    let new_consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
+        proposer_election_type: ProposerElectionType::LeaderReputation(
+            LeaderReputationType::ProposerAndVoter(proposer_and_voter_config.clone()),
+        ),
+        ..inner
+    });
+
+    let update_consensus_config_script = format!(
+        r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::consensus_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            consensus_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+        generate_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+    );
+
+    // confirm with default (fixed) configs, validator doesn't wait much from voting to being elected
+    let (first_vote, first_elected) = check_vote_to_elected(&mut swarm).await;
+    println!("With new config: {:?} to {:?}", first_vote, first_elected);
+
+    println!(
+        "Epoch before : {}",
+        rest_client
+            .get_ledger_information()
+            .await
+            .unwrap()
+            .into_inner()
+            .epoch
+    );
+    cli.run_script(root_cli_index, &update_consensus_config_script)
+        .await
+        .unwrap();
+    // faucet can make our root LocalAccount sequence number get out of sync.
+    swarm
+        .chain_info()
+        .resync_root_account_seq_num(&rest_client)
+        .await
+        .unwrap();
+    swarm.wait_for_all_nodes_to_catchup_to_next(Duration::from_secs(30));
+    println!(
+        "Epoch after : {}",
+        rest_client
+            .get_ledger_information()
+            .await
+            .unwrap()
+            .into_inner()
+            .epoch
+    );
+
+    // let txn = root_account.sign_with_transaction_builder(
+    //     transaction_factory
+    //         .clone()
+    //         .script(script)
+    //         .payload(TransactionPayload::Script(Script{
+    //             code: Vec<u8>,
+    //             vec![],
+    //             vec![TransactionArgument::U8Vector(bcs::to_bytes(new_consensus_config).unwrap())],
+    //         }))
+    // );
+    // submit_and_wait_reconfig(client, txn).await
+
+    // confirm with old configs, validator will need to wait quite a bit from voting to being elected
+    let (first_vote_old, first_elected_old) = check_vote_to_elected(&mut swarm).await;
+    println!(
+        "With old config: {:?} to {:?}",
+        first_vote_old, first_elected_old
+    );
+
+    cli.analyze_validator_performance(Some(0), None)
+        .await
+        .unwrap();
+}
+
+fn generate_blob(data: &[u8]) -> String {
+    let mut buf = String::new();
+
+    write!(buf, "vector[").unwrap();
+    for (i, b) in data.iter().enumerate() {
+        if i % 20 == 0 {
+            if i > 0 {
+                writeln!(buf).unwrap();
+            }
+        } else {
+            write!(buf, " ").unwrap();
+        }
+        write!(buf, "{}u8,", b).unwrap();
+    }
+    write!(buf, "]").unwrap();
+    buf
 }
 
 #[tokio::test]
