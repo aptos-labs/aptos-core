@@ -177,13 +177,13 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Merkle tree** is a type of authenticated data structure that allows for efficient verification of data integrity and updates.
 - The Aptos network treats the entire blockchain as a single data structure that records the history of transactions and states over time.
-- The Merkle tree implementation simplifies the work of apps accessing the blockchain. It allows apps to:
+- The [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) implementation simplifies the work of apps accessing the blockchain. It allows apps to:
   - Read any data from any point in time.
   - Verify the integrity of the data using a unified framework.
 
 ## Merkle Accumulator
 
-- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) that the Aptos blockchain uses to store the ledger.
+- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ Merkle tree that the Aptos blockchain uses to store the ledger.
 - Merkle accumulators can provide proofs that a transaction was included in the chain (“proof of inclusion”).
 - They are also called "history trees" in literature.
 
