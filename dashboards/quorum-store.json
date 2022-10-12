@@ -1791,7 +1791,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(chain_name)", "refId": "StandardVariableQuery" },
         "regex": "",
-        "current": { "text": ["None"], "value": "" },
+        "current": { "text": ["ait3-nhc-baseline"], "value": "ait3-nhc-baseline" },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -1892,7 +1892,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 26,
+  "version": 30,
   "links": [],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }

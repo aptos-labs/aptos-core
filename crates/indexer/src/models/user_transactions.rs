@@ -35,6 +35,7 @@ pub struct UserTransaction {
     pub gas_unit_price: BigDecimal,
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
+    pub epoch: i64,
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
@@ -54,10 +55,15 @@ pub struct UserTransactionQuery {
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
     pub inserted_at: chrono::NaiveDateTime,
+    pub epoch: i64,
 }
 
 impl UserTransaction {
-    pub fn from_transaction(txn: &APIUserTransaction, block_height: i64) -> (Self, Vec<Signature>) {
+    pub fn from_transaction(
+        txn: &APIUserTransaction,
+        block_height: i64,
+        epoch: i64,
+    ) -> (Self, Vec<Signature>) {
         let version = txn.info.version.0 as i64;
         (
             Self {
@@ -84,6 +90,7 @@ impl UserTransaction {
                     }
                     _ => String::default(),
                 },
+                epoch,
             },
             txn.request
                 .signature

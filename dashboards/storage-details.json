@@ -2696,7 +2696,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 40,
+  "version": 45,
   "links": [
     {
       "title": "aptos-core",

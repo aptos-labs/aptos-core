@@ -1,0 +1,9 @@
+[package]
+name = "axum-test"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.5.16"
+tokio = { version = "1.21.2", features = ["full"] }

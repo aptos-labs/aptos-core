@@ -13,8 +13,50 @@ variable "zone" {
   type        = string
 }
 
+variable "workspace_name_override" {
+  description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  default     = ""
+}
+
+variable "tls_sans" {
+  description = "List of Subject Alternate Names to include in TLS certificate"
+  type        = list(string)
+  default     = []
+}
+
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
+variable "dns_prefix_name" {
+  description = "DNS prefix for fullnode url"
+  default     = "fullnode"
+}
+
+variable "zone_name" {
+  description = "Zone name of GCP Cloud DNS zone to create records in"
+  default     = ""
+}
+
+variable "zone_project" {
+  description = "GCP project which the DNS zone is in (if different)"
+  default     = ""
+}
+
+variable "create_google_managed_ssl_certificate" {
+  description = "Whether to create a Google Managed SSL Certificate for the GCE Ingress"
+  default     = false
+}
+
 variable "helm_values" {
   description = "Map of values to pass to Helm"
+  type        = any
+  default     = {}
+}
+
+variable "pfn_helm_values" {
+  description = "Map of values to pass to pfn-addons Helm"
   type        = any
   default     = {}
 }
@@ -71,6 +113,11 @@ variable "chain_name" {
   default     = "devnet"
 }
 
+variable "fullnode_name" {
+  description = "Name of the fullnode node owner"
+  type        = string
+}
+
 variable "machine_type" {
   description = "Machine type for running fullnode"
   default     = "c2-standard-16"
@@ -78,5 +125,26 @@ variable "machine_type" {
 
 variable "enable_backup" {
   description = "enable data backup from fullnode"
+  default     = false
+}
+
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
   default     = false
 }

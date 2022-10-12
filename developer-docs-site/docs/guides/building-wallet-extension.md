@@ -69,5 +69,5 @@ const response = await (window as any).aptos.signAndSubmitTransaction(transactio
 const signedTransaction = await (window as any).aptos.signTransaction(transaction)
 
 // Disconnect dApp from the wallet
-await (window as any).aptos.disconnect(transaction)
+await (window as any).aptos.disconnect()
 ```
