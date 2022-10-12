@@ -2,6 +2,8 @@ chain:
   name:
 validator:
   name:
+fullnode:
+  name:
 
 monitoring:
   prometheus:

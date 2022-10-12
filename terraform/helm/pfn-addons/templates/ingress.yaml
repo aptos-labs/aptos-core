@@ -1,0 +1,73 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "pfn-addons.fullname" . }}
+  labels:
+    {{- include "pfn-addons.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+    {{- if .Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.service.domain }}
+    {{- end }}
+    # Apply ALB ingress annotations
+    {{ if eq .Values.ingress.class "alb" }}
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/tags: {{ .Values.service.aws_tags | quote }}
+    {{- if .Values.ingress.loadBalancerSourceRanges }}
+    alb.ingress.kubernetes.io/inbound-cidrs: {{ join "," .Values.ingress.loadBalancerSourceRanges }}
+    {{- end }}
+    {{- if .Values.ingress.acm_certificate }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.acm_certificate }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    # ensure ALB ingress controller is version > 1.4.4
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    {{- end }}
+    {{- if .Values.ingress.wafAclArn }}
+    alb.ingress.kubernetes.io/wafv2-acl-arn: {{ .Values.ingress.wafAclArn }}
+    {{- end }}
+    {{- if .Values.ingress.enableStickyness }}
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds={{ .Values.ingress.cookieDurationSeconds }}
+    alb.ingress.kubernetes.io/target-type: ip
+    {{- end }}
+    {{ end }}
+    # Apply GCE ingress annotations
+    {{ if eq .Values.ingress.class "gce" }}
+    # kubernetes.io/ingress.global-static-ip-name: config.ingressConfig.staticIpName # may not be necessary
+    {{- if .Values.ingress.gce_managed_certificate }}
+    kubernetes.io/ingress.allow-http: "false"
+    networking.gke.io/managed-certificates: {{ .Values.ingress.gce_managed_certificate }}
+    networking.gke.io/v1beta1.FrontendConfig: ssl-redirect
+    {{- end }}
+    {{ end }}
+
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "pfn-addons.fullname" . }}-fullnode
+            port:
+              number: 80
+---
+{{- if .Values.ingress.gce_managed_certificate }}
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: ssl-redirect
+spec:
+  redirectToHttps:
+    enabled: true
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ .Values.ingress.gce_managed_certificate }}
+spec:
+  domains: 
+    {{- range .Values.ingress.gce_managed_certificate_domains | split "," }}
+    - {{ . }}
+    {{- end }}
+{{- end }}
