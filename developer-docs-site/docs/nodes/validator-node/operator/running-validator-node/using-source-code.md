@@ -112,7 +112,8 @@ With your development environment ready, now you can start to setup your validat
    - `waypoint.txt`
    - `haproxy.cfg`
    - `haproxy-fullnode.cfg` and
-   - `blocked.ips`  
+   - `blocked.ips`
+   - `docker-compose-src.yaml`
 
 10. Copy the `validator.yaml`, `fullnode.yaml` files into ~/$WORKSPACE/config/ directory.
     ```bash

@@ -153,9 +153,6 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 12. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page:
     - `genesis.blob`
     - `waypoint.txt`
-    - `haproxy.cfg`
-    - `haproxy-fullnode.cfg`
-    - `blocked.ips`
 
 13. **Summary:** To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).

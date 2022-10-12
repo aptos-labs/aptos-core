@@ -30,7 +30,6 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
 2. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page:
     - `validator.yaml`
     - `docker-compose.yaml`
-    - `docker-compose-src.yaml`
     - `docker-compose-fullnode.yaml`
     - `haproxy.cfg`
     - `haproxy-fullnode.cfg`
