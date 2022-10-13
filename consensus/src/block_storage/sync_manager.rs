@@ -25,7 +25,7 @@ use consensus_types::{
     },
     common::Author,
     quorum_cert::QuorumCert,
-    sync_info::SyncInfo, proof_of_store::LogicalTime,
+    sync_info::SyncInfo,
 };
 use fail::fail_point;
 use rand::{prelude::*, Rng};
@@ -75,8 +75,8 @@ impl BlockStore {
         sync_info: &SyncInfo,
         mut retriever: BlockRetriever,
     ) -> anyhow::Result<()> {
-        // update the logical time for quorum store during state sync
-        self.data_manager.notify_commit(LogicalTime::new(sync_info.highest_commit_cert().ledger_info().ledger_info().epoch(), sync_info.highest_commit_cert().ledger_info().ledger_info().round()), Vec::new()).await;
+        // // update the logical time for quorum store during state sync
+        // self.data_manager.notify_commit(LogicalTime::new(sync_info.highest_commit_cert().ledger_info().ledger_info().epoch(), sync_info.highest_commit_cert().ledger_info().ledger_info().round()), Vec::new()).await;
 
         self.sync_to_highest_commit_cert(
             sync_info.highest_commit_cert().ledger_info(),
