@@ -39,9 +39,3 @@ To configure a node as a private node, set the following in the node configurato
 - `full_node_network[0].mutual_authentication = true`
 
 This will not allow unauthenticated connections.
-
-## Setting the number of outbound connections
-
-To set the number of outbound connections from a node, edit the following field in that node's configuration YAML. For example, to set the number to 4:
-
-- `max_outbound_connections: 4`
