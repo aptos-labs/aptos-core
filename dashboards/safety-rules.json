@@ -610,7 +610,7 @@
         "multiFormat": "",
         "query": "prometheus",
         "regex": "",
-        "current": { "text": null, "value": null },
+        "current": { "text": ["[TEST] TELEMETRY"], "value": "[TEST] TELEMETRY" },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -711,6 +711,25 @@
     "list": [
       {
         "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      },
+      {
+        "name": "Annotations \u0026 Alerts",
         "datasource": { "type": "datasource", "uid": "grafana" },
         "showLine": false,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -731,8 +750,8 @@
     ]
   },
   "refresh": false,
-  "schemaVersion": 36,
-  "version": 1,
+  "schemaVersion": 37,
+  "version": 5,
   "links": [
     {
       "title": "Other Dashboards",

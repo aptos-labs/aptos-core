@@ -157,24 +157,22 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         lookback_versions = lookback_versions,
         "Fetching starting version from db..."
     );
-    let starting_version_from_db = tailer
-        .get_start_version(&processor_name, lookback_versions)
-        .unwrap_or_else(|| {
-            info!(
-                processor_name = processor_name,
-                "Could not fetch version from db so starting from version 0"
-            );
-            0
-        }) as u64;
     let start_version = match config.starting_version {
-        None => starting_version_from_db,
+        None => tailer
+            .get_start_version(&processor_name, lookback_versions)
+            .unwrap_or_else(|| {
+                info!(
+                    processor_name = processor_name,
+                    "Could not fetch version from db so starting from version 0"
+                );
+                0
+            }) as u64,
         Some(version) => version,
     };
 
     info!(
         processor_name = processor_name,
-        final_start_version = start_version,
-        start_version_from_db = starting_version_from_db,
+        start_version = start_version,
         start_version_from_config = config.starting_version,
         "Setting starting version..."
     );

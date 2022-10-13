@@ -367,13 +367,19 @@ export class AptosClient {
    * transaction will be ignored and the estimated value will be used.
    * @param query.estimateMaxGasAmount If set to true, the max gas value in the
    * transaction will be ignored and the maximum possible gas will be used.
+   * @param query.estimatePrioritizedGasUnitPrice If set to true, the transaction will use a higher price than the
+   * original estimate.
    * @returns The BCS encoded signed transaction, which you should then provide
    *
    */
   async simulateTransaction(
     accountOrPubkey: AptosAccount | Ed25519PublicKey,
     rawTransaction: TxnBuilderTypes.RawTransaction,
-    query?: { estimateGasUnitPrice?: boolean; estimateMaxGasAmount?: boolean },
+    query?: {
+      estimateGasUnitPrice?: boolean;
+      estimateMaxGasAmount?: boolean;
+      estimatePrioritizedGasUnitPrice: boolean;
+    },
   ): Promise<Gen.UserTransaction[]> {
     let signedTxn: Uint8Array;
 
@@ -415,17 +421,24 @@ export class AptosClient {
    * transaction will be ignored and the estimated value will be used.
    * @param query?.estimateMaxGasAmount If set to true, the max gas value in the
    * transaction will be ignored and the maximum possible gas will be used.
+   * @param query?.estimatePrioritizedGasUnitPrice If set to true, the transaction will use a higher price than the
+   * original estimate.
    * @returns Simulation result in the form of UserTransaction.
    */
   @parseApiError
   async submitBCSSimulation(
     bcsBody: Uint8Array,
-    query?: { estimateGasUnitPrice?: boolean; estimateMaxGasAmount?: boolean },
+    query?: {
+      estimateGasUnitPrice?: boolean;
+      estimateMaxGasAmount?: boolean;
+      estimatePrioritizedGasUnitPrice?: boolean;
+    },
   ): Promise<Gen.UserTransaction[]> {
     // Need to construct a customized post request for transactions in BCS payload.
     const queryParams = {
       estimate_gas_unit_price: query?.estimateGasUnitPrice ?? false,
       estimate_max_gas_amount: query?.estimateMaxGasAmount ?? false,
+      estimate_prioritized_gas_unit_price: query?.estimatePrioritizedGasUnitPrice ?? false,
     };
     return this.client.request.request<Gen.UserTransaction[]>({
       url: "/transactions/simulate",

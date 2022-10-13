@@ -8,8 +8,8 @@ use crate::{
 };
 
 #[derive(AsChangeset, Debug, Insertable, Queryable)]
-#[diesel(table_name = "indexer_states")]
-#[changeset_options(treat_none_as_null = "true")]
+#[diesel(table_name = indexer_states)]
+#[diesel(treat_none_as_null = true)]
 pub struct IndexerState {
     pub substream_module: String,
     pub block_height: i64,

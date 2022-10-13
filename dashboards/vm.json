@@ -701,7 +701,7 @@
         "multiFormat": "",
         "query": "prometheus",
         "regex": "",
-        "current": { "text": null, "value": null },
+        "current": { "text": ["[TEST] TELEMETRY"], "value": "[TEST] TELEMETRY" },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -859,7 +859,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 2,
+  "version": 6,
   "links": [
     {
       "title": "aptos core",

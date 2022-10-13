@@ -1,0 +1,319 @@
+{
+  "uid": "2tR-VnS4z",
+  "slug": "",
+  "title": "Outliers",
+  "originalTitle": "",
+  "tags": ["aptos-core"],
+  "style": "dark",
+  "timezone": "",
+  "editable": true,
+  "hideControls": false,
+  "sharedCrosshair": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 74,
+      "isNew": false,
+      "span": 0,
+      "title": "Slow execution nodes (consensus)",
+      "transparent": false,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+          "expr": "rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "legendFormat": "__auto",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "scroll": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 75,
+      "isNew": false,
+      "span": 0,
+      "title": "Slow commit nodes (consensus)",
+      "transparent": false,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+          "expr": "rate(aptos_executor_commit_blocks_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "legendFormat": "__auto",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "scroll": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 77,
+      "isNew": false,
+      "span": 0,
+      "title": "Slow execution/apply nodes (state sync)",
+      "transparent": false,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+          "expr": "rate(aptos_executor_apply_chunk_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "legendFormat": "__auto",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+          "expr": "rate(aptos_executor_execute_chunk_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "scroll": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 78,
+      "isNew": false,
+      "span": 0,
+      "title": "Slow commit nodes (state sync)",
+      "transparent": false,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+          "expr": "rate(aptos_executor_commit_chunk_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "legendFormat": "__auto",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "scroll": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 76,
+      "isNew": false,
+      "span": 0,
+      "title": "IOPS",
+      "transparent": false,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
+      "targets": [
+        {
+          "refId": "Read",
+          "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+          "expr": "rate(node_linux_disk_num_reads{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "legendFormat": "__auto",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "Write",
+          "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+          "expr": "rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "legendFormat": "__auto",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "scroll": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 72,
+      "isNew": false,
+      "span": 0,
+      "title": "Lagging nodes",
+      "transparent": false,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "expr": "clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\", data_type=\"transactions\"} - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",  role=~\"$role_type\", type=\"synced\"}, 0)",
+          "legendFormat": "__auto",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "scroll": false
+    }
+  ],
+  "rows": null,
+  "templating": {
+    "list": [
+      {
+        "name": "Datasource",
+        "type": "datasource",
+        "datasource": null,
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": "prometheus",
+        "regex": ".*Prometheus.*|.*Victoria.*",
+        "current": { "text": ["VictoriaMetrics Global"], "value": "VictoriaMetrics Global" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "chain_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": { "query": "label_values(chain_name)", "refId": "StandardVariableQuery" },
+        "regex": "",
+        "current": { "text": ["3"], "value": "3" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": { "query": "label_values(namespace)", "refId": "StandardVariableQuery" },
+        "regex": "",
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "kubernetes_pod_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": true,
+        "multiFormat": "",
+        "query": { "query": "label_values(kubernetes_pod_name)", "refId": "StandardVariableQuery" },
+        "regex": "",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "role_type",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": "",
+        "multi": true,
+        "multiFormat": "",
+        "query": { "query": "label_values(role)", "refId": "StandardVariableQuery" },
+        "regex": "validator.*",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "refresh": false,
+  "schemaVersion": 37,
+  "version": 43,
+  "links": [
+    {
+      "title": "aptos core",
+      "type": "dashboards",
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["aptos-core"],
+      "targetBlank": true
+    }
+  ],
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": { "refresh_intervals": null, "time_options": null }
+}
