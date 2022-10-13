@@ -114,7 +114,6 @@ impl Transaction {
             .block_height
             .unwrap()
             .0 as i64;
-        println!("blabla: {:?}", transaction.transaction_info());
         let epoch = transaction.transaction_info().unwrap().epoch.unwrap().0 as i64;
         match transaction {
             APITransaction::UserTransaction(user_txn) => {
@@ -241,7 +240,6 @@ impl Transaction {
         let mut wsc_details = vec![];
 
         for txn in transactions {
-            println!("blablatxn: {:?}", txn);
             let (txn, txn_detail, mut event_list, mut wsc_list, mut wsc_detail_list) =
                 Self::from_transaction(txn);
             txns.push(txn);
