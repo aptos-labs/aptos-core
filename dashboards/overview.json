@@ -415,7 +415,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\", data_type=\"transactions\"} - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",  role=~\"validator\", type=\"synced\"}, 0) \u003e 50000 ",
+          "expr": "sort_desc(clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\", data_type=\"transactions\"} - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",  role=~\"validator\", type=\"synced\"}, 0) \u003e 50000 )",
           "instant": true,
           "format": "table"
         }
@@ -453,20 +453,8 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 5, "w": 4, "x": 9, "y": 6 },
-      "links": [],
-      "pluginVersion": "9.1.1",
-      "title": "Participating Stake ",
-      "type": "gauge",
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "id": 74,
       "maxDataPoints": 100,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -478,7 +466,19 @@
           "refId": "A",
           "step": 10
         }
-      ]
+      ],
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "gridPos": { "h": 5, "w": 4, "x": 9, "y": 6 },
+      "links": [],
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "9.1.1",
+      "title": "Participating Stake ",
+      "type": "gauge"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -493,6 +493,28 @@
       "type": "gauge",
       "type": "gauge",
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "gridPos": { "h": 5, "w": 4, "x": 13, "y": 6 },
+      "id": 75,
+      "maxDataPoints": 100,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
+          "interval": "10s",
+          "intervalFactor": 1,
+          "range": true,
+          "refId": "A",
+          "step": 10
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -513,30 +535,8 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 5, "w": 4, "x": 13, "y": 6 },
-      "maxDataPoints": 100,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "9.1.1",
-      "title": "Participating Validators ",
-      "id": 75,
       "links": [],
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editorMode": "code",
-          "expr": "quantile(0.5, aptos_chain_health_participating_num_validators_last_100_rounds{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}/aptos_chain_health_total_num_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})*100",
-          "interval": "10s",
-          "intervalFactor": 1,
-          "range": true,
-          "refId": "A",
-          "step": 10
-        }
-      ]
+      "title": "Participating Validators "
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2308,6 +2308,27 @@
         "sort": 0
       },
       {
+        "name": "metrics_source",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{}, metrics_source)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
         "name": "chain_name",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2318,12 +2339,36 @@
         "allValue": "",
         "multi": false,
         "multiFormat": "",
-        "query": { "query": "label_values(chain_name)", "refId": "StandardVariableQuery" },
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
+          "refId": "StandardVariableQuery"
+        },
         "regex": "",
         "current": { "text": ["3"], "value": "3" },
         "label": "",
         "hide": 0,
         "sort": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
       },
       {
         "name": "namespace",
@@ -2336,7 +2381,10 @@
         "allValue": ".*",
         "multi": false,
         "multiFormat": "",
-        "query": { "query": "label_values(namespace)", "refId": "StandardVariableQuery" },
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
         "regex": "",
         "current": { "text": ["All"], "value": "$__all" },
         "label": "",
@@ -2354,7 +2402,10 @@
         "allValue": ".*",
         "multi": true,
         "multiFormat": "",
-        "query": { "query": "label_values(kubernetes_pod_name)", "refId": "StandardVariableQuery" },
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "refId": "StandardVariableQuery"
+        },
         "regex": "",
         "current": { "text": ["All"], "value": ["$__all"] },
         "label": "",
@@ -2407,7 +2458,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 94,
+  "version": 109,
   "links": [
     {
       "title": "aptos-core",
