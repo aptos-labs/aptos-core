@@ -473,6 +473,8 @@ impl RosettaClient {
                         .public_key()
                         .try_into()
                         .unwrap()]),
+                    gas_price_multiplier: None,
+                    gas_price_priority: None,
                 }),
             })
             .await?;

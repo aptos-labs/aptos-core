@@ -37,9 +37,9 @@ You can find out when the next epoch starts in multiple ways:
 
 **Use the CLI**
 ```bash
-aptos node show-epoch-info --url https://fullnode.premainnet.aptoslabs.com/v1
+aptos node show-epoch-info --url https://fullnode.mainnet.aptoslabs.com/v1
 ```
-which produces an output like below (example output for premainnet):
+which produces an output like below (example output for mainnet):
 ```json
 {
   "Result": {
@@ -130,7 +130,7 @@ Follow these steps on the Aptos Explorer:
 
 ### How to see previous epoch rewards
 
-To see the previous epoch rewards for a given pool address, click on a URL of the below format. This example is for Premainnet and for the pool address `0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4`. Use the network and pool address of your choice in this place:
+To see the previous epoch rewards for a given pool address, click on a URL of the below format. This example is for mainnet and for the pool address `0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4`. Use the network and pool address of your choice in this place:
 
 ```html
 https://fullnode.mainnet.aptoslabs.com/v1/accounts/0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4/events/10
