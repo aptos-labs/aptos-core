@@ -8,7 +8,7 @@ hidden: false
 
 Use these Aptos software development kits (SDKs), in combination with the [Aptos CLI](/cli-tools/aptos-cli-tool/index.md) for your development on the Aptos blockchain. 
 
-- ### [Typescript SDK](ts-sdk/index.md)
+- ### [TypeScript SDK](ts-sdk/index.md)
 
 - ### [Python SDK](python-sdk.md)
 
