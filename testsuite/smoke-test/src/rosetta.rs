@@ -722,7 +722,7 @@ async fn test_block() {
         Duration::from_secs(5),
         Some(0),
         // TODO(greg): Revisit after fixing gas estimation.
-        Some(10000),
+        Some(1000000),
         None,
     )
     .await
@@ -740,7 +740,7 @@ async fn test_block() {
         Duration::from_secs(5),
         None,
         // TODO(greg): Revisit after fixing gas estimation.
-        Some(10000),
+        Some(1000000),
         None,
     )
     .await
@@ -755,7 +755,7 @@ async fn test_block() {
         Duration::from_secs(5),
         Some(seq_no_0 + 1),
         // TODO(greg): revisit after fixing gas estimation
-        Some(10000),
+        Some(1000000),
         None,
     )
     .await
@@ -771,7 +771,7 @@ async fn test_block() {
         Duration::from_secs(5),
         None,
         // TODO(greg): Revisit after fixing gas estimation.
-        Some(10000),
+        Some(1000000),
         None,
     )
     .await
@@ -785,7 +785,7 @@ async fn test_block() {
         20,
         Duration::from_secs(5),
         None,
-        Some(20000),
+        Some(2000000),
         Some(min_gas_price),
     )
     .await

@@ -7,7 +7,7 @@ import { AptosAccount } from "./aptos_account";
 import { HexString } from "./hex_string";
 import * as Gen from "./generated/index";
 
-import { NODE_URL, FAUCET_URL, getFaucetClient } from "./utils/test_helper.test";
+import { NODE_URL, getFaucetClient } from "./utils/test_helper.test";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
@@ -25,12 +25,12 @@ test(
     const faucetClient = getFaucetClient();
 
     const account1 = new AptosAccount();
-    const txns = await faucetClient.fundAccount(account1.address(), 1000000);
+    const txns = await faucetClient.fundAccount(account1.address(), 10000000);
     const tx0 = await client.getTransactionByHash(txns[0]);
     expect(tx0.type).toBe("user_transaction");
     let resources = await client.getAccountResources(account1.address());
     let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("1000000");
+    expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("10000000");
 
     const account2 = new AptosAccount();
     await faucetClient.fundAccount(account2.address(), 0);

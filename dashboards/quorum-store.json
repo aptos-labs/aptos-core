@@ -481,18 +481,18 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 7, "w": 6, "x": 6, "y": 17 },
-      "id": 140,
+      "id": 200,
       "isNew": false,
       "span": 0,
-      "title": "MISSED_BATCHES_COUNT",
-      "description": "Count of the missed batches when execute.",
+      "title": "DELIVERED_FRAGMENTS_COUNT",
+      "description": "Count of the delivered fragments since last restart.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_missed_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "expr": "rate(quorum_store_delivered_fragments_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -536,18 +536,18 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 7, "w": 6, "x": 12, "y": 17 },
-      "id": 156,
+      "id": 202,
       "isNew": false,
       "span": 0,
-      "title": "TIMEOUT_BATCHES_COUNT",
-      "description": "Count of the timeout batches at the sender side.",
+      "title": "DELIVERED_END_BATCH_COUNT",
+      "description": "Count of the delivered end batch since last restart.",
       "transparent": false,
       "type": "timeseries",
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_timeout_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "expr": "rate(quorum_store_delivered_end_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -752,6 +752,116 @@
       }
     },
     {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 7, "w": 6, "x": 12, "y": 24 },
+      "id": 156,
+      "isNew": false,
+      "span": 0,
+      "title": "TIMEOUT_BATCHES_COUNT",
+      "description": "Count of the timeout batches at the sender side.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_timeout_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 24 },
+      "id": 140,
+      "isNew": false,
+      "span": 0,
+      "title": "MISSED_BATCHES_COUNT",
+      "description": "Count of the missed batches when execute.",
+      "transparent": false,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
+          "expr": "rate(quorum_store_missed_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "legendFormat": "__auto"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "linear" },
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        }
+      }
+    },
+    {
       "editable": false,
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
@@ -835,7 +945,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "expr": "rate(quorum_store_delivered_batch_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "expr": "rate(quorum_store_sent_batch_request_retry_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto"
         }
       ],
@@ -1782,7 +1892,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 23,
+  "version": 26,
   "links": [],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }

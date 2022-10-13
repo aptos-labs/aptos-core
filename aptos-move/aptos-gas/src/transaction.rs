@@ -53,6 +53,7 @@ impl StorageGasParameters {
     pub fn calculate_write_set_gas<'a>(
         &self,
         ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        feature_version: u64,
     ) -> InternalGas {
         use WriteOp::*;
 
@@ -62,26 +63,14 @@ impl StorageGasParameters {
         let mut num_bytes_write = NumBytes::zero();
 
         for (key, op) in ops.into_iter() {
-            let key_size = || {
-                NumBytes::new(
-                    key.encode()
-                        .expect("Should be able to serialize state key")
-                        .len() as u64,
-                )
-            };
-
-            match op {
+            match &op {
                 Creation(data) => {
                     num_items_create += 1.into();
-
-                    num_bytes_create += key_size();
-                    num_bytes_create += NumBytes::new(data.len() as u64);
+                    num_bytes_create += Self::write_op_size(key, data, feature_version);
                 }
                 Modification(data) => {
                     num_items_write += 1.into();
-
-                    num_bytes_write += key_size();
-                    num_bytes_write += NumBytes::new(data.len() as u64);
+                    num_bytes_write += Self::write_op_size(key, data, feature_version);
                 }
                 Deletion => (),
             }
@@ -91,6 +80,25 @@ impl StorageGasParameters {
             + num_items_write * self.per_item_write
             + num_bytes_create * self.per_byte_create
             + num_bytes_write * self.per_byte_write
+    }
+
+    fn write_op_size(key: &StateKey, value: &[u8], feature_version: u64) -> NumBytes {
+        let value_size = NumBytes::new(value.len() as u64);
+
+        if feature_version > 2 {
+            let key_size = NumBytes::new(key.size() as u64);
+            let kb = NumBytes::new(1024);
+            (key_size + value_size)
+                .checked_sub(kb)
+                .unwrap_or(NumBytes::zero())
+        } else {
+            let key_size = NumBytes::new(
+                key.encode()
+                    .expect("Should be able to serialize state key")
+                    .len() as u64,
+            );
+            key_size + value_size
+        }
     }
 }
 
@@ -125,7 +133,7 @@ crate::params::define_gas_parameters!(
         [
             maximum_number_of_gas_units: Gas,
             "maximum_number_of_gas_units",
-            10_000_000
+            2_000_000
         ],
         // The minimum gas price that a transaction can be submitted with.
         // TODO(Gas): should probably change this to something > 0
@@ -138,7 +146,7 @@ crate::params::define_gas_parameters!(
         [
             max_price_per_gas_unit: FeePerGasUnit,
             "max_price_per_gas_unit",
-            10_000
+            10_000_000_000
         ],
         [
             max_transaction_size_in_bytes: NumBytes,

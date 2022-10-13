@@ -35,8 +35,7 @@ class CoinClient(RestClient):
         payload = EntryFunction.natural(
             "0x1::managed_coin",
             "register",
-            [TypeTag(StructTag.from_str(
-                f"{coin_address}::moon_coin::MoonCoin"))],
+            [TypeTag(StructTag.from_str(f"{coin_address}::moon_coin::MoonCoin"))],
             [],
         )
         signed_transaction = self.create_single_signer_bcs_transaction(
@@ -52,8 +51,7 @@ class CoinClient(RestClient):
         payload = EntryFunction.natural(
             "0x1::managed_coin",
             "mint",
-            [TypeTag(StructTag.from_str(
-                f"{minter.address()}::moon_coin::MoonCoin"))],
+            [TypeTag(StructTag.from_str(f"{minter.address()}::moon_coin::MoonCoin"))],
             [
                 TransactionArgument(receiver_address, Serializer.struct),
                 TransactionArgument(amount, Serializer.u64),

@@ -5,7 +5,10 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::{signatures::Signature, transactions::Transaction};
+use super::{
+    signatures::Signature,
+    transactions::{Transaction, TransactionQuery},
+};
 use crate::{
     schema::user_transactions,
     util::{parse_timestamp, parse_timestamp_secs, u64_to_bigdecimal},
@@ -16,15 +19,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Associations,
-    Clone,
-    Deserialize,
-    Debug,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Queryable,
-    Serialize,
+    Associations, Clone, Deserialize, Debug, FieldCount, Identifiable, Insertable, Serialize,
 )]
 #[diesel(belongs_to(Transaction, foreign_key = version))]
 #[diesel(primary_key(version))]
@@ -40,11 +35,35 @@ pub struct UserTransaction {
     pub gas_unit_price: BigDecimal,
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
+    pub epoch: i64,
+}
+
+/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
+#[derive(Associations, Clone, Deserialize, Debug, Identifiable, Queryable, Serialize)]
+#[diesel(belongs_to(TransactionQuery, foreign_key = version))]
+#[diesel(primary_key(version))]
+#[diesel(table_name = user_transactions)]
+pub struct UserTransactionQuery {
+    pub version: i64,
+    pub block_height: i64,
+    pub parent_signature_type: String,
+    pub sender: String,
+    pub sequence_number: i64,
+    pub max_gas_amount: BigDecimal,
+    pub expiration_timestamp_secs: chrono::NaiveDateTime,
+    pub gas_unit_price: BigDecimal,
+    pub timestamp: chrono::NaiveDateTime,
+    pub entry_function_id_str: String,
     pub inserted_at: chrono::NaiveDateTime,
+    pub epoch: i64,
 }
 
 impl UserTransaction {
-    pub fn from_transaction(txn: &APIUserTransaction, block_height: i64) -> (Self, Vec<Signature>) {
+    pub fn from_transaction(
+        txn: &APIUserTransaction,
+        block_height: i64,
+        epoch: i64,
+    ) -> (Self, Vec<Signature>) {
         let version = txn.info.version.0 as i64;
         (
             Self {
@@ -65,13 +84,13 @@ impl UserTransaction {
                 ),
                 gas_unit_price: u64_to_bigdecimal(txn.request.gas_unit_price.0),
                 timestamp: parse_timestamp(txn.timestamp.0, version),
-                inserted_at: chrono::Utc::now().naive_utc(),
                 entry_function_id_str: match &txn.request.payload {
                     TransactionPayload::EntryFunctionPayload(payload) => {
                         payload.function.to_string()
                     }
                     _ => String::default(),
                 },
+                epoch,
             },
             txn.request
                 .signature

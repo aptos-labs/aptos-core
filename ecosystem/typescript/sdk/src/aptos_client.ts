@@ -31,6 +31,7 @@ import {
   Uint64,
   AnyNumber,
 } from "./bcs";
+import { Ed25519PublicKey } from "./aptos_types";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -357,8 +358,9 @@ export class AptosClient {
    * Generates and submits a transaction to the transaction simulation
    * endpoint. For this we generate a transaction with a fake signature.
    *
-   * @param accountFrom The account that will be used to send the transaction
-   * for simulation.
+   * @param accountOrPubkey The sender or sender's public key. When private key is available, `AptosAccount` instance
+   * can be used to send the transaction for simulation. If private key is not available, sender's public key can be
+   * used to send the transaction for simulation.
    * @param rawTransaction The raw transaction to be simulated, likely created
    * by calling the `generateTransaction` function.
    * @param query.estimateGasUnitPrice If set to true, the gas unit price in the
@@ -369,11 +371,22 @@ export class AptosClient {
    *
    */
   async simulateTransaction(
-    accountFrom: AptosAccount,
+    accountOrPubkey: AptosAccount | Ed25519PublicKey,
     rawTransaction: TxnBuilderTypes.RawTransaction,
     query?: { estimateGasUnitPrice?: boolean; estimateMaxGasAmount?: boolean },
   ): Promise<Gen.UserTransaction[]> {
-    const signedTxn = AptosClient.generateBCSSimulation(accountFrom, rawTransaction);
+    let signedTxn: Uint8Array;
+
+    if (accountOrPubkey instanceof AptosAccount) {
+      signedTxn = AptosClient.generateBCSSimulation(accountOrPubkey, rawTransaction);
+    } else {
+      const txnBuilder = new TransactionBuilderEd25519(() => {
+        const invalidSigBytes = new Uint8Array(64);
+        return new TxnBuilderTypes.Ed25519Signature(invalidSigBytes);
+      }, accountOrPubkey.toBytes());
+
+      signedTxn = txnBuilder.sign(rawTransaction);
+    }
     return this.submitBCSSimulation(signedTxn, query);
   }
 

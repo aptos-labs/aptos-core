@@ -175,11 +175,7 @@ fn insert_tokens(
             diesel::insert_into(schema::tokens::table)
                 .values(&tokens_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, property_version, transaction_version))
-                .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -207,12 +203,7 @@ fn insert_token_ownerships(
                     transaction_version,
                     table_handle,
                 ))
-                .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    table_type.eq(excluded(table_type)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -233,10 +224,7 @@ fn insert_token_datas(
                 .values(&token_datas_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, transaction_version))
                 .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                )),
+                .set((description.eq(excluded(description)),)),
             None,
         )?;
     }
@@ -259,11 +247,7 @@ fn insert_collection_datas(
             diesel::insert_into(schema::collection_datas::table)
                 .values(&collection_datas_to_insert[start_ind..end_ind])
                 .on_conflict((collection_data_id_hash, transaction_version))
-                .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    table_handle.eq(excluded(table_handle)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -292,7 +276,6 @@ fn insert_current_token_ownerships(
                     amount.eq(excluded(amount)),
                     token_properties.eq(excluded(token_properties)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                     table_type.eq(excluded(table_type)),
                 )),
@@ -335,8 +318,8 @@ fn insert_current_token_datas(
                     royalty_mutable.eq(excluded(royalty_mutable)),
                     default_properties.eq(excluded(default_properties)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    description.eq(excluded(description)),
                 )),
             Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -370,7 +353,6 @@ fn insert_current_collection_datas(
                     uri_mutable.eq(excluded(uri_mutable)),
                     description_mutable.eq(excluded(description_mutable)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                     table_handle.eq(excluded(table_handle)),
                 )),
             Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
@@ -432,7 +414,6 @@ fn insert_current_token_claims(
                     amount.eq(excluded(amount)),
                     table_handle.eq(excluded(table_handle)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -459,7 +440,6 @@ fn insert_current_ans_lookups(
                     registered_address.eq(excluded(registered_address)),
                     expiration_timestamp.eq(excluded(expiration_timestamp)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
             )?;

@@ -27,3 +27,11 @@ pub static APTOS_JELLYFISH_LEAF_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static APTOS_JELLYFISH_LEAF_DELETION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_jellyfish_leaf_deletion_count",
+        "The number of deletions happened in JMT."
+    )
+    .unwrap()
+});

@@ -91,6 +91,15 @@ pub static TOTAL_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Voting power of the validator
+pub static VALIDATOR_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_validator_voting_power",
+        "Voting power of the validator"
+    )
+    .unwrap()
+});
+
 /// Number of rounds we were collecting votes for proposer
 /// (similar to PROPOSALS_COUNT, but can be larger, if we failed in creating/sending of the proposal)
 pub static PROPOSER_COLLECTED_ROUND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
@@ -485,6 +494,15 @@ pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_buffer_manager_retry_count",
         "Count of the buffer manager retry requests since last restart"
+    )
+    .unwrap()
+});
+
+/// Time it takes for proposer election to compute proposer (when not cached)
+pub static PROPOSER_ELECTION_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_proposer_election_duration",
+        "Time it takes for proposer election to compute proposer (when not cached)"
     )
     .unwrap()
 });

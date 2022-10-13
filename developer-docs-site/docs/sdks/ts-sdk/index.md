@@ -1,5 +1,5 @@
 ---
-title: "TS SDK"
+title: "Typescript Index"
 slug: "index"
 hidden: false
 ---
@@ -8,3 +8,4 @@ hidden: false
 
 - ### [Typescript SDK Installation](typescript-sdk.md)
 - ### [Typescript SDK Overview](typescript-sdk-overview.md)
+- ### [Typescript SDK Reference](https://aptos-labs.github.io/ts-sdk-doc/)

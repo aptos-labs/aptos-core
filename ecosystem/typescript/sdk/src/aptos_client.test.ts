@@ -9,6 +9,7 @@ import { TokenClient } from "./token_client";
 import { HexString } from "./hex_string";
 import { getFaucetClient, NODE_URL } from "./utils/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "./bcs";
+import { Ed25519PublicKey } from "./aptos_types";
 
 const account = "0x1::account::Account";
 
@@ -170,11 +171,11 @@ test(
     const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
 
     const mutisigAccountAddress = authKey.derivedAddress();
-    await faucetClient.fundAccount(mutisigAccountAddress, 5000000);
+    await faucetClient.fundAccount(mutisigAccountAddress, 50000000);
 
     let resources = await client.getAccountResources(mutisigAccountAddress);
     let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("5000000");
+    expect((accountResource!.data as any).coin.value).toBe("50000000");
 
     const account4 = new AptosAccount();
     await faucetClient.fundAccount(account4.address(), 0);
@@ -254,24 +255,29 @@ test(
       arguments: [account2.address().hex(), 100000],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
-    const transactionRes = (
-      await client.simulateTransaction(account1, txnRequest, { estimateGasUnitPrice: true, estimateMaxGasAmount: true })
-    )[0];
-    expect(parseInt(transactionRes.gas_used, 10) > 0);
-    expect(transactionRes.success);
-    const account2AptosCoin = transactionRes.changes.filter((change) => {
-      if (change.type !== "write_resource") {
-        return false;
-      }
-      const write = change as Gen.WriteResource;
+    [account1, new Ed25519PublicKey(account1.pubKey().toUint8Array())].forEach(async (accountOrAddress) => {
+      const transactionRes = (
+        await client.simulateTransaction(accountOrAddress, txnRequest, {
+          estimateGasUnitPrice: true,
+          estimateMaxGasAmount: true,
+        })
+      )[0];
+      expect(parseInt(transactionRes.gas_used, 10) > 0);
+      expect(transactionRes.success);
+      const account2AptosCoin = transactionRes.changes.filter((change) => {
+        if (change.type !== "write_resource") {
+          return false;
+        }
+        const write = change as Gen.WriteResource;
 
-      return (
-        write.address === account2.address().hex() &&
-        write.data.type === aptosCoin &&
-        (write.data.data as { coin: { value: string } }).coin.value === "1100000"
-      );
+        return (
+          write.address === account2.address().hex() &&
+          write.data.type === aptosCoin &&
+          (write.data.data as { coin: { value: string } }).coin.value === "1100000"
+        );
+      });
+      expect(account2AptosCoin).toHaveLength(1);
     });
-    expect(account2AptosCoin).toHaveLength(1);
     await checkAptosCoin();
   },
   30 * 1000,
@@ -346,8 +352,8 @@ test(
     const bob = new AptosAccount();
 
     // Fund both Alice's and Bob's Account
-    await faucetClient.fundAccount(alice.address(), 10000000);
-    await faucetClient.fundAccount(bob.address(), 10000000);
+    await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(bob.address(), 100000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";

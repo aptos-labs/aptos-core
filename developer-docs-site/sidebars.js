@@ -57,7 +57,6 @@ const sidebars = {
         "concepts/basics-fullnodes",
         "concepts/basics-validator-nodes",
         "concepts/basics-node-networks-sync",
-        "concepts/state-sync",
         "concepts/staking",
         "concepts/governance",
       ],
@@ -72,6 +71,8 @@ const sidebars = {
         "guides/basics-life-of-txn",
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
+        "guides/state-sync",
+        "guides/data-pruning",
         "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
@@ -96,6 +97,7 @@ const sidebars = {
     },
     "nodes/aptos-deployments",
     "nodes/leaderboard-metrics",
+    "nodes/node-files",
     /** Delete during clean up
     {
       type: "category",
@@ -149,6 +151,7 @@ const sidebars = {
             },
             "nodes/validator-node/operator/node-liveness-criteria",
             "nodes/validator-node/operator/connect-to-aptos-network",
+            "nodes/validator-node/operator/staking-pool-operations",
             "nodes/validator-node/operator/shutting-down-nodes",
           ],
         },

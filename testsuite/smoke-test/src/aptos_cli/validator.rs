@@ -8,7 +8,7 @@ use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos::test::ValidatorPerformance;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::{bls12381, x25519};
+use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{Client, State};
@@ -520,6 +520,10 @@ async fn test_register_and_update_validator() {
     assert_eq!(
         validator_config.consensus_public_key,
         keys.consensus_public_key()
+            .to_encoded_string()
+            .unwrap()
+            .as_bytes()
+            .to_vec()
     );
 
     let new_port = 5678;
@@ -627,7 +631,8 @@ async fn test_join_and_leave_validator() {
     gas_used += get_gas(
         cli.add_stake(validator_cli_index, stake_coins)
             .await
-            .unwrap(),
+            .unwrap()[0]
+            .clone(),
     );
 
     cli.assert_account_balance_now(
@@ -707,7 +712,8 @@ async fn test_join_and_leave_validator() {
     gas_used += get_gas(
         cli.unlock_stake(validator_cli_index, unlock_stake)
             .await
-            .unwrap(),
+            .unwrap()[0]
+            .clone(),
     );
 
     // Conservatively wait until the recurring lockup is over.
@@ -753,9 +759,9 @@ async fn test_owner_create_and_delegate_flow() {
 
     let mut keygen = KeyGen::from_os_rng();
 
-    let owner_initial_coins = 1100000;
-    let voter_initial_coins = 10000;
-    let operator_initial_coins = 10000;
+    let owner_initial_coins = 20000000;
+    let voter_initial_coins = 1000000;
+    let operator_initial_coins = 1000000;
 
     // Owner of the coins receives coins
     let owner_cli_index = cli

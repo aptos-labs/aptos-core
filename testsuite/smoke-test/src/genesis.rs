@@ -39,6 +39,8 @@ async fn test_genesis_transaction_flow() {
     workspace_builder::get_bin("db-restore");
     workspace_builder::get_bin("db-backup-verify");
 
+    println!("0. pre-building finished.");
+
     let num_nodes = 5;
     let (mut env, cli, _) = SwarmBuilder::new_local(num_nodes)
         .with_aptos()

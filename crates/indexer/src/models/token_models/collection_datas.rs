@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 const QUERY_RETRIES: u32 = 5;
 const QUERY_RETRY_DELAY_MS: u64 = 500;
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(collection_data_id_hash, transaction_version))]
 #[diesel(table_name = collection_datas)]
 pub struct CollectionData {
@@ -37,12 +37,11 @@ pub struct CollectionData {
     pub maximum_mutable: bool,
     pub uri_mutable: bool,
     pub description_mutable: bool,
-    // Default time columns
-    pub inserted_at: chrono::NaiveDateTime,
     pub table_handle: String,
+    pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(collection_data_id_hash))]
 #[diesel(table_name = current_collection_datas)]
 pub struct CurrentCollectionData {
@@ -57,15 +56,36 @@ pub struct CurrentCollectionData {
     pub uri_mutable: bool,
     pub description_mutable: bool,
     pub last_transaction_version: i64,
-    // Default time columns
+    pub table_handle: String,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+}
+
+/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
+#[derive(Debug, Identifiable, Queryable)]
+#[diesel(primary_key(collection_data_id_hash))]
+#[diesel(table_name = current_collection_datas)]
+pub struct CurrentCollectionDataQuery {
+    pub collection_data_id_hash: String,
+    pub creator_address: String,
+    pub collection_name: String,
+    pub description: String,
+    pub metadata_uri: String,
+    pub supply: BigDecimal,
+    pub maximum: BigDecimal,
+    pub maximum_mutable: bool,
+    pub uri_mutable: bool,
+    pub description_mutable: bool,
+    pub last_transaction_version: i64,
     pub inserted_at: chrono::NaiveDateTime,
     pub table_handle: String,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
 
 impl CollectionData {
     pub fn from_write_table_item(
         table_item: &APIWriteTableItem,
         txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
         conn: &mut PgPoolConnection,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionData)>> {
@@ -110,8 +130,8 @@ impl CollectionData {
                     maximum_mutable: collection_data.mutability_config.maximum,
                     uri_mutable: collection_data.mutability_config.uri,
                     description_mutable: collection_data.mutability_config.description,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                     table_handle: table_handle.clone(),
+                    transaction_timestamp: txn_timestamp,
                 },
                 CurrentCollectionData {
                     collection_data_id_hash,
@@ -125,8 +145,8 @@ impl CollectionData {
                     uri_mutable: collection_data.mutability_config.uri,
                     description_mutable: collection_data.mutability_config.description,
                     last_transaction_version: txn_version,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                     table_handle,
+                    last_transaction_timestamp: txn_timestamp,
                 },
             )))
         } else {
@@ -146,7 +166,7 @@ impl CollectionData {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match CurrentCollectionData::get_by_table_handle(conn, table_handle) {
+            match CurrentCollectionDataQuery::get_by_table_handle(conn, table_handle) {
                 Ok(current_collection_data) => return Ok(current_collection_data.creator_address),
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
@@ -157,7 +177,7 @@ impl CollectionData {
     }
 }
 
-impl CurrentCollectionData {
+impl CurrentCollectionDataQuery {
     pub fn get_by_table_handle(
         conn: &mut PgPoolConnection,
         table_handle: &str,

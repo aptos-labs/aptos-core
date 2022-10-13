@@ -40,7 +40,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "quantile(0.5, rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -98,7 +98,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_last_committed_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "quantile(0.5, rate(aptos_consensus_last_committed_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -1943,7 +1943,7 @@
       "transparent": false,
       "type": "row",
       "panels": [],
-      "collapsed": true
+      "collapsed": false
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2245,7 +2245,7 @@
       "transparent": false,
       "type": "row",
       "panels": [],
-      "collapsed": true
+      "collapsed": false
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2377,7 +2377,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "aptos_total_voting_power{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} / 100000000",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
         }
@@ -2623,7 +2623,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "aptos_consensus_num_blocks_in_pipeline{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "{{stage}}",
           "format": "time_series"
         }
       ],
@@ -3391,7 +3391,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_proposals_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_proposals_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "format": "time_series"
@@ -3502,1118 +3502,1119 @@
       "title": "Message queue",
       "transparent": false,
       "type": "row",
-      "panels": [],
-      "collapsed": false
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 169 },
-      "id": 65,
-      "isNew": false,
-      "span": 0,
-      "title": "Network -\u003e Consensus Enqueue rate",
-      "description": "The channel metrics related to network layer to consensus.",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
+      "panels": [
         {
-          "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 0, "y": 57 },
+          "id": 65,
+          "isNew": false,
+          "span": 0,
+          "title": "Network -\u003e Consensus Enqueue rate",
+          "description": "The channel metrics related to network layer to consensus.",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
           },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 8, "y": 57 },
+          "id": 104,
+          "isNew": false,
+          "span": 0,
+          "title": "Network -\u003e Consensus Dequeue rate",
+          "description": "The channel metrics related to network layer to consensus.",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 57 },
+          "id": 91,
+          "isNew": false,
+          "span": 0,
+          "title": "Network -\u003e Consensus Dropped rate",
+          "description": "The channel metrics related to network layer to consensus.",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisLabel": "dropped messages / s",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 0, "y": 66 },
+          "id": 67,
+          "isNew": false,
+          "span": 0,
+          "title": "Block retrieval Enqueue rate",
+          "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 8, "y": 66 },
+          "id": 105,
+          "isNew": false,
+          "span": 0,
+          "title": "Block retrieval Dequeue rate",
+          "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 66 },
+          "id": 92,
+          "isNew": false,
+          "span": 0,
+          "title": "Block retrieval Dropped rate",
+          "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisLabel": "messages dropped / s",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 0, "y": 75 },
+          "id": 66,
+          "isNew": false,
+          "span": 0,
+          "title": "Epoch manager Enqueue rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 8, "y": 75 },
+          "id": 106,
+          "isNew": false,
+          "span": 0,
+          "title": "Epoch manager Dequeue rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 75 },
+          "id": 93,
+          "isNew": false,
+          "span": 0,
+          "title": "Epoch manager Dropped rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisLabel": "dropped messages / s",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 0, "y": 84 },
+          "id": 107,
+          "isNew": false,
+          "span": 0,
+          "title": "Round manager Enqueue rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 8, "y": 84 },
+          "id": 108,
+          "isNew": false,
+          "span": 0,
+          "title": "Round manager Dequeue rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 84 },
+          "id": 109,
+          "isNew": false,
+          "span": 0,
+          "title": "Round manager Dropped rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisLabel": "dropped messages / s",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 0, "y": 93 },
+          "id": 110,
+          "isNew": false,
+          "span": 0,
+          "title": "Buffer manager Enqueue rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 8, "y": 93 },
+          "id": 111,
+          "isNew": false,
+          "span": 0,
+          "title": "Buffer manager Dequeue rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\",namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 93 },
+          "id": 112,
+          "isNew": false,
+          "span": 0,
+          "title": "Buffer manager Dropped rate",
+          "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisLabel": "dropped messages / s",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 0, "y": 102 },
+          "id": 68,
+          "isNew": false,
+          "span": 0,
+          "title": "Pending self message",
+          "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_consensus_pending_self_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 8, "y": 102 },
+          "id": 94,
+          "isNew": false,
+          "span": 0,
+          "title": "Pending round local timeouts",
+          "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_consensus_pending_round_timeouts{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 102 },
+          "id": 117,
+          "isNew": false,
+          "span": 0,
+          "title": "Pending state sync notification",
+          "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "C",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_consensus_pending_state_sync_notification{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 0, "y": 111 },
+          "id": 113,
+          "isNew": false,
+          "span": 0,
+          "title": "Consensus Message Sent",
+          "description": "The number of messages sent group by types",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_sent_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{type}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editable": false,
+          "error": false,
+          "gridPos": { "h": 9, "w": 8, "x": 8, "y": 111 },
+          "id": 114,
+          "isNew": false,
+          "span": 0,
+          "title": "Consensus Message Received",
+          "description": "The number of messages received group by types",
+          "transparent": false,
+          "type": "timeseries",
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "rate(aptos_consensus_received_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{type}}"
+            }
+          ],
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineStyle": { "fill": "" },
+                "scaleDistribution": { "type": "linear" },
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              }
+            }
           }
         }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 169 },
-      "id": 104,
-      "isNew": false,
-      "span": 0,
-      "title": "Network -\u003e Consensus Dequeue rate",
-      "description": "The channel metrics related to network layer to consensus.",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
       ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 169 },
-      "id": 91,
-      "isNew": false,
-      "span": 0,
-      "title": "Network -\u003e Consensus Dropped rate",
-      "description": "The channel metrics related to network layer to consensus.",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisLabel": "dropped messages / s",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 178 },
-      "id": 67,
-      "isNew": false,
-      "span": 0,
-      "title": "Block retrieval Enqueue rate",
-      "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 178 },
-      "id": 105,
-      "isNew": false,
-      "span": 0,
-      "title": "Block retrieval Dequeue rate",
-      "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 178 },
-      "id": 92,
-      "isNew": false,
-      "span": 0,
-      "title": "Block retrieval Dropped rate",
-      "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisLabel": "messages dropped / s",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 187 },
-      "id": 66,
-      "isNew": false,
-      "span": 0,
-      "title": "Epoch manager Enqueue rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 187 },
-      "id": 106,
-      "isNew": false,
-      "span": 0,
-      "title": "Epoch manager Dequeue rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 187 },
-      "id": 93,
-      "isNew": false,
-      "span": 0,
-      "title": "Epoch manager Dropped rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisLabel": "dropped messages / s",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 196 },
-      "id": 107,
-      "isNew": false,
-      "span": 0,
-      "title": "Round manager Enqueue rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 196 },
-      "id": 108,
-      "isNew": false,
-      "span": 0,
-      "title": "Round manager Dequeue rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 196 },
-      "id": 109,
-      "isNew": false,
-      "span": 0,
-      "title": "Round manager Dropped rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_round_manager_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisLabel": "dropped messages / s",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 205 },
-      "id": 110,
-      "isNew": false,
-      "span": 0,
-      "title": "Buffer manager Enqueue rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 205 },
-      "id": 111,
-      "isNew": false,
-      "span": 0,
-      "title": "Buffer manager Dequeue rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\",namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 205 },
-      "id": 112,
-      "isNew": false,
-      "span": 0,
-      "title": "Buffer manager Dropped rate",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisLabel": "dropped messages / s",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 214 },
-      "id": 68,
-      "isNew": false,
-      "span": 0,
-      "title": "Pending self message",
-      "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_consensus_pending_self_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 214 },
-      "id": 94,
-      "isNew": false,
-      "span": 0,
-      "title": "Pending round local timeouts",
-      "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_consensus_pending_round_timeouts{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 214 },
-      "id": 117,
-      "isNew": false,
-      "span": 0,
-      "title": "Pending state sync notification",
-      "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_consensus_pending_state_sync_notification{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 223 },
-      "id": 113,
-      "isNew": false,
-      "span": 0,
-      "title": "Consensus Message Sent",
-      "description": "The number of messages sent group by types",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_sent_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{type}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 223 },
-      "id": 114,
-      "isNew": false,
-      "span": 0,
-      "title": "Consensus Message Received",
-      "description": "The number of messages received group by types",
-      "transparent": false,
-      "type": "timeseries",
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_consensus_received_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{type}}"
-        }
-      ],
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "linear" },
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          }
-        }
-      }
+      "collapsed": true
     },
     {
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 232 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 169 },
       "id": 137,
       "isNew": false,
       "span": 0,
@@ -4627,7 +4628,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 233 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 170 },
       "id": 135,
       "isNew": false,
       "span": 0,
@@ -4682,7 +4683,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 233 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 170 },
       "id": 138,
       "isNew": false,
       "span": 0,
@@ -4737,7 +4738,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 233 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 170 },
       "id": 139,
       "isNew": false,
       "span": 0,
@@ -4792,7 +4793,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 241 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 178 },
       "id": 142,
       "isNew": false,
       "span": 0,
@@ -4847,7 +4848,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 241 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 178 },
       "id": 143,
       "isNew": false,
       "span": 0,
@@ -4860,7 +4861,7 @@
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "aptos_failed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} / clamp_min(aptos_failed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} + aptos_committed_proposals_in_window{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}, 1)",
-          "legendFormat": "__auto"
+          "legendFormat": "{{kubernetes_pod_name}}"
         }
       ],
       "options": {
@@ -4902,7 +4903,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 249 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 186 },
       "id": 144,
       "isNew": false,
       "span": 0,
@@ -4978,7 +4979,7 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 249 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 186 },
       "id": 145,
       "isNew": false,
       "span": 0,
@@ -5067,7 +5068,7 @@
         "multiFormat": "",
         "query": "prometheus",
         "regex": "",
-        "current": { "text": null, "value": null },
+        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -5078,14 +5079,14 @@
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "refresh": 1,
         "options": [],
-        "includeAll": false,
+        "includeAll": true,
         "allFormat": "",
-        "allValue": "",
+        "allValue": ".*",
         "multi": false,
         "multiFormat": "",
         "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
         "regex": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -5103,7 +5104,7 @@
         "multiFormat": "",
         "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
         "regex": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
+        "current": { "text": ["3"], "value": "3" },
         "label": "",
         "hide": 0,
         "sort": 1
@@ -5226,7 +5227,7 @@
   },
   "refresh": false,
   "schemaVersion": 37,
-  "version": 59,
+  "version": 66,
   "links": [
     {
       "title": "aptos-core",

@@ -229,10 +229,10 @@ class Script:
 
     def __eq__(self, other: ScriptArgument) -> bool:
         return (
-                self.code == other.code
-                and self.ty_args == other.ty_args
-                and self.args == other.args
-                )
+            self.code == other.code
+            and self.ty_args == other.ty_args
+            and self.args == other.args
+        )
 
     def __str__(self):
         return f"<{self.ty_args}>({self.args})"
@@ -244,7 +244,7 @@ class ScriptArgument:
     U128: int = 2
     ADDRESS: int = 3
     U8_VECTOR: int = 4
-    BOOL: int = 5,
+    BOOL: int = 5
 
     variant: int
     value: typing.Any

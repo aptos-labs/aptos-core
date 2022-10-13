@@ -15,6 +15,14 @@ fn main() {
         prev_dir.pop();
         println!(
             "cargo:rerun-if-changed={}",
+            prev_dir.join("aptos-names").join("sources").display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir.join("aptos-names").join("Move.toml").display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
             prev_dir.join("aptos-token").join("sources").display()
         );
         println!(
@@ -46,9 +54,13 @@ fn main() {
             prev_dir.join("move-stdlib").join("Move.toml").display()
         );
         ReleaseTarget::Head
-            .create_release(Some(
-                PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined")).join("head.mrb"),
-            ))
+            .create_release(
+                true,
+                Some(
+                    PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined"))
+                        .join("head.mrb"),
+                ),
+            )
             .expect("release build failed");
     }
 }
