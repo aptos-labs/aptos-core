@@ -63,9 +63,10 @@ where
         transport_reqs_rx: channel::Receiver<TransportRequest>,
         transport_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
     ) -> (Self, NetworkAddress) {
+        let addr_string = format!("{}", listen_addr);
         let (listener, listen_addr) = transport
             .listen_on(listen_addr)
-            .expect("Transport listen on fails");
+            .unwrap_or_else(|_| panic!("Transport listen on fails: {}", addr_string));
         debug!(
             NetworkSchema::new(&network_context),
             listen_address = listen_addr,

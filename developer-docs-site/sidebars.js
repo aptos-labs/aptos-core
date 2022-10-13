@@ -179,6 +179,7 @@ const sidebars = {
         "nodes/full-node/bootstrap-fullnode",
       ],
     },
+    "nodes/node-connections",
     {
       type: "category",
       label: "Local Testnet",
@@ -302,6 +303,7 @@ const sidebars = {
       value: "Tools",
       className: "sidebar-title",
     },
+    "guides/use-aptos-explorer",
     {
       type: "category",
       label: "SDKs",

@@ -11,6 +11,10 @@ This page shows the key updates to the developer documentation on this site.
 
 - [Aptos Explorer](https://explorer.aptoslabs.com/) offers [user documentation](/docs/guides/use-aptos-explorer.md) covering common use cases and popular Explorer screen descriptions in Aptos.dev.
 
+## 12 October 2022
+
+- Added [Node Connections](/docs/nodes/node-connections.md) document that describes how to configure node network connections.
+
 ## 11 October 2022
 
 - Added [Data Pruning](/docs/guides/data-pruning.md) document that describes how to change the data pruning settings.
