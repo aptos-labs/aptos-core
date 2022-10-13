@@ -1,13 +1,12 @@
 '''
 Today if 2 structs/enums use `CryptoHasher` derive and share the same name,
-the current `CryptoHasher` implemtation does not prevent hash input collision.
+the current `CryptoHasher` implementation does not prevent hash input collision.
 This can be a potential vulnerability.
 
 The easiest way is to let aptos developers ensure unique symbol names.
 
-This is a quick and dirty script to help find enum/structs in this repo that
+This script is a quick and dirty script to help find enum/structs in this repo that
 use `CryptoHasher` derive and share the same name.
-Ultimately it will be done by a rust lint.
 
 How to use:
     cargo doc --workspace --document-private-items
