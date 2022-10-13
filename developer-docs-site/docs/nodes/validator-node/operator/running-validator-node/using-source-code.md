@@ -143,12 +143,14 @@ With your development environment ready, now you can start to setup your validat
 12. Start your validator by running the below command:
 
     ```bash
+    cargo clean
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
     ```
 
     Run validator fullnode on **another machine**:
 
     ```bash
+    cargo clean
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
     ```
 
