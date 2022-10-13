@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pfn-addons.fullname" . }}-fullnode
+  labels:
+    {{- include "pfn-addons.labels" . | nindent 4 }}
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /v1/-/healthy
+spec:
+  selector:
+    app.kubernetes.io/part-of: aptos-fullnode
+    app.kubernetes.io/name: fullnode
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: NodePort
+  externalTrafficPolicy: Local

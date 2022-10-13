@@ -2788,7 +2788,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 11,
+  "version": 15,
   "links": [],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null }
