@@ -63,6 +63,7 @@ async fn test_block_request_no_txns() {
             assert!(payload.is_empty());
             match payload {
                 Payload::DirectMempool(txns) => assert!(txns.is_empty()),
+                _ => {}
             }
         }
     }

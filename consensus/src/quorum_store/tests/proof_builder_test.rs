@@ -23,7 +23,7 @@ async fn test_proof_builder_basic() {
     tokio::spawn(proof_builder.start(proof_builder_rx, verifier.clone()));
 
     let digest = compute_digest_from_signed_transaction(create_vec_signed_transactions(100));
-    let signed_digest_info = SignedDigestInfo::new(digest, LogicalTime::new(1, 20));
+    let signed_digest_info = SignedDigestInfo::new(digest, LogicalTime::new(1, 20),1, 1);
     let (proof_tx, proof_rx) = oneshot::channel();
 
     assert!(proof_builder_tx
@@ -36,7 +36,7 @@ async fn test_proof_builder_basic() {
         .is_ok());
     for i in 0..arc_signers.len() {
         let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone()).unwrap();
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signers[i].clone()).unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await
@@ -76,7 +76,7 @@ async fn test_proof_builder_basic() {
         .is_ok());
     for i in 0..arc_signers.len() {
         let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone()).unwrap();
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signers[i].clone()).unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await
@@ -99,7 +99,7 @@ async fn test_proof_builder_basic() {
         .is_ok());
     for _ in 0..arc_signers.len() {
         let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[1].clone()).unwrap();
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signers[1].clone()).unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await

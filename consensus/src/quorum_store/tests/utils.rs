@@ -55,7 +55,7 @@ pub fn create_vec_serialized_transactions(size: u64) -> Vec<SerializedTransactio
 }
 
 pub fn compute_digest_from_signed_transaction(data: Vec<SignedTransaction>) -> HashValue {
-    let mut hasher = DefaultHasher::new(b"QuorumStoreTest");
+    let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
     let serialized_data: Vec<u8> = data
         .iter()
         .map(|txn| to_bytes(txn).unwrap())

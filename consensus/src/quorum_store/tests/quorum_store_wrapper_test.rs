@@ -98,6 +98,7 @@ async fn test_batch_creation() {
         db_quota: 10000000000,
         mempool_txn_pull_max_count: 100,
         mempool_txn_pull_max_bytes: 1000000,
+        num_nodes_per_worker_handles: 2,
     };
 
     let mut wrapper = QuorumStoreWrapper::new(
@@ -204,6 +205,7 @@ async fn test_block_request() {
         db_quota: 10000000000,
         mempool_txn_pull_max_count: 100,
         mempool_txn_pull_max_bytes: 1000000,
+        num_nodes_per_worker_handles: 2,
     };
 
     let mut wrapper = QuorumStoreWrapper::new(
@@ -221,7 +223,7 @@ async fn test_block_request() {
 
     let digest = HashValue::random();
     let proof = ProofOfStore::new(
-        SignedDigestInfo::new(digest, LogicalTime::new(0, 10)),
+        SignedDigestInfo::new(digest, LogicalTime::new(0, 10), 1, 1),
         AggregateSignature::empty(),
     );
     wrapper.insert_proof(proof.clone());

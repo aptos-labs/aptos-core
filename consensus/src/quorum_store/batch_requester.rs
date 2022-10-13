@@ -144,7 +144,9 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
     }
 
     pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Vec<SignedTransaction>) {
+        println!("3.1");
         if self.digest_to_state.contains_key(&digest) {
+            println!("3.2");
             let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
             let serialized_payload: Vec<u8> = payload
                 .iter()
@@ -153,10 +155,12 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
                 .collect();
             hasher.update(&serialized_payload);
             if hasher.finish() == digest {
+                println!("3.2.1");
                 debug!("QS: serving batch digest = {}", digest);
                 let state = self.digest_to_state.remove(&digest).unwrap();
                 state.serve_request(digest, Some(payload));
             } else {
+                println!("3.2.2");
                 debug!("Payload does not fit digest")
             }
         }

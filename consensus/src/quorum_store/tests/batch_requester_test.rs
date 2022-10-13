@@ -28,6 +28,7 @@ async fn test_batch_requester() {
     let digest = compute_digest_from_signed_transaction(signed_transactions.clone());
     let (oneshot_tx, oneshot_rx) = oneshot::channel();
     let mut signers = Vec::new();
+
     for _ in 1..10 {
         signers.push(AccountAddress::random());
     }
@@ -43,7 +44,7 @@ async fn test_batch_requester() {
         _ => unreachable!(),
     }
     assert_eq!(signers.len(), 3);
-
+    
     batch_requester.serve_request(digest, signed_transactions.clone());
     assert_eq!(
         oneshot_rx.await.expect("sender dropped"),
@@ -57,6 +58,7 @@ async fn test_batch_requester() {
     batch_requester
         .add_request(digest, signers, oneshot_tx)
         .await;
+    println!("5");
     batch_requester.handle_timeouts().await;
     assert_some!(rx.recv().await);
     batch_requester.handle_timeouts().await;

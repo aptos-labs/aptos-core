@@ -222,7 +222,7 @@ impl QuorumStoreWrapper {
     }
 
     #[cfg(test)]
-    pub(crate) fn insert_proof(&mut self, mut proof: ProofOfStore) {
+    pub(crate) fn insert_proof(&mut self, proof: ProofOfStore) {
         self.proofs_for_consensus.push(proof);
     }
 
