@@ -27,8 +27,8 @@ services:
       - "6182:6182"
       - "8080:8080"
       # Only expose these internally
-      - "127.0.0.1:9101:9101"
-      - "127.0.0.1:9102:9102"
+      - "127.0.0.1:9101:9103"
+      - "127.0.0.1:9102:9104"
 
   fullnode:
     image: "${VALIDATOR_IMAGE_REPO:-aptoslabs/validator}:${IMAGE_TAG:-testnet}"
