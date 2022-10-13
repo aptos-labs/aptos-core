@@ -69,7 +69,6 @@ jobs:
         with:
           python-version: '3.10'
       - uses: ./.github/actions/rust-setup
-      - run: cargo doc --workspace --document-private-items
       - run: python3 scripts/check-cryptohasher-symbols.py
 
   rust-lint:

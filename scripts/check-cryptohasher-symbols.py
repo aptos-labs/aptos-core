@@ -7,16 +7,13 @@ The easiest way is to let aptos developers ensure unique symbol names.
 
 This script is a quick and dirty script to help find enum/structs in this repo that
 use `CryptoHasher` derive and share the same name.
-
-How to use:
-    cargo doc --workspace --document-private-items
-    python3 scripts/check-cryptohasher-symbols.py
 '''
 
 from collections import defaultdict
 from pprint import pprint
 import os
 import re
+import subprocess
 
 # False positives that needs to be skipped for now.
 whitelisted_symbols = set([
@@ -30,6 +27,8 @@ ignored_crates = set([
     'siphasher',
 ])
 
+proc = subprocess.run("cargo doc --workspace --document-private-items", shell=True)
+assert proc.returncode == 0
 assert os.path.exists('target/doc')
 
 symbol_to_paths_map = defaultdict(set)
