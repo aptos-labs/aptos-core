@@ -250,49 +250,6 @@ docker exec -it $id /bin/bash
 du -cs -BM /opt/aptos/data
 ```
 
-## Add upstream seed peers
-
-:::tip
-
-You may see `NoAvailablePeers` in your node's error messages. This is normal when the node is first starting.
-Wait for the node to run for a few minutes to see if it connects to peers. If not, follow the below steps:
-
-:::
-
-Devnet validator fullnodes will only accept a maximum of connections. If Aptos devnet is experiencing high network connection volume, your fullnode might not able to connect and you may see `NoAvailablePeers` continuously in your node's error messages. If this happens, manually add peer addresses in the `seeds` key in `public_full_node.yaml`, the fullnode configuration file. This will then connect your fullnode to the specified seed peer.
-
-See below for a few seed peer addresses you can use in your `public_full_node.yaml` file.
-
-:::tip
-
-You can also use the fullnode addresses provided by the Aptos community. Anyone already running a fullnode can provide their address for you to connect. See the channel `#advertise-full-nodes` in Aptos Discord.
-
-:::
-
-Add these to your `public_full_node.yaml` configuration file under your `discovery_method`, as shown in the below example:
-
-```
-...
-full_node_networks:
-    - discovery_method: "onchain"
-      # The network must have a listen address to specify protocols. This runs it locally to
-      # prevent remote, incoming connections.
-      listen_address: ...
-      seeds:
-        bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
-            addresses:
-            - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/handshake/0"
-            role: "Upstream"
-        7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61:
-            addresses:
-            - "/dns4/pfn1.node.devnet.aptoslabs.com/tcp/6182/noise-ik/7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61/handshake/0"
-            role: "Upstream"
-        f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b:
-            addresses:
-            - "/dns4/pfn2.node.devnet.aptoslabs.com/tcp/6182/noise-ik/f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b/handshake/0"
-            role: "Upstream"
-...
-```
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt

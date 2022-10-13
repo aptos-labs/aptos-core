@@ -7,7 +7,7 @@ slug: "whats-new-in-docs"
 
 ## 12 October 2022
 
-- Added [Node Connections](/docs/nodes/node-connections.md) document that describes how to configure node network connections.
+- Added [Node Connections](/docs/nodes/full-node/fullnode-network-connections.md) document that describes how to configure node network connections.
 
 ## 11 October 2022
 
