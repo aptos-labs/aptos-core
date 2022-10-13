@@ -1,0 +1,17 @@
+name: "Test Docker Compose"
+on:
+  pull_request:
+    paths:
+      - "docker/compose"
+      - ".github/workflows/test-docker-compose.yaml"
+
+jobs:
+  test-docker-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+        with:
+          repository: aptos-labs/aptos-networks
+          path: aptos-networks
+      - run: docker/compose/aptos-node/test.sh
