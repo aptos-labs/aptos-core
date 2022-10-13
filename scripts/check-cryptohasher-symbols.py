@@ -20,7 +20,6 @@ import re
 
 # False positives that needs to be skipped for now.
 whitelisted_symbols = set([
-    'TestAptosCrypto',
 ])
 
 ignored_crates = set([
