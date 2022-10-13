@@ -120,6 +120,7 @@ impl Transport for TcpTransport {
         if let Some(tx_buf) = self.tcp_buff_cfg.inbound_tx_buffer_bytes {
             socket.set_send_buffer_size(tx_buf)?;
         }
+        socket.set_reuseaddr(true)?;
         socket.bind(addr)?;
 
         let listener = socket.listen(256)?;

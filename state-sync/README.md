@@ -78,6 +78,12 @@ While your node is syncing, you'll be able to see the
 `aptos_state_sync_version{type="synced"}` metric gradually increase.
 
 ### Fast Syncing
+Note: Fast sync should only be used as a last resort for validators and
+validator fullnodes. This is because fast sync skips all of the blockchain
+history and as a result: (i) reduces the data availability in the network;
+and (ii) may hinder validator consensus performance if too much data has
+been skipped. Thus, validator and validator fullnode operators should be
+careful to consider alternate ways of syncing before resorting to fast sync.
 
 Note: this is the fastest and cheapest method of syncing your node. It
 requires the node to start from an empty state (i.e., not have any existing

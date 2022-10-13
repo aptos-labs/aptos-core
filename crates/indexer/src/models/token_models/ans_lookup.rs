@@ -24,6 +24,7 @@ pub type CurrentAnsLookupPK = (Domain, Subdomain);
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(domain, subdomain))]
 #[diesel(table_name = current_ans_lookup)]
+#[diesel(treat_none_as_null = true)]
 pub struct CurrentAnsLookup {
     pub domain: String,
     pub subdomain: String,
