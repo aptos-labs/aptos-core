@@ -36,6 +36,7 @@ pub struct TokenData {
     pub default_properties: serde_json::Value,
     pub collection_data_id_hash: String,
     pub transaction_timestamp: chrono::NaiveDateTime,
+    pub description: String,
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -62,6 +63,7 @@ pub struct CurrentTokenData {
     pub last_transaction_version: i64,
     pub collection_data_id_hash: String,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub description: String,
 }
 
 impl TokenData {
@@ -125,6 +127,7 @@ impl TokenData {
                         royalty_mutable: token_data.mutability_config.royalty,
                         default_properties: token_data.default_properties.clone(),
                         transaction_timestamp: txn_timestamp,
+                        description: token_data.description.clone(),
                     },
                     CurrentTokenData {
                         collection_data_id_hash,
@@ -147,6 +150,7 @@ impl TokenData {
                         default_properties: token_data.default_properties,
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
+                        description: token_data.description,
                     },
                 )));
             } else {

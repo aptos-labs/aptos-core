@@ -27,7 +27,13 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
     cd ~/$WORKSPACE
     ```
 
-2. Download the validator.yaml, docker-compose.yaml and blocked.ips configuration files into this directory. See [Node Files](/nodes/node-files.md) for a full list of files you should download and the download commands.  
+2. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page:
+    - `validator.yaml`
+    - `docker-compose.yaml`
+    - `docker-compose-fullnode.yaml`
+    - `haproxy.cfg`
+    - `haproxy-fullnode.cfg`
+    - `blocked.ips`
 
 3. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
 
@@ -81,7 +87,9 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-5. Download the genesis blob and waypoint for the network you want to connect to. See [Node Files](/nodes/node-files.md) for a full list of files you should download and the download commands. 
+5. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page:
+    - `genesis.blob`
+    - `waypoint.txt`
 
 6. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
 

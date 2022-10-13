@@ -112,7 +112,7 @@ With your development environment ready, now you can start to setup your fullnod
       ```
   
     :::tip
-    To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-genesis-waypoint
+    To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-networks
     :::
 
 8. Edit the `fullnode.yaml` file in your current working directory as follows.
@@ -178,7 +178,7 @@ If M1/M2 support is important to you, please comment on and follow this issue: h
     ```
 
     :::tip
-    To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-genesis-waypoint
+    To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-networks
     :::
 
 4. Finally, start the fullnode via docker:

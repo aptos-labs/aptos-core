@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::args::CheckEndpointArgs;
 use anyhow::{bail, Context, Result};
 use aptos_config::{
     config::{RoleType, HANDSHAKE_VERSION},
@@ -9,6 +10,7 @@ use aptos_config::{
 use aptos_crypto::x25519::{self, PRIVATE_KEY_SIZE};
 use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use futures::{AsyncReadExt, AsyncWriteExt};
+use network::transport::TCPBufferCfg;
 use network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
     protocols::wire::handshake::v1::ProtocolIdSet,
@@ -17,8 +19,6 @@ use network::{
 };
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
-
-use crate::args::CheckEndpointArgs;
 
 // This function must take the private key in as an owned value vs as part of
 // the args struct because private key needs to be owned, and cannot be cloned.
@@ -86,7 +86,7 @@ async fn check_endpoint_with_handshake(
 ) -> Result<String> {
     // Connect to the address, this should handle DNS resolution if necessary.
     let fut_socket = async {
-        resolve_and_connect(address.clone())
+        resolve_and_connect(address.clone(), TCPBufferCfg::new())
             .await
             .map(TcpSocket::new)
     };
@@ -112,7 +112,7 @@ async fn check_endpoint_with_handshake(
 const INVALID_NOISE_HEADER: &[u8; 152] = &[7; 152];
 
 async fn check_endpoint_no_handshake(address: NetworkAddress) -> Result<String> {
-    let mut socket = resolve_and_connect(address.clone())
+    let mut socket = resolve_and_connect(address.clone(), TCPBufferCfg::new())
         .await
         .map(TcpSocket::new)
         .with_context(|| format!("Failed to connect to {}", address))?;

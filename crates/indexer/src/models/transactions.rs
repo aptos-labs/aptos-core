@@ -45,6 +45,7 @@ pub struct Transaction {
     pub accumulator_root_hash: String,
     pub num_events: i64,
     pub num_write_set_changes: i64,
+    pub epoch: i64,
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
@@ -67,6 +68,7 @@ pub struct TransactionQuery {
     pub num_events: i64,
     pub num_write_set_changes: i64,
     pub inserted_at: chrono::NaiveDateTime,
+    pub epoch: i64,
 }
 
 impl Transaction {
@@ -76,6 +78,7 @@ impl Transaction {
         type_: String,
         num_events: i64,
         block_height: i64,
+        epoch: i64,
     ) -> Self {
         Self {
             type_,
@@ -92,6 +95,7 @@ impl Transaction {
             accumulator_root_hash: info.accumulator_root_hash.to_string(),
             num_events,
             num_write_set_changes: info.changes.len() as i64,
+            epoch,
         }
     }
 
@@ -110,10 +114,12 @@ impl Transaction {
             .block_height
             .unwrap()
             .0 as i64;
+        println!("blabla: {:?}", transaction.transaction_info());
+        let epoch = transaction.transaction_info().unwrap().epoch.unwrap().0 as i64;
         match transaction {
             APITransaction::UserTransaction(user_txn) => {
                 let (user_txn_output, signatures) =
-                    UserTransaction::from_transaction(user_txn, block_height);
+                    UserTransaction::from_transaction(user_txn, block_height, epoch);
                 let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
                     &user_txn.info.changes,
                     user_txn.info.version.0 as i64,
@@ -129,6 +135,7 @@ impl Transaction {
                         transaction.type_str().to_string(),
                         user_txn.events.len() as i64,
                         block_height,
+                        epoch,
                     ),
                     Some(TransactionDetail::User(user_txn_output, signatures)),
                     EventModel::from_events(
@@ -156,6 +163,7 @@ impl Transaction {
                         transaction.type_str().to_string(),
                         0,
                         block_height,
+                        epoch,
                     ),
                     None,
                     EventModel::from_events(
@@ -180,6 +188,7 @@ impl Transaction {
                         transaction.type_str().to_string(),
                         0,
                         block_height,
+                        epoch,
                     ),
                     Some(TransactionDetail::BlockMetadata(
                         BlockMetadataTransaction::from_transaction(
@@ -203,6 +212,7 @@ impl Transaction {
                     transaction.type_str().to_string(),
                     0,
                     block_height,
+                    epoch,
                 ),
                 None,
                 vec![],
@@ -231,6 +241,7 @@ impl Transaction {
         let mut wsc_details = vec![];
 
         for txn in transactions {
+            println!("blablatxn: {:?}", txn);
             let (txn, txn_detail, mut event_list, mut wsc_list, mut wsc_detail_list) =
                 Self::from_transaction(txn);
             txns.push(txn);
