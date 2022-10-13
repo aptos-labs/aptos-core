@@ -10,6 +10,7 @@ import { TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./tr
 import { MAX_U64_BIG_INT } from "./bcs/consts";
 import { TOKEN_ABIS } from "./abis";
 import { AnyNumber, bcsToBytes } from "./bcs";
+import {PropertyMap, TokenId} from "./token_types";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -272,6 +273,62 @@ export class TokenClient {
   }
 
   /**
+   * User opt-in or out direct transfer through a boolean flag
+   *
+   * @param sender AptosAccount where the token will be transferred
+   * @param opt_in boolean value indicates user want to opt-in or out of direct transfer
+   * @returns The hash of the transaction submitted to the API
+   */
+  async opt_in_token_transfer(
+      sender: AptosAccount,
+      opt_in: boolean,
+  ): Promise<string> {
+    const payload = this.transactionBuilder.buildTransactionPayload(
+        "0x3::token::opt_in_direct_transfer",
+        [],
+        [opt_in],
+    );
+
+    return this.aptosClient.generateSignSubmitTransaction(sender, payload);
+  }
+
+  /**
+   * User opt-in or out direct transfer through a boolean flag
+   *
+   * @param account AptosAccount who modifies the token properties
+   * @param token_owner the address of account owning the token
+   * @param creator the creator of the token
+   * @param collection_name the name of the token collection
+   * @param token_name the name of created token
+   * @param token_property_version the property_version of the token to be modified
+   * @param amount the number of tokens to be modified
+   *
+   * @returns The hash of the transaction submitted to the API
+   */
+  async mutate_token_properties(
+      account: AptosAccount,
+      token_owner: TxnBuilderTypes.AccountAddress,
+      creator:  TxnBuilderTypes.AccountAddress,
+      collection_name: string,
+      token_name: string,
+      token_property_version: number,
+      amount: number,
+      keys: Array<string>,
+      values: Array<string>,
+      types: Array<string>,
+  ): Promise<string> {
+    const payload = this.transactionBuilder.buildTransactionPayload(
+        "0x3::token::mutate_token_properties",
+        [],
+        [
+            token_owner, creator, collection_name, token_name, token_property_version, amount, keys, values, types
+        ],
+    );
+
+    return this.aptosClient.generateSignSubmitTransaction(account, payload);
+  }
+
+  /**
    * Queries collection data
    * @param creator Hex-encoded 32 byte Aptos account address which created a collection
    * @param collectionName Collection name
@@ -360,6 +417,7 @@ export class TokenClient {
     return this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
   } // <:!:getTokenData
 
+
   /**
    * Queries token balance for the token creator
    */
@@ -422,6 +480,7 @@ export class TokenClient {
         return {
           id: tokenId,
           amount: "0",
+          token_properties: {}
         };
       }
       return error;
