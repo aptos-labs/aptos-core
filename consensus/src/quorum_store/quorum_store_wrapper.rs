@@ -319,10 +319,10 @@ impl QuorumStoreWrapper {
                     logical_time.epoch(),
                     "Wrong epoch"
                 );
-                assert!(
-                    self.latest_logical_time < logical_time,
-                    "Non-increasing logical time"
-                );
+                // assert!(
+                //     self.latest_logical_time < logical_time,
+                //     "Non-increasing logical time"
+                // );
                 self.latest_logical_time = logical_time;
                 for batch_id in self.batch_expirations.expire(logical_time.round()) {
                     if self.batches_in_progress.remove(&batch_id).is_some() {
