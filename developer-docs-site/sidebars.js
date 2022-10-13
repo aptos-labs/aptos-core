@@ -179,6 +179,7 @@ const sidebars = {
         "nodes/full-node/bootstrap-fullnode",
       ],
     },
+    "nodes/node-connections",
     {
       type: "category",
       label: "Local Testnet",
