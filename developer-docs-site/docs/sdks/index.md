@@ -6,10 +6,10 @@ hidden: false
 
 # Aptos SDKs
 
-Use these Aptos SDKs, in combination with the [Aptos CLI](/cli-tools/aptos-cli-tool/index.md) for your development on the Aptos blockchain. 
-
-- ### [Python SDK](python-sdk.md)
+Use these Aptos software development kits (SDKs), in combination with the [Aptos CLI](/cli-tools/aptos-cli-tool/index.md) for your development on the Aptos blockchain. 
 
 - ### [Typescript SDK](ts-sdk/index.md)
+
+- ### [Python SDK](python-sdk.md)
 
 - ### [Rust SDK](rust-sdk.md)
