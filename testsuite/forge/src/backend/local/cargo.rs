@@ -166,6 +166,7 @@ where
     let mut args = vec![
         "build",
         "--package=aptos-node",
+        "--bin=aptos-node",
         "--features=failpoints,indexer",
     ];
     if use_release {
