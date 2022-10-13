@@ -1,0 +1,14 @@
+[package]
+name = "AptosNames"
+version = "1.0.0"
+
+[addresses]
+std = "0x1"
+aptos_framework = "0x1"
+aptos_token = "0x3"
+aptos_names = "0x4"
+
+[dependencies]
+MoveStdlib = { local = "../move-stdlib" }
+AptosFramework = { local = "../aptos-framework" }
+AptosToken = { local = "../aptos-token" }
