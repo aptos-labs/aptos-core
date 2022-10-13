@@ -66,7 +66,7 @@ impl GovernanceTool {
     }
 }
 
-/// Command to view a known onchain governance proposal
+/// View a known on-chain governance proposal
 ///
 /// This command will return the proposal requested as well as compute
 /// the hash of the metadata to determine whether it was verified or not.
@@ -108,13 +108,13 @@ impl CliCommand<VerifiedProposal> for ViewProposal {
         let metadata_url = proposal.metadata.get("metadata_location").unwrap();
 
         // Compute the hash and verify accordingly
-        let mut verified = false;
+        let mut metadata_verified = false;
         let mut actual_metadata_hash = "Unable to fetch metadata url".to_string();
         let mut actual_metadata = None;
         if let Ok(url) = Url::parse(metadata_url) {
             if let Ok(bytes) = get_metadata_from_url(&url).await {
                 let hash = HashValue::sha3_256_of(&bytes);
-                verified = metadata_hash == &hash.to_hex();
+                metadata_verified = metadata_hash == &hash.to_hex();
                 actual_metadata_hash = hash.to_hex();
                 if let Ok(metadata) = String::from_utf8(bytes) {
                     actual_metadata = Some(metadata);
@@ -123,7 +123,7 @@ impl CliCommand<VerifiedProposal> for ViewProposal {
         }
 
         Ok(VerifiedProposal {
-            verified,
+            metadata_verified,
             actual_metadata_hash,
             actual_metadata,
             proposal,
@@ -131,7 +131,7 @@ impl CliCommand<VerifiedProposal> for ViewProposal {
     }
 }
 
-/// Command to list the last 100 visible onchain proposals
+/// List the last 100 visible onchain proposals
 ///
 /// Note, if the full node you are talking to is pruning data, it may not have some of the
 /// proposals show here
@@ -175,7 +175,7 @@ impl CliCommand<Vec<ProposalSummary>> for ListProposals {
     }
 }
 
-/// Command to verify a proposal given the source of the script
+/// Verify a proposal given the source code of the script
 ///
 /// The script's bytecode or source can be provided and it will
 /// verify whether the hash matches the onchain hash
@@ -252,15 +252,21 @@ async fn get_proposal(
         .map_err(|err| CliError::CommandArgumentError(format!("Failed to parse proposal {}", err)))
 }
 
-/// Submit proposal to other validators to be proposed on
+/// Submit a governance proposal
 #[derive(Parser)]
 pub struct SubmitProposal {
     /// Location of the JSON metadata of the proposal
+    ///
+    /// If this location does not keep the metadata in the exact format, it will be less likely
+    /// that voters will approve this proposal, as they won't be able to verify it.
     #[clap(long)]
     pub(crate) metadata_url: Url,
 
     #[cfg(feature = "no-upload-proposal")]
     /// A JSON file to be uploaded later at the metadata URL
+    ///
+    /// If this does not match properly, voters may choose to vote no.  For real proposals,
+    /// it is better to already have it uploaded at the URL.
     #[clap(long)]
     pub(crate) metadata_path: Option<PathBuf>,
 
@@ -368,6 +374,7 @@ impl SubmitProposal {
     }
 }
 
+/// Retrieve the Metadata from the given URL
 async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
     let client = reqwest::ClientBuilder::default()
         .tls_built_in_root_certs(true)
@@ -406,26 +413,29 @@ struct ProposalSubmissionSummary {
     transaction: TransactionSummary,
 }
 
-/// Submit a vote on a current proposal
+/// Submit a vote on a proposal
+///
+/// Votes can only be given on proposals that are currently open for voting.
 #[derive(Parser)]
 pub struct SubmitVote {
-    /// Id of proposal to vote on
+    /// Id of the proposal to vote on
     #[clap(long)]
     pub(crate) proposal_id: u64,
 
-    /// Vote yes on the proposal
+    /// Vote to accept the proposal
     #[clap(long, group = "vote")]
     pub(crate) yes: bool,
 
-    /// Vote no on the proposal
+    /// Vote to reject the proposal
     #[clap(long, group = "vote")]
     pub(crate) no: bool,
 
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
     /// Space separated list of pool addresses.
     #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) pool_addresses: Vec<AccountAddress>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
@@ -440,7 +450,7 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
             (false, true) => ("No", false),
             (_, _) => {
                 return Err(CliError::CommandArgumentError(
-                    "Must choose either --yes or --no".to_string(),
+                    "Must choose only either --yes or --no".to_string(),
                 ));
             }
         };
@@ -814,7 +824,7 @@ struct CreateProposalFullEvent {
 /// A proposal and the verified information about it
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VerifiedProposal {
-    verified: bool,
+    metadata_verified: bool,
     actual_metadata_hash: String,
     actual_metadata: Option<String>,
     proposal: Proposal,
