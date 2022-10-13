@@ -10,6 +10,10 @@ slug: "whats-new-in-docs"
 - Added [Node Connections](/docs/nodes/full-node/fullnode-network-connections.md) document that describes how to configure node network connections.
 This page shows the key updates to the developer documentation on this site.
 
+## 13 October 2022
+
+- [Aptos Explorer](https://explorer.aptoslabs.com/) offers [user documentation](/docs/guides/use-aptos-explorer.md) covering common use cases and popular Explorer screen descriptions in Aptos.dev.
+
 ## 11 October 2022
 
 - Added [Data Pruning](/docs/guides/data-pruning.md) document that describes how to change the data pruning settings.
