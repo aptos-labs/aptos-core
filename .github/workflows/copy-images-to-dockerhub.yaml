@@ -1,3 +1,4 @@
+name: Release Images
 on:
   workflow_call:
     inputs:
@@ -18,20 +19,7 @@ permissions:
   id-token: write #required for GCP Workload Identity federation
 
 jobs:
-  wait-for-images-to-have-been-built:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Wait for images to have been built
-        timeout-minutes: 30
-        uses: lewagon/wait-on-check-action@0179dfc359f90a703c41240506f998ee1603f9ea # pin@v1.0.0
-        with:
-          ref: ${{ github.ref }}
-          check-name: "rust-images / rust-all" # only copy the release images to dockerhub
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 30 # wait 30 seconds between making polling API calls, default is 10 but we ran in the past into rate-limiting issues with too frequent polling
-
   copy-images:
-    needs: wait-for-images-to-have-been-built
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
@@ -54,10 +42,15 @@ jobs:
           username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
 
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+        with:
+          version: 7.13.4
+
       - name: Release Images
         env:
+          FORCE_COLOR: 3 # Force color output as per https://github.com/google/zx#using-github-actions
           GIT_SHA: ${{ github.sha }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
-        run: ./docker/release-images.sh
+        run: ./docker/release-images.mjs --wait-for-image-seconds=3600
