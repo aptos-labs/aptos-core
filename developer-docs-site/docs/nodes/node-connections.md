@@ -7,13 +7,13 @@ slug: "node-connections"
 
 When running a node on an Aptos network, you can configure your node's network connections for a few different purposes. For example, you can add an upstream seed peer to your node's configuration YAML to connect your node to this peer, as described in [Add upstream seed peers](/nodes/full-node/fullnode-source-code-or-docker#add-upstream-seed-peers). Or you can create a static network identity for your node to allow other nodes to connect to your node, as shown in [Network Identity For Fullnode](/nodes/full-node/network-identity-fullnode).
 
-This document describes how to configure your node for more sophisticated network connection requirements, such as configuring preferred access to a node, configuring a node as a private node, or setting the number of outbound connections. 
+This document describes how to configure your node for more sophisticated network connection requirements, such as configuring preferred access to a node or configuring a node as a private node. 
 
 ## Configuring preferred access to an inbound node
 
 To configure an upstream fullnode (server side) to allow a downstream node to connect to it even when the network is saturated, follow this method:
 
-In the `fullnode.yaml` configuration of the upstream full node (server side), add the downstream fullnode as a seed peer with the `Downstream​​` role. This will mean the upstream fullnode will not make outbound connections, but it will allow inbound connections from the downstream fullnode. See also https://aptos.dev/nodes/full-node/network-identity-fullnode#allowing-other-fullnodes-to-connect. 
+In the `fullnode.yaml` configuration of the upstream full node (server side), add the downstream fullnode as a seed peer with the `Downstream​​` role. This will mean the upstream fullnode will not make outbound connections, but it will allow inbound connections from the downstream fullnode. See also [Allowing other fullnodes to connect](https://aptos.dev/nodes/full-node/network-identity-fullnode#allowing-other-fullnodes-to-connect).
 
 In the upstream server's `fullnode.yaml`:
 ```yaml
@@ -38,4 +38,4 @@ To configure a node as a private node, set the following in the node configurato
 - `full_node_network[0].max_inbound_connections = 0` 
 - `full_node_network[0].mutual_authentication = true`
 
-This will not allow unauthenticated connections.
+This will not allow unauthenticated connections to the node.
