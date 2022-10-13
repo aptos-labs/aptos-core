@@ -14,7 +14,7 @@ This tutorial describes how to generate and submit transactions to the Aptos blo
 
 Install your preferred SDK from the below list:
 
-* [Typescript SDK][typescript-sdk]
+* [TypeScript SDK][typescript-sdk]
 * [Python SDK][python-sdk]
 * [Rust SDK][rust-sdk]
 
@@ -127,7 +127,7 @@ The `transfer-coin` example code uses helper functions to interact with the [RES
   <TabItem value="typescript" label="Typescript">
 
 :::tip See the full code
-See the Typescript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
+See the TypeScript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="python" label="Python">
@@ -388,7 +388,7 @@ Breaking the above down into pieces:
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-In Typescript, just calling `coinClient.transfer` is sufficient to wait for the transaction to complete. The function will return the `Transaction` returned by the API once it is processed (either successfully or unsuccessfully) or throw an error if processing time exceeds the timeout.
+In TypeScript, just calling `coinClient.transfer` is sufficient to wait for the transaction to complete. The function will return the `Transaction` returned by the API once it is processed (either successfully or unsuccessfully) or throw an error if processing time exceeds the timeout.
 
 You can set `checkSuccess` to true when calling `transfer` if you'd like it to throw if the transaction was not committed successfully:
 ```ts
