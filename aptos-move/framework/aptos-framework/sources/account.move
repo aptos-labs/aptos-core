@@ -203,15 +203,14 @@ module aptos_framework::account {
     }
 
     public(friend) fun increment_sequence_number(addr: address) acquires Account {
-        let account_resource = borrow_global_mut<Account>(addr);
-        let old_sequence_number = account_resource.sequence_number;
+        let sequence_number = &mut borrow_global_mut<Account>(addr).sequence_number;
 
         assert!(
-            (old_sequence_number as u128) < MAX_U64,
+            (*sequence_number as u128) < MAX_U64,
             error::out_of_range(ESEQUENCE_NUMBER_TOO_BIG)
         );
 
-        account_resource.sequence_number = old_sequence_number + 1;
+        *sequence_number = *sequence_number + 1;
     }
 
     public fun get_authentication_key(addr: address): vector<u8> acquires Account {
@@ -220,7 +219,7 @@ module aptos_framework::account {
 
     public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT_ALREADY_EXISTS));
+        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         assert!(
             vector::length(&new_auth_key) == 32,
             error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
@@ -382,7 +381,7 @@ module aptos_framework::account {
         assert!(exists_at(offerer_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
         // Check if there's an existing signer capability offer from the offerer
-        let account_resource = borrow_global_mut<Account>(offerer_address);
+        let account_resource = borrow_global<Account>(offerer_address);
         let addr = signer::address_of(account);
         assert!(option::contains(&account_resource.signer_capability_offer.for, &addr), error::not_found(ENO_SUCH_SIGNER_CAPABILITY));
 
