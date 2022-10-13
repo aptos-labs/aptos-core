@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Locked","A locked value acquired from a `TryLock`."],["TryLock","A light-weight lock guarded by an atomic boolean."]]};

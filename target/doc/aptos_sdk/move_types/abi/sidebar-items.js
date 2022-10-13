@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["ScriptABI","How to call a particular Move script (aka. an “ABI”)."]],"struct":[["ArgumentABI","The description of a (regular) argument in a script."],["ScriptFunctionABI",""],["TransactionScriptABI",""],["TypeArgumentABI","The description of a type argument in a script."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["MOVE_STDLIB_ADDR_NAME",""],["MOVE_STDLIB_ADDR_VALUE",""],["MOVE_STDLIB_PACKAGE_NAME",""],["MOVE_STDLIB_PACKAGE_PATH",""]],"struct":[["New","Create a new Move package with name `name` at `path`. If `path` is not provided the package will be created in the directory `name`."]]};

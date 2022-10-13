@@ -1,0 +1,100 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A multi-producer, multi-consumer broadcast queue. Each sent value is seen by all consumers."><meta name="keywords" content="rust, rustlang, rust-lang, broadcast"><title>tokio::sync::broadcast - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module broadcast</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../tokio/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../../index.html">tokio</a>::<wbr><a href="../index.html">sync</a>::<wbr><a class="mod" href="#">broadcast</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../../src/tokio/sync/broadcast.rs.html#1-1160">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A multi-producer, multi-consumer broadcast queue. Each sent value is seen by
+all consumers.</p>
+<p>A <a href="struct.Sender.html"><code>Sender</code></a> is used to broadcast values to <strong>all</strong> connected <a href="struct.Receiver.html"><code>Receiver</code></a>
+values. <a href="struct.Sender.html"><code>Sender</code></a> handles are clone-able, allowing concurrent send and
+receive actions. <a href="struct.Sender.html"><code>Sender</code></a> and <a href="struct.Receiver.html"><code>Receiver</code></a> are both <code>Send</code> and <code>Sync</code> as
+long as <code>T</code> is also <code>Send</code> or <code>Sync</code> respectively.</p>
+<p>When a value is sent, <strong>all</strong> <a href="struct.Receiver.html"><code>Receiver</code></a> handles are notified and will
+receive the value. The value is stored once inside the channel and cloned on
+demand for each receiver. Once all receivers have received a clone of the
+value, the value is released from the channel.</p>
+<p>A channel is created by calling <a href="fn.channel.html"><code>channel</code></a>, specifying the maximum number
+of messages the channel can retain at any given time.</p>
+<p>New <a href="struct.Receiver.html"><code>Receiver</code></a> handles are created by calling <a href="struct.Sender.html#method.subscribe"><code>Sender::subscribe</code></a>. The
+returned <a href="struct.Receiver.html"><code>Receiver</code></a> will receive values sent <strong>after</strong> the call to
+<code>subscribe</code>.</p>
+<h3 id="lagging"><a href="#lagging">Lagging</a></h3>
+<p>As sent messages must be retained until <strong>all</strong> <a href="struct.Receiver.html"><code>Receiver</code></a> handles receive
+a clone, broadcast channels are susceptible to the “slow receiver” problem.
+In this case, all but one receiver are able to receive values at the rate
+they are sent. Because one receiver is stalled, the channel starts to fill
+up.</p>
+<p>This broadcast channel implementation handles this case by setting a hard
+upper bound on the number of values the channel may retain at any given
+time. This upper bound is passed to the <a href="fn.channel.html"><code>channel</code></a> function as an argument.</p>
+<p>If a value is sent when the channel is at capacity, the oldest value
+currently held by the channel is released. This frees up space for the new
+value. Any receiver that has not yet seen the released value will return
+<a href="error/enum.RecvError.html#variant.Lagged"><code>RecvError::Lagged</code></a> the next time <a href="struct.Receiver.html#method.recv"><code>recv</code></a> is called.</p>
+<p>Once <a href="error/enum.RecvError.html#variant.Lagged"><code>RecvError::Lagged</code></a> is returned, the lagging receiver’s position is
+updated to the oldest value contained by the channel. The next call to
+<a href="struct.Receiver.html#method.recv"><code>recv</code></a> will return this value.</p>
+<p>This behavior enables a receiver to detect when it has lagged so far behind
+that data has been dropped. The caller may decide how to respond to this:
+either by aborting its task or by tolerating lost messages and resuming
+consumption of the channel.</p>
+<h3 id="closing"><a href="#closing">Closing</a></h3>
+<p>When <strong>all</strong> <a href="struct.Sender.html"><code>Sender</code></a> handles have been dropped, no new values may be
+sent. At this point, the channel is “closed”. Once a receiver has received
+all values retained by the channel, the next call to <a href="struct.Receiver.html#method.recv"><code>recv</code></a> will return
+with <a href="error/enum.RecvError.html#variant.Closed"><code>RecvError::Closed</code></a>.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Basic usage</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::sync::broadcast</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> (<span class="ident">tx</span>, <span class="kw-2">mut</span> <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">broadcast::channel</span>(<span class="number">16</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx2</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">subscribe</span>();
+
+    <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="macro">assert_eq!</span>(<span class="ident">rx1</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>(), <span class="number">10</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">rx1</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>(), <span class="number">20</span>);
+    });
+
+    <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="macro">assert_eq!</span>(<span class="ident">rx2</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>(), <span class="number">10</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">rx2</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>(), <span class="number">20</span>);
+    });
+
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">10</span>).<span class="ident">unwrap</span>();
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">20</span>).<span class="ident">unwrap</span>();
+}</code></pre></div>
+<p>Handling lag</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::sync::broadcast</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> (<span class="ident">tx</span>, <span class="kw-2">mut</span> <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">broadcast::channel</span>(<span class="number">2</span>);
+
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">10</span>).<span class="ident">unwrap</span>();
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">20</span>).<span class="ident">unwrap</span>();
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">30</span>).<span class="ident">unwrap</span>();
+
+    <span class="comment">// The receiver lagged behind</span>
+    <span class="macro">assert!</span>(<span class="ident">rx</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">is_err</span>());
+
+    <span class="comment">// At this point, we can abort or continue with lost messages</span>
+
+    <span class="macro">assert_eq!</span>(<span class="number">20</span>, <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+    <span class="macro">assert_eq!</span>(<span class="number">30</span>, <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+}</code></pre></div>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="error/index.html" title="tokio::sync::broadcast::error mod">error</a></div><div class="item-right docblock-short"><p>Broadcast error types</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Receiver.html" title="tokio::sync::broadcast::Receiver struct">Receiver</a></div><div class="item-right docblock-short"><p>Receiving-half of the <a href="index.html"><code>broadcast</code></a> channel.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Sender.html" title="tokio::sync::broadcast::Sender struct">Sender</a></div><div class="item-right docblock-short"><p>Sending-half of the <a href="index.html"><code>broadcast</code></a> channel.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.channel.html" title="tokio::sync::broadcast::channel fn">channel</a></div><div class="item-right docblock-short"><p>Create a bounded, multi-producer, multi-consumer channel where each sent
+value is broadcasted to all active receivers.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="tokio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

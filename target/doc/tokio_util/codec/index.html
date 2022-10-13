@@ -1,0 +1,237 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Adaptors from AsyncRead/AsyncWrite to Stream/Sink"><meta name="keywords" content="rust, rustlang, rust-lang, codec"><title>tokio_util::codec - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tokio_util/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tokio_util/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module codec</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tokio_util/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">tokio_util</a>::<wbr><a class="mod" href="#">codec</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tokio_util/codec/mod.rs.html#1-290">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Adaptors from AsyncRead/AsyncWrite to Stream/Sink</p>
+<p>Raw I/O objects work with byte sequences, but higher-level code usually
+wants to batch these into meaningful chunks, called “frames”.</p>
+<p>This module contains adapters to go from streams of bytes, <a href="../../tokio/io/async_read/trait.AsyncRead.html"><code>AsyncRead</code></a> and
+<a href="../../tokio/io/async_write/trait.AsyncWrite.html"><code>AsyncWrite</code></a>, to framed streams implementing <a href="../../futures_sink/trait.Sink.html"><code>Sink</code></a> and <a href="../../futures_core/stream/trait.Stream.html"><code>Stream</code></a>.
+Framed streams are also known as transports.</p>
+<h2 id="the-decoder-trait"><a href="#the-decoder-trait">The Decoder trait</a></h2>
+<p>A <a href="trait.Decoder.html"><code>Decoder</code></a> is used together with <a href="struct.FramedRead.html"><code>FramedRead</code></a> or <a href="struct.Framed.html"><code>Framed</code></a> to turn an
+<a href="../../tokio/io/async_read/trait.AsyncRead.html"><code>AsyncRead</code></a> into a <a href="../../futures_core/stream/trait.Stream.html"><code>Stream</code></a>. The job of the decoder trait is to specify
+how sequences of bytes are turned into a sequence of frames, and to
+determine where the boundaries between frames are.  The job of the
+<code>FramedRead</code> is to repeatedly switch between reading more data from the IO
+resource, and asking the decoder whether we have received enough data to
+decode another frame of data.</p>
+<p>The main method on the <code>Decoder</code> trait is the <a href="trait.Decoder.html#tymethod.decode"><code>decode</code></a> method. This method
+takes as argument the data that has been read so far, and when it is called,
+it will be in one of the following situations:</p>
+<ol>
+<li>The buffer contains less than a full frame.</li>
+<li>The buffer contains exactly a full frame.</li>
+<li>The buffer contains more than a full frame.</li>
+</ol>
+<p>In the first situation, the decoder should return <code>Ok(None)</code>.</p>
+<p>In the second situation, the decoder should clear the provided buffer and
+return <code>Ok(Some(the_decoded_frame))</code>.</p>
+<p>In the third situation, the decoder should use a method such as <a href="../../bytes/bytes_mut/struct.BytesMut.html#method.split_to"><code>split_to</code></a>
+or <a href="../../bytes/buf/buf_impl/trait.Buf.html#tymethod.advance"><code>advance</code></a> to modify the buffer such that the frame is removed from the
+buffer, but any data in the buffer after that frame should still remain in
+the buffer. The decoder should also return <code>Ok(Some(the_decoded_frame))</code> in
+this case.</p>
+<p>Finally the decoder may return an error if the data is invalid in some way.
+The decoder should <em>not</em> return an error just because it has yet to receive
+a full frame.</p>
+<p>It is guaranteed that, from one call to <code>decode</code> to another, the provided
+buffer will contain the exact same data as before, except that if more data
+has arrived through the IO resource, that data will have been appended to
+the buffer.  This means that reading frames from a <code>FramedRead</code> is
+essentially equivalent to the following loop:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::io::AsyncReadExt</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">bytes::BytesMut::new</span>();
+<span class="kw">loop</span> {
+    <span class="comment">// The read_buf call will append to buf rather than overwrite existing data.</span>
+    <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">io_resource</span>.<span class="ident">read_buf</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="kw">if</span> <span class="ident">len</span> <span class="op">==</span> <span class="number">0</span> {
+        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">frame</span>) <span class="op">=</span> <span class="ident">decoder</span>.<span class="ident">decode_eof</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>)<span class="question-mark">?</span> {
+            <span class="kw">yield</span> <span class="ident">frame</span>;
+        }
+        <span class="kw">break</span>;
+    }
+
+    <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">frame</span>) <span class="op">=</span> <span class="ident">decoder</span>.<span class="ident">decode</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>)<span class="question-mark">?</span> {
+        <span class="kw">yield</span> <span class="ident">frame</span>;
+    }
+}</code></pre></div>
+<p>The example above uses <code>yield</code> whenever the <code>Stream</code> produces an item.</p>
+<h3 id="example-decoder"><a href="#example-decoder">Example decoder</a></h3>
+<p>As an example, consider a protocol that can be used to send strings where
+each frame is a four byte integer that contains the length of the frame,
+followed by that many bytes of string data. The decoder fails with an error
+if the string data is not valid utf-8 or too long.</p>
+<p>Such a decoder can be written like this:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio_util::codec::Decoder</span>;
+<span class="kw">use</span> <span class="ident">bytes</span>::{<span class="ident">BytesMut</span>, <span class="ident">Buf</span>};
+
+<span class="kw">struct</span> <span class="ident">MyStringDecoder</span> {}
+
+<span class="kw">const</span> <span class="ident">MAX</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
+
+<span class="kw">impl</span> <span class="ident">Decoder</span> <span class="kw">for</span> <span class="ident">MyStringDecoder</span> {
+    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">String</span>;
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">std::io::Error</span>;
+
+    <span class="kw">fn</span> <span class="ident">decode</span>(
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
+        <span class="ident">src</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="ident">src</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="number">4</span> {
+            <span class="comment">// Not enough data to read length marker.</span>
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+        }
+
+        <span class="comment">// Read length marker.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">length_bytes</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">4</span>];
+        <span class="ident">length_bytes</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">src</span>[..<span class="number">4</span>]);
+        <span class="kw">let</span> <span class="ident">length</span> <span class="op">=</span> <span class="ident">u32::from_le_bytes</span>(<span class="ident">length_bytes</span>) <span class="kw">as</span> <span class="ident">usize</span>;
+
+        <span class="comment">// Check that the length is not too large to avoid a denial of</span>
+        <span class="comment">// service attack where the server runs out of memory.</span>
+        <span class="kw">if</span> <span class="ident">length</span> <span class="op">&gt;</span> <span class="ident">MAX</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">std::io::Error::new</span>(
+                <span class="ident">std::io::ErrorKind::InvalidData</span>,
+                <span class="macro">format!</span>(<span class="string">&quot;Frame of length {} is too large.&quot;</span>, <span class="ident">length</span>)
+            ));
+        }
+
+        <span class="kw">if</span> <span class="ident">src</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="number">4</span> <span class="op">+</span> <span class="ident">length</span> {
+            <span class="comment">// The full string has not yet arrived.</span>
+            <span class="comment">//</span>
+            <span class="comment">// We reserve more space in the buffer. This is not strictly</span>
+            <span class="comment">// necessary, but is a good idea performance-wise.</span>
+            <span class="ident">src</span>.<span class="ident">reserve</span>(<span class="number">4</span> <span class="op">+</span> <span class="ident">length</span> <span class="op">-</span> <span class="ident">src</span>.<span class="ident">len</span>());
+
+            <span class="comment">// We inform the Framed that we need more bytes to form the next</span>
+            <span class="comment">// frame.</span>
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+        }
+
+        <span class="comment">// Use advance to modify src such that it no longer contains</span>
+        <span class="comment">// this frame.</span>
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">src</span>[<span class="number">4</span>..<span class="number">4</span> <span class="op">+</span> <span class="ident">length</span>].<span class="ident">to_vec</span>();
+        <span class="ident">src</span>.<span class="ident">advance</span>(<span class="number">4</span> <span class="op">+</span> <span class="ident">length</span>);
+
+        <span class="comment">// Convert the data to a string, or fail if it is not valid utf-8.</span>
+        <span class="kw">match</span> <span class="ident">String::from_utf8</span>(<span class="ident">data</span>) {
+            <span class="prelude-val">Ok</span>(<span class="ident">string</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">string</span>)),
+            <span class="prelude-val">Err</span>(<span class="ident">utf8_error</span>) =&gt; {
+                <span class="prelude-val">Err</span>(<span class="ident">std::io::Error::new</span>(
+                    <span class="ident">std::io::ErrorKind::InvalidData</span>,
+                    <span class="ident">utf8_error</span>.<span class="ident">utf8_error</span>(),
+                ))
+            },
+        }
+    }
+}</code></pre></div>
+<h2 id="the-encoder-trait"><a href="#the-encoder-trait">The Encoder trait</a></h2>
+<p>An <a href="trait.Encoder.html" title="Encoder"><code>Encoder</code></a> is used together with <a href="struct.FramedWrite.html"><code>FramedWrite</code></a> or <a href="struct.Framed.html"><code>Framed</code></a> to turn
+an <a href="../../tokio/io/async_write/trait.AsyncWrite.html"><code>AsyncWrite</code></a> into a <a href="../../futures_sink/trait.Sink.html"><code>Sink</code></a>. The job of the encoder trait is to
+specify how frames are turned into a sequences of bytes.  The job of the
+<code>FramedWrite</code> is to take the resulting sequence of bytes and write it to the
+IO resource.</p>
+<p>The main method on the <code>Encoder</code> trait is the <a href="trait.Encoder.html#tymethod.encode"><code>encode</code></a> method. This method
+takes an item that is being written, and a buffer to write the item to. The
+buffer may already contain data, and in this case, the encoder should append
+the new frame the to buffer rather than overwrite the existing data.</p>
+<p>It is guaranteed that, from one call to <code>encode</code> to another, the provided
+buffer will contain the exact same data as before, except that some of the
+data may have been removed from the front of the buffer. Writing to a
+<code>FramedWrite</code> is essentially equivalent to the following loop:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::io::AsyncWriteExt</span>;
+<span class="kw">use</span> <span class="ident">bytes::Buf</span>; <span class="comment">// for advance</span>
+
+<span class="kw">const</span> <span class="ident">MAX</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8192</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">bytes::BytesMut::new</span>();
+<span class="kw">loop</span> {
+    <span class="macro">tokio::select!</span> {
+        <span class="ident">num_written</span> <span class="op">=</span> <span class="ident">io_resource</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">buf</span>), <span class="kw">if</span> <span class="op">!</span><span class="ident">buf</span>.<span class="ident">is_empty</span>() =&gt; {
+            <span class="ident">buf</span>.<span class="ident">advance</span>(<span class="ident">num_written</span><span class="question-mark">?</span>);
+        },
+        <span class="ident">frame</span> <span class="op">=</span> <span class="ident">next_frame</span>(), <span class="kw">if</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">MAX</span> =&gt; {
+            <span class="ident">encoder</span>.<span class="ident">encode</span>(<span class="ident">frame</span>, <span class="kw-2">&amp;mut</span> <span class="ident">buf</span>)<span class="question-mark">?</span>;
+        },
+        <span class="kw">_</span> <span class="op">=</span> <span class="ident">no_more_frames</span>() =&gt; {
+            <span class="ident">io_resource</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">buf</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="ident">io_resource</span>.<span class="ident">shutdown</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+        },
+    }
+}</code></pre></div>
+<p>Here the <code>next_frame</code> method corresponds to any frames you write to the
+<code>FramedWrite</code>. The <code>no_more_frames</code> method corresponds to closing the
+<code>FramedWrite</code> with <a href="https://docs.rs/futures/0.3/futures/sink/trait.SinkExt.html#method.close"><code>SinkExt::close</code></a>.</p>
+<h3 id="example-encoder"><a href="#example-encoder">Example encoder</a></h3>
+<p>As an example, consider a protocol that can be used to send strings where
+each frame is a four byte integer that contains the length of the frame,
+followed by that many bytes of string data. The encoder will fail if the
+string is too long.</p>
+<p>Such an encoder can be written like this:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio_util::codec::Encoder</span>;
+<span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
+
+<span class="kw">struct</span> <span class="ident">MyStringEncoder</span> {}
+
+<span class="kw">const</span> <span class="ident">MAX</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
+
+<span class="kw">impl</span> <span class="ident">Encoder</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MyStringEncoder</span> {
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">std::io::Error</span>;
+
+    <span class="kw">fn</span> <span class="ident">encode</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">item</span>: <span class="ident">String</span>, <span class="ident">dst</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
+        <span class="comment">// Don&#39;t send a string if it is longer than the other end will</span>
+        <span class="comment">// accept.</span>
+        <span class="kw">if</span> <span class="ident">item</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="ident">MAX</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">std::io::Error::new</span>(
+                <span class="ident">std::io::ErrorKind::InvalidData</span>,
+                <span class="macro">format!</span>(<span class="string">&quot;Frame of length {} is too large.&quot;</span>, <span class="ident">item</span>.<span class="ident">len</span>())
+            ));
+        }
+
+        <span class="comment">// Convert the length into a byte array.</span>
+        <span class="comment">// The cast to u32 cannot overflow due to the length check above.</span>
+        <span class="kw">let</span> <span class="ident">len_slice</span> <span class="op">=</span> <span class="ident">u32::to_le_bytes</span>(<span class="ident">item</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u32</span>);
+
+        <span class="comment">// Reserve space in the buffer.</span>
+        <span class="ident">dst</span>.<span class="ident">reserve</span>(<span class="number">4</span> <span class="op">+</span> <span class="ident">item</span>.<span class="ident">len</span>());
+
+        <span class="comment">// Write the length and string to the buffer.</span>
+        <span class="ident">dst</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">len_slice</span>);
+        <span class="ident">dst</span>.<span class="ident">extend_from_slice</span>(<span class="ident">item</span>.<span class="ident">as_bytes</span>());
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.LengthDelimitedCodec"><code>pub use self::length_delimited::<a class="struct" href="length_delimited/struct.LengthDelimitedCodec.html" title="struct tokio_util::codec::length_delimited::LengthDelimitedCodec">LengthDelimitedCodec</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.LengthDelimitedCodecError"><code>pub use self::length_delimited::<a class="struct" href="length_delimited/struct.LengthDelimitedCodecError.html" title="struct tokio_util::codec::length_delimited::LengthDelimitedCodecError">LengthDelimitedCodecError</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="length_delimited/index.html" title="tokio_util::codec::length_delimited mod">length_delimited</a></div><div class="item-right docblock-short"><p>Frame a stream of bytes based on a length prefix</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.AnyDelimiterCodec.html" title="tokio_util::codec::AnyDelimiterCodec struct">AnyDelimiterCodec</a></div><div class="item-right docblock-short"><p>A simple <a href="trait.Decoder.html"><code>Decoder</code></a> and <a href="trait.Encoder.html"><code>Encoder</code></a> implementation that splits up data into chunks based on any character in the given delimiter string.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BytesCodec.html" title="tokio_util::codec::BytesCodec struct">BytesCodec</a></div><div class="item-right docblock-short"><p>A simple <a href="trait.Decoder.html"><code>Decoder</code></a> and <a href="trait.Encoder.html"><code>Encoder</code></a> implementation that just ships bytes around.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Framed.html" title="tokio_util::codec::Framed struct">Framed</a></div><div class="item-right docblock-short"><p>A unified <a href="../../futures_core/stream/trait.Stream.html"><code>Stream</code></a> and <a href="../../futures_sink/trait.Sink.html"><code>Sink</code></a> interface to an underlying I/O object, using
+the <code>Encoder</code> and <code>Decoder</code> traits to encode and decode frames.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FramedParts.html" title="tokio_util::codec::FramedParts struct">FramedParts</a></div><div class="item-right docblock-short"><p><code>FramedParts</code> contains an export of the data of a Framed transport.
+It can be used to construct a new <a href="struct.Framed.html"><code>Framed</code></a> with a different codec.
+It contains all current buffers and the inner transport.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FramedRead.html" title="tokio_util::codec::FramedRead struct">FramedRead</a></div><div class="item-right docblock-short"><p>A <a href="../../futures_core/stream/trait.Stream.html"><code>Stream</code></a> of messages decoded from an <a href="../../tokio/io/async_read/trait.AsyncRead.html"><code>AsyncRead</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FramedWrite.html" title="tokio_util::codec::FramedWrite struct">FramedWrite</a></div><div class="item-right docblock-short"><p>A <a href="../../futures_sink/trait.Sink.html"><code>Sink</code></a> of frames encoded to an <code>AsyncWrite</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.LinesCodec.html" title="tokio_util::codec::LinesCodec struct">LinesCodec</a></div><div class="item-right docblock-short"><p>A simple <a href="trait.Decoder.html"><code>Decoder</code></a> and <a href="trait.Encoder.html"><code>Encoder</code></a> implementation that splits up data into lines.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.AnyDelimiterCodecError.html" title="tokio_util::codec::AnyDelimiterCodecError enum">AnyDelimiterCodecError</a></div><div class="item-right docblock-short"><p>An error occurred while encoding or decoding a chunk.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.LinesCodecError.html" title="tokio_util::codec::LinesCodecError enum">LinesCodecError</a></div><div class="item-right docblock-short"><p>An error occurred while encoding or decoding a line.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Decoder.html" title="tokio_util::codec::Decoder trait">Decoder</a></div><div class="item-right docblock-short"><p>Decoding of frames via buffers.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Encoder.html" title="tokio_util::codec::Encoder trait">Encoder</a></div><div class="item-right docblock-short"><p>Trait of helper objects to write out messages as bytes, for use with
+<a href="struct.FramedWrite.html"><code>FramedWrite</code></a>.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tokio_util" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

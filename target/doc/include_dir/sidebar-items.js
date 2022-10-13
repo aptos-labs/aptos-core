@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["DirEntry","A directory entry, roughly analogous to [`std::fs::DirEntry`]."]],"macro":[["include_dir","Embed the contents of a directory in your crate."]],"struct":[["Dir","A directory."],["File","A file with its contents stored in a `&'static [u8]`."]]};

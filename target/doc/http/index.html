@@ -1,0 +1,139 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A general purpose library of common HTTP types"><meta name="keywords" content="rust, rustlang, rust-lang, http"><title>http - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../http/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../http/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate http</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.2.8</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../http/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">http</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/http/lib.rs.html#1-211">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A general purpose library of common HTTP types</p>
+<p>This crate is a general purpose library for common types found when working
+with the HTTP protocol. You’ll find <code>Request</code> and <code>Response</code> types for
+working as either a client or a server as well as all of their components.
+Notably you’ll find <code>Uri</code> for what a <code>Request</code> is requesting, a <code>Method</code>
+for how it’s being requested, a <code>StatusCode</code> for what sort of response came
+back, a <code>Version</code> for how this was communicated, and
+<code>HeaderName</code>/<code>HeaderValue</code> definitions to get grouped in a <code>HeaderMap</code> to
+work with request/response headers.</p>
+<p>You will notably <em>not</em> find an implementation of sending requests or
+spinning up a server in this crate. It’s intended that this crate is the
+“standard library” for HTTP clients and servers without dictating any
+particular implementation. Note that this crate is still early on in its
+lifecycle so the support libraries that integrate with the <code>http</code> crate are
+a work in progress! Stay tuned and we’ll be sure to highlight crates here
+in the future.</p>
+<h3 id="requests-and-responses"><a href="#requests-and-responses">Requests and Responses</a></h3>
+<p>Perhaps the main two types in this crate are the <code>Request</code> and <code>Response</code>
+types. A <code>Request</code> could either be constructed to get sent off as a client
+or it can also be received to generate a <code>Response</code> for a server. Similarly
+as a client a <code>Response</code> is what you get after sending a <code>Request</code>, whereas
+on a server you’ll be manufacturing a <code>Response</code> to send back to the client.</p>
+<p>Each type has a number of accessors for the component fields. For as a
+server you might want to inspect a requests URI to dispatch it:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http</span>::{<span class="ident">Request</span>, <span class="ident">Response</span>};
+
+<span class="kw">fn</span> <span class="ident">response</span>(<span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) -&gt; <span class="ident">http::Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">uri</span>().<span class="ident">path</span>() {
+        <span class="string">&quot;/&quot;</span> =&gt; <span class="ident">index</span>(<span class="ident">req</span>),
+        <span class="string">&quot;/foo&quot;</span> =&gt; <span class="ident">foo</span>(<span class="ident">req</span>),
+        <span class="string">&quot;/bar&quot;</span> =&gt; <span class="ident">bar</span>(<span class="ident">req</span>),
+        <span class="kw">_</span> =&gt; <span class="ident">not_found</span>(<span class="ident">req</span>),
+    }
+}</code></pre></div>
+<p>On a <code>Request</code> you’ll also find accessors like <code>method</code> to return a
+<code>Method</code> and <code>headers</code> to inspect the various headers. A <code>Response</code>
+has similar methods for headers, the status code, etc.</p>
+<p>In addition to getters, request/response types also have mutable accessors
+to edit the request/response:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http</span>::{<span class="ident">HeaderValue</span>, <span class="ident">Response</span>, <span class="ident">StatusCode</span>};
+<span class="kw">use</span> <span class="ident">http::header::CONTENT_TYPE</span>;
+
+<span class="kw">fn</span> <span class="ident">add_server_headers</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">response</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Response</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) {
+    <span class="ident">response</span>.<span class="ident">headers_mut</span>()
+        .<span class="ident">insert</span>(<span class="ident">CONTENT_TYPE</span>, <span class="ident">HeaderValue::from_static</span>(<span class="string">&quot;text/html&quot;</span>));
+    <span class="kw-2">*</span><span class="ident">response</span>.<span class="ident">status_mut</span>() <span class="op">=</span> <span class="ident">StatusCode::OK</span>;
+}</code></pre></div>
+<p>And finally, one of the most important aspects of requests/responses, the
+body! The <code>Request</code> and <code>Response</code> types in this crate are <em>generic</em> in
+what their body is. This allows downstream libraries to use different
+representations such as <code>Request&lt;Vec&lt;u8&gt;&gt;</code>, <code>Response&lt;impl Read&gt;</code>,
+<code>Request&lt;impl Stream&lt;Item = Vec&lt;u8&gt;, Error = _&gt;&gt;</code>, or even
+<code>Response&lt;MyCustomType&gt;</code> where the custom type was deserialized from JSON.</p>
+<p>The body representation is intentionally flexible to give downstream
+libraries maximal flexibility in implementing the body as appropriate.</p>
+<h3 id="http-headers"><a href="#http-headers">HTTP Headers</a></h3>
+<p>Another major piece of functionality in this library is HTTP header
+interpretation and generation. The <code>HeaderName</code> type serves as a way to
+define header <em>names</em>, or what’s to the left of the colon. A <code>HeaderValue</code>
+conversely is the header <em>value</em>, or what’s to the right of a colon.</p>
+<p>For example, if you have an HTTP request that looks like:</p>
+<div class="example-wrap"><pre class="language-http"><code>GET /foo HTTP/1.1
+Accept: text/html</code></pre></div>
+<p>Then <code>&quot;Accept&quot;</code> is a <code>HeaderName</code> while <code>&quot;text/html&quot;</code> is a <code>HeaderValue</code>.
+Each of these is a dedicated type to allow for a number of interesting
+optimizations and to also encode the static guarantees of each type. For
+example a <code>HeaderName</code> is always a valid <code>&amp;str</code>, but a <code>HeaderValue</code> may
+not be valid UTF-8.</p>
+<p>The most common header names are already defined for you as constant values
+in the <code>header</code> module of this crate. For example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http::header</span>::{<span class="self">self</span>, <span class="ident">HeaderName</span>};
+
+<span class="kw">let</span> <span class="ident">name</span>: <span class="ident">HeaderName</span> <span class="op">=</span> <span class="ident">header::ACCEPT</span>;
+<span class="macro">assert_eq!</span>(<span class="ident">name</span>.<span class="ident">as_str</span>(), <span class="string">&quot;accept&quot;</span>);</code></pre></div>
+<p>You can, however, also parse header names from strings:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http::header</span>::{<span class="self">self</span>, <span class="ident">HeaderName</span>};
+
+<span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;Accept&quot;</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">HeaderName</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
+<span class="macro">assert_eq!</span>(<span class="ident">name</span>, <span class="ident">header::ACCEPT</span>);</code></pre></div>
+<p>Header values can be created from string literals through the <code>from_static</code>
+function:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http::HeaderValue</span>;
+
+<span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">HeaderValue::from_static</span>(<span class="string">&quot;text/html&quot;</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">value</span>.<span class="ident">as_bytes</span>(), <span class="string">b&quot;text/html&quot;</span>);</code></pre></div>
+<p>And header values can also be parsed like names:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http::HeaderValue</span>;
+
+<span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="string">&quot;text/html&quot;</span>;
+<span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">HeaderValue</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();</code></pre></div>
+<p>Most HTTP requests and responses tend to come with more than one header, so
+it’s not too useful to just work with names and values only! This crate also
+provides a <code>HeaderMap</code> type which is a specialized hash map for keys as
+<code>HeaderName</code> and generic values. This type, like header names, is optimized
+for common usage but should continue to scale with your needs over time.</p>
+<h2 id="uris"><a href="#uris">URIs</a></h2>
+<p>Each HTTP <code>Request</code> has an associated URI with it. This may just be a path
+like <code>/index.html</code> but it could also be an absolute URL such as
+<code>https://www.rust-lang.org/index.html</code>. A <code>URI</code> has a number of accessors to
+interpret it:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http::Uri</span>;
+<span class="kw">use</span> <span class="ident">http::uri::Scheme</span>;
+
+<span class="kw">let</span> <span class="ident">uri</span> <span class="op">=</span> <span class="string">&quot;https://www.rust-lang.org/index.html&quot;</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Uri</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
+
+<span class="macro">assert_eq!</span>(<span class="ident">uri</span>.<span class="ident">scheme</span>(), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">Scheme::HTTPS</span>));
+<span class="macro">assert_eq!</span>(<span class="ident">uri</span>.<span class="ident">host</span>(), <span class="prelude-val">Some</span>(<span class="string">&quot;www.rust-lang.org&quot;</span>));
+<span class="macro">assert_eq!</span>(<span class="ident">uri</span>.<span class="ident">path</span>(), <span class="string">&quot;/index.html&quot;</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">uri</span>.<span class="ident">query</span>(), <span class="prelude-val">None</span>);</code></pre></div>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.HeaderMap"><code>pub use crate::header::<a class="struct" href="header/struct.HeaderMap.html" title="struct http::header::HeaderMap">HeaderMap</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.HeaderValue"><code>pub use crate::header::<a class="struct" href="header/struct.HeaderValue.html" title="struct http::header::HeaderValue">HeaderValue</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Method"><code>pub use crate::method::<a class="struct" href="method/struct.Method.html" title="struct http::method::Method">Method</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Request"><code>pub use crate::request::<a class="struct" href="request/struct.Request.html" title="struct http::request::Request">Request</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Response"><code>pub use crate::response::<a class="struct" href="response/struct.Response.html" title="struct http::response::Response">Response</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.StatusCode"><code>pub use crate::status::<a class="struct" href="status/struct.StatusCode.html" title="struct http::status::StatusCode">StatusCode</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Uri"><code>pub use crate::uri::<a class="struct" href="uri/struct.Uri.html" title="struct http::uri::Uri">Uri</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Version"><code>pub use crate::version::<a class="struct" href="version/struct.Version.html" title="struct http::version::Version">Version</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="header/index.html" title="http::header mod">header</a></div><div class="item-right docblock-short"><p>HTTP header types</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="method/index.html" title="http::method mod">method</a></div><div class="item-right docblock-short"><p>The HTTP request method</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="request/index.html" title="http::request mod">request</a></div><div class="item-right docblock-short"><p>HTTP request types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="response/index.html" title="http::response mod">response</a></div><div class="item-right docblock-short"><p>HTTP response types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="status/index.html" title="http::status mod">status</a></div><div class="item-right docblock-short"><p>HTTP status codes</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="uri/index.html" title="http::uri mod">uri</a></div><div class="item-right docblock-short"><p>URI component of request and response lines</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="version/index.html" title="http::version mod">version</a></div><div class="item-right docblock-short"><p>HTTP version</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Error.html" title="http::Error struct">Error</a></div><div class="item-right docblock-short"><p>A generic “error” for HTTP connections</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Extensions.html" title="http::Extensions struct">Extensions</a></div><div class="item-right docblock-short"><p>A type map of protocol extensions.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Result.html" title="http::Result type">Result</a></div><div class="item-right docblock-short"><p>A <code>Result</code> typedef to use with the <code>http::Error</code> type</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="http" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

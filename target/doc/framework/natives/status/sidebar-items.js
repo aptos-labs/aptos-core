@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["NFE_EXPECTED_STRUCT_TYPE_TAG",""],["NFE_UNABLE_TO_PARSE_ADDRESS",""]]};

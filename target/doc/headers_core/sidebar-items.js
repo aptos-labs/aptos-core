@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["header","HTTP header types"]],"struct":[["Error","Errors trying to decode a header."],["HeaderName","Represents an HTTP header field name"],["HeaderValue","Represents an HTTP header field value."]],"trait":[["Header","A trait for any object that will represent a header field and value."]]};

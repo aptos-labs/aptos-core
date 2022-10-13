@@ -1,0 +1,184 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A `Subscriber` for formatting and logging `tracing` data."><meta name="keywords" content="rust, rustlang, rust-lang, fmt"><title>tracing_subscriber::fmt - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tracing_subscriber/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tracing_subscriber/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module fmt</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tracing_subscriber/index.html">
+                        <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">tracing_subscriber</a>::<wbr><a class="mod" href="#">fmt</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tracing_subscriber/fmt/mod.rs.html#1-1324">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A <code>Subscriber</code> for formatting and logging <code>tracing</code> data.</p>
+<h2 id="overview"><a href="#overview">Overview</a></h2>
+<p><a href="https://crates.io/crates/tracing"><code>tracing</code></a> is a framework for instrumenting Rust programs with context-aware,
+structured, event-based diagnostic information. This crate provides an
+implementation of the <a href="https://docs.rs/tracing/latest/tracing/trait.Subscriber.html"><code>Subscriber</code></a> trait that records <code>tracing</code>’s <code>Event</code>s
+and <code>Span</code>s by formatting them as text and logging them to stdout.</p>
+<h2 id="usage"><a href="#usage">Usage</a></h2>
+<p>First, add this to your <code>Cargo.toml</code> file:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+tracing-subscriber = &quot;0.3&quot;</code></pre></div>
+<p><em>Compiler support: <a href="../index.html#supported-rust-versions">requires <code>rustc</code> 1.49+</a></em></p>
+<p>Add the following to your executable to initialize the default subscriber:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tracing_subscriber</span>;
+
+<span class="ident">tracing_subscriber::fmt::init</span>();</code></pre></div>
+<h3 id="filtering-events-with-environment-variables"><a href="#filtering-events-with-environment-variables">Filtering Events with Environment Variables</a></h3>
+<p>The default subscriber installed by <code>init</code> enables you to filter events
+at runtime using environment variables (using the <a href="super::filter::EnvFilter"><code>EnvFilter</code></a>).</p>
+<p>The filter syntax is a superset of the <a href="https://docs.rs/env_logger/"><code>env_logger</code></a> syntax.</p>
+<p>For example:</p>
+<ul>
+<li>Setting <code>RUST_LOG=debug</code> enables all <code>Span</code>s and <code>Event</code>s
+set to the log level <code>DEBUG</code> or higher</li>
+<li>Setting <code>RUST_LOG=my_crate=trace</code> enables <code>Span</code>s and <code>Event</code>s
+in <code>my_crate</code> at all log levels</li>
+</ul>
+<p><strong>Note</strong>: This should <strong>not</strong> be called by libraries. Libraries should use
+<a href="https://crates.io/crates/tracing"><code>tracing</code></a> to publish <code>tracing</code> <code>Event</code>s.</p>
+<h2 id="configuration"><a href="#configuration">Configuration</a></h2>
+<p>You can configure a subscriber instead of using the defaults with
+the following functions:</p>
+<h4 id="subscriber"><a href="#subscriber">Subscriber</a></h4>
+<p>The <a href="struct.Subscriber.html"><code>FmtSubscriber</code></a> formats and records <code>tracing</code> events as line-oriented logs.
+You can create one by calling:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">subscriber</span> <span class="op">=</span> <span class="ident">tracing_subscriber::fmt</span>()
+    <span class="comment">// ... add configuration</span>
+    .<span class="ident">finish</span>();</code></pre></div>
+<p>You can find the configuration methods for <a href="struct.Subscriber.html"><code>FmtSubscriber</code></a> in
+<a href="struct.SubscriberBuilder.html" title="SubscriberBuilder"><code>SubscriberBuilder</code></a>.</p>
+<h3 id="formatters"><a href="#formatters">Formatters</a></h3>
+<p>The output format used by the layer and subscriber in this module is
+represented by implementing the <a href="trait.FormatEvent.html" title="FormatEvent"><code>FormatEvent</code></a> trait, and can be
+customized. This module provides a number of formatter implementations:</p>
+<ul>
+<li>
+<p><a href="format/struct.Full.html" title="format::Full"><code>format::Full</code></a>: The default formatter. This emits human-readable,
+single-line logs for each event that occurs, with the current span context
+displayed before the formatted representation of the event. See
+<a href="format/struct.Full.html#example-output">here</a> for sample output.</p>
+</li>
+<li>
+<p><a href="format/struct.Compact.html" title="format::Compact"><code>format::Compact</code></a>: A variant of the default formatter, optimized for
+short line lengths. Fields from the current span context are appended to
+the fields of the formatted event. See
+<a href="format/struct.Compact.html#example-output">here</a> for sample output.</p>
+</li>
+<li>
+<p><a href="format/struct.Pretty.html" title="format::Pretty"><code>format::Pretty</code></a>: Emits excessively pretty, multi-line logs, optimized
+for human readability. This is primarily intended to be used in local
+development and debugging, or for command-line applications, where
+automated analysis and compact storage of logs is less of a priority than
+readability and visual appeal. See <a href="format/struct.Pretty.html#example-output">here</a>
+for sample output.</p>
+</li>
+<li>
+<p>[<code>format::Json</code>]: Outputs newline-delimited JSON logs. This is intended
+for production use with systems where structured logs are consumed as JSON
+by analysis and viewing tools. The JSON output is not optimized for human
+readability. See <a href="format::Json#example-output">here</a> for sample output.</p>
+</li>
+</ul>
+<h4 id="customizing-formatters"><a href="#customizing-formatters">Customizing Formatters</a></h4>
+<p>The formatting of log lines for spans and events is controlled by two
+traits, <a href="trait.FormatEvent.html" title="FormatEvent"><code>FormatEvent</code></a> and <a href="trait.FormatFields.html" title="FormatFields"><code>FormatFields</code></a>. The <a href="trait.FormatEvent.html" title="FormatEvent"><code>FormatEvent</code></a> trait
+determines the overall formatting of the log line, such as what information
+from the event’s metadata and span context is included and in what order.
+The <a href="trait.FormatFields.html" title="FormatFields"><code>FormatFields</code></a> trait determines how fields — both the event’s
+fields and fields on spans — are formatted.</p>
+<p>The <a href="format/index.html"><code>fmt::format</code></a> module provides several types which implement these traits,
+many of which expose additional configuration options to customize their
+output. The <a href="format/struct.Format.html" title="format::Format"><code>format::Format</code></a> type implements common configuration used by
+all the formatters provided in this crate, and can be used as a builder to
+set specific formatting settings. For example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tracing_subscriber::fmt</span>;
+
+<span class="comment">// Configure a custom event formatter</span>
+<span class="kw">let</span> <span class="ident">format</span> <span class="op">=</span> <span class="ident">fmt::format</span>()
+   .<span class="ident">with_level</span>(<span class="bool-val">false</span>) <span class="comment">// don&#39;t include levels in formatted output</span>
+   .<span class="ident">with_target</span>(<span class="bool-val">false</span>) <span class="comment">// don&#39;t include targets</span>
+   .<span class="ident">with_thread_ids</span>(<span class="bool-val">true</span>) <span class="comment">// include the thread ID of the current thread</span>
+   .<span class="ident">with_thread_names</span>(<span class="bool-val">true</span>) <span class="comment">// include the name of the current thread</span>
+   .<span class="ident">compact</span>(); <span class="comment">// use the `Compact` formatting style.</span>
+
+<span class="comment">// Create a `fmt` subscriber that uses our custom event format, and set it</span>
+<span class="comment">// as the default.</span>
+<span class="ident">tracing_subscriber::fmt</span>()
+    .<span class="ident">event_format</span>(<span class="ident">format</span>)
+    .<span class="ident">init</span>();</code></pre></div>
+<p>However, if a specific output format is needed, other crates can
+also implement <a href="trait.FormatEvent.html" title="FormatEvent"><code>FormatEvent</code></a> and <a href="trait.FormatFields.html" title="FormatFields"><code>FormatFields</code></a>. See those traits’
+documentation for details on how to implement them.</p>
+<h3 id="filters"><a href="#filters">Filters</a></h3>
+<p>If you want to filter the <code>tracing</code> <code>Events</code> based on environment
+variables, you can use the <a href="super::filter::EnvFilter"><code>EnvFilter</code></a> as follows:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tracing_subscriber::EnvFilter</span>;
+
+<span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="ident">EnvFilter::from_default_env</span>();</code></pre></div>
+<p>As mentioned above, the <a href="super::filter::EnvFilter"><code>EnvFilter</code></a> allows <code>Span</code>s and <code>Event</code>s to
+be filtered at runtime by setting the <code>RUST_LOG</code> environment variable.</p>
+<p>You can find the other available <a href="../filter/index.html"><code>filter</code></a>s in the documentation.</p>
+<h4 id="using-your-subscriber"><a href="#using-your-subscriber">Using Your Subscriber</a></h4>
+<p>Finally, once you have configured your <code>Subscriber</code>, you need to
+configure your executable to use it.</p>
+<p>A subscriber can be installed globally using:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tracing</span>;
+<span class="kw">use</span> <span class="ident">tracing_subscriber::FmtSubscriber</span>;
+
+<span class="kw">let</span> <span class="ident">subscriber</span> <span class="op">=</span> <span class="ident">FmtSubscriber::new</span>();
+
+<span class="ident">tracing::subscriber::set_global_default</span>(<span class="ident">subscriber</span>)
+    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_err</span><span class="op">|</span> <span class="macro">eprintln!</span>(<span class="string">&quot;Unable to set global default subscriber&quot;</span>));
+<span class="comment">// Note this will only fail if you try to set the global default</span>
+<span class="comment">// subscriber multiple times</span></code></pre></div>
+<h4 id="composing-layers"><a href="#composing-layers">Composing Layers</a></h4>
+<p>Composing an <a href="super::filter::EnvFilter"><code>EnvFilter</code></a> <code>Layer</code> and a <a href="struct.Layer.html" title="super::fmt::Layer">format <code>Layer</code></a>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tracing_subscriber</span>::{<span class="ident">fmt</span>, <span class="ident">EnvFilter</span>};
+<span class="kw">use</span> <span class="ident">tracing_subscriber::prelude</span>::<span class="kw-2">*</span>;
+
+<span class="kw">let</span> <span class="ident">fmt_layer</span> <span class="op">=</span> <span class="ident">fmt::layer</span>()
+    .<span class="ident">with_target</span>(<span class="bool-val">false</span>);
+<span class="kw">let</span> <span class="ident">filter_layer</span> <span class="op">=</span> <span class="ident">EnvFilter::try_from_default_env</span>()
+    .<span class="ident">or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">EnvFilter::try_new</span>(<span class="string">&quot;info&quot;</span>))
+    .<span class="ident">unwrap</span>();
+
+<span class="ident">tracing_subscriber::registry</span>()
+    .<span class="ident">with</span>(<span class="ident">filter_layer</span>)
+    .<span class="ident">with</span>(<span class="ident">fmt_layer</span>)
+    .<span class="ident">init</span>();</code></pre></div>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="format/index.html" title="tracing_subscriber::fmt::format mod">format</a></div><div class="item-right docblock-short"><p>Formatters for logging <code>tracing</code> events.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="time/index.html" title="tracing_subscriber::fmt::time mod">time</a></div><div class="item-right docblock-short"><p>Formatters for event timestamps.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="writer/index.html" title="tracing_subscriber::fmt::writer mod">writer</a></div><div class="item-right docblock-short"><p>Abstractions for creating <a href="https://doc.rust-lang.org/1.63.0/std/io/trait.Write.html"><code>io::Write</code></a> instances.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FmtContext.html" title="tracing_subscriber::fmt::FmtContext struct">FmtContext</a></div><div class="item-right docblock-short"><p>Provides the current span context to a formatter.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FormattedFields.html" title="tracing_subscriber::fmt::FormattedFields struct">FormattedFields</a></div><div class="item-right docblock-short"><p>A formatted representation of a span’s fields stored in its <a href="../registry/struct.Extensions.html">extensions</a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Layer.html" title="tracing_subscriber::fmt::Layer struct">Layer</a></div><div class="item-right docblock-short"><p>A <a href="../layer/trait.Layer.html"><code>Layer</code></a> that logs formatted representations of <code>tracing</code> events.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Subscriber.html" title="tracing_subscriber::fmt::Subscriber struct">Subscriber</a></div><div class="item-right docblock-short"><p>A <code>Subscriber</code> that logs formatted representations of <code>tracing</code> events.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SubscriberBuilder.html" title="tracing_subscriber::fmt::SubscriberBuilder struct">SubscriberBuilder</a></div><div class="item-right docblock-short"><p>Configures and constructs <code>Subscriber</code>s.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.TestWriter.html" title="tracing_subscriber::fmt::TestWriter struct">TestWriter</a></div><div class="item-right docblock-short"><p>A writer intended to support <a href="https://doc.rust-lang.org/book/ch11-02-running-tests.html#showing-function-output"><code>libtest</code>’s output capturing</a> for use in unit tests.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FormatEvent.html" title="tracing_subscriber::fmt::FormatEvent trait">FormatEvent</a></div><div class="item-right docblock-short"><p>A type that can format a tracing <a href="tracing::Event"><code>Event</code></a> to a <a href="format/struct.Writer.html" title="Writer"><code>Writer</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FormatFields.html" title="tracing_subscriber::fmt::FormatFields trait">FormatFields</a></div><div class="item-right docblock-short"><p>A type that can format a <a href="../field/trait.RecordFields.html">set of fields</a> to a <a href="format/struct.Writer.html" title="Writer"><code>Writer</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.MakeWriter.html" title="tracing_subscriber::fmt::MakeWriter trait">MakeWriter</a></div><div class="item-right docblock-short"><p>A type that can create <a href="https://doc.rust-lang.org/1.63.0/std/io/trait.Write.html"><code>io::Write</code></a> instances.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.fmt.html" title="tracing_subscriber::fmt::fmt fn">fmt</a></div><div class="item-right docblock-short"><p>Returns a new <a href="struct.SubscriberBuilder.html" title="SubscriberBuilder"><code>SubscriberBuilder</code></a> for configuring a <a href="struct.Subscriber.html">formatting subscriber</a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.format.html" title="tracing_subscriber::fmt::format fn">format</a></div><div class="item-right docblock-short"><p>Returns the default configuration for an [event formatter].</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.init.html" title="tracing_subscriber::fmt::init fn">init</a></div><div class="item-right docblock-short"><p>Install a global tracing subscriber that listens for events and
+filters based on the value of the <a href="crate::filter::EnvFilter::DEFAULT_ENV"><code>RUST_LOG</code> environment variable</a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.layer.html" title="tracing_subscriber::fmt::layer fn">layer</a></div><div class="item-right docblock-short"><p>Returns a new <a href="struct.Layer.html">formatting layer</a> that can be <a href="../layer/index.html">composed</a> with other layers to
+construct a <a href="struct.Subscriber.html" title="Subscriber"><code>Subscriber</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.time.html" title="tracing_subscriber::fmt::time fn">time</a></div><div class="item-right docblock-short"><p>Returns a new <code>SystemTime</code> timestamp provider.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.try_init.html" title="tracing_subscriber::fmt::try_init fn">try_init</a></div><div class="item-right docblock-short"><p>Install a global tracing subscriber that listens for events and
+filters based on the value of the <a href="crate::filter::EnvFilter::DEFAULT_ENV"><code>RUST_LOG</code> environment variable</a>,
+if one is not already set.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Formatter.html" title="tracing_subscriber::fmt::Formatter type">Formatter</a></div><div class="item-right docblock-short"><p>A <code>Subscriber</code> that logs formatted representations of <code>tracing</code> events.
+This type only logs formatted events; it does not perform any filtering.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tracing_subscriber" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

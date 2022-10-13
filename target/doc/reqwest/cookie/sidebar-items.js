@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Cookie","A single HTTP cookie."],["Jar","A good default `CookieStore` implementation."]],"trait":[["CookieStore","Actions for a persistent cookie store providing session support."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["DurationHistogram","A small wrapper around Histogram to handle the special case of duration buckets. This Histogram will handle the correct granularity for logging time duration in a way that fits the used buckets."],["OpMetrics",""]]};

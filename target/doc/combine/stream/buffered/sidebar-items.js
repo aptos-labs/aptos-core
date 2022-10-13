@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Stream","`Stream` which buffers items from an instance of `StreamOnce` into a ring buffer. Instances of `StreamOnce` which is not able to implement `ResetStream` (such as `ReadStream`) may use this as a way to implement `ResetStream` and become a full `Stream` instance."]]};

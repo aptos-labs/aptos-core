@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":[["toml","Construct a `toml_edit::easy::Value` from TOML syntax."]],"mod":[["map","A map of String to toml::Value."],["value","Definition of a TOML value"]]};

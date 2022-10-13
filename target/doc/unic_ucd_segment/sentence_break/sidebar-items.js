@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["SentenceBreak","Represents the Unicode character `Sentence_Break` property."]],"mod":[["abbr_names","Abbreviated name aliases for the `Sentence_Break` property."],["long_names","Long name aliases for the `Sentence_Break` property."]]};

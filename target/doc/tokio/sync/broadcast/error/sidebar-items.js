@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["RecvError","An error returned from the `recv` function on a `Receiver`."],["TryRecvError","An error returned from the `try_recv` function on a `Receiver`."]],"struct":[["SendError","Error returned by from the `send` function on a `Sender`."]]};

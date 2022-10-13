@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["NumberFormat","Number format enum, the u32 value represents the base"]],"fn":[["parse_address_impl",""],["parse_address_number",""],["parse_u128",""],["parse_u64",""],["parse_u8",""]],"struct":[["Parser",""]],"trait":[["Token",""]]};

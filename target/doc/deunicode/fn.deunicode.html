@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This function takes any Unicode string and returns an ASCII transliteration of that string."><meta name="keywords" content="rust, rustlang, rust-lang, deunicode"><title>deunicode in deunicode - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../deunicode/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../deunicode/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In deunicode</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../deunicode/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Function <a href="index.html">deunicode</a>::<wbr><a class="fn" href="#">deunicode</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/deunicode/lib.rs.html#63-65">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust fn"><code>pub fn deunicode(s: &amp;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.str.html">str</a>) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.63.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a></code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This function takes any Unicode string and returns an ASCII transliteration
+of that string.</p>
+<h3 id="guarantees-and-warnings"><a href="#guarantees-and-warnings">Guarantees and Warnings</a></h3>
+<p>Here are some guarantees you have when calling <code>deunicode()</code>:</p>
+<ul>
+<li>The <code>String</code> returned will be valid ASCII; the decimal representation of
+every <code>char</code> in the string will be between 0 and 127, inclusive.</li>
+<li>Every ASCII character (0x0000 - 0x007F) is mapped to itself.</li>
+<li>All Unicode characters will translate to a string containing newlines
+(<code>&quot;\n&quot;</code>) or ASCII characters in the range 0x0020 - 0x007E. So for example,
+no Unicode character will translate to <code>\u{01}</code>. The exception is if the
+ASCII character itself is passed in, in which case it will be mapped to
+itself. (So <code>'\u{01}'</code> will be mapped to <code>&quot;\u{01}&quot;</code>.)</li>
+</ul>
+<p>There are, however, some things you should keep in mind:</p>
+<ul>
+<li>As stated, some transliterations do produce <code>\n</code> characters.</li>
+<li>Some Unicode characters transliterate to an empty string, either on purpose
+or because <code>deunicode</code> does not know about the character.</li>
+<li>Some Unicode characters are unknown and transliterate to <code>&quot;[?]&quot;</code>.</li>
+<li>Many Unicode characters transliterate to multi-character strings. For
+example, 北 is transliterated as “Bei “.</li>
+<li>Han characters are mapped to Mandarin, and will be mostly illegible to Japanese readers.</li>
+</ul>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="deunicode" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

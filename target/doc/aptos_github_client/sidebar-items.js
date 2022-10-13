@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Error",""]],"struct":[["Client","Client provides a client around the restful interface to GitHub API version 3. Learn more here: https://developer.github.com/v3"]]};

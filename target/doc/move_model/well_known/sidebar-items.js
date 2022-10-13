@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["EVENT_EMIT_EVENT",""],["TYPE_INFO_MOVE",""],["TYPE_INFO_SPEC",""],["TYPE_NAME_MOVE",""],["TYPE_NAME_SPEC",""],["VECTOR_BORROW_MUT",""]]};

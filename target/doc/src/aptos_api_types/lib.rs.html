@@ -1,0 +1,157 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `api/types/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../aptos_api_types/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../aptos_api_types/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../aptos_api_types/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+</pre><pre class="rust"><code><span class="comment">// Copyright (c) Aptos</span>
+<span class="comment">// SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="kw">mod</span> <span class="ident">account</span>;
+<span class="kw">mod</span> <span class="ident">address</span>;
+<span class="kw">mod</span> <span class="ident">block</span>;
+<span class="kw">mod</span> <span class="ident">bytecode</span>;
+<span class="kw">mod</span> <span class="ident">convert</span>;
+<span class="kw">mod</span> <span class="ident">derives</span>;
+<span class="kw">mod</span> <span class="ident">error</span>;
+<span class="kw">mod</span> <span class="ident">hash</span>;
+<span class="kw">mod</span> <span class="ident">headers</span>;
+<span class="kw">mod</span> <span class="ident">index</span>;
+<span class="kw">mod</span> <span class="ident">ledger_info</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">mime_types</span>;
+<span class="kw">mod</span> <span class="ident">move_types</span>;
+<span class="kw">mod</span> <span class="ident">table</span>;
+<span class="kw">mod</span> <span class="ident">transaction</span>;
+<span class="kw">mod</span> <span class="ident">wrappers</span>;
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">account::AccountData</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">address::Address</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">block</span>::{<span class="ident">BcsBlock</span>, <span class="ident">Block</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bytecode::Bytecode</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">convert</span>::{<span class="ident">new_vm_utf8_string</span>, <span class="ident">AsConverter</span>, <span class="ident">ExplainVMStatus</span>, <span class="ident">MoveConverter</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">error</span>::{<span class="ident">AptosError</span>, <span class="ident">AptosErrorCode</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">hash::HashValue</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">headers</span>::<span class="kw-2">*</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">index</span>::{<span class="ident">IndexResponse</span>, <span class="ident">IndexResponseBcs</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">ledger_info::LedgerInfo</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">move_types</span>::{
+    <span class="ident">verify_field_identifier</span>, <span class="ident">verify_function_identifier</span>, <span class="ident">verify_module_identifier</span>, <span class="ident">EntryFunctionId</span>,
+    <span class="ident">HexEncodedBytes</span>, <span class="ident">MoveAbility</span>, <span class="ident">MoveFunction</span>, <span class="ident">MoveFunctionGenericTypeParam</span>,
+    <span class="ident">MoveFunctionVisibility</span>, <span class="ident">MoveModule</span>, <span class="ident">MoveModuleBytecode</span>, <span class="ident">MoveModuleId</span>, <span class="ident">MoveResource</span>,
+    <span class="ident">MoveScriptBytecode</span>, <span class="ident">MoveStruct</span>, <span class="ident">MoveStructField</span>, <span class="ident">MoveStructTag</span>, <span class="ident">MoveType</span>, <span class="ident">MoveValue</span>,
+    <span class="ident">MAX_RECURSIVE_TYPES_ALLOWED</span>, <span class="ident">U128</span>, <span class="ident">U64</span>,
+};
+<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Deserializer</span>};
+<span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">table::TableItemRequest</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">transaction</span>::{
+    <span class="ident">AccountSignature</span>, <span class="ident">BlockMetadataTransaction</span>, <span class="ident">DeleteModule</span>, <span class="ident">DeleteResource</span>, <span class="ident">DeleteTableItem</span>,
+    <span class="ident">DirectWriteSet</span>, <span class="ident">Ed25519Signature</span>, <span class="ident">EncodeSubmissionRequest</span>, <span class="ident">EntryFunctionPayload</span>, <span class="ident">Event</span>,
+    <span class="ident">GasEstimation</span>, <span class="ident">GasEstimationBcs</span>, <span class="ident">GenesisPayload</span>, <span class="ident">GenesisTransaction</span>, <span class="ident">ModuleBundlePayload</span>,
+    <span class="ident">MultiAgentSignature</span>, <span class="ident">MultiEd25519Signature</span>, <span class="ident">PendingTransaction</span>, <span class="ident">ScriptPayload</span>, <span class="ident">ScriptWriteSet</span>,
+    <span class="ident">SubmitTransactionRequest</span>, <span class="ident">Transaction</span>, <span class="ident">TransactionData</span>, <span class="ident">TransactionId</span>, <span class="ident">TransactionInfo</span>,
+    <span class="ident">TransactionOnChainData</span>, <span class="ident">TransactionPayload</span>, <span class="ident">TransactionSignature</span>, <span class="ident">TransactionSigningMessage</span>,
+    <span class="ident">TransactionsBatchSingleSubmissionFailure</span>, <span class="ident">TransactionsBatchSubmissionResult</span>,
+    <span class="ident">UserCreateSigningMessageRequest</span>, <span class="ident">UserTransaction</span>, <span class="ident">UserTransactionRequest</span>, <span class="ident">VersionedEvent</span>,
+    <span class="ident">WriteModule</span>, <span class="ident">WriteResource</span>, <span class="ident">WriteSet</span>, <span class="ident">WriteSetChange</span>, <span class="ident">WriteSetPayload</span>, <span class="ident">WriteTableItem</span>,
+};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">wrappers</span>::{<span class="ident">EventGuid</span>, <span class="ident">IdentifierWrapper</span>};
+
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">deserialize_from_string</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">D</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">deserializer</span>: <span class="ident">D</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">D::Error</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">D</span>: <span class="ident">Deserializer</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
+    <span class="ident">T</span>: <span class="ident">FromStr</span>,
+    <span class="op">&lt;</span><span class="ident">T</span> <span class="kw">as</span> <span class="ident">FromStr</span><span class="op">&gt;</span><span class="ident">::Err</span>: <span class="ident">std::fmt::Display</span>,
+{
+    <span class="kw">use</span> <span class="ident">serde::de::Error</span>;
+
+    <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="ident">::deserialize</span>(<span class="ident">deserializer</span>)<span class="question-mark">?</span>;
+    <span class="ident">s</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>().<span class="ident">map_err</span>(<span class="ident">D::Error::custom</span>)
+}
+
+<span class="doccomment">/// For verifying a given struct</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">VerifyInput</span> {
+    <span class="kw">fn</span> <span class="ident">verify</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+}
+
+<span class="doccomment">/// For verifying a given struct that needs to limit recursion</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">VerifyInputWithRecursion</span> {
+    <span class="kw">fn</span> <span class="ident">verify</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">recursion_count</span>: <span class="ident">u8</span>) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="aptos_api_types" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

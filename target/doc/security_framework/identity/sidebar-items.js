@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["SecIdentity","A type representing an identity."]]};

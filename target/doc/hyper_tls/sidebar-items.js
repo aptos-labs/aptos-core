@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["MaybeHttpsStream","A stream that might be protected with TLS."]],"struct":[["HttpsConnecting","A Future representing work to connect to a URL, and a TLS handshake."],["HttpsConnector","A Connector for the `https` scheme."],["TlsStream","A wrapper around an underlying raw stream which implements the TLS or SSL protocol."]]};

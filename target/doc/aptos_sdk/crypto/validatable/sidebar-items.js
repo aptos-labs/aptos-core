@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Validatable","Used in connection with the `Validate` trait to be able to represent types which can benefit from deferred validation as a performance optimization."]],"trait":[["Validate","The `Validate` trait is used in tandem with the `Validatable` type in order to provide deferred validation for types."]]};

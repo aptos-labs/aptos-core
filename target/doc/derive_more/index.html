@@ -1,0 +1,133 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="`derive_more`"><meta name="keywords" content="rust, rustlang, rust-lang, derive_more"><title>derive_more - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../derive_more/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../derive_more/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate derive_more</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.99.17</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../derive_more/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">derive_more</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/derive_more/lib.rs.html#1-422">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="derive_more"><a href="#derive_more"><code>derive_more</code></a></h2>
+<p><a href="https://github.com/JelteF/derive_more/actions"><img src="https://github.com/JelteF/derive_more/workflows/CI/badge.svg" alt="Build Status" /></a>
+<a href="https://crates.io/crates/derive_more"><img src="https://img.shields.io/crates/v/derive_more.svg" alt="Latest Version" /></a>
+<a href="https://jeltef.github.io/derive_more/derive_more/"><img src="https://img.shields.io/badge/api-rustdoc-blue.svg" alt="Rust Documentation" /></a>
+<a href="https://raw.githubusercontent.com/JelteF/derive_more/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="GitHub license" /></a>
+<a href="https://blog.rust-lang.org/2019/07/04/Rust-1.36.0.html"><img src="https://img.shields.io/badge/rustc-1.36+-lightgray.svg" alt="Rust 1.36+" /></a></p>
+<p>Rust has lots of builtin traits that are implemented for its basic types, such
+as <code>Add</code>, <code>Not</code>, <code>From</code> or <code>Display</code>.
+However, when wrapping these types inside your own structs or enums you lose the
+implementations of these traits and are required to recreate them.
+This is especially annoying when your own structures are very simple, such as
+when using the commonly advised newtype pattern (e.g. <code>MyInt(i32)</code>).</p>
+<p>This library tries to remove these annoyances and the corresponding boilerplate code.
+It does this by allowing you to derive lots of commonly used traits for both structs and enums.</p>
+<h3 id="example-code"><a href="#example-code">Example code</a></h3>
+<p>By using this library the following code just works:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">derive_more</span>;
+<span class="kw">use</span> <span class="ident">derive_more</span>::{<span class="ident">Add</span>, <span class="ident">Display</span>, <span class="ident">From</span>, <span class="ident">Into</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PartialEq</span>, <span class="ident">From</span>, <span class="ident">Add</span>)]</span>
+<span class="kw">struct</span> <span class="ident">MyInt</span>(<span class="ident">i32</span>);
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PartialEq</span>, <span class="ident">From</span>, <span class="ident">Into</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Point2D</span> {
+    <span class="ident">x</span>: <span class="ident">i32</span>,
+    <span class="ident">y</span>: <span class="ident">i32</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PartialEq</span>, <span class="ident">From</span>, <span class="ident">Add</span>, <span class="ident">Display</span>)]</span>
+<span class="kw">enum</span> <span class="ident">MyEnum</span> {
+    <span class="attribute">#[<span class="ident">display</span>(<span class="ident">fmt</span> <span class="op">=</span> <span class="string">&quot;int: {}&quot;</span>, <span class="ident">_0</span>)]</span>
+    <span class="ident">Int</span>(<span class="ident">i32</span>),
+    <span class="ident">Uint</span>(<span class="ident">u32</span>),
+    <span class="attribute">#[<span class="ident">display</span>(<span class="ident">fmt</span> <span class="op">=</span> <span class="string">&quot;nothing&quot;</span>)]</span>
+    <span class="ident">Nothing</span>,
+}
+
+<span class="macro">assert!</span>(<span class="ident">MyInt</span>(<span class="number">11</span>) <span class="op">==</span> <span class="ident">MyInt</span>(<span class="number">5</span>) <span class="op">+</span> <span class="number">6</span>.<span class="ident">into</span>());
+<span class="macro">assert!</span>((<span class="number">5</span>, <span class="number">6</span>) <span class="op">==</span> <span class="ident">Point2D</span> { <span class="ident">x</span>: <span class="number">5</span>, <span class="ident">y</span>: <span class="number">6</span> }.<span class="ident">into</span>());
+<span class="macro">assert!</span>(<span class="ident">MyEnum::Int</span>(<span class="number">15</span>) <span class="op">==</span> (<span class="ident">MyEnum::Int</span>(<span class="number">8</span>) <span class="op">+</span> <span class="number">7</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>());
+<span class="macro">assert!</span>(<span class="ident">MyEnum::Int</span>(<span class="number">15</span>).<span class="ident">to_string</span>() <span class="op">==</span> <span class="string">&quot;int: 15&quot;</span>);
+<span class="macro">assert!</span>(<span class="ident">MyEnum::Uint</span>(<span class="number">42</span>).<span class="ident">to_string</span>() <span class="op">==</span> <span class="string">&quot;42&quot;</span>);
+<span class="macro">assert!</span>(<span class="ident">MyEnum::Nothing</span>.<span class="ident">to_string</span>() <span class="op">==</span> <span class="string">&quot;nothing&quot;</span>);</code></pre></div>
+<h3 id="the-derivable-traits"><a href="#the-derivable-traits">The derivable traits</a></h3>
+<p>Below are all the traits that you can derive using this library.
+Some trait derivations are so similar that the further documentation will only show a single one
+of them.
+You can recognize these by the “-like” suffix in their name.
+The trait name before that will be the only one that is used throughout the further
+documentation.</p>
+<p>It is important to understand what code gets generated when using one of the
+derives from this crate.
+That is why the links below explain what code gets generated for a trait for
+each group from before.</p>
+<p>You can use the <a href="https://github.com/dtolnay/cargo-expand"><code>cargo-expand</code></a> utility to see the exact code that is generated
+for your specific type.
+This will show you your code with all macros and derives expanded.</p>
+<p><strong>NOTE</strong>: You still have to derive each trait separately. So <code>#[derive(Mul)]</code> doesn’t
+automatically derive <code>Div</code> as well. To derive both you should do <code>#[derive(Mul, Div)]</code></p>
+<h4 id="conversion-traits"><a href="#conversion-traits">Conversion traits</a></h4>
+<p>These are traits that are used to convert automatically between types.</p>
+<ol>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/from.html"><code>From</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/into.html"><code>Into</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/from_str.html"><code>FromStr</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/try_into.html"><code>TryInto</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/into_iterator.html"><code>IntoIterator</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/as_ref.html"><code>AsRef</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/as_mut.html"><code>AsMut</code></a></li>
+</ol>
+<h4 id="formatting-traits"><a href="#formatting-traits">Formatting traits</a></h4>
+<p>These traits are used for converting a struct to a string in different ways.</p>
+<ol>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/display.html"><code>Display</code>-like</a>, contains <code>Display</code>, <code>Binary</code>, <code>Octal</code>, <code>LowerHex</code>,
+<code>UpperHex</code>, <code>LowerExp</code>, <code>UpperExp</code>, <code>Pointer</code></li>
+</ol>
+<h4 id="error-handling-traits"><a href="#error-handling-traits">Error-handling traits</a></h4>
+<p>These traits are used to define error-types.</p>
+<ol>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/error.html"><code>Error</code></a></li>
+</ol>
+<h4 id="operators"><a href="#operators">Operators</a></h4>
+<p>These are traits that can be used for operator overloading.</p>
+<ol>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/index_op.html"><code>Index</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/deref.html"><code>Deref</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/not.html"><code>Not</code>-like</a>, contains <code>Not</code> and <code>Neg</code></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/add.html"><code>Add</code>-like</a>, contains <code>Add</code>, <code>Sub</code>, <code>BitAnd</code>, <code>BitOr</code>, <code>BitXor</code></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/mul.html"><code>Mul</code>-like</a>, contains <code>Mul</code>, <code>Div</code>, <code>Rem</code>, <code>Shr</code> and <code>Shl</code></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/sum.html"><code>Sum</code>-like</a>, contains <code>Sum</code> and <code>Product</code></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/index_mut.html"><code>IndexMut</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/deref_mut.html"><code>DerefMut</code></a></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/add_assign.html"><code>AddAssign</code>-like</a>, contains <code>AddAssign</code>, <code>SubAssign</code>, <code>BitAndAssign</code>,
+<code>BitOrAssign</code> and <code>BitXorAssign</code></li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/mul_assign.html"><code>MulAssign</code>-like</a>, contains <code>MulAssign</code>, <code>DivAssign</code>, <code>RemAssign</code>,
+<code>ShrAssign</code> and <code>ShlAssign</code></li>
+</ol>
+<h4 id="static-methods"><a href="#static-methods">Static methods</a></h4>
+<p>These don’t derive traits, but derive static methods instead.</p>
+<ol>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/constructor.html"><code>Constructor</code></a>, this derives a <code>new</code> method that can be used as a constructor.
+This is very basic if you need more customization for your constructor, check
+out the <a href="https://github.com/nrc/derive-new"><code>derive-new</code></a> crate.</li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/is_variant.html"><code>IsVariant</code></a>, for each variant <code>foo</code> of an enum type, derives a <code>is_foo</code> method.</li>
+<li><a href="https://jeltef.github.io/derive_more/derive_more/unwrap.html"><code>Unwrap</code></a>, for each variant <code>foo</code> of an enum type, derives an <code>unwrap_foo</code> method.</li>
+</ol>
+<h3 id="generated-code"><a href="#generated-code">Generated code</a></h3><h3 id="installation"><a href="#installation">Installation</a></h3>
+<p>This library requires Rust 1.36 or higher and it supports <code>no_std</code> out of the box.
+Then add the following to <code>Cargo.toml</code>:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+derive_more = &quot;0.99.0&quot;
+default-features = false
+features = [&quot;from&quot;, &quot;add&quot;, &quot;iterator&quot;]</code></pre></div>
+<p>And this to the top of your Rust file for Rust 2018:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">derive_more</span>;
+<span class="comment">// use the derives that you want in the file</span>
+<span class="kw">use</span> <span class="ident">derive_more</span>::{<span class="ident">Add</span>, <span class="ident">Display</span>, <span class="ident">From</span>};</code></pre></div>
+<p>If you’re still using Rust 2015 you should add this instead:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">core</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">derive_more</span>;</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="derive_more" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

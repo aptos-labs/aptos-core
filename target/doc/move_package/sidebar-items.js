@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Architecture",""]],"mod":[["compilation",""],["package_hooks",""],["resolution",""],["source_package",""]],"struct":[["BuildConfig",""],["ModelConfig",""]]};

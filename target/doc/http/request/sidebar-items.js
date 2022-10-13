@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Builder","An HTTP request builder"],["Parts","Component parts of an HTTP `Request`"],["Request","Represents an HTTP request."]]};

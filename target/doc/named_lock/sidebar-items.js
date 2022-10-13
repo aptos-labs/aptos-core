@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Error","Error type of this crate."]],"struct":[["NamedLock","Cross-process lock that is identified by name."],["NamedLockGuard","Scoped guard that unlocks NamedLock."]],"type":[["Result","Type alias to `Result<T, Error>`."]]};

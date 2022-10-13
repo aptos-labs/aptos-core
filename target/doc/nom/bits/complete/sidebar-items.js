@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["tag","generates a parser taking `count` bits and comparing them to `pattern`"],["take","generates a parser taking `count` bits"]]};

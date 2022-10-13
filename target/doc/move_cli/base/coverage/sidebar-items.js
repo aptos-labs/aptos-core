@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["CoverageSummaryOptions",""]],"struct":[["Coverage","Inspect test coverage for this package. A previous test run with the `--coverage` flag must have previously been run."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["get_bytecode_version_from_env","Get the bytecode version from the environment variable."],["read_bool_env_var",""],["read_env_var",""]],"static":[["MOVE_HOME",""]]};

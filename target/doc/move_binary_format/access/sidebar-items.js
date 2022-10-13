@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["ModuleAccess","Represents accessors for a compiled module."],["ScriptAccess","Represents accessors for a compiled script."]]};

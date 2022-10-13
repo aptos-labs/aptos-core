@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":[["match_cfg","The macro provided by this crate, `match_cfg`, is similar to the `if/elif` C preprocessor directives and allows defining a cascade of `#[cfg]` cases, emitting the implementation which matches first."]]};

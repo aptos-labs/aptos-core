@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["UnicodeVersion","Represents a Unicode Version type."]]};

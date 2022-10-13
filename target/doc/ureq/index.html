@@ -1,0 +1,127 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="ureq is a minimal request library."><meta name="keywords" content="rust, rustlang, rust-lang, ureq"><title>ureq - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../ureq/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../ureq/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate ureq</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 1.5.5</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#macros">Macros</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../ureq/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">ureq</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/ureq/lib.rs.html#1-239">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>ureq is a minimal request library.</p>
+<p>The goals of this library are:</p>
+<ul>
+<li>Minimal dependency tree</li>
+<li>Obvious API</li>
+<li>Blocking API</li>
+<li>Convenience over correctness</li>
+<li>No use of unsafe</li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// requires feature: `ureq = { version = &quot;*&quot;, features = [&quot;json&quot;] }`</span>
+<span class="kw">use</span> <span class="ident">ureq::json</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">std::io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+  <span class="comment">// sync post request of some json.</span>
+  <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">ureq::post</span>(<span class="string">&quot;https://myapi.example.com/ingest&quot;</span>)
+      .<span class="ident">set</span>(<span class="string">&quot;X-My-Header&quot;</span>, <span class="string">&quot;Secret&quot;</span>)
+      .<span class="ident">send_json</span>(<span class="macro">json!</span>({
+          <span class="string">&quot;name&quot;</span>: <span class="string">&quot;martin&quot;</span>,
+          <span class="string">&quot;rust&quot;</span>: <span class="bool-val">true</span>
+      }));
+
+  <span class="comment">// .ok() tells if response is 200-299.</span>
+  <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">ok</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;success: {}&quot;</span>, <span class="ident">resp</span>.<span class="ident">into_string</span>()<span class="question-mark">?</span>);
+  } <span class="kw">else</span> {
+    <span class="comment">// This can include errors like failure to parse URL or connect timeout.</span>
+    <span class="comment">// They are treated as synthetic HTTP-level error statuses.</span>
+    <span class="macro">println!</span>(<span class="string">&quot;error {}: {}&quot;</span>, <span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">resp</span>.<span class="ident">into_string</span>()<span class="question-mark">?</span>);
+  }
+  <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<h2 id="plain-requests"><a href="#plain-requests">Plain requests</a></h2>
+<p>Most standard methods (GET, POST, PUT etc), are supported as functions from the
+top of the library (<a href="fn.get.html"><code>ureq::get</code></a>, <a href="fn.post.html"><code>ureq::post</code></a>,
+<a href="fn.put.html"><code>ureq::put</code></a>, etc).</p>
+<p>These top level http method functions create a <a href="struct.Request.html">Request</a> instance
+which follows a build pattern. The builders are finished using:</p>
+<ul>
+<li><a href="struct.Request.html#method.call"><code>.call()</code></a> without a request body.</li>
+<li><a href="struct.Request.html#method.send"><code>.send()</code></a> with a request body as <code>Read</code> (chunked encoding support for non-known sized readers).</li>
+<li><a href="struct.Request.html#method.send_string"><code>.send_string()</code></a> body as string.</li>
+<li><a href="struct.Request.html#method.send_bytes"><code>.send_bytes()</code></a> body as bytes.</li>
+<li><a href="struct.Request.html#method.send_form"><code>.send_form()</code></a> key-value pairs as application/x-www-form-urlencoded.</li>
+</ul>
+<h2 id="json"><a href="#json">JSON</a></h2>
+<p>By enabling the <code>ureq = { version = &quot;*&quot;, features = [&quot;json&quot;] }</code> feature,
+the library supports serde json.</p>
+<ul>
+<li><a href="struct.Request.html#method.send_json"><code>request.send_json()</code></a> send body as serde json.</li>
+<li><a href="struct.Response.html#method.into_json"><code>response.into_json()</code></a> transform response to json.</li>
+</ul>
+<h2 id="agents"><a href="#agents">Agents</a></h2>
+<p>To maintain a state, cookies, between requests, you use an <a href="struct.Agent.html">agent</a>.
+Agents also follow the build pattern. Agents are created with
+<a href="struct.Agent.html"><code>ureq::agent()</code></a>.</p>
+<h2 id="content-length"><a href="#content-length">Content-Length</a></h2>
+<p>The library will set the content length on the request when using
+<a href="struct.Request.html#method.send_string"><code>.send_string()</code></a> or
+<a href="struct.Request.html#method.send_json"><code>.send_json()</code></a>. In other cases the user
+can optionally <code>request.set(&quot;Content-Length&quot;, 1234)</code>.</p>
+<p>For responses, if the <code>Content-Length</code> header is present, the methods that reads the
+body (as string, json or read trait) are all limited to the length specified in the header.</p>
+<h2 id="transfer-encoding-chunked"><a href="#transfer-encoding-chunked">Transfer-Encoding: chunked</a></h2>
+<p>Dechunking is a response body is done automatically if the response headers contains
+a <code>Transfer-Encoding</code> header.</p>
+<p>Sending a chunked request body is done by setting the header prior to sending a body.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">ureq::post</span>(<span class="string">&quot;http://my-server.com/ingest&quot;</span>)
+    .<span class="ident">set</span>(<span class="string">&quot;Transfer-Encoding&quot;</span>, <span class="string">&quot;chunked&quot;</span>)
+    .<span class="ident">send_string</span>(<span class="string">&quot;Hello world&quot;</span>);</code></pre></div>
+<h2 id="character-encoding"><a href="#character-encoding">Character encoding</a></h2>
+<p>By enabling the <code>ureq = { version = &quot;*&quot;, features = [&quot;charset&quot;] }</code> feature,
+the library supports sending/receiving other character sets than <code>utf-8</code>.</p>
+<p>For <a href="struct.Response.html#method.into_string"><code>response.into_string()</code></a> we read the
+header <code>Content-Type: text/plain; charset=iso-8859-1</code> and if it contains a charset
+specification, we try to decode the body using that encoding. In the absence of, or failing
+to interpret the charset, we fall back on <code>utf-8</code>.</p>
+<p>Similarly when using <a href="struct.Request.html#method.send_string"><code>request.send_string()</code></a>,
+we first check if the user has set a <code>; charset=&lt;whatwg charset&gt;</code> and attempt
+to encode the request body using that.</p>
+<h2 id="synthetic-errors"><a href="#synthetic-errors">Synthetic errors</a></h2>
+<p>Rather than exposing a custom error type through results, this library has opted for
+representing potential connection/TLS/etc errors as HTTP response codes. These invented codes
+are called “<a href="struct.Response.html#method.synthetic">synthetic</a>.”</p>
+<p>The idea is that from a library user’s point of view the distinction of whether a failure
+originated in the remote server (500, 502) etc, or some transient network failure, the code
+path of handling that would most often be the same.</p>
+<p>As a result, reading from a Response may yield an error message generated by the ureq library.
+To handle these errors, use the
+<a href="struct.Response.html#method.synthetic_error"><code>response.synthetic_error()</code></a> method.</p>
+</div></details><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.json.html" title="ureq::json macro">json</a></div><div class="item-right docblock-short"><p>Construct a <code>serde_json::Value</code> from a JSON literal.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Agent.html" title="ureq::Agent struct">Agent</a></div><div class="item-right docblock-short"><p>Agents keep state between requests.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Header.html" title="ureq::Header struct">Header</a></div><div class="item-right docblock-short"><p>Wrapper type for a header field.
+https://tools.ietf.org/html/rfc7230#section-3.2</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Proxy.html" title="ureq::Proxy struct">Proxy</a></div><div class="item-right docblock-short"><p>Proxy server definition</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Request.html" title="ureq::Request struct">Request</a></div><div class="item-right docblock-short"><p>Request instances are builders that creates a request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Response.html" title="ureq::Response struct">Response</a></div><div class="item-right docblock-short"><p>Response instances are created as results of firing off requests.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SerdeMap.html" title="ureq::SerdeMap struct">SerdeMap</a></div><div class="item-right docblock-short"><p>Represents a JSON key/value type.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Error.html" title="ureq::Error enum">Error</a></div><div class="item-right docblock-short"><p>Errors that are translated to <a href="struct.Response.html#method.synthetic">“synthetic” responses</a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.SerdeValue.html" title="ureq::SerdeValue enum">SerdeValue</a></div><div class="item-right docblock-short"><p>Represents any valid JSON value.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Resolver.html" title="ureq::Resolver trait">Resolver</a></div><div class="item-right docblock-short"></div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.agent.html" title="ureq::agent fn">agent</a></div><div class="item-right docblock-short"><p>Agents are used to keep state between requests.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.delete.html" title="ureq::delete fn">delete</a></div><div class="item-right docblock-short"><p>Make a DELETE request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get.html" title="ureq::get fn">get</a></div><div class="item-right docblock-short"><p>Make a GET request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.head.html" title="ureq::head fn">head</a></div><div class="item-right docblock-short"><p>Make a HEAD request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.options.html" title="ureq::options fn">options</a></div><div class="item-right docblock-short"><p>Make an OPTIONS request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.patch.html" title="ureq::patch fn">patch</a></div><div class="item-right docblock-short"><p>Make an PATCH request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.post.html" title="ureq::post fn">post</a></div><div class="item-right docblock-short"><p>Make a POST request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.put.html" title="ureq::put fn">put</a></div><div class="item-right docblock-short"><p>Make a PUT request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.request.html" title="ureq::request fn">request</a></div><div class="item-right docblock-short"><p>Make a request setting the HTTP method via a string.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.serde_to_value.html" title="ureq::serde_to_value fn">serde_to_value</a></div><div class="item-right docblock-short"><p>Convert a <code>T</code> into <code>serde_json::Value</code> which is an enum that can represent
+any valid JSON data.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.trace.html" title="ureq::trace fn">trace</a></div><div class="item-right docblock-short"><p>Make a TRACE request.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="ureq" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

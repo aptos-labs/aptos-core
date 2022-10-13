@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["DependencyGraph","Directed graph capturing dependencies between modules"]]};

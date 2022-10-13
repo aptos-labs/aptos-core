@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["home_dir",""],["is_absolute_path",""]]};

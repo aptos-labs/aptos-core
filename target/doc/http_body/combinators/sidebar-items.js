@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["BoxBody","A boxed [`Body`] trait object."],["MapData","Body returned by the `map_data` combinator."],["MapErr","Body returned by the `map_err` combinator."],["UnsyncBoxBody","A boxed [`Body`] trait object that is !Sync."]]};

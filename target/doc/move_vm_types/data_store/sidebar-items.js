@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["DataStore","Provide an implementation for bytecodes related to data with a given data store."]]};

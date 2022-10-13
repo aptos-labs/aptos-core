@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":[["bail","Return early with an error."]],"struct":[["Error","The `Error` type, a wrapper around a dynamic error type."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Aggregator","Rust representation of Aggregator Move struct."],["CoinInfoResource","Rust representation of CoinInfo Move resource."],["Integer","Rust representation of Integer Move struct."],["OptionalAggregator","Rust representation of OptionalAggregator Move struct."]]};

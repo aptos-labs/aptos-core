@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Strategies for protecting the reference counts."><meta name="keywords" content="rust, rustlang, rust-lang, strategy"><title>arc_swap::strategy - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module strategy</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../arc_swap/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">arc_swap</a>::<wbr><a class="mod" href="#">strategy</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/arc_swap/strategy/mod.rs.html#1-160">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Strategies for protecting the reference counts.</p>
+<p>There are multiple algorithms how to protect the reference counts while they’re being updated
+by multiple threads, each with its own set of pros and cons. The <a href="type.DefaultStrategy.html" title="DefaultStrategy"><code>DefaultStrategy</code></a> is used by
+default and should generally be the least surprising option. It is possible to pick a different
+strategy.</p>
+<p>For now, the traits in here are sealed and don’t expose any methods to the users of the crate.
+This is because we are not confident about the details just yet. In the future it may be
+possible for downstream users to implement their own, but for now it is only so users can
+choose one of the provided.</p>
+<p>It is expected that future strategies would come with different capabilities and limitations.
+In particular, some that are not “tight” in the cleanup (delay the cleanup) or not support the
+compare and swap operations.</p>
+<p>Currently, we have these strategies:</p>
+<ul>
+<li><a href="type.DefaultStrategy.html" title="DefaultStrategy"><code>DefaultStrategy</code></a> (this one is used implicitly)</li>
+<li><a href="https://doc.rust-lang.org/1.63.0/std/sync/rwlock/struct.RwLock.html" title="std::sync::RwLock"><code>RwLock&lt;()&gt;</code></a></li>
+</ul>
+<h2 id="testing"><a href="#testing">Testing</a></h2>
+<p>Formally, the <a href="https://doc.rust-lang.org/1.63.0/std/sync/rwlock/struct.RwLock.html" title="std::sync::RwLock"><code>RwLock&lt;()&gt;</code></a> may be used as a strategy too. It doesn’t have
+the performance characteristics or lock-free guarantees of the others, but it is much simpler
+and contains less <code>unsafe</code> code (actually, less code altogether). Therefore, it can be used for
+testing purposes and cross-checking.</p>
+<p>Note that generally, using <a href="https://doc.rust-lang.org/1.63.0/std/sync/rwlock/struct.RwLock.html" title="std::sync::RwLock"><code>RwLock&lt;Arc&lt;T&gt;&gt;</code></a> is likely to be better
+performance wise. So if the goal is to not use third-party unsafe code, only the one in
+<a href="https://doc.rust-lang.org/1.63.0/std/index.html" title="std"><code>std</code></a>, that is the better option. This is provided mostly for investigation and testing of
+<a href="../type.ArcSwap.html"><code>ArcSwap</code></a> itself or algorithms written to use <a href="../type.ArcSwap.html"><code>ArcSwap</code></a>.</p>
+<p><em>This is not meant to be used in production code</em>.</p>
+</div></details><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.CaS.html" title="arc_swap::strategy::CaS trait">CaS</a></div><div class="item-right docblock-short"><p>An extension of the <a href="trait.Strategy.html" title="Strategy"><code>Strategy</code></a>, allowing for compare and swap operation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Strategy.html" title="arc_swap::strategy::Strategy trait">Strategy</a></div><div class="item-right docblock-short"><p>A strategy for protecting the reference counted pointer <code>T</code>.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.DefaultStrategy.html" title="arc_swap::strategy::DefaultStrategy type">DefaultStrategy</a></div><div class="item-right docblock-short"><p>The default strategy.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="arc_swap" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

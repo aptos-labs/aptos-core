@@ -1,0 +1,82 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="An implementation of HKDF, the HMAC-based Extract-and-Expand Key Derivation Function."><meta name="keywords" content="rust, rustlang, rust-lang, hkdf"><title>hkdf - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../hkdf/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../hkdf/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate hkdf</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.12.3</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../hkdf/index.html">
+                        <img src="https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">hkdf</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/hkdf/lib.rs.html#1-280">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>An implementation of HKDF, the <a href="https://tools.ietf.org/html/rfc5869">HMAC-based Extract-and-Expand Key Derivation Function</a>.</p>
+<h2 id="usage"><a href="#usage">Usage</a></h2>
+<p>The most common way to use HKDF is as follows: you provide the Initial Key
+Material (IKM) and an optional salt, then you expand it (perhaps multiple times)
+into some Output Key Material (OKM) bound to an “info” context string.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">sha2::Sha256</span>;
+<span class="kw">use</span> <span class="ident">hkdf::Hkdf</span>;
+<span class="kw">use</span> <span class="ident">hex_literal::hex</span>;
+
+<span class="kw">let</span> <span class="ident">ikm</span> <span class="op">=</span> <span class="macro">hex!</span>(<span class="string">&quot;0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b&quot;</span>);
+<span class="kw">let</span> <span class="ident">salt</span> <span class="op">=</span> <span class="macro">hex!</span>(<span class="string">&quot;000102030405060708090a0b0c&quot;</span>);
+<span class="kw">let</span> <span class="ident">info</span> <span class="op">=</span> <span class="macro">hex!</span>(<span class="string">&quot;f0f1f2f3f4f5f6f7f8f9&quot;</span>);
+
+<span class="kw">let</span> <span class="ident">hk</span> <span class="op">=</span> <span class="ident">Hkdf</span>::<span class="op">&lt;</span><span class="ident">Sha256</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">salt</span>[..]), <span class="kw-2">&amp;</span><span class="ident">ikm</span>);
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">okm</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">42</span>];
+<span class="ident">hk</span>.<span class="ident">expand</span>(<span class="kw-2">&amp;</span><span class="ident">info</span>, <span class="kw-2">&amp;mut</span> <span class="ident">okm</span>)
+    .<span class="ident">expect</span>(<span class="string">&quot;42 is a valid length for Sha256 to output&quot;</span>);
+
+<span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">hex!</span>(<span class="string">&quot;
+    3cb25f25faacd57a90434f64d0362f2a
+    2d2d0a90cf1a5a4c5db02d56ecc4c5bf
+    34007208d5b887185865
+&quot;</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">okm</span>[..], <span class="ident">expected</span>[..]);</code></pre></div>
+<p>Normally the PRK (Pseudo-Random Key) remains hidden within the HKDF
+object, but if you need to access it, use <a href="struct.Hkdf.html#method.extract" title="Hkdf::extract"><code>Hkdf::extract</code></a> instead of
+<a href="struct.Hkdf.html#method.new" title="Hkdf::new"><code>Hkdf::new</code></a>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="kw">let</span> (<span class="ident">prk</span>, <span class="ident">hk</span>) <span class="op">=</span> <span class="ident">Hkdf</span>::<span class="op">&lt;</span><span class="ident">Sha256</span><span class="op">&gt;</span><span class="ident">::extract</span>(<span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">salt</span>[..]), <span class="kw-2">&amp;</span><span class="ident">ikm</span>);
+<span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">hex!</span>(<span class="string">&quot;
+    077709362c2e32df0ddc3f0dc47bba63
+    90b6c73bb50f9c3122ec844ad7c2b3e5
+&quot;</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">prk</span>[..], <span class="ident">expected</span>[..]);</code></pre></div>
+<p>If you already have a strong key to work from (uniformly-distributed and
+long enough), you can save a tiny amount of time by skipping the extract
+step. In this case, you pass a Pseudo-Random Key (PRK) into the
+<a href="struct.Hkdf.html#method.from_prk" title="Hkdf::from_prk"><code>Hkdf::from_prk</code></a> constructor, then use the resulting <a href="struct.Hkdf.html" title="Hkdf"><code>Hkdf</code></a> object
+as usual.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">prk</span> <span class="op">=</span> <span class="macro">hex!</span>(<span class="string">&quot;
+    077709362c2e32df0ddc3f0dc47bba63
+    90b6c73bb50f9c3122ec844ad7c2b3e5
+&quot;</span>);
+
+<span class="kw">let</span> <span class="ident">hk</span> <span class="op">=</span> <span class="ident">Hkdf</span>::<span class="op">&lt;</span><span class="ident">Sha256</span><span class="op">&gt;</span><span class="ident">::from_prk</span>(<span class="kw-2">&amp;</span><span class="ident">prk</span>).<span class="ident">expect</span>(<span class="string">&quot;PRK should be large enough&quot;</span>);
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">okm</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">42</span>];
+<span class="ident">hk</span>.<span class="ident">expand</span>(<span class="kw-2">&amp;</span><span class="ident">info</span>, <span class="kw-2">&amp;mut</span> <span class="ident">okm</span>)
+    .<span class="ident">expect</span>(<span class="string">&quot;42 is a valid length for Sha256 to output&quot;</span>);
+
+<span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">hex!</span>(<span class="string">&quot;
+    3cb25f25faacd57a90434f64d0362f2a
+    2d2d0a90cf1a5a4c5db02d56ecc4c5bf
+    34007208d5b887185865
+&quot;</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">okm</span>[..], <span class="ident">expected</span>[..]);</code></pre></div>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.hmac"><code>pub use <a class="mod" href="../hmac/index.html" title="mod hmac">hmac</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Hkdf.html" title="hkdf::Hkdf struct">Hkdf</a></div><div class="item-right docblock-short"><p>Structure representing the HKDF, capable of HKDF-Expand and HKDF-Extract operations.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.HkdfExtract.html" title="hkdf::HkdfExtract struct">HkdfExtract</a></div><div class="item-right docblock-short"><p>Structure representing the streaming context of an HKDF-Extract operation</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.InvalidLength.html" title="hkdf::InvalidLength struct">InvalidLength</a></div><div class="item-right docblock-short"><p>Structure for InvalidLength, used for output error handling.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.InvalidPrkLength.html" title="hkdf::InvalidPrkLength struct">InvalidPrkLength</a></div><div class="item-right docblock-short"><p>Error that is returned when supplied pseudorandom key (PRK) is not long enough.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.HmacImpl.html" title="hkdf::HmacImpl trait">HmacImpl</a></div><div class="item-right docblock-short"><p>Sealed trait implemented for <a href="../hmac/optim/type.Hmac.html" title="Hmac"><code>Hmac</code></a> and <a href="../hmac/simple/struct.SimpleHmac.html" title="SimpleHmac"><code>SimpleHmac</code></a>.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.SimpleHkdf.html" title="hkdf::SimpleHkdf type">SimpleHkdf</a></div><div class="item-right docblock-short"><p><a href="struct.Hkdf.html" title="Hkdf"><code>Hkdf</code></a> variant which uses <a href="../hmac/simple/struct.SimpleHmac.html" title="SimpleHmac"><code>SimpleHmac</code></a> for underlying HMAC
+implementation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.SimpleHkdfExtract.html" title="hkdf::SimpleHkdfExtract type">SimpleHkdfExtract</a></div><div class="item-right docblock-short"><p><a href="struct.HkdfExtract.html" title="HkdfExtract"><code>HkdfExtract</code></a> variant which uses <a href="../hmac/simple/struct.SimpleHmac.html" title="SimpleHmac"><code>SimpleHmac</code></a> for underlying HMAC
+implementation.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="hkdf" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,298 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This crate provides a way to extract format descriptions for Rust containers that implement the Serialize and/or Deserialize trait(s) of Serde."><meta name="keywords" content="rust, rustlang, rust-lang, serde_reflection"><title>serde_reflection - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../serde_reflection/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../serde_reflection/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate serde_reflection</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.3.5</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../serde_reflection/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">serde_reflection</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/serde_reflection/lib.rs.html#4-349">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This crate provides a way to extract format descriptions for Rust containers that
+implement the Serialize and/or Deserialize trait(s) of Serde.</p>
+<p>Format descriptions are useful in several ways:</p>
+<ul>
+<li>Stored under version control, formats can be tested to prevent unintended modifications
+of binary serialization formats (e.g. by changing variant order).</li>
+<li>Formats can be passed to <a href="https://docs.rs/serde-generate"><code>serde-generate</code></a>
+in order to generate class definitions and provide Serde-compatible binary
+serialization in other languages (C++, python, Java, etc).</li>
+</ul>
+<h2 id="quick-start"><a href="#quick-start">Quick Start</a></h2>
+<p>Very often, Serde traits are simply implemented using Serde derive macros. In this case,
+you may obtain format descriptions as follows:</p>
+<ul>
+<li>call <code>trace_simple_type</code> on the desired top-level container definition(s), then</li>
+<li>add a call to <code>trace_simple_type</code> for each <code>enum</code> type. (This will fix any <code>MissingVariants</code> error.)</li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Deserialize</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Foo</span> {
+  <span class="ident">bar</span>: <span class="ident">Bar</span>,
+  <span class="ident">choice</span>: <span class="ident">Choice</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Deserialize</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Bar</span>(<span class="ident">u64</span>);
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Deserialize</span>)]</span>
+<span class="kw">enum</span> <span class="ident">Choice</span> { <span class="ident">A</span>, <span class="ident">B</span>, <span class="ident">C</span> }
+
+<span class="comment">// Start the tracing session.</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tracer</span> <span class="op">=</span> <span class="ident">Tracer::new</span>(<span class="ident">TracerConfig::default</span>());
+
+<span class="comment">// Trace the desired top-level type(s).</span>
+<span class="ident">tracer</span>.<span class="ident">trace_simple_type</span>::<span class="op">&lt;</span><span class="ident">Foo</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Also trace each enum type separately to fix any `MissingVariants` error.</span>
+<span class="ident">tracer</span>.<span class="ident">trace_simple_type</span>::<span class="op">&lt;</span><span class="ident">Choice</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Obtain the registry of Serde formats and serialize it in YAML (for instance).</span>
+<span class="kw">let</span> <span class="ident">registry</span> <span class="op">=</span> <span class="ident">tracer</span>.<span class="ident">registry</span>()<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">serde_yaml::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">registry</span>).<span class="ident">unwrap</span>();
+<span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>, <span class="string">r#&quot;---
+Bar:
+  NEWTYPESTRUCT: U64
+Choice:
+  ENUM:
+    0:
+      A: UNIT
+    1:
+      B: UNIT
+    2:
+      C: UNIT
+Foo:
+  STRUCT:
+    - bar:
+        TYPENAME: Bar
+    - choice:
+        TYPENAME: Choice
+&quot;#</span>);</code></pre></div>
+<h2 id="features-and-limitations"><a href="#features-and-limitations">Features and Limitations</a></h2>
+<p><code>serde_reflection</code> is meant to extract formats for Rust containers (i.e. structs and
+enums) with “reasonable” implementations of the Serde traits <code>Serialize</code> and
+<code>Deserialize</code>.</p>
+<p>Supported implementations include:</p>
+<ul>
+<li>
+<p>Plain derived implementations obtained with <code>#[derive(Serialize, Deserialize)]</code> for
+Rust containers in the Serde <a href="https://serde.rs/data-model.html">data model</a></p>
+</li>
+<li>
+<p>Customized derived implementations using Serde attributes that are compatible with
+binary serialization formats, such as <code>#[serde(rename = &quot;Name&quot;)]</code>.</p>
+</li>
+<li>
+<p>Hand-written implementations of <code>Deserialize</code> that are more restrictive than the
+derived ones, provided that <code>trace_value</code> is used during tracing to provide sample
+values for all such constrained types (see the detailed example below).</p>
+</li>
+<li>
+<p>Mutually recursive types provided that the first variant of each enum is
+recursion-free. (For instance, <code>enum List { None, Some(Box&lt;List&gt;)}</code>.) Note that each
+enum must be traced separately with <code>trace_type</code> to discover all the variants.</p>
+</li>
+</ul>
+<p>Unsupported idioms include:</p>
+<ul>
+<li>
+<p>Containers sharing the same base name (e.g. <code>Foo</code>) but from different modules. (Work
+around: use <code>#[serde(rename = ..)]</code>)</p>
+</li>
+<li>
+<p>Generic types instantiated multiple times in the same tracing session. (Work around:
+use the crate <a href="https://crates.io/crates/serde-name"><code>serde-name</code></a> and its adapters <code>SerializeNameAdapter</code> and <code>DeserializeNameAdapter</code>.)</p>
+</li>
+<li>
+<p>Attributes that are not compatible with binary formats (e.g. <code>#[serde(flatten)]</code>, <code>#[serde(tag = ..)]</code>)</p>
+</li>
+<li>
+<p>Tracing type aliases. (E.g. <code>type Pair = (u32, u64)</code> will not create an entry “Pair”.)</p>
+</li>
+<li>
+<p>Mutually recursive types for which picking the first variant of each enum does not
+terminate. (Work around: re-order the variants. For instance <code>enum List { Some(Box&lt;List&gt;), None}</code> must be rewritten <code>enum List { None, Some(Box&lt;List&gt;)}</code>.)</p>
+</li>
+</ul>
+<h2 id="troubleshooting"><a href="#troubleshooting">Troubleshooting</a></h2>
+<p>The error type used in this crate provides a method <code>error.explanation()</code> to help with
+troubleshooting during format tracing.</p>
+<h2 id="detailed-example"><a href="#detailed-example">Detailed Example</a></h2>
+<p>In the following, more complete example, we extract the Serde formats of two containers
+<code>Name</code> and <code>Person</code> and demonstrate how to handle a custom implementation of <code>serde::Deserialize</code>
+for <code>Name</code>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">serde_reflection</span>::{<span class="ident">ContainerFormat</span>, <span class="ident">Error</span>, <span class="ident">Format</span>, <span class="ident">Samples</span>, <span class="ident">Tracer</span>, <span class="ident">TracerConfig</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Name</span>(<span class="ident">String</span>);
+<span class="comment">// impl&lt;&#39;de&gt; Deserialize&lt;&#39;de&gt; for Name { ... }</span>
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">enum</span> <span class="ident">Person</span> {
+    <span class="ident">NickName</span>(<span class="ident">Name</span>),
+    <span class="ident">FullName</span> { <span class="ident">first</span>: <span class="ident">Name</span>, <span class="ident">last</span>: <span class="ident">Name</span> },
+}
+
+<span class="comment">// Start a session to trace formats.</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tracer</span> <span class="op">=</span> <span class="ident">Tracer::new</span>(<span class="ident">TracerConfig::default</span>());
+<span class="comment">// Create a store to hold samples of Rust values.</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">samples</span> <span class="op">=</span> <span class="ident">Samples::new</span>();
+
+<span class="comment">// For every type (here `Name`), if a user-defined implementation of `Deserialize` exists and</span>
+<span class="comment">// is known to perform custom validation checks, use `trace_value` first so that `samples`</span>
+<span class="comment">// contains a valid Rust value of this type.</span>
+<span class="kw">let</span> <span class="ident">bob</span> <span class="op">=</span> <span class="ident">Name</span>(<span class="string">&quot;Bob&quot;</span>.<span class="ident">into</span>());
+<span class="ident">tracer</span>.<span class="ident">trace_value</span>(<span class="kw-2">&amp;mut</span> <span class="ident">samples</span>, <span class="kw-2">&amp;</span><span class="ident">bob</span>)<span class="question-mark">?</span>;
+<span class="macro">assert!</span>(<span class="ident">samples</span>.<span class="ident">value</span>(<span class="string">&quot;Name&quot;</span>).<span class="ident">is_some</span>());
+
+<span class="comment">// Now, let&#39;s trace deserialization for the top-level type `Person`.</span>
+<span class="comment">// We pass a reference to `samples` so that sampled values are used for custom types.</span>
+<span class="kw">let</span> (<span class="ident">format</span>, <span class="ident">values</span>) <span class="op">=</span> <span class="ident">tracer</span>.<span class="ident">trace_type</span>::<span class="op">&lt;</span><span class="ident">Person</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">samples</span>)<span class="question-mark">?</span>;
+<span class="macro">assert_eq!</span>(<span class="ident">format</span>, <span class="ident">Format::TypeName</span>(<span class="string">&quot;Person&quot;</span>.<span class="ident">into</span>()));
+
+<span class="comment">// As a byproduct, we have also obtained sample values of type `Person`.</span>
+<span class="comment">// We can see that the user-provided value `bob` was used consistently to pass</span>
+<span class="comment">// validation checks for `Name`.</span>
+<span class="macro">assert_eq!</span>(<span class="ident">values</span>[<span class="number">0</span>], <span class="ident">Person::NickName</span>(<span class="ident">bob</span>.<span class="ident">clone</span>()));
+<span class="macro">assert_eq!</span>(<span class="ident">values</span>[<span class="number">1</span>], <span class="ident">Person::FullName</span> { <span class="ident">first</span>: <span class="ident">bob</span>.<span class="ident">clone</span>(), <span class="ident">last</span>: <span class="ident">bob</span>.<span class="ident">clone</span>() });
+
+<span class="comment">// We have no more top-level types to trace, so let&#39;s stop the tracing session and obtain</span>
+<span class="comment">// a final registry of containers.</span>
+<span class="kw">let</span> <span class="ident">registry</span> <span class="op">=</span> <span class="ident">tracer</span>.<span class="ident">registry</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// We have successfully extracted a format description of all Serde containers under `Person`.</span>
+<span class="macro">assert_eq!</span>(
+    <span class="ident">registry</span>.<span class="ident">get</span>(<span class="string">&quot;Name&quot;</span>).<span class="ident">unwrap</span>(),
+    <span class="kw-2">&amp;</span><span class="ident">ContainerFormat::NewTypeStruct</span>(<span class="ident">Box::new</span>(<span class="ident">Format::Str</span>)),
+);
+<span class="kw">match</span> <span class="ident">registry</span>.<span class="ident">get</span>(<span class="string">&quot;Person&quot;</span>).<span class="ident">unwrap</span>() {
+    <span class="ident">ContainerFormat::Enum</span>(<span class="ident">variants</span>) =&gt; <span class="macro">assert_eq!</span>(<span class="ident">variants</span>.<span class="ident">len</span>(), <span class="number">2</span>),
+     <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(),
+};
+
+<span class="comment">// Export the registry in YAML.</span>
+<span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">serde_yaml::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">registry</span>).<span class="ident">unwrap</span>();
+<span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>, <span class="string">r#&quot;---
+Name:
+  NEWTYPESTRUCT: STR
+Person:
+  ENUM:
+    0:
+      NickName:
+        NEWTYPE:
+          TYPENAME: Name
+    1:
+      FullName:
+        STRUCT:
+          - first:
+              TYPENAME: Name
+          - last:
+              TYPENAME: Name
+&quot;#</span>);</code></pre></div>
+<h2 id="tracing-serialization-with-trace_value"><a href="#tracing-serialization-with-trace_value">Tracing Serialization with <code>trace_value</code></a></h2>
+<p>Tracing the serialization of a Rust value <code>v</code> consists of visiting the structural
+components of <code>v</code> in depth and recording Serde formats for all the visited types.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>)]</span>
+<span class="kw">struct</span> <span class="ident">FullName</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+  <span class="ident">first</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>,
+  <span class="ident">middle</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span>,
+  <span class="ident">last</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>,
+}
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tracer</span> <span class="op">=</span> <span class="ident">Tracer::new</span>(<span class="ident">TracerConfig::default</span>());
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">samples</span> <span class="op">=</span> <span class="ident">Samples::new</span>();
+<span class="ident">tracer</span>.<span class="ident">trace_value</span>(<span class="kw-2">&amp;mut</span> <span class="ident">samples</span>, <span class="kw-2">&amp;</span><span class="ident">FullName</span> { <span class="ident">first</span>: <span class="string">&quot;&quot;</span>, <span class="ident">middle</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;&quot;</span>), <span class="ident">last</span>: <span class="string">&quot;&quot;</span> })<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">registry</span> <span class="op">=</span> <span class="ident">tracer</span>.<span class="ident">registry</span>()<span class="question-mark">?</span>;
+<span class="kw">match</span> <span class="ident">registry</span>.<span class="ident">get</span>(<span class="string">&quot;FullName&quot;</span>).<span class="ident">unwrap</span>() {
+    <span class="ident">ContainerFormat::Struct</span>(<span class="ident">fields</span>) =&gt; <span class="macro">assert_eq!</span>(<span class="ident">fields</span>.<span class="ident">len</span>(), <span class="number">3</span>),
+    <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(),
+};</code></pre></div>
+<p>This approach works well but it can only recover the formats of datatypes for which
+nontrivial samples have been provided:</p>
+<ul>
+<li>
+<p>In enums, only the variants explicitly covered by user samples will be recorded.</p>
+</li>
+<li>
+<p>Providing a <code>None</code> value or an empty vector <code>[]</code> within a sample may result in
+formats that are partially unknown.</p>
+</li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tracer</span> <span class="op">=</span> <span class="ident">Tracer::new</span>(<span class="ident">TracerConfig::default</span>());
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">samples</span> <span class="op">=</span> <span class="ident">Samples::new</span>();
+<span class="ident">tracer</span>.<span class="ident">trace_value</span>(<span class="kw-2">&amp;mut</span> <span class="ident">samples</span>, <span class="kw-2">&amp;</span><span class="ident">FullName</span> { <span class="ident">first</span>: <span class="string">&quot;&quot;</span>, <span class="ident">middle</span>: <span class="prelude-val">None</span>, <span class="ident">last</span>: <span class="string">&quot;&quot;</span> })<span class="question-mark">?</span>;
+<span class="macro">assert_eq!</span>(<span class="ident">tracer</span>.<span class="ident">registry</span>().<span class="ident">unwrap_err</span>(), <span class="ident">Error::UnknownFormatInContainer</span>(<span class="string">&quot;FullName&quot;</span>.<span class="ident">to_string</span>()));</code></pre></div>
+<p>For this reason, we introduce a complementary set of APIs to trace deserialization of types.</p>
+<h2 id="tracing-deserialization-with-trace_typet"><a href="#tracing-deserialization-with-trace_typet">Tracing Deserialization with <code>trace_type&lt;T&gt;</code></a></h2>
+<p>Deserialization-tracing APIs take a type <code>T</code>, the current tracing state, and a
+reference to previously recorded samples as input.</p>
+<h3 id="core-algorithm-and-high-level-api"><a href="#core-algorithm-and-high-level-api">Core Algorithm and High-Level API</a></h3>
+<p>The core algorithm <code>trace_type_once&lt;T&gt;</code>
+attempts to reconstruct a witness value of type <code>T</code> by exploring the graph of all the types
+occurring in the definition of <code>T</code>. At the same time, the algorithm records the
+formats of all the visited structs and enum variants.</p>
+<p>For the exploration to be able to terminate, the core algorithm <code>trace_type_once&lt;T&gt;</code> explores
+each possible recursion point only once (see paragraph below).
+In particular, if <code>T</code> is an enum, <code>trace_type_once&lt;T&gt;</code> discovers only one variant of <code>T</code> at a time.</p>
+<p>For this reason, the high-level API <code>trace_type&lt;T&gt;</code>
+will repeat calls to <code>trace_type_once&lt;T&gt;</code> until all the variants of <code>T</code> are known.
+Variant cases of <code>T</code> are explored in sequential order, starting with index <code>0</code>.</p>
+<h3 id="coverage-guarantees"><a href="#coverage-guarantees">Coverage Guarantees</a></h3>
+<p>Under the assumptions listed below, a single call to <code>trace_type&lt;T&gt;</code> is guaranteed to
+record formats for all the types that <code>T</code> depends on. Besides, if <code>T</code> is an enum, it
+will record all the variants of <code>T</code>.</p>
+<p>(0) Container names must not collide. If this happens, consider using <code>#[serde(rename = &quot;name&quot;)]</code>,
+or implementing serde traits manually.</p>
+<p>(1) The first variants of mutually recursive enums must be a “base case”. That is,
+defaulting to the first variant for every enum type (along with <code>None</code> for option values
+and <code>[]</code> for sequences) must guarantee termination of depth-first traversals of the graph of type
+declarations.</p>
+<p>(2) If a type runs custom validation checks during deserialization, sample values must have been provided
+previously by calling <code>trace_value</code>. Besides, the corresponding registered formats
+must not contain unknown parts.</p>
+<h3 id="design-considerations"><a href="#design-considerations">Design Considerations</a></h3>
+<p>Whenever we traverse the graph of type declarations using deserialization callbacks, the type
+system requires us to return valid Rust values of type <code>V::Value</code>, where <code>V</code> is the type of
+a given <code>visitor</code>. This contraint limits the way we can stop graph traversal to only a few cases.</p>
+<p>The first 4 cases are what we have called <em>possible recursion points</em> above:</p>
+<ul>
+<li>while visiting an <code>Option&lt;T&gt;</code> for the second time, we choose to return the value <code>None</code> to stop;</li>
+<li>while visiting an <code>Seq&lt;T&gt;</code> for the second time, we choose to return the empty sequence <code>[]</code>;</li>
+<li>while visiting an <code>Map&lt;K, V&gt;</code> for the second time, we choose to return the empty map <code>{}</code>;</li>
+<li>while visiting an <code>enum T</code> for the second time, we choose to return the first variant, i.e.
+a “base case” by assumption (1) above.</li>
+</ul>
+<p>In addition to the cases above,</p>
+<ul>
+<li>while visiting a container, if the container’s name is mapped to a recorded value,
+we MAY decide to use it.</li>
+</ul>
+<p>The default configuration <code>TracerConfig:default()</code> always picks the recorded value for a
+<code>NewTypeStruct</code> and never does in the other cases.</p>
+<p>For efficiency reasons, the current algorithm does not attempt to scan the variants of enums
+other than the parameter <code>T</code> of the main call <code>trace_type&lt;T&gt;</code>. As a consequence, each enum type must be
+traced separately.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Named.html" title="serde_reflection::Named struct">Named</a></div><div class="item-right docblock-short"><p>A named value.
+Used for named parameters or variants.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Samples.html" title="serde_reflection::Samples struct">Samples</a></div><div class="item-right docblock-short"><p>User inputs, aka “samples”, recorded during serialization.
+This will help passing user-defined checks during deserialization.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Tracer.html" title="serde_reflection::Tracer struct">Tracer</a></div><div class="item-right docblock-short"><p>Structure to drive the tracing of Serde serialization and deserialization.
+This typically aims at computing a <code>Registry</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.TracerConfig.html" title="serde_reflection::TracerConfig struct">TracerConfig</a></div><div class="item-right docblock-short"><p>Configuration object to create a tracer.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Variable.html" title="serde_reflection::Variable struct">Variable</a></div><div class="item-right docblock-short"><p>A mutable holder for an initially unknown value.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.ContainerFormat.html" title="serde_reflection::ContainerFormat enum">ContainerFormat</a></div><div class="item-right docblock-short"><p>Serde-based serialization format for named “container” types.
+In Rust, those are enums and structs.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Error.html" title="serde_reflection::Error enum">Error</a></div><div class="item-right docblock-short"><p>Error type used in this crate.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Format.html" title="serde_reflection::Format enum">Format</a></div><div class="item-right docblock-short"><p>Serde-based serialization format for anonymous “value” types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Value.html" title="serde_reflection::Value enum">Value</a></div><div class="item-right docblock-short"><p>A structured Serde value.
+Meant to be easily recorded while tracing serialization and easily used while tracing deserialization.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.VariantFormat.html" title="serde_reflection::VariantFormat enum">VariantFormat</a></div><div class="item-right docblock-short"><p>Description of a variant in an enum.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FormatHolder.html" title="serde_reflection::FormatHolder trait">FormatHolder</a></div><div class="item-right docblock-short"><p>Common methods for nodes in the AST of formats.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Registry.html" title="serde_reflection::Registry type">Registry</a></div><div class="item-right docblock-short"><p>A map of container formats.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Result.html" title="serde_reflection::Result type">Result</a></div><div class="item-right docblock-short"><p>Result type used in this crate.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="serde_reflection" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

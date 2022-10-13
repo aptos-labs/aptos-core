@@ -1,0 +1,162 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Performs C-style bitfield access through a `BitSlice`."><meta name="keywords" content="rust, rustlang, rust-lang, BitField"><title>BitField in bitvec::field - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../bitvec/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../bitvec/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">BitField</a></h2><div class="sidebar-elems"><section><div class="block"><h3 class="sidebar-title"><a href="#required-methods">Required Methods</a></h3><ul><li><a href="#tymethod.load_be">load_be</a></li><li><a href="#tymethod.load_le">load_le</a></li><li><a href="#tymethod.store_be">store_be</a></li><li><a href="#tymethod.store_le">store_le</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#provided-methods">Provided Methods</a></h3><ul><li><a href="#method.load">load</a></li><li><a href="#method.store">store</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#implementors">Implementors</a></h3></div></section><h2 class="location"><a href="index.html">In bitvec::field</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../bitvec/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Trait <a href="../index.html">bitvec</a>::<wbr><a href="index.html">field</a>::<wbr><a class="trait" href="#">BitField</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/bitvec/field.rs.html#98-298">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust trait"><code>pub trait BitField {
+    fn <a href="#tymethod.load_le" class="fnname">load_le</a>&lt;M&gt;(&amp;self) -&gt; M<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a></span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.load_be" class="fnname">load_be</a>&lt;M&gt;(&amp;self) -&gt; M<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a></span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.store_le" class="fnname">store_le</a>&lt;M&gt;(&amp;mut self, value: M)<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a></span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.store_be" class="fnname">store_be</a>&lt;M&gt;(&amp;mut self, value: M)<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a></span>;
+
+    fn <a href="#method.load" class="fnname">load</a>&lt;M&gt;(&amp;self) -&gt; M<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a></span>,
+    { ... }
+<span class="item-spacer"></span>    fn <a href="#method.store" class="fnname">store</a>&lt;M&gt;(&amp;mut self, value: M)<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a></span>,
+    { ... }
+}</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Performs C-style bitfield access through a <code>BitSlice</code>.</p>
+<p>Bit orderings that permit batched access to regions of memory are enabled to
+load data from, and store data to, a <code>BitStore</code> with faster behavior than the
+default bit-by-bit traversal.</p>
+<p>This trait transfers data between a <code>BitSlice</code> and a local element. The trait
+functions always place the live bit region of the slice against the least
+significant bit edge of the local element (return value of <code>load</code>, argument of
+<code>store</code>).</p>
+<p>Implementations are encouraged to preserve in-memory bit ordering within a
+memory element, so that call sites can provide a value pattern that the user can
+clearly see matches what they expect for memory ordering. These methods should
+only move data between locations, without modifying the data itself.</p>
+<p>Methods should be called as <code>bits[start .. end].load_or_store()</code>, where the
+range subslice selects no mor than the <code>M::BITS</code> element width being
+transferred.</p>
+</div></details><h2 id="required-methods" class="small-section-header">Required Methods<a href="#required-methods" class="anchor"></a></h2><div class="methods"><details class="rustdoc-toggle" open><summary><div id="tymethod.load_le" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#205-206">source</a></div><h4 class="code-header">fn <a href="#tymethod.load_le" class="fnname">load_le</a>&lt;M&gt;(&amp;self) -&gt; M <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a>,&nbsp;</span></h4></div></summary><div class="docblock"><p>Loads from <code>self</code>, using little-endian element <code>T</code> ordering.</p>
+<p>This function interprets a multi-element slice as having its least
+significant chunk in the low memory address, and its most significant
+chunk in the high memory address. Each element <code>T</code> is still interpreted
+from individual bytes according to the local CPU ordering.</p>
+<h5 id="parameters"><a href="#parameters">Parameters</a></h5>
+<ul>
+<li><code>&amp;self</code>: A read reference to some bits in memory. This slice must be
+trimmed to have a width no more than the <code>M::BITS</code> width of the type
+being loaded. This can be accomplished with range indexing on a larger
+slice.</li>
+</ul>
+<h5 id="returns"><a href="#returns">Returns</a></h5>
+<p>A value <code>M</code> whose least <code>self.len()</code> significant bits are filled with
+the bits of <code>self</code>. If <code>self</code> spans multiple elements <code>T</code>, then the
+lowest-address <code>T</code> is interpreted as containing the least significant
+bits of the return value <code>M</code>, and the highest-address <code>T</code> is interpreted
+as containing its most significant bits.</p>
+<h5 id="panics"><a href="#panics">Panics</a></h5>
+<p>This method is encouraged to panic if <code>self</code> is empty, or wider than a
+single element <code>M</code>.</p>
+</div></details><details class="rustdoc-toggle" open><summary><div id="tymethod.load_be" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#234-235">source</a></div><h4 class="code-header">fn <a href="#tymethod.load_be" class="fnname">load_be</a>&lt;M&gt;(&amp;self) -&gt; M <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a>,&nbsp;</span></h4></div></summary><div class="docblock"><p>Loads from <code>self</code>, using big-endian element <code>T</code> ordering.</p>
+<p>This function interprets a multi-element slice as having its most
+significant chunk in the low memory address, and its least significant
+chunk in the high memory address. Each element <code>T</code> is still interpreted
+from individual bytes according to the local CPU ordering.</p>
+<h5 id="parameters-1"><a href="#parameters-1">Parameters</a></h5>
+<ul>
+<li><code>&amp;self</code>: A read reference to some bits in memory. This slice must be
+trimmed to have a width no more than the <code>M::BITS</code> width of the type
+being loaded. This can be accomplished with range indexing on a larger
+slice.</li>
+</ul>
+<h5 id="returns-1"><a href="#returns-1">Returns</a></h5>
+<p>A value <code>M</code> whose least <code>self.len()</code> significant bits are filled with
+the bits of <code>self</code>. If <code>self</code> spans multiple elements <code>T</code>, then the
+lowest-address <code>T</code> is interpreted as containing the most significant
+bits of the return value <code>M</code>, and the highest-address <code>T</code> is interpreted
+as containing its least significant bits.</p>
+<h5 id="panics-1"><a href="#panics-1">Panics</a></h5>
+<p>This method is encouraged to panic if <code>self</code> is empty, or wider than a
+single element <code>M</code>.</p>
+</div></details><details class="rustdoc-toggle" open><summary><div id="tymethod.store_le" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#265-266">source</a></div><h4 class="code-header">fn <a href="#tymethod.store_le" class="fnname">store_le</a>&lt;M&gt;(&amp;mut self, value: M) <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a>,&nbsp;</span></h4></div></summary><div class="docblock"><p>Stores into <code>self</code>, using little-endian element ordering.</p>
+<p>This function interprets a multi-element slice as having its least
+significant chunk in the low memory address, and its most significant
+chunk in the high memory address. Each element <code>T</code> is still interpreted
+from individual bytes according to the local CPU ordering.</p>
+<h5 id="parameters-2"><a href="#parameters-2">Parameters</a></h5>
+<ul>
+<li><code>&amp;mut self</code>: A write reference to some bits in memory. This slice must
+be trimmed to have a width no more than the <code>M::BITS</code> width of the
+type being stored. This can be accomplished with range indexing on a
+larger slice.</li>
+<li><code>value</code>: A value, whose <code>self.len()</code> least significant bits will be
+stored into <code>self</code>.</li>
+</ul>
+<h5 id="behavior"><a href="#behavior">Behavior</a></h5>
+<p>The <code>self.len()</code> least significant bits of <code>value</code> are written into the
+domain of <code>self</code>. If <code>self</code> spans multiple elements <code>T</code>, then the
+lowest-address <code>T</code> is interpreted as containing the least significant
+bits of the <code>M</code> return value, and the highest-address <code>T</code> is interpreted
+as containing its most significant bits.</p>
+<h5 id="panics-2"><a href="#panics-2">Panics</a></h5>
+<p>This method is encouraged to panic if <code>self</code> is empty, or wider than a
+single element <code>M</code>.</p>
+</div></details><details class="rustdoc-toggle" open><summary><div id="tymethod.store_be" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#296-297">source</a></div><h4 class="code-header">fn <a href="#tymethod.store_be" class="fnname">store_be</a>&lt;M&gt;(&amp;mut self, value: M) <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a>,&nbsp;</span></h4></div></summary><div class="docblock"><p>Stores into <code>self</code>, using big-endian element ordering.</p>
+<p>This function interprets a multi-element slice as having its most
+significant chunk in the low memory address, and its least significant
+chunk in the high memory address. Each element <code>T</code> is still interpreted
+from individual bytes according to the local CPU ordering.</p>
+<h5 id="parameters-3"><a href="#parameters-3">Parameters</a></h5>
+<ul>
+<li><code>&amp;mut self</code>: A write reference to some bits in memory. This slice must
+be trimmed to have a width no more than the <code>M::BITS</code> width of the
+type being stored. This can be accomplished with range indexing on a
+larger slice.</li>
+<li><code>value</code>: A value, whose <code>self.len()</code> least significant bits will be
+stored into <code>self</code>.</li>
+</ul>
+<h5 id="behavior-1"><a href="#behavior-1">Behavior</a></h5>
+<p>The <code>self.len()</code> least significant bits of <code>value</code> are written into the
+domain of <code>self</code>. If <code>self</code> spans multiple elements <code>T</code>, then the
+lowest-address <code>T</code> is interpreted as containing the most significant
+bits of the <code>M</code> return value, and the highest-address <code>T</code> is interpreted
+as containing its least significant bits.</p>
+<h5 id="panics-3"><a href="#panics-3">Panics</a></h5>
+<p>This method is encouraged to panic if <code>self</code> is empty, or wider than a
+single element <code>M</code>.</p>
+</div></details></div><h2 id="provided-methods" class="small-section-header">Provided Methods<a href="#provided-methods" class="anchor"></a></h2><div class="methods"><details class="rustdoc-toggle" open><summary><div id="method.load" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#129-136">source</a></div><h4 class="code-header">fn <a href="#method.load" class="fnname">load</a>&lt;M&gt;(&amp;self) -&gt; M <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a>,&nbsp;</span></h4></div></summary><div class="docblock"><p>Loads the bits in the <code>self</code> region into a local value.</p>
+<p>This can load into any of the unsigned integers which implement
+<code>BitMemory</code>. Any further transformation must be done by the user.</p>
+<p>The default implementation of this function calls <a href="#tymethod.load_le"><code>load_le</code></a> on
+little-endian byte-ordered CPUs, and <a href="#tymethod.load_be"><code>load_be</code></a> on big-endian
+byte-ordered CPUs.</p>
+<h5 id="parameters-4"><a href="#parameters-4">Parameters</a></h5>
+<ul>
+<li><code>&amp;self</code>: A read reference to some bits in memory. This slice must be
+trimmed to have a width no more than the <code>M::BITS</code> width of the type
+being loaded. This can be accomplished with range indexing on a larger
+slice.</li>
+</ul>
+<h5 id="returns-2"><a href="#returns-2">Returns</a></h5>
+<p>A value <code>M</code> whose least <code>self.len()</code> significant bits are filled with
+the bits of <code>self</code>.</p>
+<h5 id="panics-4"><a href="#panics-4">Panics</a></h5>
+<p>This method is encouraged to panic if <code>self</code> is empty, or wider than a
+single element <code>M</code>.</p>
+</div></details><details class="rustdoc-toggle" open><summary><div id="method.store" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#170-177">source</a></div><h4 class="code-header">fn <a href="#method.store" class="fnname">store</a>&lt;M&gt;(&amp;mut self, value: M) <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;M: <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a>,&nbsp;</span></h4></div></summary><div class="docblock"><p>Stores a sequence of bits from the user into the domain of <code>self</code>.</p>
+<p>This can store any of the unsigned integers which implement
+<code>BitMemory</code>. Any other types must first be transformed by the user.</p>
+<p>The default implementation of this function calls <a href="#tymethod.store_le"><code>store_le</code></a> on
+little-endian byte-ordered CPUs, and <a href="#tymethod.store_be"><code>store_be</code></a> on big-endian
+byte-ordered CPUs.</p>
+<h5 id="parameters-5"><a href="#parameters-5">Parameters</a></h5>
+<ul>
+<li><code>&amp;mut self</code>: A write reference to some bits in memory. This slice must
+be trimmed to have a width no more than the <code>M::BITS</code> width of the
+type being stored. This can be accomplished with range indexing on a
+larger slice.</li>
+<li><code>value</code>: A value, whose <code>self.len()</code> least significant bits will be
+stored into <code>self</code>.</li>
+</ul>
+<h5 id="behavior-2"><a href="#behavior-2">Behavior</a></h5>
+<p>The <code>self.len()</code> least significant bits of <code>value</code> are written into the
+domain of <code>self</code>.</p>
+<h5 id="panics-5"><a href="#panics-5">Panics</a></h5>
+<p>This method is encouraged to panic if <code>self</code> is empty, or wider than a
+single element <code>M</code>.</p>
+</div></details></div><h2 id="implementors" class="small-section-header">Implementors<a href="#implementors" class="anchor"></a></h2><div class="item-list" id="implementors-list"><section id="impl-BitField" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#655-684">source</a></span><a href="#impl-BitField" class="anchor"></a><h3 class="code-header in-band">impl&lt;O, T&gt; <a class="trait" href="trait.BitField.html" title="trait bitvec::field::BitField">BitField</a> for <a class="struct" href="../boxed/struct.BitBox.html" title="struct bitvec::boxed::BitBox">BitBox</a>&lt;O, T&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;O: <a class="trait" href="../order/trait.BitOrder.html" title="trait bitvec::order::BitOrder">BitOrder</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../store/trait.BitStore.html" title="trait bitvec::store::BitStore">BitStore</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;<a class="struct" href="../slice/struct.BitSlice.html" title="struct bitvec::slice::BitSlice">BitSlice</a>&lt;O, T&gt;: <a class="trait" href="trait.BitField.html" title="trait bitvec::field::BitField">BitField</a>,&nbsp;</span></h3></section><section id="impl-BitField-1" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#688-717">source</a></span><a href="#impl-BitField-1" class="anchor"></a><h3 class="code-header in-band">impl&lt;O, T&gt; <a class="trait" href="trait.BitField.html" title="trait bitvec::field::BitField">BitField</a> for <a class="struct" href="../vec/struct.BitVec.html" title="struct bitvec::vec::BitVec">BitVec</a>&lt;O, T&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;O: <a class="trait" href="../order/trait.BitOrder.html" title="trait bitvec::order::BitOrder">BitOrder</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../store/trait.BitStore.html" title="trait bitvec::store::BitStore">BitStore</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;<a class="struct" href="../slice/struct.BitSlice.html" title="struct bitvec::slice::BitSlice">BitSlice</a>&lt;O, T&gt;: <a class="trait" href="trait.BitField.html" title="trait bitvec::field::BitField">BitField</a>,&nbsp;</span></h3></section><section id="impl-BitField-2" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#622-651">source</a></span><a href="#impl-BitField-2" class="anchor"></a><h3 class="code-header in-band">impl&lt;O, V&gt; <a class="trait" href="trait.BitField.html" title="trait bitvec::field::BitField">BitField</a> for <a class="struct" href="../array/struct.BitArray.html" title="struct bitvec::array::BitArray">BitArray</a>&lt;O, V&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;O: <a class="trait" href="../order/trait.BitOrder.html" title="trait bitvec::order::BitOrder">BitOrder</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;V: <a class="trait" href="../view/trait.BitView.html" title="trait bitvec::view::BitView">BitView</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;<a class="struct" href="../slice/struct.BitSlice.html" title="struct bitvec::slice::BitSlice">BitSlice</a>&lt;O, V::<a class="associatedtype" href="../view/trait.BitView.html#associatedtype.Store" title="type bitvec::view::BitView::Store">Store</a>&gt;: <a class="trait" href="trait.BitField.html" title="trait bitvec::field::BitField">BitField</a>,&nbsp;</span></h3></section><section id="impl-BitField-3" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#300-458">source</a></span><a href="#impl-BitField-3" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="trait.BitField.html" title="trait bitvec::field::BitField">BitField</a> for <a class="struct" href="../slice/struct.BitSlice.html" title="struct bitvec::slice::BitSlice">BitSlice</a>&lt;<a class="struct" href="../order/struct.Lsb0.html" title="struct bitvec::order::Lsb0">Lsb0</a>, T&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../store/trait.BitStore.html" title="trait bitvec::store::BitStore">BitStore</a>,&nbsp;</span></h3></section><section id="impl-BitField-4" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/bitvec/field.rs.html#460-619">source</a></span><a href="#impl-BitField-4" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="trait.BitField.html" title="trait bitvec::field::BitField">BitField</a> for <a class="struct" href="../slice/struct.BitSlice.html" title="struct bitvec::slice::BitSlice">BitSlice</a>&lt;<a class="struct" href="../order/struct.Msb0.html" title="struct bitvec::order::Msb0">Msb0</a>, T&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../store/trait.BitStore.html" title="trait bitvec::store::BitStore">BitStore</a>,&nbsp;</span></h3></section></div><script type="text/javascript" src="../../implementors/bitvec/field/trait.BitField.js" data-ignore-extern-crates="" async></script></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="bitvec" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Docgen","The documentation generator."],["DocgenOptions","Options passed into the documentation generator."]]};

@@ -1,0 +1,84 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Dispatches trace events to `Subscriber`s."><meta name="keywords" content="rust, rustlang, rust-lang, dispatcher"><title>tracing::dispatcher - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tracing/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tracing/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module dispatcher</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tracing/index.html">
+                        <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">tracing</a>::<wbr><a class="mod" href="#">dispatcher</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tracing/dispatcher.rs.html#1-145">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Dispatches trace events to <a href="../trait.Subscriber.html"><code>Subscriber</code></a>s.</p>
+<p>The <em>dispatcher</em> is the component of the tracing system which is responsible
+for forwarding trace data from the instrumentation points that generate it
+to the subscriber that collects it.</p>
+<h2 id="using-the-trace-dispatcher"><a href="#using-the-trace-dispatcher">Using the Trace Dispatcher</a></h2>
+<p>Every thread in a program using <code>tracing</code> has a <em>default subscriber</em>. When
+events occur, or spans are created, they are dispatched to the thread’s
+current subscriber.</p>
+<h3 id="setting-the-default-subscriber"><a href="#setting-the-default-subscriber">Setting the Default Subscriber</a></h3>
+<p>By default, the current subscriber is an empty implementation that does
+nothing. To use a subscriber implementation, it must be set as the default.
+There are two methods for doing so: <a href="fn.with_default.html" title="with_default"><code>with_default</code></a> and
+<a href="fn.set_global_default.html" title="set_global_default"><code>set_global_default</code></a>. <code>with_default</code> sets the default subscriber for the
+duration of a scope, while <code>set_global_default</code> sets a default subscriber
+for the entire process.</p>
+<p>To use either of these functions, we must first wrap our subscriber in a
+<a href="../struct.Dispatch.html" title="Dispatch"><code>Dispatch</code></a>, a cloneable, type-erased reference to a subscriber. For
+example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">dispatcher::Dispatch</span>;
+
+<span class="kw">let</span> <span class="ident">my_subscriber</span> <span class="op">=</span> <span class="ident">FooSubscriber::new</span>();
+<span class="kw">let</span> <span class="ident">my_dispatch</span> <span class="op">=</span> <span class="ident">Dispatch::new</span>(<span class="ident">my_subscriber</span>);</code></pre></div>
+<p>Then, we can use <a href="fn.with_default.html" title="with_default"><code>with_default</code></a> to set our <code>Dispatch</code> as the default for
+the duration of a block:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// no default subscriber</span>
+
+<span class="ident">dispatcher::with_default</span>(<span class="kw-2">&amp;</span><span class="ident">my_dispatch</span>, <span class="op">|</span><span class="op">|</span> {
+    <span class="comment">// my_subscriber is the default</span>
+});
+
+<span class="comment">// no default subscriber again</span></code></pre></div>
+<p>It’s important to note that <code>with_default</code> will not propagate the current
+thread’s default subscriber to any threads spawned within the <code>with_default</code>
+block. To propagate the default subscriber to new threads, either use
+<code>with_default</code> from the new thread, or use <code>set_global_default</code>.</p>
+<p>As an alternative to <code>with_default</code>, we can use <a href="fn.set_global_default.html" title="set_global_default"><code>set_global_default</code></a> to
+set a <code>Dispatch</code> as the default for all threads, for the lifetime of the
+program. For example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// no default subscriber</span>
+
+<span class="ident">dispatcher::set_global_default</span>(<span class="ident">my_dispatch</span>)
+    <span class="comment">// `set_global_default` will return an error if the global default</span>
+    <span class="comment">// subscriber has already been set.</span>
+    .<span class="ident">expect</span>(<span class="string">&quot;global default was already set!&quot;</span>);
+
+<span class="comment">// `my_subscriber` is now the default</span></code></pre></div>
+<pre class="ignore" style="white-space:normal;font:inherit;">
+<strong>Note</strong>: The thread-local scoped dispatcher (<code>with_default</code>)
+requires the Rust standard library. <code>no_std</code> users should
+use <a href="fn.set_global_default.html"><code>set_global_default</code></a>
+instead.
+</pre>
+<h3 id="accessing-the-default-subscriber"><a href="#accessing-the-default-subscriber">Accessing the Default Subscriber</a></h3>
+<p>A thread’s current default subscriber can be accessed using the
+<a href="fn.get_default.html" title="get_default"><code>get_default</code></a> function, which executes a closure with a reference to the
+currently default <code>Dispatch</code>. This is used primarily by <code>tracing</code>
+instrumentation.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DefaultGuard.html" title="tracing::dispatcher::DefaultGuard struct">DefaultGuard</a></div><div class="item-right docblock-short"><p>A guard that resets the current default dispatcher to the prior
+default dispatcher when dropped.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Dispatch.html" title="tracing::dispatcher::Dispatch struct">Dispatch</a></div><div class="item-right docblock-short"><p><code>Dispatch</code> trace data to a <a href="../trait.Subscriber.html" title="Subscriber"><code>Subscriber</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SetGlobalDefaultError.html" title="tracing::dispatcher::SetGlobalDefaultError struct">SetGlobalDefaultError</a></div><div class="item-right docblock-short"><p>Returned if setting the global dispatcher fails.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_default.html" title="tracing::dispatcher::get_default fn">get_default</a></div><div class="item-right docblock-short"><p>Executes a closure with a reference to this thread’s current <a href="../struct.Dispatch.html">dispatcher</a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.set_default.html" title="tracing::dispatcher::set_default fn">set_default</a></div><div class="item-right docblock-short"><p>Sets the dispatch as the default dispatch for the duration of the lifetime
+of the returned DefaultGuard</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.set_global_default.html" title="tracing::dispatcher::set_global_default fn">set_global_default</a></div><div class="item-right docblock-short"><p>Sets this dispatch as the global default for the duration of the entire program.
+Will be used as a fallback if no thread-local dispatch has been set in a thread
+(using <code>with_default</code>.)</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.with_default.html" title="tracing::dispatcher::with_default fn">with_default</a></div><div class="item-right docblock-short"><p>Sets this dispatch as the default for the duration of a closure.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tracing" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

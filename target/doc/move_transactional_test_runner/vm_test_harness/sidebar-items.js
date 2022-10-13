@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["format_vm_error",""],["run_test",""],["view_resource_in_move_storage",""]],"struct":[["AdapterPublishArgs",""]]};

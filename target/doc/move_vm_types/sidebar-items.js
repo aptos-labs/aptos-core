@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":[["pop_arg","Return the argument at the top of the stack."]],"mod":[["data_store",""],["gas",""],["loaded_data","Loaded definition of code data used in runtime."],["natives",""],["values",""],["views",""]]};

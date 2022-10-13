@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["BlockMetadata","Struct that will be persisted on chain to store the information of the current block."]]};

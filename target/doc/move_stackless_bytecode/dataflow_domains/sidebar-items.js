@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["JoinResult","Represents the abstract outcome of a join."]],"struct":[["MapDomain",""],["SetDomain","Implements a set domain."]],"trait":[["AbstractDomain","A trait to be implemented by domains which support a join."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"attr":[["enum_dispatch","Annotating a trait or enum definition with an `#[enum_dispatch]` attribute will register it with the enum_dispatch library, allowing it to be used to generate impl blocks elsewhere."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["register_package_hooks","Registers package hooks for the process in which the package system is used."]],"trait":[["PackageHooks","A trait providing hooks to customize the package system for a particular Move application. An instance of the trait can be registered globally."]]};

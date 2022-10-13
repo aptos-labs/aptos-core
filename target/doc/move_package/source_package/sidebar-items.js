@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["layout",""],["manifest_parser",""],["parsed_manifest",""]]};

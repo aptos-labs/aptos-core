@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["MOVEY_CREDENTIAL_PATH",""],["MOVEY_URL",""]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Error","Indicates that an error occurred when reloading a layer."],["Handle","Allows reloading the state of an associated `Layer`."],["Layer","Wraps a `Layer` or `Filter`, allowing it to be reloaded dynamically at runtime."]]};

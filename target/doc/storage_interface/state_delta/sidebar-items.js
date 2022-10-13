@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["StateDelta","This represents two state sparse merkle trees at their versions in memory with the updates reflecting the difference of `current` on top of `base`."]]};

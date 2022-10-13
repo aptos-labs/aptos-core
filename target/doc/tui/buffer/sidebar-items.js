@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Buffer","A buffer that maps to the desired content of the terminal after the draw call"],["Cell","A buffer cell"]]};

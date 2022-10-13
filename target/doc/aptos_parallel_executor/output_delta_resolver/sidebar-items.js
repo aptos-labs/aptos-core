@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["OutputDeltaResolver",""]],"type":[["ResolvedData","Resolved and serialized data for WriteOps, None means deletion."]]};

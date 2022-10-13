@@ -1,0 +1,144 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Define a OpenAPI."><meta name="keywords" content="rust, rustlang, rust-lang, OpenApi"><title>OpenApi in poem_openapi - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/poem-web/poem/master/favicon.ico"></head><body class="rustdoc attr"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In poem_openapi</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../poem_openapi/index.html">
+                        <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Attribute Macro <a href="index.html">poem_openapi</a>::<wbr><a class="attr" href="#">OpenApi</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/poem_openapi_derive/lib.rs.html#87">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust attr"><code>#[OpenApi]</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Define a OpenAPI.</p>
+<h2 id="macro-parameters"><a href="#macro-parameters">Macro parameters</a></h2>
+<p>These are attributes that can be added to the <code>#[OpenApi]</code> attribute.</p>
+<div><table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>prefix_path</td><td>Define the prefix for all operation paths. May contain shared path parameters.</td><td>string</td><td>Y</td></tr>
+<tr><td>tag</td><td>Define a tag for all operations. This must be the name of an in-scope variant of an enum which implements <code>Tags</code></td><td>Tags</td><td>Y</td></tr>
+<tr><td>response_header</td><td>Add an extra response header to all operations.</td><td><a href="derive.ApiResponse.html#extra-header-parameters"><code>ExtraHeader</code></a></td><td>Y</td></tr>
+<tr><td>request_header</td><td>Add an extra request header to all operations.</td><td><a href="derive.ApiResponse.html#extra-header-parameters"><code>ExtraHeader</code></a></td><td>Y</td></tr>
+</tbody></table>
+</div><h3 id="example"><a href="#example">Example</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem_openapi</span>::{<span class="ident">OpenApi</span>, <span class="ident">Tags</span>};
+<span class="kw">use</span> <span class="ident">poem_openapi::param::Path</span>;
+<span class="kw">use</span> <span class="ident">poem_openapi::payload::PlainText</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Tags</span>)]</span>
+<span class="kw">enum</span> <span class="ident">MyTags</span> {
+    <span class="ident">V1</span>
+}
+
+<span class="kw">struct</span> <span class="ident">Api</span>;
+
+<span class="attribute">#[<span class="ident">OpenApi</span>(<span class="ident">prefix_path</span> <span class="op">=</span> <span class="string">&quot;/v1/:customer_id&quot;</span>, <span class="ident">tag</span> <span class="op">=</span> <span class="string">&quot;MyTags::V1&quot;</span>)]</span>
+<span class="kw">impl</span> <span class="ident">Api</span> {
+    <span class="doccomment">/// Greet the customer</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Example</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Call `/v1/1234/hello` to get the response `&quot;Hello 1234!&quot;`. </span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">path</span> <span class="op">=</span> <span class="string">&quot;/hello&quot;</span>, <span class="ident">method</span> <span class="op">=</span> <span class="string">&quot;get&quot;</span>)]</span>
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">hello</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">customer_id</span>: <span class="ident">Path</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) -&gt; <span class="ident">PlainText</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
+        <span class="ident">PlainText</span>(<span class="macro">format!</span>(<span class="string">&quot;Hello {}!&quot;</span>, <span class="ident">customer_id</span>.<span class="number">0</span>))
+    }
+}</code></pre></div>
+<h2 id="operation-parameters"><a href="#operation-parameters">Operation parameters</a></h2>
+<p>Parameters that can be passed into the <code>#[oai()]</code> attribute above each operation function within an <code>OpenApi</code>.</p>
+<div><table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>path</td><td>URI path optionally containing path parameters (e.g., “/:name/hello”)</td><td>string</td><td>N</td></tr>
+<tr><td>method</td><td>HTTP method. The possible values are “get”, “post”, “put”, “delete”, “head”, “options”, “connect”, “patch”, “trace”.</td><td>string</td><td>N</td></tr>
+<tr><td>deprecated</td><td>Operation deprecated</td><td>bool</td><td>Y</td></tr>
+<tr><td>external_docs</td><td>Specify a external resource for extended documentation</td><td>string</td><td>Y</td></tr>
+<tr><td>tag</td><td>Tag to use for an operation. Must be a variant of an enum which implements <code>Tags</code></td><td>Tags</td><td>Y</td></tr>
+<tr><td>operation_id</td><td>Unique string used to identify the operation.</td><td>string</td><td>Y</td></tr>
+<tr><td>transform</td><td>Use a function to transform the API endpoint.</td><td>string</td><td>Y</td></tr>
+<tr><td>response_header</td><td>Add an extra response header to the operation.</td><td><a href="derive.ApiResponse.html#extra-header-parameters"><code>ExtraHeader</code></a></td><td>Y</td></tr>
+<tr><td>request_header</td><td>Add an extra request header to all operations.</td><td><a href="derive.ApiResponse.html#extra-header-parameters"><code>ExtraHeader</code></a></td><td>Y</td></tr>
+<tr><td>actual_type</td><td>Specifies the actual response type</td><td>string</td><td>Y</td></tr>
+</tbody></table>
+</div><h3 id="example-1"><a href="#example-1">Example</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem_openapi</span>::{<span class="ident">OpenApi</span>, <span class="ident">Tags</span>};
+<span class="kw">use</span> <span class="ident">poem_openapi::param::Path</span>;
+<span class="kw">use</span> <span class="ident">poem_openapi::payload::PlainText</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Tags</span>)]</span>
+<span class="kw">enum</span> <span class="ident">MyTags</span> {
+    <span class="ident">V1</span>
+}
+
+<span class="kw">struct</span> <span class="ident">Api</span>;
+
+<span class="attribute">#[<span class="ident">OpenApi</span>]</span>
+<span class="kw">impl</span> <span class="ident">Api</span> {
+    <span class="doccomment">/// Greet the customer</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Example</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Call `/v1/1234/hello` to get the response `&quot;Hello 1234!&quot;`. </span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">path</span> <span class="op">=</span> <span class="string">&quot;/v1/:customer_id/hello&quot;</span>, <span class="ident">method</span> <span class="op">=</span> <span class="string">&quot;get&quot;</span>, <span class="ident">tag</span> <span class="op">=</span> <span class="string">&quot;MyTags::V1&quot;</span>)]</span>
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">hello</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">customer_id</span>: <span class="ident">Path</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) -&gt; <span class="ident">PlainText</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
+        <span class="ident">PlainText</span>(<span class="macro">format!</span>(<span class="string">&quot;Hello {}!&quot;</span>, <span class="ident">customer_id</span>.<span class="number">0</span>))
+    }
+}</code></pre></div>
+<h2 id="operation-argument-parameters"><a href="#operation-argument-parameters">Operation argument parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>name</td><td>Parameter name</td><td>string</td><td>Y</td></tr>
+<tr><td>deprecated</td><td>Argument deprecated</td><td>bool</td><td>Y</td></tr>
+<tr><td>default</td><td>Default value</td><td>bool,string</td><td>Y</td></tr>
+<tr><td>explode</td><td>When this is <code>true</code>, parameter values of type array or object generate separate parameters for each value of the array or key-value pair of the map.</td><td>bool</td><td>Y (default: true)</td></tr>
+<tr><td>validator.multiple_of</td><td>The value of “multiple_of” MUST be a number, strictly greater than 0. A numeric instance is only valid if division by this value results in an integer.</td><td>number</td><td>Y</td></tr>
+<tr><td>validator.maximum</td><td>The value of “maximum” MUST be a number, representing an upper limit for a numeric instance. If <code>exclusive</code> is <code>true</code> and instance is less than the provided value, or else if the instance is less than or exactly equal to the provided value.</td><td>{ value: <code>&lt;number&gt;</code>, exclusive: <code>&lt;bool&gt;</code>}</td><td>Y</td></tr>
+<tr><td>validator.minimum</td><td>The value of “minimum” MUST be a number, representing a lower limit for a numeric instance. If <code>exclusive</code> is <code>true</code> and instance is greater than the provided value, or else if the instance is greater than or exactly equal to the provided value.</td><td>{ value: <code>&lt;number&gt;</code>, exclusive: <code>&lt;bool&gt;</code>}</td><td>Y</td></tr>
+<tr><td>validator.max_length</td><td>The value of “max_length” MUST be a non-negative integer. A string instance is valid against this validator if its length is less than, or equal to, the value.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.min_length</td><td>The value of “min_length” MUST be a non-negative integer.  The value of this validator MUST be an integer. This integer MUST be greater than, or equal to, 0.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.pattern</td><td>The value of “pattern” MUST be a string. This string SHOULD be a valid regular expression, according to the ECMA 262 regular expression dialect. A string instance is considered valid if the regular expression matches the instance successfully.</td><td>string</td><td>Y</td></tr>
+<tr><td>validator.max_items</td><td>The value of “max_items” MUST be an integer. This integer MUST be greater than, or equal to, 0. An array instance is valid if its size is less than, or equal to, the value of this validator.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.min_items</td><td>The value of “min_items” MUST be an integer. This integer MUST be greater than, or equal to, 0. An array instance is valid if its size is greater than, or equal to, the value of this validator.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.unique_items</td><td>The value of “unique_items” MUST be an boolean.  If this value is <code>false</code>, the instance validates successfully.  If this value is <code>true</code>, the instance validates successfully if all of its elements are unique.</td><td>bool</td><td>Y</td></tr>
+<tr><td>validator.max_properties</td><td>The value of this keyword MUST be a non-negative integer. An object instance is valid against “maxProperties” if its number of properties is less than, or equal to, the value of this keyword.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.min_properties</td><td>The value of this keyword MUST be a non-negative integer. An object instance is valid against “minProperties” if its number of properties is greater than, or equal to, the value of this keyword.</td><td>usize</td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="examples"><a href="#examples">Examples</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem_openapi</span>::{
+    <span class="ident">param::Header</span>,
+    <span class="ident">payload</span>::{<span class="ident">Json</span>, <span class="ident">PlainText</span>},
+    <span class="ident">ApiRequest</span>, <span class="ident">Object</span>, <span class="ident">OpenApi</span>, <span class="ident">ApiResponse</span>,
+};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Object</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Pet</span> {
+    <span class="ident">id</span>: <span class="ident">String</span>,
+    <span class="ident">name</span>: <span class="ident">String</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">ApiRequest</span>)]</span>
+<span class="kw">enum</span> <span class="ident">CreatePetRequest</span> {
+    <span class="doccomment">/// This request receives a pet in JSON format(application/json).</span>
+    <span class="ident">CreateByJSON</span>(<span class="ident">Json</span><span class="op">&lt;</span><span class="ident">Pet</span><span class="op">&gt;</span>),
+    <span class="doccomment">/// This request receives a pet in text format(text/plain).</span>
+    <span class="ident">CreateByPlainText</span>(<span class="ident">PlainText</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>),
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">ApiResponse</span>)]</span>
+<span class="kw">enum</span> <span class="ident">CreatePetResponse</span> {
+    <span class="doccomment">/// Returns when the pet is successfully created.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">200</span>)]</span>
+    <span class="prelude-val">Ok</span>,
+    <span class="doccomment">/// Returns when the pet already exists.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">409</span>)]</span>
+    <span class="ident">PetAlreadyExists</span>,
+}
+
+<span class="kw">struct</span> <span class="ident">PetApi</span>;
+
+<span class="attribute">#[<span class="ident">OpenApi</span>]</span>
+<span class="kw">impl</span> <span class="ident">PetApi</span> {
+    <span class="doccomment">/// Create a new pet.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">path</span> <span class="op">=</span> <span class="string">&quot;/pet&quot;</span>, <span class="ident">method</span> <span class="op">=</span> <span class="string">&quot;post&quot;</span>)]</span>
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">create_pet</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;TOKEN&quot;</span>)]</span> <span class="ident">token</span>: <span class="ident">Header</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+        <span class="ident">req</span>: <span class="ident">CreatePetRequest</span>
+    ) -&gt; <span class="ident">CreatePetResponse</span> {
+        <span class="macro">todo!</span>()
+    }
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="poem_openapi" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

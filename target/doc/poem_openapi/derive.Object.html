@@ -1,0 +1,65 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Define a OpenAPI object"><meta name="keywords" content="rust, rustlang, rust-lang, Object"><title>Object in poem_openapi - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/poem-web/poem/master/favicon.ico"></head><body class="rustdoc derive"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In poem_openapi</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../poem_openapi/index.html">
+                        <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Derive Macro <a href="index.html">poem_openapi</a>::<wbr><a class="derive" href="#">Object</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/poem_openapi_derive/lib.rs.html#32">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust derive"><code>#[derive(Object)]
+{
+    // Attributes available to this derive:
+    #[oai]
+}
+</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Define a OpenAPI object</p>
+<h2 id="macro-parameters"><a href="#macro-parameters">Macro parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>rename</td><td>Rename the object</td><td>string</td><td>Y</td></tr>
+<tr><td>rename_all</td><td>Rename all the fields according to the given case convention. The possible values are “lowercase”, “UPPERCASE”, “PascalCase”, “camelCase”, “snake_case”, “SCREAMING_SNAKE_CASE”, “kebab-case”, “SCREAMING-KEBAB-CASE”.</td><td>string</td><td>Y</td></tr>
+<tr><td>default</td><td>Default value</td><td>bool,string</td><td>Y</td></tr>
+<tr><td>deprecated</td><td>Schema deprecated</td><td>bool</td><td>Y</td></tr>
+<tr><td>read_only_all</td><td>Set all fields openapi readOnly property</td><td>bool</td><td>Y</td></tr>
+<tr><td>write_only_all</td><td>Set all fields openapi writeOnly property</td><td>bool</td><td>Y</td></tr>
+<tr><td>deny_unknown_fields</td><td>Always error during parsing when encountering unknown fields.</td><td>bool</td><td>Y</td></tr>
+<tr><td>example</td><td>Indicates that the object type has implemented <code>Example</code> trait</td><td>bool</td><td>Y</td></tr>
+<tr><td>external_docs</td><td>Specify a external resource for extended documentation</td><td>string</td><td>Y</td></tr>
+<tr><td>remote</td><td>Derive a remote object</td><td>string</td><td>Y</td></tr>
+<tr><td>skip_serializing_if_is_none</td><td>Skip serializing field if the value is none.</td><td>bool</td><td>Y</td></tr>
+<tr><td>skip_serializing_if_is_empty</td><td>Skip serializing field if the value is empty.</td><td>bool</td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="field-parameters"><a href="#field-parameters">Field parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>skip</td><td>Skip this field</td><td>bool</td><td>Y</td></tr>
+<tr><td>rename</td><td>Rename the field</td><td>string</td><td>Y</td></tr>
+<tr><td>default</td><td>Default value</td><td>bool,string</td><td>Y</td></tr>
+<tr><td>read_only</td><td>set field openapi readOnly property</td><td>bool</td><td>Y</td></tr>
+<tr><td>write_only</td><td>set field openapi writeOnly property bool</td><td>bool</td><td>Y</td></tr>
+<tr><td>flatten</td><td>Similar to serde (flatten)</td><td>bool</td><td>Y</td></tr>
+<tr><td>skip_serializing_if_is_none</td><td>Skip serializing this field if the value is none.</td><td>bool</td><td>Y</td></tr>
+<tr><td>skip_serializing_if_is_empty</td><td>Skip serializing this field if the value is empty.</td><td>bool</td><td>Y</td></tr>
+<tr><td>skip_serializing_if</td><td>Call a function to determine whether to skip serializing this field.</td><td>string</td><td>Y</td></tr>
+<tr><td>validator.multiple_of</td><td>The value of “multiple_of” MUST be a number, strictly greater than 0. A numeric instance is only valid if division by this value results in an integer.</td><td>number</td><td>Y</td></tr>
+<tr><td>validator.maximum</td><td>The value of “maximum” MUST be a number, representing an upper limit for a numeric instance. If <code>exclusive</code> is <code>true</code> and instance is less than the provided value, or else if the instance is less than or exactly equal to the provided value.</td><td>{ value: <code>&lt;number&gt;</code>, exclusive: <code>&lt;bool&gt;</code>}</td><td>Y</td></tr>
+<tr><td>validator.minimum</td><td>The value of “minimum” MUST be a number, representing a lower limit for a numeric instance. If <code>exclusive</code> is <code>true</code> and instance is greater than the provided value, or else if the instance is greater than or exactly equal to the provided value.</td><td>{ value: <code>&lt;number&gt;</code>, exclusive: <code>&lt;bool&gt;</code>}</td><td>Y</td></tr>
+<tr><td>validator.max_length</td><td>The value of “max_length” MUST be a non-negative integer. A string instance is valid against this validator if its length is less than, or equal to, the value.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.min_length</td><td>The value of “min_length” MUST be a non-negative integer.  The value of this validator MUST be an integer. This integer MUST be greater than, or equal to, 0.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.pattern</td><td>The value of “pattern” MUST be a string. This string SHOULD be a valid regular expression, according to the ECMA 262 regular expression dialect. A string instance is considered valid if the regular expression matches the instance successfully.</td><td>string</td><td>Y</td></tr>
+<tr><td>validator.max_items</td><td>The value of “max_items” MUST be an integer. This integer MUST be greater than, or equal to, 0. An array instance is valid if its size is less than, or equal to, the value of this validator.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.min_items</td><td>The value of “min_items” MUST be an integer. This integer MUST be greater than, or equal to, 0. An array instance is valid if its size is greater than, or equal to, the value of this validator.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.unique_items</td><td>The value of “unique_items” MUST be an boolean.  If this value is <code>false</code>, the instance validates successfully.  If this value is <code>true</code>, the instance validates successfully if all of its elements are unique.</td><td>bool</td><td>Y</td></tr>
+<tr><td>validator.max_properties</td><td>The value of this keyword MUST be a non-negative integer. An object instance is valid against “maxProperties” if its number of properties is less than, or equal to, the value of this keyword.</td><td>usize</td><td>Y</td></tr>
+<tr><td>validator.min_properties</td><td>The value of this keyword MUST be a non-negative integer. An object instance is valid against “minProperties” if its number of properties is greater than, or equal to, the value of this keyword.</td><td>usize</td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="examples"><a href="#examples">Examples</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem_openapi::Object</span>;
+
+<span class="doccomment">/// Pet</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Object</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Pet</span> {
+    <span class="doccomment">/// The id of this pet.</span>
+    <span class="ident">id</span>: <span class="ident">String</span>,
+
+    <span class="doccomment">/// The name of this pet.</span>
+    <span class="ident">name</span>: <span class="ident">String</span>,
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="poem_openapi" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

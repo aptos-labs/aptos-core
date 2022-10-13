@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["DST_BLS_POP_IN_G2","Domain separation tag (DST) for hashing a public key before computing its proof-of-possesion (PoP), which is also just a signature."]],"struct":[["ProofOfPossession","A proof-of-possesion (PoP) of a BLS12381 private key. This is just a BLS signature on the corresponding public key."]]};

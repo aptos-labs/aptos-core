@@ -1,0 +1,125 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Declares a named parser which can easily be reused."><meta name="keywords" content="rust, rustlang, rust-lang, parser"><title>parser in combine - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc macro"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../combine/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../combine/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In combine</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../combine/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Macro <a href="index.html">combine</a>::<wbr><a class="macro" href="#">parser</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/combine/lib.rs.html#326-403">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><div class="example-wrap"><pre class="rust macro"><code><span class="macro">macro_rules!</span> <span class="ident">parser</span> {
+    (
+        <span class="kw">type</span> <span class="ident">PartialState</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">partial_state</span>: <span class="ident">ty</span>;
+        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span>
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fn_vis</span>: <span class="ident">vis</span> <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> [$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">type_params</span>: <span class="ident">tt</span>)<span class="kw-2">*</span>]( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>: <span class="ident">ident</span> :  <span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg_type</span>: <span class="ident">ty</span>),<span class="kw-2">*</span>)
+            (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">input_type</span>: <span class="ident">ty</span>) -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">output_type</span>: <span class="ident">ty</span>
+            <span class="kw">where</span> [$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">where_clause</span>: <span class="ident">tt</span>)<span class="kw-2">*</span>]
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parser</span>: <span class="ident">block</span>
+    ) =&gt; { ... };
+    (
+        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">derive</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span>
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">struct_vis</span>: <span class="ident">vis</span> <span class="kw">struct</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">type_name</span>: <span class="ident">ident</span>;
+        <span class="kw">type</span> <span class="ident">PartialState</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">partial_state</span>: <span class="ident">ty</span>;
+        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span>
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fn_vis</span>: <span class="ident">vis</span> <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> [$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">type_params</span>: <span class="ident">tt</span>)<span class="kw-2">*</span>]( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>: <span class="ident">ident</span> :  <span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg_type</span>: <span class="ident">ty</span>),<span class="op">*</span> )
+            (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">input_type</span>: <span class="ident">ty</span>) -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">output_type</span>: <span class="ident">ty</span>
+            <span class="kw">where</span> [$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">where_clause</span>: <span class="ident">tt</span>)<span class="kw-2">*</span>]
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parser</span>: <span class="ident">block</span>
+    ) =&gt; { ... };
+    (
+        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span>
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fn_vis</span>: <span class="ident">vis</span> <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> [$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">type_params</span>: <span class="ident">tt</span>)<span class="kw-2">*</span>]( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>: <span class="ident">ident</span> :  <span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg_type</span>: <span class="ident">ty</span>),<span class="kw-2">*</span>)
+            (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">input_type</span>: <span class="ident">ty</span>) -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">output_type</span>: <span class="ident">ty</span>
+            <span class="kw">where</span> [$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">where_clause</span>: <span class="ident">tt</span>)<span class="kw-2">*</span>]
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parser</span>: <span class="ident">block</span>
+    ) =&gt; { ... };
+    (
+        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">derive</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span>
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">struct_vis</span>: <span class="ident">vis</span> <span class="kw">struct</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">type_name</span>: <span class="ident">ident</span>;
+        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span>
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fn_vis</span>: <span class="ident">vis</span> <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> [$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">type_params</span>: <span class="ident">tt</span>)<span class="kw-2">*</span>]( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>: <span class="ident">ident</span> :  <span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg_type</span>: <span class="ident">ty</span>),<span class="op">*</span> )
+            (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">input_type</span>: <span class="ident">ty</span>) -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">output_type</span>: <span class="ident">ty</span>
+            <span class="kw">where</span> [$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">where_clause</span>: <span class="ident">tt</span>)<span class="kw-2">*</span>]
+        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parser</span>: <span class="ident">block</span>
+    ) =&gt; { ... };
+}</code></pre></div>
+</div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Declares a named parser which can easily be reused.</p>
+<p>The expression which creates the parser should have no side effects as it may be called
+multiple times even during a single parse attempt.</p>
+<p>NOTE: If you are using rust nightly you can use <code>impl Trait</code> instead. See the <a href="https://github.com/Marwes/combine/blob/master/benches/json.rs">json parser</a> for
+an example.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">combine</span>;
+<span class="kw">use</span> <span class="ident">combine::parser::char::digit</span>;
+<span class="kw">use</span> <span class="ident">combine</span>::{<span class="ident">any</span>, <span class="ident">choice</span>, <span class="ident">from_str</span>, <span class="ident">many1</span>, <span class="ident">Parser</span>, <span class="ident">EasyParser</span>, <span class="ident">Stream</span>};
+<span class="kw">use</span> <span class="ident">combine::error::ParseError</span>;
+
+<span class="macro">parser!</span>{
+    <span class="doccomment">/// `[Input]` represents a normal type parameters and lifetime declaration for the function</span>
+    <span class="doccomment">/// It gets expanded to `&lt;Input&gt;`</span>
+    <span class="kw">fn</span> <span class="ident">integer</span>[<span class="ident">Input</span>]()(<span class="ident">Input</span>) -&gt; <span class="ident">i32</span>
+    <span class="kw">where</span> [
+        <span class="ident">Input</span>: <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Token</span> <span class="op">=</span> <span class="ident">char</span><span class="op">&gt;</span>,
+        <span class="ident">Input::Error</span>: <span class="ident">ParseError</span><span class="op">&lt;</span><span class="ident">char</span>, <span class="ident">Input::Range</span>, <span class="ident">Input::Position</span><span class="op">&gt;</span>,
+        <span class="op">&lt;</span><span class="ident">Input::Error</span> <span class="kw">as</span> <span class="ident">ParseError</span><span class="op">&lt;</span><span class="ident">Input::Token</span>, <span class="ident">Input::Range</span>, <span class="ident">Input::Position</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::StreamError</span>:
+            <span class="ident">From</span><span class="op">&lt;</span><span class="ident">::std::num::ParseIntError</span><span class="op">&gt;</span>,
+    ]
+    {
+        <span class="comment">// The body must be a block body ( `{ &lt;block body&gt; }`) which ends with an expression</span>
+        <span class="comment">// which evaluates to a parser</span>
+        <span class="ident">from_str</span>(<span class="ident">many1</span>::<span class="op">&lt;</span><span class="ident">String</span>, <span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">digit</span>()))
+    }
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">IntOrString</span> {
+    <span class="ident">Int</span>(<span class="ident">i32</span>),
+    <span class="ident">String</span>(<span class="ident">String</span>),
+}
+<span class="comment">// prefix with `pub` to declare a public parser</span>
+<span class="macro">parser!</span>{
+    <span class="comment">// Documentation comments works as well</span>
+
+    <span class="doccomment">/// Parses an integer or a string (any characters)</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">integer_or_string</span>[<span class="ident">Input</span>]()(<span class="ident">Input</span>) -&gt; <span class="ident">IntOrString</span>
+    <span class="kw">where</span> [
+        <span class="ident">Input</span>: <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Token</span> <span class="op">=</span> <span class="ident">char</span><span class="op">&gt;</span>,
+        <span class="ident">Input::Error</span>: <span class="ident">ParseError</span><span class="op">&lt;</span><span class="ident">char</span>, <span class="ident">Input::Range</span>, <span class="ident">Input::Position</span><span class="op">&gt;</span>,
+        <span class="op">&lt;</span><span class="ident">Input::Error</span> <span class="kw">as</span> <span class="ident">ParseError</span><span class="op">&lt;</span><span class="ident">Input::Token</span>, <span class="ident">Input::Range</span>, <span class="ident">Input::Position</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::StreamError</span>:
+            <span class="ident">From</span><span class="op">&lt;</span><span class="ident">::std::num::ParseIntError</span><span class="op">&gt;</span>,
+    ]
+    {
+        <span class="macro">choice!</span>(
+            <span class="ident">integer</span>().<span class="ident">map</span>(<span class="ident">IntOrString::Int</span>),
+            <span class="ident">many1</span>(<span class="ident">any</span>()).<span class="ident">map</span>(<span class="ident">IntOrString::String</span>)
+        )
+    }
+}
+
+<span class="macro">parser!</span>{
+    <span class="comment">// Give the created type a unique name</span>
+    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Twice</span>;
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">twice</span>[<span class="ident">Input</span>, <span class="ident">F</span>, <span class="ident">P</span>](<span class="ident">f</span>: <span class="ident">F</span>)(<span class="ident">Input</span>) -&gt; (<span class="ident">P::Output</span>, <span class="ident">P::Output</span>)
+        <span class="kw">where</span> [<span class="ident">P</span>: <span class="ident">Parser</span><span class="op">&lt;</span><span class="ident">Input</span><span class="op">&gt;</span>,
+               <span class="ident">F</span>: <span class="ident">FnMut</span>() -&gt; <span class="ident">P</span>]
+    {
+        (<span class="ident">f</span>(), <span class="ident">f</span>())
+    }
+}
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">assert_eq!</span>(<span class="ident">integer</span>().<span class="ident">easy_parse</span>(<span class="string">&quot;123&quot;</span>), <span class="prelude-val">Ok</span>((<span class="number">123</span>, <span class="string">&quot;&quot;</span>)));
+    <span class="macro">assert!</span>(<span class="ident">integer</span>().<span class="ident">easy_parse</span>(<span class="string">&quot;!&quot;</span>).<span class="ident">is_err</span>());
+
+    <span class="macro">assert_eq!</span>(
+        <span class="ident">integer_or_string</span>().<span class="ident">easy_parse</span>(<span class="string">&quot;123&quot;</span>),
+        <span class="prelude-val">Ok</span>((<span class="ident">IntOrString::Int</span>(<span class="number">123</span>), <span class="string">&quot;&quot;</span>))
+    );
+    <span class="macro">assert_eq!</span>(
+        <span class="ident">integer_or_string</span>().<span class="ident">easy_parse</span>(<span class="string">&quot;abc&quot;</span>),
+        <span class="prelude-val">Ok</span>((<span class="ident">IntOrString::String</span>(<span class="string">&quot;abc&quot;</span>.<span class="ident">to_string</span>()), <span class="string">&quot;&quot;</span>))
+    );
+    <span class="macro">assert_eq!</span>(<span class="ident">twice</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">digit</span>()).<span class="ident">parse</span>(<span class="string">&quot;123&quot;</span>), <span class="prelude-val">Ok</span>(((<span class="string">&#39;1&#39;</span>, <span class="string">&#39;2&#39;</span>), <span class="string">&quot;3&quot;</span>)));
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="combine" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

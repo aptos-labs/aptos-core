@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["internal","Internal details."],["limitations","Limitations and common pitfalls."],["patterns","Common use patterns"],["performance","Performance characteristics."]]};

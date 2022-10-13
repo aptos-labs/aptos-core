@@ -1,0 +1,279 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/registry/src/github.com-1ecc6299db9ec823/ring-0.16.20/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ring/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../ring/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ring/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+</pre><pre class="rust"><code><span class="comment">// Copyright 2015-2016 Brian Smith.</span>
+<span class="comment">//</span>
+<span class="comment">// Permission to use, copy, modify, and/or distribute this software for any</span>
+<span class="comment">// purpose with or without fee is hereby granted, provided that the above</span>
+<span class="comment">// copyright notice and this permission notice appear in all copies.</span>
+<span class="comment">//</span>
+<span class="comment">// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHORS DISCLAIM ALL WARRANTIES</span>
+<span class="comment">// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</span>
+<span class="comment">// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY</span>
+<span class="comment">// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</span>
+<span class="comment">// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION</span>
+<span class="comment">// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN</span>
+<span class="comment">// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</span>
+
+<span class="doccomment">//! Safe, fast, small crypto using Rust with BoringSSL&#39;s cryptography</span>
+<span class="doccomment">//! primitives.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Feature Flags</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! &lt;table&gt;</span>
+<span class="doccomment">//! &lt;tr&gt;&lt;th&gt;Feature</span>
+<span class="doccomment">//!     &lt;th&gt;Description</span>
+<span class="doccomment">//! &lt;tr&gt;&lt;td&gt;&lt;code&gt;alloc (default)&lt;/code&gt;</span>
+<span class="doccomment">//!     &lt;td&gt;Enable features that require use of the heap, RSA in particular.</span>
+<span class="doccomment">//! &lt;tr&gt;&lt;td&gt;&lt;code&gt;dev_urandom_fallback (default)&lt;/code&gt;</span>
+<span class="doccomment">//!     &lt;td&gt;This is only applicable to Linux. On Linux, by default,</span>
+<span class="doccomment">//!         &lt;code&gt;ring::rand::SystemRandom&lt;/code&gt; will fall back to reading</span>
+<span class="doccomment">//!         from &lt;code&gt;/dev/urandom&lt;/code&gt; if the &lt;code&gt;getrandom()&lt;/code&gt;</span>
+<span class="doccomment">//!         syscall isn&#39;t supported at runtime. When the</span>
+<span class="doccomment">//!         &lt;code&gt;dev_urandom_fallback&lt;/code&gt; feature is disabled, such</span>
+<span class="doccomment">//!         fallbacks will not occur. See the documentation for</span>
+<span class="doccomment">//!         &lt;code&gt;rand::SystemRandom&lt;/code&gt; for more details.</span>
+<span class="doccomment">//! &lt;tr&gt;&lt;td&gt;&lt;code&gt;std&lt;/code&gt;</span>
+<span class="doccomment">//!     &lt;td&gt;Enable features that use libstd, in particular</span>
+<span class="doccomment">//!         &lt;code&gt;std::error::Error&lt;/code&gt; integration. Implies `alloc`.</span>
+<span class="doccomment">//! &lt;tr&gt;&lt;td&gt;&lt;code&gt;wasm32_c&lt;/code&gt;</span>
+<span class="doccomment">//!     &lt;td&gt;Enables features that require a C compiler on wasm32 targets, such as</span>
+<span class="doccomment">//!        the &lt;code&gt;constant_time&lt;/code&gt; module, HMAC verification, and PBKDF2</span>
+<span class="doccomment">//!        verification. Without this feature, only a subset of functionality</span>
+<span class="doccomment">//!        is provided to wasm32 targets so that a C compiler isn&#39;t needed. A</span>
+<span class="doccomment">//!        typical invocation would be:</span>
+<span class="doccomment">//!        &lt;code&gt;TARGET_CC=clang-10 TARGET_AR=llvm-ar-10 cargo test --target=wasm32-unknown-unknown --features=wasm32_c&lt;/code&gt;</span>
+<span class="doccomment">//!        with &lt;code&gt;llvm-ar-10&lt;/code&gt; and &lt;code&gt;clang-10&lt;/code&gt; in &lt;code&gt;$PATH&lt;/code&gt;.</span>
+<span class="doccomment">//!        (Going forward more functionality should be enabled by default, without</span>
+<span class="doccomment">//!        requiring these hacks, and without requiring a C compiler.)</span>
+<span class="doccomment">//! &lt;/table&gt;</span>
+
+<span class="attribute">#![<span class="ident">doc</span>(<span class="ident">html_root_url</span> <span class="op">=</span> <span class="string">&quot;https://briansmith.org/rustdoc/&quot;</span>)]</span>
+<span class="attribute">#![<span class="ident">allow</span>(
+    <span class="ident">clippy::collapsible_if</span>,
+    <span class="ident">clippy::identity_op</span>,
+    <span class="ident">clippy::len_without_is_empty</span>,
+    <span class="ident">clippy::len_zero</span>,
+    <span class="ident">clippy::let_unit_value</span>,
+    <span class="ident">clippy::many_single_char_names</span>,
+    <span class="ident">clippy::needless_range_loop</span>,
+    <span class="ident">clippy::new_without_default</span>,
+    <span class="ident">clippy::neg_cmp_op_on_partial_ord</span>,
+    <span class="ident">clippy::range_plus_one</span>,
+    <span class="ident">clippy::too_many_arguments</span>,
+    <span class="ident">clippy::trivially_copy_pass_by_ref</span>,
+    <span class="ident">clippy::type_complexity</span>,
+    <span class="ident">clippy::unreadable_literal</span>,
+    <span class="ident">missing_copy_implementations</span>,
+    <span class="ident">missing_debug_implementations</span>,
+    <span class="ident">non_camel_case_types</span>,
+    <span class="ident">non_snake_case</span>,
+    <span class="ident">unsafe_code</span>
+)]</span>
+<span class="comment">// `#[derive(...)]` uses `trivial_numeric_casts` and `unused_qualifications`</span>
+<span class="comment">// internally.</span>
+<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">missing_docs</span>, <span class="ident">unused_qualifications</span>, <span class="ident">variant_size_differences</span>)]</span>
+<span class="attribute">#![<span class="ident">forbid</span>(<span class="ident">unused_results</span>)]</span>
+<span class="attribute">#![<span class="ident">no_std</span>]</span>
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">mod</span> <span class="ident">debug</span>;
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">test</span>;
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">mod</span> <span class="ident">arithmetic</span>;
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">mod</span> <span class="ident">bssl</span>;
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">mod</span> <span class="ident">polyfill</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">aead</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">agreement</span>;
+
+<span class="kw">mod</span> <span class="ident">bits</span>;
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">c</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">constant_time</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">io</span>;
+
+<span class="kw">mod</span> <span class="ident">cpu</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">digest</span>;
+<span class="kw">mod</span> <span class="ident">ec</span>;
+<span class="kw">mod</span> <span class="ident">endian</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">error</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">hkdf</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">hmac</span>;
+<span class="kw">mod</span> <span class="ident">limb</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">pbkdf2</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">pkcs8</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">rand</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+<span class="kw">mod</span> <span class="ident">rsa</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">signature</span>;
+
+<span class="kw">mod</span> <span class="ident">sealed</span> {
+    <span class="doccomment">/// Traits that are designed to only be implemented internally in *ring*.</span>
+    <span class="comment">//</span>
+    <span class="comment">// Usage:</span>
+    <span class="comment">// ```</span>
+    <span class="comment">// use crate::sealed;</span>
+    <span class="comment">//</span>
+    <span class="comment">// pub trait MyType: sealed::Sealed {</span>
+    <span class="comment">//     // [...]</span>
+    <span class="comment">// }</span>
+    <span class="comment">//</span>
+    <span class="comment">// impl sealed::Sealed for MyType {}</span>
+    <span class="comment">// ```</span>
+    <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Sealed</span> {}
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ring" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

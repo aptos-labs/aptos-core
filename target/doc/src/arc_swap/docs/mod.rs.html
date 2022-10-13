@@ -1,0 +1,91 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/registry/src/github.com-1ecc6299db9ec823/arc-swap-1.5.1/src/docs/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../arc_swap/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Additional documentation.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Here we have some more general topics that might be good to know that just don&#39;t fit to the</span>
+<span class="doccomment">//! crate level intro.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Also, there were some previous blog posts about the crate which you might find interesting.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Atomic orderings</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Each operation on the [`ArcSwapAny`] with [`DefaultStrategy`] type callable concurrently (eg.</span>
+<span class="doccomment">//! [`load`], but not [`into_inner`]) contains at least one [`SeqCst`] atomic read-write operation,</span>
+<span class="doccomment">//! therefore even operations on different instances have a defined global order of operations.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Features</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The `weak` feature adds the ability to use arc-swap with the [`Weak`] pointer too,</span>
+<span class="doccomment">//! through the [`ArcSwapWeak`] type. The needed std support is stabilized in rust version 1.45 (as</span>
+<span class="doccomment">//! of now in beta).</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The `experimental-strategies` enables few more strategies that can be used. Note that these</span>
+<span class="doccomment">//! **are not** part of the API stability guarantees and they may be changed, renamed or removed at</span>
+<span class="doccomment">//! any time.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Minimal compiler version</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The `1` versions will compile on all compilers supporting the 2018 edition. Note that this</span>
+<span class="doccomment">//! applies only if no additional feature flags are enabled and does not apply to compiling or</span>
+<span class="doccomment">//! running tests.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! [`ArcSwapAny`]: crate::ArcSwapAny</span>
+<span class="doccomment">//! [`ArcSwapWeak`]: crate::ArcSwapWeak</span>
+<span class="doccomment">//! [`load`]: crate::ArcSwapAny::load</span>
+<span class="doccomment">//! [`into_inner`]: crate::ArcSwapAny::into_inner</span>
+<span class="doccomment">//! [`DefaultStrategy`]: crate::DefaultStrategy</span>
+<span class="doccomment">//! [`SeqCst`]: std::sync::atomic::Ordering::SeqCst</span>
+<span class="doccomment">//! [`Weak`]: std::sync::Weak</span>
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">internal</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">limitations</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">patterns</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">performance</span>;
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="arc_swap" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

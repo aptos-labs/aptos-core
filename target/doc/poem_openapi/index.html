@@ -1,0 +1,140 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="OpenAPI support for Poem."><meta name="keywords" content="rust, rustlang, rust-lang, poem_openapi"><title>poem_openapi - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/poem-web/poem/master/favicon.ico"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate poem_openapi</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 2.0.10</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#macros">Macros</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#attributes">Attribute Macros</a></li><li><a href="#derives">Derive Macros</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../poem_openapi/index.html">
+                        <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">poem_openapi</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/poem_openapi/lib.rs.html#1-180">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>OpenAPI support for Poem.</p>
+<p><code>Poem-openapi</code> allows you to easily implement APIs that comply with the
+<code>OpenAPIv3</code> specification. It uses procedural macros to generate a lots of
+boilerplate code, so that you only need to focus on the more
+important business implementations.</p>
+<h2 id="table-of-contents"><a href="#table-of-contents">Table of contents</a></h2>
+<ul>
+<li><a href="#features">Features</a></li>
+<li><a href="#quickstart">Quickstart</a></li>
+<li><a href="#crate-features">Crate features</a></li>
+</ul>
+<h3 id="features"><a href="#features">Features</a></h3>
+<ul>
+<li><strong>Type safety</strong> If your codes can be compiled, then it is fully compliant
+with the <code>OpenAPI v3</code> specification.</li>
+<li><strong>Rustfmt friendly</strong> Do not create any DSL that does not conform to Rust’s
+syntax specifications.</li>
+<li><strong>IDE friendly</strong> Any code generated by the procedural macro will not be
+used directly.</li>
+<li><strong>Minimal overhead</strong> All generated code is necessary, and there is almost
+no overhead.</li>
+</ul>
+<h3 id="quickstart"><a href="#quickstart">Quickstart</a></h3>
+<p>Cargo.toml</p>
+<div class="example-wrap"><pre class="language-toml"><code>[package]
+name = &quot;helloworld&quot;
+version = &quot;0.1.0&quot;
+edition = &quot;2021&quot;
+
+[dependencies]
+poem = &quot;1.2&quot;
+poem-openapi = { version = &quot;1.2&quot;, features = [&quot;swagger-ui&quot;] }
+tokio = { version = &quot;1&quot;, features = [&quot;macros&quot;, &quot;rt-multi-thread&quot;] }</code></pre></div>
+<p>main.rs</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore"><code><span class="kw">use</span> <span class="ident">poem</span>::{<span class="ident">listener::TcpListener</span>, <span class="ident">Route</span>, <span class="ident">Server</span>};
+<span class="kw">use</span> <span class="ident">poem_openapi</span>::{<span class="ident">payload::PlainText</span>, <span class="ident">OpenApi</span>, <span class="ident">OpenApiService</span>};
+
+<span class="kw">struct</span> <span class="ident">Api</span>;
+
+<span class="attribute">#[<span class="ident">OpenApi</span>]</span>
+<span class="kw">impl</span> <span class="ident">Api</span> {
+    <span class="doccomment">/// Hello world</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">path</span> <span class="op">=</span> <span class="string">&quot;/&quot;</span>, <span class="ident">method</span> <span class="op">=</span> <span class="string">&quot;get&quot;</span>)]</span>
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">PlainText</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+        <span class="ident">PlainText</span>(<span class="string">&quot;Hello World&quot;</span>)
+    }
+}
+
+<span class="kw">let</span> <span class="ident">api_service</span> <span class="op">=</span>
+    <span class="ident">OpenApiService::new</span>(<span class="ident">Api</span>, <span class="string">&quot;Hello World&quot;</span>, <span class="string">&quot;1.0&quot;</span>).<span class="ident">server</span>(<span class="string">&quot;http://localhost:3000&quot;</span>);
+<span class="kw">let</span> <span class="ident">ui</span> <span class="op">=</span> <span class="ident">api_service</span>.<span class="ident">swagger_ui</span>();
+<span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">Route::new</span>().<span class="ident">nest</span>(<span class="string">&quot;/&quot;</span>, <span class="ident">api_service</span>).<span class="ident">nest</span>(<span class="string">&quot;/docs&quot;</span>, <span class="ident">ui</span>);
+
+<span class="ident">Server::new</span>(<span class="ident">TcpListener::bind</span>(<span class="string">&quot;127.0.0.1:3000&quot;</span>))
+    .<span class="ident">run</span>(<span class="ident">app</span>)
+    .<span class="kw">await</span>;</code></pre></div>
+<h3 id="check-it"><a href="#check-it">Check it</a></h3>
+<p>Open your browser at <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>.</p>
+<p>You will see the plaintext response as:</p>
+<div class="example-wrap"><pre class="language-text"><code>Hello World</code></pre></div><h3 id="interactive-api-docs"><a href="#interactive-api-docs">Interactive API docs</a></h3>
+<p>Now go to <a href="http://127.0.0.1:3000/docs">http://127.0.0.1:3000/docs</a>.</p>
+<p>You will see the automatic interactive API documentation (provided by
+<a href="https://github.com/swagger-api/swagger-ui">Swagger UI</a>):</p>
+<p><img src="https://raw.githubusercontent.com/poem-web/poem/master/poem-openapi/assets/swagger-ui.jpg" alt="swagger-ui" /></p>
+<h3 id="crate-features"><a href="#crate-features">Crate features</a></h3>
+<p>To avoid compiling unused dependencies, Poem gates certain features, some of
+which are disabled by default:</p>
+<div><table><thead><tr><th>Feature</th><th>Description</th></tr></thead><tbody>
+<tr><td>chrono</td><td>Integrate with the <a href="https://crates.io/crates/chrono"><code>chrono</code> crate</a></td></tr>
+<tr><td>time</td><td>Integrate with the <a href="https://crates.io/crates/time"><code>time</code> crate</a>.</td></tr>
+<tr><td>humantime</td><td>Integrate with the <a href="https://crates.io/crates/humantime"><code>humantime</code> crate</a></td></tr>
+<tr><td>swagger-ui</td><td>Add swagger UI support</td></tr>
+<tr><td>rapidoc</td><td>Add RapiDoc UI support</td></tr>
+<tr><td>redoc</td><td>Add Redoc UI support</td></tr>
+<tr><td>email</td><td>Support for email address string</td></tr>
+<tr><td>hostname</td><td>Support for hostname string</td></tr>
+<tr><td>uuid</td><td>Integrate with the <a href="https://crates.io/crates/uuid"><code>uuid</code> crate</a></td></tr>
+<tr><td>url</td><td>Integrate with the <a href="https://crates.io/crates/url"><code>url</code> crate</a></td></tr>
+<tr><td>bson</td><td>Integrate with the <a href="https://crates.io/crates/bson"><code>bson</code> crate</a></td></tr>
+<tr><td>rust_decimal</td><td>Integrate with the <a href="https://crates.io/crates/rust_decimal"><code>rust_decimal</code> crate</a></td></tr>
+<tr><td>static-files</td><td>Support for static file response</td></tr>
+</tbody></table>
+</div></div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="auth/index.html" title="poem_openapi::auth mod">auth</a></div><div class="item-right docblock-short"><p>Some certificate types for security scheme.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="error/index.html" title="poem_openapi::error mod">error</a></div><div class="item-right docblock-short"><p>Some common error types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="macros/index.html" title="poem_openapi::macros mod">macros</a></div><div class="item-right docblock-short"><p>Macros to help with building custom payload types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="param/index.html" title="poem_openapi::param mod">param</a></div><div class="item-right docblock-short"><p>Parameter types for the API operation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="payload/index.html" title="poem_openapi::payload mod">payload</a></div><div class="item-right docblock-short"><p>Commonly used payload types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="response/index.html" title="poem_openapi::response mod">response</a></div><div class="item-right docblock-short"><p>Commonly used response types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="types/index.html" title="poem_openapi::types mod">types</a></div><div class="item-right docblock-short"><p>Commonly used data types.</p>
+</div></div></div><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.impl_apirequest_for_payload.html" title="poem_openapi::impl_apirequest_for_payload macro">impl_apirequest_for_payload</a></div><div class="item-right docblock-short"><p>This macro implements ApiExtractor for your type, with additional bounds
+if you want to.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ContactObject.html" title="poem_openapi::ContactObject struct">ContactObject</a></div><div class="item-right docblock-short"><p>A contact information for the exposed API.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ExternalDocumentObject.html" title="poem_openapi::ExternalDocumentObject struct">ExternalDocumentObject</a></div><div class="item-right docblock-short"><p>An object representing a external document.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ExtraHeader.html" title="poem_openapi::ExtraHeader struct">ExtraHeader</a></div><div class="item-right docblock-short"><p>An extra header</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ExtractParamOptions.html" title="poem_openapi::ExtractParamOptions struct">ExtractParamOptions</a></div><div class="item-right docblock-short"><p>Options for the parameter extractor.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.LicenseObject.html" title="poem_openapi::LicenseObject struct">LicenseObject</a></div><div class="item-right docblock-short"><p>A license information for the exposed API.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.OpenApiService.html" title="poem_openapi::OpenApiService struct">OpenApiService</a></div><div class="item-right docblock-short"><p>An OpenAPI service for Poem.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.OperationId.html" title="poem_openapi::OperationId struct">OperationId</a></div><div class="item-right docblock-short"><p>A operation id that can be obtained from the response</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ServerObject.html" title="poem_openapi::ServerObject struct">ServerObject</a></div><div class="item-right docblock-short"><p>An object representing a Server.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.ApiExtractorType.html" title="poem_openapi::ApiExtractorType enum">ApiExtractorType</a></div><div class="item-right docblock-short"><p>API extractor types.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.ApiExtractor.html" title="poem_openapi::ApiExtractor trait">ApiExtractor</a></div><div class="item-right docblock-short"><p>Represents a OpenAPI extractor.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.ApiResponse.html" title="poem_openapi::ApiResponse trait">ApiResponse</a></div><div class="item-right docblock-short"><p>Represents a OpenAPI responses object.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.OAuthScopes.html" title="poem_openapi::OAuthScopes trait">OAuthScopes</a></div><div class="item-right docblock-short"><p>Represents a OAuth scopes.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.OpenApi.html" title="poem_openapi::OpenApi trait">OpenApi</a></div><div class="item-right docblock-short"><p>Represents a OpenAPI object.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.ResponseContent.html" title="poem_openapi::ResponseContent trait">ResponseContent</a></div><div class="item-right docblock-short"><p>Represents a OpenAPI response content object.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Tags.html" title="poem_openapi::Tags trait">Tags</a></div><div class="item-right docblock-short"><p>Represents a OpenAPI tags.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Validator.html" title="poem_openapi::Validator trait">Validator</a></div><div class="item-right docblock-short"><p>Represents a validator for validate the input value.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Webhook.html" title="poem_openapi::Webhook trait">Webhook</a></div><div class="item-right docblock-short"><p>Represents a webhook object.</p>
+</div></div></div><h2 id="attributes" class="small-section-header"><a href="#attributes">Attribute Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="attr" href="attr.OpenApi.html" title="poem_openapi::OpenApi attr">OpenApi</a></div><div class="item-right docblock-short"><p>Define a OpenAPI.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="attr" href="attr.Webhook.html" title="poem_openapi::Webhook attr">Webhook</a></div><div class="item-right docblock-short"><p>Define a OpenApi webhooks.</p>
+</div></div></div><h2 id="derives" class="small-section-header"><a href="#derives">Derive Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.ApiRequest.html" title="poem_openapi::ApiRequest derive">ApiRequest</a></div><div class="item-right docblock-short"><p>Define a OpenAPI request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.ApiResponse.html" title="poem_openapi::ApiResponse derive">ApiResponse</a></div><div class="item-right docblock-short"><p>Define a OpenAPI response.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.Enum.html" title="poem_openapi::Enum derive">Enum</a></div><div class="item-right docblock-short"><p>Define a OpenAPI enum</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.Multipart.html" title="poem_openapi::Multipart derive">Multipart</a></div><div class="item-right docblock-short"><p>Define a OpenAPI payload.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.NewType.html" title="poem_openapi::NewType derive">NewType</a></div><div class="item-right docblock-short"><p>Define a new type.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.OAuthScopes.html" title="poem_openapi::OAuthScopes derive">OAuthScopes</a></div><div class="item-right docblock-short"><p>Define a OAuth scopes.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.Object.html" title="poem_openapi::Object derive">Object</a></div><div class="item-right docblock-short"><p>Define a OpenAPI object</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.ResponseContent.html" title="poem_openapi::ResponseContent derive">ResponseContent</a></div><div class="item-right docblock-short"><p>Define a OpenAPI response content.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.SecurityScheme.html" title="poem_openapi::SecurityScheme derive">SecurityScheme</a></div><div class="item-right docblock-short"><p>Define a OpenAPI Security Scheme.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.Tags.html" title="poem_openapi::Tags derive">Tags</a></div><div class="item-right docblock-short"><p>Define a OpenAPI Tags.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.Union.html" title="poem_openapi::Union derive">Union</a></div><div class="item-right docblock-short"><p>Define a OpenAPI discriminator object.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="poem_openapi" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

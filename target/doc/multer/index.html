@@ -1,0 +1,108 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="An async parser for `multipart/form-data` content-type in Rust."><meta name="keywords" content="rust, rustlang, rust-lang, multer"><title>multer - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../multer/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../multer/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate multer</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 2.0.3</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../multer/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">multer</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/multer/lib.rs.html#1-192">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>An async parser for <code>multipart/form-data</code> content-type in Rust.</p>
+<p>It accepts a <a href="../futures_core/stream/trait.Stream.html"><code>Stream</code></a> of
+<a href="../bytes/bytes/struct.Bytes.html"><code>Bytes</code></a>, or with the <code>tokio-io</code> feature enabled, an
+<code>AsyncRead</code> reader as a source, so that it can be plugged into any async
+Rust environment e.g. any async server.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::convert::Infallible</span>;
+
+<span class="kw">use</span> <span class="ident">bytes::Bytes</span>;
+<span class="comment">// Import multer types.</span>
+<span class="kw">use</span> <span class="ident">futures_util::stream::once</span>;
+<span class="kw">use</span> <span class="ident">futures_util::stream::Stream</span>;
+<span class="kw">use</span> <span class="ident">multer::Multipart</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="comment">// Generate a byte stream and the boundary from somewhere e.g. server request body.</span>
+    <span class="kw">let</span> (<span class="ident">stream</span>, <span class="ident">boundary</span>) <span class="op">=</span> <span class="ident">get_byte_stream_from_somewhere</span>().<span class="kw">await</span>;
+
+    <span class="comment">// Create a `Multipart` instance from that byte stream and the boundary.</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">multipart</span> <span class="op">=</span> <span class="ident">Multipart::new</span>(<span class="ident">stream</span>, <span class="ident">boundary</span>);
+
+    <span class="comment">// Iterate over the fields, use `next_field()` to get the next field.</span>
+    <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">field</span>) <span class="op">=</span> <span class="ident">multipart</span>.<span class="ident">next_field</span>().<span class="kw">await</span><span class="question-mark">?</span> {
+        <span class="comment">// Get field name.</span>
+        <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">field</span>.<span class="ident">name</span>();
+        <span class="comment">// Get the field&#39;s filename if provided in &quot;Content-Disposition&quot; header.</span>
+        <span class="kw">let</span> <span class="ident">file_name</span> <span class="op">=</span> <span class="ident">field</span>.<span class="ident">file_name</span>();
+
+        <span class="macro">println!</span>(<span class="string">&quot;Name: {:?}, File Name: {:?}&quot;</span>, <span class="ident">name</span>, <span class="ident">file_name</span>);
+
+        <span class="comment">// Process the field data chunks e.g. store them in a file.</span>
+        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">field</span>.<span class="ident">chunk</span>().<span class="kw">await</span><span class="question-mark">?</span> {
+            <span class="comment">// Do something with field chunk.</span>
+            <span class="macro">println!</span>(<span class="string">&quot;Chunk: {:?}&quot;</span>, <span class="ident">chunk</span>);
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}
+
+<span class="comment">// Generate a byte stream and the boundary from somewhere e.g. server request body.</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_byte_stream_from_somewhere</span>(
+) -&gt; (<span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bytes</span>, <span class="ident">Infallible</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>) {
+    <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="string">&quot;--X-BOUNDARY\r\nContent-Disposition: form-data; \
+        name=\&quot;my_text_field\&quot;\r\n\r\nabcd\r\n--X-BOUNDARY--\r\n&quot;</span>;
+
+    <span class="kw">let</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">once</span>(<span class="kw">async</span> <span class="kw">move</span> { <span class="prelude-ty">Result</span>::<span class="op">&lt;</span><span class="ident">Bytes</span>, <span class="ident">Infallible</span><span class="op">&gt;</span><span class="ident">::Ok</span>(<span class="ident">Bytes::from</span>(<span class="ident">data</span>)) });
+    (<span class="ident">stream</span>, <span class="string">&quot;X-BOUNDARY&quot;</span>)
+}</code></pre></div>
+<h3 id="prevent-denial-of-service-dos-attack"><a href="#prevent-denial-of-service-dos-attack">Prevent Denial of Service (DoS) Attack</a></h3>
+<p>This crate also provides some APIs to prevent potential DoS attacks with
+fine grained control. It’s recommended to add some constraints
+on field (specially text field) size to avoid potential DoS attacks from
+attackers running the server out of memory.</p>
+<p>An example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">multer</span>::{<span class="ident">Constraints</span>, <span class="ident">Multipart</span>, <span class="ident">SizeLimit</span>};
+
+<span class="comment">// Create some constraints to be applied to the fields to prevent DoS attack.</span>
+<span class="kw">let</span> <span class="ident">constraints</span> <span class="op">=</span> <span class="ident">Constraints::new</span>()
+    <span class="comment">// We only accept `my_text_field` and `my_file_field` fields,</span>
+    <span class="comment">// For any unknown field, we will throw an error.</span>
+    .<span class="ident">allowed_fields</span>(<span class="macro">vec!</span>[<span class="string">&quot;my_text_field&quot;</span>, <span class="string">&quot;my_file_field&quot;</span>])
+    .<span class="ident">size_limit</span>(
+        <span class="ident">SizeLimit::new</span>()
+            <span class="comment">// Set 15mb as size limit for the whole stream body.</span>
+            .<span class="ident">whole_stream</span>(<span class="number">15</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>)
+            <span class="comment">// Set 10mb as size limit for all fields.</span>
+            .<span class="ident">per_field</span>(<span class="number">10</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>)
+            <span class="comment">// Set 30kb as size limit for our text field only.</span>
+            .<span class="ident">for_field</span>(<span class="string">&quot;my_text_field&quot;</span>, <span class="number">30</span> <span class="op">*</span> <span class="number">1024</span>),
+    );
+
+<span class="comment">// Create a `Multipart` instance from a stream and the constraints.</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">multipart</span> <span class="op">=</span> <span class="ident">Multipart::with_constraints</span>(<span class="ident">some_stream</span>, <span class="string">&quot;X-BOUNDARY&quot;</span>, <span class="ident">constraints</span>);
+
+<span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">field</span>) <span class="op">=</span> <span class="ident">multipart</span>.<span class="ident">next_field</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>() {
+    <span class="kw">let</span> <span class="ident">content</span> <span class="op">=</span> <span class="ident">field</span>.<span class="ident">text</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>();
+    <span class="macro">assert_eq!</span>(<span class="ident">content</span>, <span class="string">&quot;abcd&quot;</span>);
+}</code></pre></div>
+<p>Please refer <a href="struct.Constraints.html" title="Constraints"><code>Constraints</code></a> for more info.</p>
+<h3 id="usage-with-hyperrs-server"><a href="#usage-with-hyperrs-server">Usage with hyper.rs server</a></h3>
+<p>An <a href="https://github.com/rousan/multer-rs/blob/master/examples/hyper_server_example.rs">example</a> showing usage with <a href="https://hyper.rs/">hyper.rs</a>.</p>
+<p>For more examples, please visit <a href="https://github.com/rousan/multer-rs/tree/master/examples">examples</a>.</p>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.bytes"><code>pub use <a class="mod" href="../bytes/index.html" title="mod bytes">bytes</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Constraints.html" title="multer::Constraints struct">Constraints</a></div><div class="item-right docblock-short"><p>Represents some rules to be applied on the stream and field’s content size
+to prevent DoS attacks.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Field.html" title="multer::Field struct">Field</a></div><div class="item-right docblock-short"><p>A single field in a multipart stream.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Multipart.html" title="multer::Multipart struct">Multipart</a></div><div class="item-right docblock-short"><p>Represents the implementation of <code>multipart/form-data</code> formatted data.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SizeLimit.html" title="multer::SizeLimit struct">SizeLimit</a></div><div class="item-right docblock-short"><p>Represents size limit of the stream to prevent DoS attacks.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Error.html" title="multer::Error enum">Error</a></div><div class="item-right docblock-short"><p>A set of errors that can occur during parsing multipart stream and in other
+operations.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.parse_boundary.html" title="multer::parse_boundary fn">parse_boundary</a></div><div class="item-right docblock-short"><p>Parses the <code>Content-Type</code> header to extract the boundary value.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Result.html" title="multer::Result type">Result</a></div><div class="item-right docblock-short"><p>A Result type often returned from methods that can have <code>multer</code> errors.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="multer" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

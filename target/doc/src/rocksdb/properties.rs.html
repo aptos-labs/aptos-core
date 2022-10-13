@@ -1,0 +1,511 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/git/checkouts/rust-rocksdb-2ae4cc7905b00c73/3698ab2/src/properties.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>properties.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../rocksdb/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../rocksdb/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../rocksdb/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Properties</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Full list of valid properties and descriptions pulled from</span>
+<span class="doccomment">//! [here](https:///github.com/facebook/rocksdb/blob/08809f5e6cd9cc4bc3958dd4d59457ae78c76660/include/rocksdb/db.h#L428-L634).</span>
+
+<span class="kw">use</span> <span class="ident">std::ffi</span>::{<span class="ident">CStr</span>, <span class="ident">CString</span>};
+
+<span class="macro">macro_rules!</span> <span class="ident">property</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">suffix</span>: <span class="ident">literal</span>) =&gt; {
+        <span class="comment">// SAFETY: We’re appending terminating NUL byte and this macro is always</span>
+        <span class="comment">// called with values without interior NUL bytes.</span>
+        <span class="kw">unsafe</span> {
+            <span class="ident">CStr::from_bytes_with_nul_unchecked</span>(<span class="macro">concat!</span>(<span class="string">&quot;rocksdb.&quot;</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">suffix</span>, <span class="string">&quot;\0&quot;</span>).<span class="ident">as_bytes</span>())
+        }
+    };
+}
+
+<span class="doccomment">/// &quot;rocksdb.num-files-at-level&lt;N&gt;&quot; - returns string containing the number</span>
+<span class="doccomment">/// of files at level &lt;N&gt;, where &lt;N&gt; is an ASCII representation of a</span>
+<span class="doccomment">/// level number (e.g., &quot;0&quot;).</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_files_at_level</span>(<span class="ident">level</span>: <span class="ident">usize</span>) -&gt; <span class="ident">CString</span> {
+    <span class="kw">unsafe</span> { <span class="ident">level_property</span>(<span class="string">&quot;num-files-at-level&quot;</span>, <span class="ident">level</span>) }
+}
+
+<span class="doccomment">/// &quot;rocksdb.compression-ratio-at-level&lt;N&gt;&quot; - returns string containing the</span>
+<span class="doccomment">/// compression ratio of data at level &lt;N&gt;, where &lt;N&gt; is an ASCII</span>
+<span class="doccomment">/// representation of a level number (e.g., &quot;0&quot;). Here, compression</span>
+<span class="doccomment">/// ratio is defined as uncompressed data size / compressed file size.</span>
+<span class="doccomment">/// Returns &quot;-1.0&quot; if no open files at level &lt;N&gt;.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compression_ratio_at_level</span>(<span class="ident">level</span>: <span class="ident">usize</span>) -&gt; <span class="ident">CString</span> {
+    <span class="kw">unsafe</span> { <span class="ident">level_property</span>(<span class="string">&quot;compression-ratio-at-level&quot;</span>, <span class="ident">level</span>) }
+}
+
+<span class="doccomment">/// &quot;rocksdb.stats&quot; - returns a multi-line string containing the data</span>
+<span class="doccomment">/// described by kCFStats followed by the data described by kDBStats.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">STATS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;stats&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.sstables&quot; - returns a multi-line string summarizing current</span>
+<span class="doccomment">/// SST files.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SSTABLES</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;sstables&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.cfstats&quot; - Both of &quot;rocksdb.cfstats-no-file-histogram&quot; and</span>
+<span class="doccomment">/// &quot;rocksdb.cf-file-histogram&quot; together. See below for description</span>
+<span class="doccomment">/// of the two.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CFSTATS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;CFSTATS&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.cfstats-no-file-histogram&quot; - returns a multi-line string with</span>
+<span class="doccomment">/// general columm family stats per-level over db&#39;s lifetime (&quot;L&lt;n&gt;&quot;),</span>
+<span class="doccomment">/// aggregated over db&#39;s lifetime (&quot;Sum&quot;), and aggregated over the</span>
+<span class="doccomment">/// interval since the last retrieval (&quot;Int&quot;).</span>
+<span class="doccomment">/// It could also be used to return the stats in the format of the map.</span>
+<span class="doccomment">/// In this case there will a pair of string to array of double for</span>
+<span class="doccomment">/// each level as well as for &quot;Sum&quot;. &quot;Int&quot; stats will not be affected</span>
+<span class="doccomment">/// when this form of stats are retrieved.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CFSTATS_NO_FILE_HISTOGRAM</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;cfstats-no-file-histogram&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.cf-file-histogram&quot; - print out how many file reads to every</span>
+<span class="doccomment">/// level, as well as the histogram of latency of single requests.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CF_FILE_HISTOGRAM</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;cf-file-histogram&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.dbstats&quot; - returns a multi-line string with general database</span>
+<span class="doccomment">/// stats, both cumulative (over the db&#39;s lifetime) and interval (since</span>
+<span class="doccomment">/// the last retrieval of kDBStats).</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DBSTATS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;dbstats&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.levelstats&quot; - returns multi-line string containing the number</span>
+<span class="doccomment">/// of files per level and total size of each level (MB).</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LEVELSTATS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;levelstats&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-immutable-mem-table&quot; - returns number of immutable</span>
+<span class="doccomment">/// memtables that have not yet been flushed.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_IMMUTABLE_MEM_TABLE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-immutable-mem-table&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-immutable-mem-table-flushed&quot; - returns number of immutable</span>
+<span class="doccomment">/// memtables that have already been flushed.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_IMMUTABLE_MEM_TABLE_FLUSHED</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-immutable-mem-table-flushed&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.mem-table-flush-pending&quot; - returns 1 if a memtable flush is</span>
+<span class="doccomment">/// pending; otherwise, returns 0.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MEM_TABLE_FLUSH_PENDING</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;mem-table-flush-pending&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-running-flushes&quot; - returns the number of currently running</span>
+<span class="doccomment">/// flushes.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_RUNNING_FLUSHES</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-running-flushes&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.compaction-pending&quot; - returns 1 if at least one compaction is</span>
+<span class="doccomment">/// pending; otherwise, returns 0.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">COMPACTION_PENDING</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;compaction-pending&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-running-compactions&quot; - returns the number of currently</span>
+<span class="doccomment">/// running compactions.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_RUNNING_COMPACTIONS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-running-compactions&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.background-errors&quot; - returns accumulated number of background</span>
+<span class="doccomment">/// errors.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BACKGROUND_ERRORS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;background-errors&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.cur-size-active-mem-table&quot; - returns approximate size of active</span>
+<span class="doccomment">/// memtable (bytes).</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CUR_SIZE_ACTIVE_MEM_TABLE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;cur-size-active-mem-table&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.cur-size-all-mem-tables&quot; - returns approximate size of active</span>
+<span class="doccomment">/// and unflushed immutable memtables (bytes).</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CUR_SIZE_ALL_MEM_TABLES</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;cur-size-all-mem-tables&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.size-all-mem-tables&quot; - returns approximate size of active,</span>
+<span class="doccomment">/// unflushed immutable, and pinned immutable memtables (bytes).</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SIZE_ALL_MEM_TABLES</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;size-all-mem-tables&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-entries-active-mem-table&quot; - returns total number of entries</span>
+<span class="doccomment">/// in the active memtable.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_ENTRIES_ACTIVE_MEM_TABLE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-entries-active-mem-table&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-entries-imm-mem-tables&quot; - returns total number of entries</span>
+<span class="doccomment">/// in the unflushed immutable memtables.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_ENTRIES_IMM_MEM_TABLES</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-entries-imm-mem-tables&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-deletes-active-mem-table&quot; - returns total number of delete</span>
+<span class="doccomment">/// entries in the active memtable.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_DELETES_ACTIVE_MEM_TABLE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-deletes-active-mem-table&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-deletes-imm-mem-tables&quot; - returns total number of delete</span>
+<span class="doccomment">/// entries in the unflushed immutable memtables.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_DELETES_IMM_MEM_TABLES</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-deletes-imm-mem-tables&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.estimate-num-keys&quot; - returns estimated number of total keys in</span>
+<span class="doccomment">/// the active and unflushed immutable memtables and storage.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESTIMATE_NUM_KEYS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;estimate-num-keys&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.estimate-table-readers-mem&quot; - returns estimated memory used for</span>
+<span class="doccomment">/// reading SST tables, excluding memory used in block cache (e.g.,</span>
+<span class="doccomment">/// filter and index blocks).</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESTIMATE_TABLE_READERS_MEM</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;estimate-table-readers-mem&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.is-file-deletions-enabled&quot; - returns 0 if deletion of obsolete</span>
+<span class="doccomment">/// files is enabled; otherwise, returns a non-zero number.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IS_FILE_DELETIONS_ENABLED</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;is-file-deletions-enabled&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-snapshots&quot; - returns number of unreleased snapshots of the</span>
+<span class="doccomment">/// database.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_SNAPSHOTS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-snapshots&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.oldest-snapshot-time&quot; - returns number representing unix</span>
+<span class="doccomment">/// timestamp of oldest unreleased snapshot.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">OLDEST_SNAPSHOT_TIME</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;oldest-snapshot-time&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.num-live-versions&quot; - returns number of live versions. `Version`</span>
+<span class="doccomment">/// is an internal data structure. See version_set.h for details. More</span>
+<span class="doccomment">/// live versions often mean more SST files are held from being deleted,</span>
+<span class="doccomment">/// by iterators or unfinished compactions.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NUM_LIVE_VERSIONS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;num-live-versions&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.current-super-version-number&quot; - returns number of current LSM</span>
+<span class="doccomment">/// version. It is a uint64_t integer number, incremented after there is</span>
+<span class="doccomment">/// any change to the LSM tree. The number is not preserved after restarting</span>
+<span class="doccomment">/// the DB. After DB restart, it will start from 0 again.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CURRENT_SUPER_VERSION_NUMBER</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;current-super-version-number&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.estimate-live-data-size&quot; - returns an estimate of the amount of</span>
+<span class="doccomment">/// live data in bytes.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESTIMATE_LIVE_DATA_SIZE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;estimate-live-data-size&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.min-log-number-to-keep&quot; - return the minimum log number of the</span>
+<span class="doccomment">/// log files that should be kept.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MIN_LOG_NUMBER_TO_KEEP</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;min-log-number-to-keep&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.min-obsolete-sst-number-to-keep&quot; - return the minimum file</span>
+<span class="doccomment">/// number for an obsolete SST to be kept. The max value of `uint64_t`</span>
+<span class="doccomment">/// will be returned if all obsolete files can be deleted.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MIN_OBSOLETE_SST_NUMBER_TO_KEEP</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;min-obsolete-sst-number-to-keep&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.total-sst-files-size&quot; - returns total size (bytes) of all SST</span>
+<span class="doccomment">/// files.</span>
+<span class="doccomment">/// WARNING: may slow down online queries if there are too many files.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TOTAL_SST_FILES_SIZE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;total-sst-files-size&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.live-sst-files-size&quot; - returns total size (bytes) of all SST</span>
+<span class="doccomment">/// files belong to the latest LSM tree.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LIVE_SST_FILES_SIZE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;live-sst-files-size&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.base-level&quot; - returns number of level to which L0 data will be</span>
+<span class="doccomment">/// compacted.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BASE_LEVEL</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;base-level&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.estimate-pending-compaction-bytes&quot; - returns estimated total</span>
+<span class="doccomment">/// number of bytes compaction needs to rewrite to get all levels down</span>
+<span class="doccomment">/// to under target size. Not valid for other compactions than level-</span>
+<span class="doccomment">/// based.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESTIMATE_PENDING_COMPACTION_BYTES</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;estimate-pending-compaction-bytes&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.aggregated-table-properties&quot; - returns a string representation</span>
+<span class="doccomment">/// of the aggregated table properties of the target column family.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AGGREGATED_TABLE_PROPERTIES</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;aggregated-table-properties&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.aggregated-table-properties-at-level&lt;N&gt;&quot;, same as the previous</span>
+<span class="doccomment">/// one but only returns the aggregated table properties of the</span>
+<span class="doccomment">/// specified level &quot;N&quot; at the target column family.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">aggregated_table_properties_at_level</span>(<span class="ident">level</span>: <span class="ident">usize</span>) -&gt; <span class="ident">CString</span> {
+    <span class="kw">unsafe</span> { <span class="ident">level_property</span>(<span class="string">&quot;aggregated-table-properties-at-level&quot;</span>, <span class="ident">level</span>) }
+}
+
+<span class="doccomment">/// &quot;rocksdb.actual-delayed-write-rate&quot; - returns the current actual delayed</span>
+<span class="doccomment">/// write rate. 0 means no delay.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ACTUAL_DELAYED_WRITE_RATE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;actual-delayed-write-rate&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.is-write-stopped&quot; - Return 1 if write has been stopped.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IS_WRITE_STOPPED</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;is-write-stopped&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.estimate-oldest-key-time&quot; - returns an estimation of</span>
+<span class="doccomment">/// oldest key timestamp in the DB. Currently only available for</span>
+<span class="doccomment">/// FIFO compaction with</span>
+<span class="doccomment">/// compaction_options_fifo.allow_compaction = false.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESTIMATE_OLDEST_KEY_TIME</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;estimate-oldest-key-time&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.block-cache-capacity&quot; - returns block cache capacity.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BLOCK_CACHE_CAPACITY</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;block-cache-capacity&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.block-cache-usage&quot; - returns the memory size for the entries</span>
+<span class="doccomment">/// residing in block cache.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BLOCK_CACHE_USAGE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;block-cache-usage&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.block-cache-pinned-usage&quot; - returns the memory size for the</span>
+<span class="doccomment">/// entries being pinned.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BLOCK_CACHE_PINNED_USAGE</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;block-cache-pinned-usage&quot;</span>);
+
+<span class="doccomment">/// &quot;rocksdb.options-statistics&quot; - returns multi-line string</span>
+<span class="doccomment">/// of options.statistics</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">OPTIONS_STATISTICS</span>: <span class="kw-2">&amp;</span><span class="ident">CStr</span> <span class="op">=</span> <span class="macro">property!</span>(<span class="string">&quot;options-statistics&quot;</span>);
+
+<span class="doccomment">/// Constructs a property name for an ‘at level’ property.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// `name` is the infix of the property name (e.g. `&quot;num-files-at-level&quot;`) and</span>
+<span class="doccomment">/// `level` is level to get statistics of.  The property name is constructed as</span>
+<span class="doccomment">/// `&quot;rocksdb.&lt;name&gt;&lt;level&gt;&quot;`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Expects `name` not to contain any interior NUL bytes.</span>
+<span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">level_property</span>(<span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">level</span>: <span class="ident">usize</span>) -&gt; <span class="ident">CString</span> {
+    <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;rocksdb.{}{}\0&quot;</span>, <span class="ident">name</span>, <span class="ident">level</span>).<span class="ident">into_bytes</span>();
+    <span class="comment">// SAFETY: We’re appending terminating NUL and all our call sites pass</span>
+    <span class="comment">// a string without interior NUL bytes.</span>
+    <span class="ident">CString::from_vec_with_nul_unchecked</span>(<span class="ident">bytes</span>)
+}
+
+<span class="attribute">#[<span class="ident">test</span>]</span>
+<span class="kw">fn</span> <span class="ident">sanity_checks</span>() {
+    <span class="kw">let</span> <span class="ident">want</span> <span class="op">=</span> <span class="ident">CString::new</span>(<span class="string">&quot;rocksdb.cfstats-no-file-histogram&quot;</span>.<span class="ident">to_string</span>()).<span class="ident">unwrap</span>();
+    <span class="macro">assert_eq!</span>(<span class="ident">want</span>.<span class="ident">as_c_str</span>(), <span class="ident">CFSTATS_NO_FILE_HISTOGRAM</span>);
+
+    <span class="kw">let</span> <span class="ident">want</span> <span class="op">=</span> <span class="ident">CString::new</span>(<span class="string">&quot;rocksdb.num-files-at-level5&quot;</span>.<span class="ident">to_string</span>()).<span class="ident">unwrap</span>();
+    <span class="macro">assert_eq!</span>(<span class="ident">want</span>, <span class="ident">num_files_at_level</span>(<span class="number">5</span>));
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="rocksdb" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["Float","Generic trait for floating point numbers"],["FloatConst",""],["FloatCore","Generic trait for floating point numbers that works with `no_std`."]]};

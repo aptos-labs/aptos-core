@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["print_tree","Print the tree `item` to standard output using default formatting"],["print_tree_with","Print the tree `item` to standard output using custom formatting"],["write_tree","Write the tree `item` to writer `f` using default formatting"],["write_tree_with","Write the tree `item` to writer `f` using custom formatting"]]};

@@ -1,0 +1,91 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Wrap abstract fragments into lines with an optimal-fit algorithm."><meta name="keywords" content="rust, rustlang, rust-lang, wrap_optimal_fit"><title>wrap_optimal_fit in textwrap::wrap_algorithms - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../textwrap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../textwrap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In textwrap::wrap_algorithms</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../textwrap/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Function <a href="../index.html">textwrap</a>::<wbr><a href="index.html">wrap_algorithms</a>::<wbr><a class="fn" href="#">wrap_optimal_fit</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/textwrap/wrap_algorithms/optimal_fit.rs.html#302-389">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust fn"><code>pub fn wrap_optimal_fit&lt;'a, 'b, T:&nbsp;<a class="trait" href="../core/trait.Fragment.html" title="trait textwrap::core::Fragment">Fragment</a>&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;fragments: &amp;'a <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.slice.html">[T]</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;line_widths: &amp;'b [<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.f64.html">f64</a>], <br>&nbsp;&nbsp;&nbsp;&nbsp;penalties: &amp;'b <a class="struct" href="struct.Penalties.html" title="struct textwrap::wrap_algorithms::Penalties">Penalties</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;&amp;'a <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.slice.html">[T]</a>&gt;, <a class="struct" href="struct.OverflowError.html" title="struct textwrap::wrap_algorithms::OverflowError">OverflowError</a>&gt;</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Wrap abstract fragments into lines with an optimal-fit algorithm.</p>
+<p>The <code>line_widths</code> slice gives the target line width for each line
+(the last slice element is repeated as necessary). This can be
+used to implement hanging indentation.</p>
+<p>The fragments must already have been split into the desired
+widths, this function will not (and cannot) attempt to split them
+further when arranging them into lines.</p>
+<h2 id="optimal-fit-algorithm"><a href="#optimal-fit-algorithm">Optimal-Fit Algorithm</a></h2>
+<p>The algorithm considers all possible break points and picks the
+breaks which minimizes the gaps at the end of each line. More
+precisely, the algorithm assigns a cost or penalty to each break
+point, determined by <code>cost = gap * gap</code> where <code>gap = target_width - line_width</code>. Shorter lines are thus penalized more heavily since
+they leave behind a larger gap.</p>
+<p>We can illustrate this with the text “To be, or not to be: that is
+the question”. We will be wrapping it in a narrow column with room
+for only 10 characters. The <a href="fn.wrap_first_fit.html">greedy
+algorithm</a> will produce these lines, each
+annotated with the corresponding penalty:</p>
+<div class="example-wrap"><pre class="language-text"><code>&quot;To be, or&quot;   1² =  1
+&quot;not to be:&quot;  0² =  0
+&quot;that is&quot;     3² =  9
+&quot;the&quot;         7² = 49
+&quot;question&quot;    2² =  4</code></pre></div>
+<p>We see that line four with “the” leaves a gap of 7 columns, which
+gives it a penalty of 49. The sum of the penalties is 63.</p>
+<p>There are 10 words, which means that there are <code>2_u32.pow(9)</code> or
+512 different ways to typeset it. We can compute
+the sum of the penalties for each possible line break and search
+for the one with the lowest sum:</p>
+<div class="example-wrap"><pre class="language-text"><code>&quot;To be,&quot;     4² = 16
+&quot;or not to&quot;  1² =  1
+&quot;be: that&quot;   2² =  4
+&quot;is the&quot;     4² = 16
+&quot;question&quot;   2² =  4</code></pre></div>
+<p>The sum of the penalties is 41, which is better than what the
+greedy algorithm produced.</p>
+<p>Searching through all possible combinations would normally be
+prohibitively slow. However, it turns out that the problem can be
+formulated as the task of finding column minima in a cost matrix.
+This matrix has a special form (totally monotone) which lets us
+use a <a href="https://lib.rs/crates/smawk">linear-time algorithm called
+SMAWK</a> to find the optimal break
+points.</p>
+<p>This means that the time complexity remains O(<em>n</em>) where <em>n</em> is
+the number of words. Compared to
+<a href="fn.wrap_first_fit.html"><code>wrap_first_fit</code></a>, this function is about
+4 times slower.</p>
+<p>The optimization of per-line costs over the entire paragraph is
+inspired by the line breaking algorithm used in TeX, as described
+in the 1981 article <a href="http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf"><em>Breaking Paragraphs into
+Lines</em></a>
+by Knuth and Plass. The implementation here is based on <a href="https://github.com/jfinkels/PADS/blob/master/pads/wrap.py">Python
+code by David
+Eppstein</a>.</p>
+<h2 id="errors"><a href="#errors">Errors</a></h2>
+<p>In case of an overflow during the cost computation, an <code>Err</code> is
+returned. Overflows happens when fragments or lines have infinite
+widths (<code>f64::INFINITY</code>) or if the widths are so large that the
+gaps at the end of lines have sizes larger than <code>f64::MAX.sqrt()</code>
+(approximately 1e154):</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">textwrap::core::Fragment</span>;
+<span class="kw">use</span> <span class="ident">textwrap::wrap_algorithms</span>::{<span class="ident">wrap_optimal_fit</span>, <span class="ident">OverflowError</span>, <span class="ident">Penalties</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Word</span>(<span class="ident">f64</span>);
+
+<span class="kw">impl</span> <span class="ident">Fragment</span> <span class="kw">for</span> <span class="ident">Word</span> {
+    <span class="kw">fn</span> <span class="ident">width</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">f64</span> { <span class="self">self</span>.<span class="number">0</span> }
+    <span class="kw">fn</span> <span class="ident">whitespace_width</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">f64</span> { <span class="number">1.0</span> }
+    <span class="kw">fn</span> <span class="ident">penalty_width</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">f64</span> { <span class="number">0.0</span> }
+}
+
+<span class="comment">// Wrapping overflows because 1e155 * 1e155 = 1e310, which is</span>
+<span class="comment">// larger than f64::MAX:</span>
+<span class="macro">assert_eq!</span>(<span class="ident">wrap_optimal_fit</span>(<span class="kw-2">&amp;</span>[<span class="ident">Word</span>(<span class="number">0.0</span>), <span class="ident">Word</span>(<span class="number">0.0</span>)], <span class="kw-2">&amp;</span>[<span class="number">1e155</span>], <span class="kw-2">&amp;</span><span class="ident">Penalties::default</span>()),
+           <span class="prelude-val">Err</span>(<span class="ident">OverflowError</span>));</code></pre></div>
+<p>When using fragment widths and line widths which fit inside an
+<code>u64</code>, overflows cannot happen. This means that fragments derived
+from a <code>&amp;str</code> cannot cause overflows.</p>
+<p><strong>Note:</strong> Only available when the <code>smawk</code> Cargo feature is
+enabled.</p>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="textwrap" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

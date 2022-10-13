@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["counters","The high level parallel execution logic is implemented in ‘executor.rs’. The input of parallel executor is a block of transactions, containing a sequence of n transactions tx_1, tx_2, …, tx_n (this defines the preset serialization order tx_1< tx_2< …<tx_n)."],["errors",""],["executor",""],["output_delta_resolver",""],["task",""]]};

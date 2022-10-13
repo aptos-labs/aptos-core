@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["framework"] = [{"text":"impl <a class=\"trait\" href=\"clap/derive/trait.ValueEnum.html\" title=\"trait clap::derive::ValueEnum\">ValueEnum</a> for <a class=\"enum\" href=\"framework/enum.ReleaseTarget.html\" title=\"enum framework::ReleaseTarget\">ReleaseTarget</a>","synthetic":false,"types":["framework::aptos::ReleaseTarget"]}];
+implementors["move_cli"] = [{"text":"impl <a class=\"trait\" href=\"clap/derive/trait.ValueEnum.html\" title=\"trait clap::derive::ValueEnum\">ValueEnum</a> for <a class=\"enum\" href=\"move_cli/experimental/cli/enum.ConcretizeMode.html\" title=\"enum move_cli::experimental::cli::ConcretizeMode\">ConcretizeMode</a>","synthetic":false,"types":["move_cli::experimental::cli::ConcretizeMode"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

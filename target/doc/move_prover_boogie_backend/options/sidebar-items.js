@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["VectorTheory",""]],"struct":[["BoogieOptions","Boogie options."],["CustomNativeOptions","Options to define custom native functions to include in generated Boogie file."]]};

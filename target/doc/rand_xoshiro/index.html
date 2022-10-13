@@ -1,0 +1,86 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This crate implements the xoshiro family of pseudorandom number generators designed by David Blackman and Sebastiano Vigna. They feature high perfomance and a small state and superseed the previous xorshift-based generators. However, they are no cryptographically secure and their output can be predicted by observing a few samples."><meta name="keywords" content="rust, rustlang, rust-lang, rand_xoshiro"><title>rand_xoshiro - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://www.rust-lang.org/favicon.ico"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../rand_xoshiro/index.html"><div class="logo-container"><img src="https://www.rust-lang.org/logos/rust-logo-128x128-blk.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../rand_xoshiro/index.html"><div class="logo-container">
+                    <img src="https://www.rust-lang.org/logos/rust-logo-128x128-blk.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate rand_xoshiro</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.6.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#structs">Structs</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../rand_xoshiro/index.html">
+                        <img src="https://www.rust-lang.org/logos/rust-logo-128x128-blk.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">rand_xoshiro</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/rand_xoshiro/lib.rs.html#9-114">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This crate implements the <a href="http://xoshiro.di.unimi.it/">xoshiro</a> family of pseudorandom number generators
+designed by David Blackman and Sebastiano Vigna. They feature high
+perfomance and a small state and superseed the previous xorshift-based
+generators. However, they are no cryptographically secure and their output
+can be predicted by observing a few samples.</p>
+<p>The following generators are implemented:</p>
+<h2 id="64-bit-generators"><a href="#64-bit-generators">64-bit generators</a></h2>
+<ul>
+<li><a href="struct.Xoshiro256StarStar.html" title="Xoshiro256StarStar"><code>Xoshiro256StarStar</code></a>: Recommended for all purposes. Excellent speed and
+a state space (256 bits) large enough for any parallel application.</li>
+<li><a href="struct.Xoshiro256PlusPlus.html" title="Xoshiro256PlusPlus"><code>Xoshiro256PlusPlus</code></a>: Recommended for all purposes. Excellent speed and
+a state space (256 bits) large enough for any parallel application.</li>
+<li><a href="struct.Xoshiro256Plus.html" title="Xoshiro256Plus"><code>Xoshiro256Plus</code></a>: Recommended for generating 64-bit floating-point
+numbers. About 15% faster than <code>Xoshiro256StarStar</code>, but has a <a href="http://xoshiro.di.unimi.it/lowcomp.php">low linear
+complexity</a> in the lowest bits (which are discarded when generating
+floats), making it fail linearity tests. This is unlikely to have any
+impact in practise.</li>
+<li><a href="struct.Xoroshiro128StarStar.html" title="Xoroshiro128StarStar"><code>Xoroshiro128StarStar</code></a>: An alternative to <code>Xoshiro256StarStar</code>, having
+the same speed but using half the state. Only suited for low-scale parallel
+applications.</li>
+<li><a href="struct.Xoroshiro128PlusPlus.html" title="Xoroshiro128PlusPlus"><code>Xoroshiro128PlusPlus</code></a>: An alternative to <code>Xoshiro256PlusPlus</code>, having
+the same speed but using half the state. Only suited for low-scale parallel
+applications.</li>
+<li><a href="struct.Xoroshiro128Plus.html" title="Xoroshiro128Plus"><code>Xoroshiro128Plus</code></a>: An alternative to <code>Xoshiro256Plus</code>, having the same
+speed but using half the state. Only suited for low-scale parallel
+applications. Has a <a href="http://xoshiro.di.unimi.it/lowcomp.php">low linear complexity</a> in the lowest bits (which are
+discarded when generating floats), making it fail linearity tests. This is
+unlikely to have any impact in practise.</li>
+<li><a href="struct.Xoshiro512StarStar.html" title="Xoshiro512StarStar"><code>Xoshiro512StarStar</code></a>: An alternative to <code>Xoshiro256StarStar</code> with more
+state and the same speed.</li>
+<li><a href="struct.Xoshiro512PlusPlus.html" title="Xoshiro512PlusPlus"><code>Xoshiro512PlusPlus</code></a>: An alternative to <code>Xoshiro256PlusPlus</code> with more
+state and the same speed.</li>
+<li><a href="struct.Xoshiro512Plus.html" title="Xoshiro512Plus"><code>Xoshiro512Plus</code></a>: An alternative to <code>Xoshiro512Plus</code> with more
+state and the same speed. Has a <a href="http://xoshiro.di.unimi.it/lowcomp.php">low linear complexity</a> in the lowest bits
+(which are discarded when generating floats), making it fail linearity
+tests. This is unlikely to have any impact in practise.</li>
+<li><a href="struct.SplitMix64.html" title="SplitMix64"><code>SplitMix64</code></a>: Recommended for initializing generators of the xoshiro
+familiy from a 64-bit seed. Used for implementing <code>seed_from_u64</code>.</li>
+</ul>
+<h2 id="32-bit-generators"><a href="#32-bit-generators">32-bit generators</a></h2>
+<ul>
+<li><a href="struct.Xoshiro128StarStar.html" title="Xoshiro128StarStar"><code>Xoshiro128StarStar</code></a>: Recommended for all purposes. Excellent speed.</li>
+<li><a href="struct.Xoshiro128PlusPlus.html" title="Xoshiro128PlusPlus"><code>Xoshiro128PlusPlus</code></a>: Recommended for all purposes. Excellent speed.</li>
+<li><a href="struct.Xoshiro128Plus.html" title="Xoshiro128Plus"><code>Xoshiro128Plus</code></a>: Recommended for generating 32-bit floating-point
+numbers. Faster than <code>Xoshiro128StarStar</code>, but has a <a href="http://xoshiro.di.unimi.it/lowcomp.php">low linear
+complexity</a> in the lowest bits (which are discarded when generating
+floats), making it fail linearity tests. This is unlikely to have any
+impact in practise.</li>
+<li><a href="struct.Xoroshiro64StarStar.html" title="Xoroshiro64StarStar"><code>Xoroshiro64StarStar</code></a>: An alternative to <code>Xoshiro128StarStar</code>, having
+the same speed but using half the state.</li>
+<li><a href="struct.Xoroshiro64Star.html" title="Xoroshiro64Star"><code>Xoroshiro64Star</code></a>: An alternative to <code>Xoshiro128Plus</code>, having the
+same speed but using half the state. Has a <a href="http://xoshiro.di.unimi.it/lowcomp.php">low linear complexity</a> in the
+lowest bits (which are discarded when generating floats), making it fail
+linearity tests. This is unlikely to have any impact in practise.</li>
+</ul>
+<p>The <code>*PlusPlus</code> generators perform similarily to the <code>*StarStar</code> generators.
+See the <a href="http://vigna.di.unimi.it/ftp/papers/ScrambledLinear.pdf">xoshiro paper</a>, where the differences are discussed in detail.</p>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.rand_core"><code>pub use <a class="mod" href="../rand_core/index.html" title="mod rand_core">rand_core</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Seed512.html" title="rand_xoshiro::Seed512 struct">Seed512</a></div><div class="item-right docblock-short"><p>512-bit seed for a generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SplitMix64.html" title="rand_xoshiro::SplitMix64 struct">SplitMix64</a></div><div class="item-right docblock-short"><p>A splitmix64 random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoroshiro64Star.html" title="rand_xoshiro::Xoroshiro64Star struct">Xoroshiro64Star</a></div><div class="item-right docblock-short"><p>A xoroshiro64* random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoroshiro64StarStar.html" title="rand_xoshiro::Xoroshiro64StarStar struct">Xoroshiro64StarStar</a></div><div class="item-right docblock-short"><p>A xoroshiro64** random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoroshiro128Plus.html" title="rand_xoshiro::Xoroshiro128Plus struct">Xoroshiro128Plus</a></div><div class="item-right docblock-short"><p>A xoroshiro128+ random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoroshiro128PlusPlus.html" title="rand_xoshiro::Xoroshiro128PlusPlus struct">Xoroshiro128PlusPlus</a></div><div class="item-right docblock-short"><p>A xoroshiro128++ random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoroshiro128StarStar.html" title="rand_xoshiro::Xoroshiro128StarStar struct">Xoroshiro128StarStar</a></div><div class="item-right docblock-short"><p>A xoroshiro128** random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro128Plus.html" title="rand_xoshiro::Xoshiro128Plus struct">Xoshiro128Plus</a></div><div class="item-right docblock-short"><p>A xoshiro128+ random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro128PlusPlus.html" title="rand_xoshiro::Xoshiro128PlusPlus struct">Xoshiro128PlusPlus</a></div><div class="item-right docblock-short"><p>A xoshiro128++ random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro128StarStar.html" title="rand_xoshiro::Xoshiro128StarStar struct">Xoshiro128StarStar</a></div><div class="item-right docblock-short"><p>A xoshiro128** random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro256Plus.html" title="rand_xoshiro::Xoshiro256Plus struct">Xoshiro256Plus</a></div><div class="item-right docblock-short"><p>A xoshiro256+ random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro256PlusPlus.html" title="rand_xoshiro::Xoshiro256PlusPlus struct">Xoshiro256PlusPlus</a></div><div class="item-right docblock-short"><p>A xoshiro256** random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro256StarStar.html" title="rand_xoshiro::Xoshiro256StarStar struct">Xoshiro256StarStar</a></div><div class="item-right docblock-short"><p>A xoshiro256** random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro512Plus.html" title="rand_xoshiro::Xoshiro512Plus struct">Xoshiro512Plus</a></div><div class="item-right docblock-short"><p>A xoshiro512+ random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro512PlusPlus.html" title="rand_xoshiro::Xoshiro512PlusPlus struct">Xoshiro512PlusPlus</a></div><div class="item-right docblock-short"><p>A xoshiro512++ random number generator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Xoshiro512StarStar.html" title="rand_xoshiro::Xoshiro512StarStar struct">Xoshiro512StarStar</a></div><div class="item-right docblock-short"><p>A xoshiro512** random number generator.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="rand_xoshiro" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

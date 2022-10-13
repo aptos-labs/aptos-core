@@ -1,0 +1,69 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Document tree traversal to walk a shared borrow of a document tree."><meta name="keywords" content="rust, rustlang, rust-lang, visit"><title>toml_edit::visit - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../toml_edit/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../toml_edit/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module visit</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../toml_edit/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">toml_edit</a>::<wbr><a class="mod" href="#">visit</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/toml_edit/visit.rs.html#1-236">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Document tree traversal to walk a shared borrow of a document tree.</p>
+<p>Each method of the <a href="trait.Visit.html" title="Visit"><code>Visit</code></a> trait is a hook that can be overridden
+to customize the behavior when mutating the corresponding type of node.
+By default, every method recursively visits the substructure of the
+input by invoking the right visitor method of each of its fields.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Visit</span><span class="op">&lt;</span><span class="lifetime">&#39;doc</span><span class="op">&gt;</span> {
+    <span class="comment">/* ... */</span>
+
+    <span class="kw">fn</span> <span class="ident">visit_item</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">i</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;doc</span> <span class="ident">Item</span>) {
+        <span class="ident">visit_item</span>(<span class="self">self</span>, <span class="ident">i</span>);
+    }
+
+    <span class="comment">/* ... */</span>
+}
+
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">visit_item</span><span class="op">&lt;</span><span class="lifetime">&#39;doc</span>, <span class="ident">V</span><span class="op">&gt;</span>(<span class="ident">v</span>: <span class="kw-2">&amp;mut</span> <span class="ident">V</span>, <span class="ident">node</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;doc</span> <span class="ident">Item</span>)
+<span class="kw">where</span>
+    <span class="ident">V</span>: <span class="ident">Visit</span><span class="op">&lt;</span><span class="lifetime">&#39;doc</span><span class="op">&gt;</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span>,
+{
+    <span class="kw">match</span> <span class="ident">node</span> {
+        <span class="ident">Item::None</span> =&gt; {}
+        <span class="ident">Item::Value</span>(<span class="ident">value</span>) =&gt; <span class="ident">v</span>.<span class="ident">visit_value</span>(<span class="ident">value</span>),
+        <span class="ident">Item::Table</span>(<span class="ident">table</span>) =&gt; <span class="ident">v</span>.<span class="ident">visit_table</span>(<span class="ident">table</span>),
+        <span class="ident">Item::ArrayOfTables</span>(<span class="ident">array</span>) =&gt; <span class="ident">v</span>.<span class="ident">visit_array_of_tables</span>(<span class="ident">array</span>),
+    }
+}</code></pre></div>
+<p>The API is modeled after <a href="https://docs.rs/syn/1/syn/visit"><code>syn::visit</code></a>.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>This visitor stores every string in the document.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">toml_edit::visit</span>::<span class="kw-2">*</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
+<span class="kw">struct</span> <span class="ident">StringCollector</span><span class="op">&lt;</span><span class="lifetime">&#39;doc</span><span class="op">&gt;</span> {
+    <span class="ident">strings</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;doc</span> <span class="ident">str</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;doc</span><span class="op">&gt;</span> <span class="ident">Visit</span><span class="op">&lt;</span><span class="lifetime">&#39;doc</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StringCollector</span><span class="op">&lt;</span><span class="lifetime">&#39;doc</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">visit_string</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">node</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;doc</span> <span class="ident">Formatted</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {
+         <span class="self">self</span>.<span class="ident">strings</span>.<span class="ident">push</span>(<span class="ident">node</span>.<span class="ident">value</span>().<span class="ident">as_str</span>());
+    }
+}
+
+<span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="string">r#&quot;
+laputa = &quot;sky-castle&quot;
+the-force = { value = &quot;surrounds-you&quot; }
+&quot;#</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">document</span>: <span class="ident">Document</span> <span class="op">=</span> <span class="ident">input</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>();
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">visitor</span> <span class="op">=</span> <span class="ident">StringCollector::default</span>();
+<span class="ident">visitor</span>.<span class="ident">visit_document</span>(<span class="kw-2">&amp;</span><span class="ident">document</span>);
+
+<span class="macro">assert_eq!</span>(<span class="ident">visitor</span>.<span class="ident">strings</span>, <span class="macro">vec!</span>[<span class="string">&quot;sky-castle&quot;</span>, <span class="string">&quot;surrounds-you&quot;</span>]);</code></pre></div>
+<p>For a more complex example where the visitor has internal state, see <code>examples/visit.rs</code>
+<a href="https://github.com/ordian/toml_edit/blob/master/examples/visit.rs">on GitHub</a>.</p>
+</div></details><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Visit.html" title="toml_edit::visit::Visit trait">Visit</a></div><div class="item-right docblock-short"><p>Document tree traversal to mutate an exclusive borrow of a document tree in-place.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_array.html" title="toml_edit::visit::visit_array fn">visit_array</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_array_of_tables.html" title="toml_edit::visit::visit_array_of_tables fn">visit_array_of_tables</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_document.html" title="toml_edit::visit::visit_document fn">visit_document</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_inline_table.html" title="toml_edit::visit::visit_inline_table fn">visit_inline_table</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_item.html" title="toml_edit::visit::visit_item fn">visit_item</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_table.html" title="toml_edit::visit::visit_table fn">visit_table</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_table_like.html" title="toml_edit::visit::visit_table_like fn">visit_table_like</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_table_like_kv.html" title="toml_edit::visit::visit_table_like_kv fn">visit_table_like_kv</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.visit_value.html" title="toml_edit::visit::visit_value fn">visit_value</a></div><div class="item-right docblock-short"></div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="toml_edit" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

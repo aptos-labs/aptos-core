@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["TextBuilder","A `TextBuilder` is used to build up a paragraph, where some parts of it may need to have different styling, and where this styling may not conform to line boundaries."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["STATIC_MAX_LEVEL","The statically configured maximum trace level."]],"struct":[["LevelFilter","A filter comparable to a verbosity [`Level`]."],["ParseLevelFilterError","Indicates that a string could not be parsed to a valid level."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Op","A storage operation."]],"struct":[["AccountChangeSet","A collection of resource and module operations on a Move account."],["ChangeSet","A collection of changes to a Move state. Each AccountChangeSet in the domain of `accounts` is guaranteed to be nonempty"]],"type":[["Event",""]]};

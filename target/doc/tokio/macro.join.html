@@ -1,0 +1,64 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Waits on multiple concurrent branches, returning when all branches complete."><meta name="keywords" content="rust, rustlang, rust-lang, join"><title>join in tokio - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc macro"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In tokio</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../tokio/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Macro <a href="index.html">tokio</a>::<wbr><a class="macro" href="#">join</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/tokio/macros/join.rs.html#57-154">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><div class="example-wrap"><pre class="rust macro"><code><span class="macro">macro_rules!</span> <span class="ident">join</span> {
+    (@ {
+        <span class="comment">// One `_` for each branch in the `join!` macro. This is not used once</span>
+        <span class="comment">// normalization is complete.</span>
+        ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">count</span>:<span class="ident">tt</span>)<span class="op">*</span> )
+
+        <span class="comment">// The expression `0+1+1+ ... +1` equal to the number of branches.</span>
+        ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">total</span>:<span class="ident">tt</span>)<span class="op">*</span> )
+
+        <span class="comment">// Normalized join! branches</span>
+        $( ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">skip</span>:<span class="ident">tt</span>)<span class="op">*</span> ) <span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>, )<span class="op">*</span>
+
+    }) =&gt; { ... };
+    (@ { ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>),<span class="op">*</span> $(,)<span class="question-mark">?</span>) =&gt; { ... };
+}</code></pre></div>
+</div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Waits on multiple concurrent branches, returning when <strong>all</strong> branches
+complete.</p>
+<p>The <code>join!</code> macro must be used inside of async functions, closures, and
+blocks.</p>
+<p>The <code>join!</code> macro takes a list of async expressions and evaluates them
+concurrently on the same task. Each async expression evaluates to a future
+and the futures from each expression are multiplexed on the current task.</p>
+<p>When working with async expressions returning <code>Result</code>, <code>join!</code> will wait
+for <strong>all</strong> branches complete regardless if any complete with <code>Err</code>. Use
+<a href="macro.try_join.html"><code>try_join!</code></a> to return early when <code>Err</code> is encountered.</p>
+<h2 id="notes"><a href="#notes">Notes</a></h2>
+<p>The supplied futures are stored inline and does not require allocating a
+<code>Vec</code>.</p>
+<h4 id="runtime-characteristics"><a href="#runtime-characteristics">Runtime characteristics</a></h4>
+<p>By running all async expressions on the current task, the expressions are
+able to run <strong>concurrently</strong> but not in <strong>parallel</strong>. This means all
+expressions are run on the same thread and if one branch blocks the thread,
+all other expressions will be unable to continue. If parallelism is
+required, spawn each async expression using <a href="task/fn.spawn.html"><code>tokio::spawn</code></a> and pass the
+join handle to <code>join!</code>.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Basic join with two branches</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">async</span> <span class="kw">fn</span> <span class="ident">do_stuff_async</span>() {
+    <span class="comment">// async work</span>
+}
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">more_async_work</span>() {
+    <span class="comment">// more here</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> (<span class="ident">first</span>, <span class="ident">second</span>) <span class="op">=</span> <span class="macro">tokio::join!</span>(
+        <span class="ident">do_stuff_async</span>(),
+        <span class="ident">more_async_work</span>());
+
+    <span class="comment">// do something with the values</span>
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="tokio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,289 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="An asynchronous function from a `Request` to a `Response`."><meta name="keywords" content="rust, rustlang, rust-lang, Service"><title>Service in tower_service - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../tower_service/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../tower_service/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Service</a></h2><div class="sidebar-elems"><section><div class="block"><h3 class="sidebar-title"><a href="#required-associated-types">Required Associated Types</a></h3><ul><li><a href="#associatedtype.Error">Error</a></li><li><a href="#associatedtype.Future">Future</a></li><li><a href="#associatedtype.Response">Response</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#required-methods">Required Methods</a></h3><ul><li><a href="#tymethod.call">call</a></li><li><a href="#tymethod.poll_ready">poll_ready</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#foreign-impls">Implementations on Foreign Types</a></h3><ul><li><a href="#impl-Service%3CRequest%3E-for-%26%27a%20mut%20S">&amp;&#39;a mut S</a></li><li><a href="#impl-Service%3CRequest%3E-for-Box%3CS%3E">Box&lt;S&gt;</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#implementors">Implementors</a></h3></div></section><h2 class="location"><a href="index.html">In tower_service</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../tower_service/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Trait <a href="index.html">tower_service</a>::<wbr><a class="trait" href="#">Service</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/tower_service/lib.rs.html#311-355">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust trait"><code>pub trait Service&lt;Request&gt; {
+    type <a href="#associatedtype.Response" class="associatedtype">Response</a>;
+    type <a href="#associatedtype.Error" class="associatedtype">Error</a>;
+    type <a href="#associatedtype.Future" class="associatedtype">Future</a>: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self::<a class="associatedtype" href="trait.Service.html#associatedtype.Response" title="type tower_service::Service::Response">Response</a>, Self::<a class="associatedtype" href="trait.Service.html#associatedtype.Error" title="type tower_service::Service::Error">Error</a>&gt;&gt;;
+
+    fn <a href="#tymethod.poll_ready" class="fnname">poll_ready</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&amp;mut self, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;<br>&nbsp;&nbsp;&nbsp;&nbsp;) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>, Self::<a class="associatedtype" href="trait.Service.html#associatedtype.Error" title="type tower_service::Service::Error">Error</a>&gt;&gt;;
+<span class="item-spacer"></span>    fn <a href="#tymethod.call" class="fnname">call</a>(&amp;mut self, req: Request) -&gt; Self::<a class="associatedtype" href="trait.Service.html#associatedtype.Future" title="type tower_service::Service::Future">Future</a>;
+}</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>An asynchronous function from a <code>Request</code> to a <code>Response</code>.</p>
+<p>The <code>Service</code> trait is a simplified interface making it easy to write
+network applications in a modular and reusable way, decoupled from the
+underlying protocol. It is one of Tower’s fundamental abstractions.</p>
+<h2 id="functional"><a href="#functional">Functional</a></h2>
+<p>A <code>Service</code> is a function of a <code>Request</code>. It immediately returns a
+<code>Future</code> representing the eventual completion of processing the
+request. The actual request processing may happen at any time in the
+future, on any thread or executor. The processing may depend on calling
+other services. At some point in the future, the processing will complete,
+and the <code>Future</code> will resolve to a response or error.</p>
+<p>At a high level, the <code>Service::call</code> function represents an RPC request. The
+<code>Service</code> value can be a server or a client.</p>
+<h2 id="server"><a href="#server">Server</a></h2>
+<p>An RPC server <em>implements</em> the <code>Service</code> trait. Requests received by the
+server over the network are deserialized and then passed as an argument to the
+server value. The returned response is sent back over the network.</p>
+<p>As an example, here is how an HTTP request is processed by a server:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http</span>::{<span class="ident">Request</span>, <span class="ident">Response</span>, <span class="ident">StatusCode</span>};
+
+<span class="kw">struct</span> <span class="ident">HelloWorld</span>;
+
+<span class="kw">impl</span> <span class="ident">Service</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">HelloWorld</span> {
+    <span class="kw">type</span> <span class="ident">Response</span> <span class="op">=</span> <span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">http::Error</span>;
+    <span class="kw">type</span> <span class="ident">Future</span> <span class="op">=</span> <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Response</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll_ready</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">cx</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">Poll</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="ident">Poll::Ready</span>(<span class="prelude-val">Ok</span>(()))
+    }
+
+    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident"><span class="self">Self</span>::Future</span> {
+        <span class="comment">// create the body</span>
+        <span class="kw">let</span> <span class="ident">body</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="string">&quot;hello, world!\n&quot;</span>
+            .<span class="ident">as_bytes</span>()
+            .<span class="ident">to_owned</span>();
+        <span class="comment">// Create the HTTP response</span>
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">Response::builder</span>()
+            .<span class="ident">status</span>(<span class="ident">StatusCode::OK</span>)
+            .<span class="ident">body</span>(<span class="ident">body</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;Unable to create `http::Response`&quot;</span>);
+
+        <span class="comment">// create a response in a future.</span>
+        <span class="kw">let</span> <span class="ident">fut</span> <span class="op">=</span> <span class="kw">async</span> {
+            <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
+        };
+
+        <span class="comment">// Return the response as an immediate future</span>
+        <span class="ident">Box::pin</span>(<span class="ident">fut</span>)
+    }
+}</code></pre></div>
+<h2 id="client"><a href="#client">Client</a></h2>
+<p>A client consumes a service by using a <code>Service</code> value. The client may
+issue requests by invoking <code>call</code> and passing the request as an argument.
+It then receives the response by waiting for the returned future.</p>
+<p>As an example, here is how a Redis request would be issued:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore"><code><span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">redis::Client::new</span>()
+    .<span class="ident">connect</span>(<span class="string">&quot;127.0.0.1:6379&quot;</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>())
+    .<span class="ident">unwrap</span>();
+
+<span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">call</span>(<span class="ident">Cmd::set</span>(<span class="string">&quot;foo&quot;</span>, <span class="string">&quot;this is the value of foo&quot;</span>)).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// Wait for the future to resolve</span>
+<span class="macro">println!</span>(<span class="string">&quot;Redis response: {:?}&quot;</span>, <span class="ident">resp</span>);</code></pre></div>
+<h2 id="middleware--layer"><a href="#middleware--layer">Middleware / Layer</a></h2>
+<p>More often than not, all the pieces needed for writing robust, scalable
+network applications are the same no matter the underlying protocol. By
+unifying the API for both clients and servers in a protocol agnostic way,
+it is possible to write middleware that provide these pieces in a
+reusable way.</p>
+<p>Take timeouts as an example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tower_service::Service</span>;
+<span class="kw">use</span> <span class="ident">tower_layer::Layer</span>;
+<span class="kw">use</span> <span class="ident">futures::FutureExt</span>;
+<span class="kw">use</span> <span class="ident">std::future::Future</span>;
+<span class="kw">use</span> <span class="ident">std::task</span>::{<span class="ident">Context</span>, <span class="ident">Poll</span>};
+<span class="kw">use</span> <span class="ident">std::time::Duration</span>;
+<span class="kw">use</span> <span class="ident">std::pin::Pin</span>;
+<span class="kw">use</span> <span class="ident">std::fmt</span>;
+<span class="kw">use</span> <span class="ident">std::error::Error</span>;
+
+<span class="comment">// Our timeout service, which wraps another service and</span>
+<span class="comment">// adds a timeout to its response future.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Timeout</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="ident">inner</span>: <span class="ident">T</span>,
+    <span class="ident">timeout</span>: <span class="ident">Duration</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Timeout</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">inner</span>: <span class="ident">T</span>, <span class="ident">timeout</span>: <span class="ident">Duration</span>) -&gt; <span class="ident">Timeout</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">Timeout</span> {
+            <span class="ident">inner</span>,
+            <span class="ident">timeout</span>
+        }
+    }
+}
+
+<span class="comment">// The error returned if processing a request timed out</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Expired</span>;
+
+<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Expired</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;expired&quot;</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Error</span> <span class="kw">for</span> <span class="ident">Expired</span> {}
+
+<span class="comment">// We can implement `Service` for `Timeout&lt;T&gt;` if `T` is a `Service`</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Request</span><span class="op">&gt;</span> <span class="ident">Service</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Timeout</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">T</span>: <span class="ident">Service</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&gt;</span>,
+    <span class="ident">T::Future</span>: <span class="lifetime">&#39;static</span>,
+    <span class="ident">T::Error</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T::Response</span>: <span class="lifetime">&#39;static</span>,
+{
+    <span class="comment">// `Timeout` doesn&#39;t modify the response type, so we use `T`&#39;s response type</span>
+    <span class="kw">type</span> <span class="ident">Response</span> <span class="op">=</span> <span class="ident">T::Response</span>;
+    <span class="comment">// Errors may be either `Expired` if the timeout expired, or the inner service&#39;s</span>
+    <span class="comment">// `Error` type. Therefore, we return a boxed `dyn Error + Send + Sync` trait object to erase</span>
+    <span class="comment">// the error&#39;s type.</span>
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">Future</span> <span class="op">=</span> <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Response</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll_ready</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">cx</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">Poll</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="comment">// Our timeout service is ready if the inner service is ready.</span>
+        <span class="comment">// This is how backpressure can be propagated through a tree of nested services.</span>
+       <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">poll_ready</span>(<span class="ident">cx</span>).<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+    }
+
+    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">req</span>: <span class="ident">Request</span>) -&gt; <span class="ident"><span class="self">Self</span>::Future</span> {
+        <span class="comment">// Create a future that completes after `self.timeout`</span>
+        <span class="kw">let</span> <span class="ident">timeout</span> <span class="op">=</span> <span class="ident">tokio::time::sleep</span>(<span class="self">self</span>.<span class="ident">timeout</span>);
+
+        <span class="comment">// Call the inner service and get a future that resolves to the response</span>
+        <span class="kw">let</span> <span class="ident">fut</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">call</span>(<span class="ident">req</span>);
+
+        <span class="comment">// Wrap those two futures in another future that completes when either one completes</span>
+        <span class="comment">//</span>
+        <span class="comment">// If the inner service is too slow the `sleep` future will complete first</span>
+        <span class="comment">// And an error will be returned and `fut` will be dropped and not polled again</span>
+        <span class="comment">//</span>
+        <span class="comment">// We have to box the errors so the types match</span>
+        <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="macro">tokio::select!</span> {
+                <span class="ident">res</span> <span class="op">=</span> <span class="ident">fut</span> =&gt; {
+                    <span class="ident">res</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">err</span>.<span class="ident">into</span>())
+                },
+                <span class="kw">_</span> <span class="op">=</span> <span class="ident">timeout</span> =&gt; {
+                    <span class="prelude-val">Err</span>(<span class="ident">Box::new</span>(<span class="ident">Expired</span>) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span>)
+                },
+            }
+        };
+
+        <span class="ident">Box::pin</span>(<span class="ident">f</span>)
+    }
+}
+
+<span class="comment">// A layer for wrapping services in `Timeout`</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TimeoutLayer</span>(<span class="ident">Duration</span>);
+
+<span class="kw">impl</span> <span class="ident">TimeoutLayer</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">delay</span>: <span class="ident">Duration</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident">TimeoutLayer</span>(<span class="ident">delay</span>)
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Layer</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">TimeoutLayer</span> {
+    <span class="kw">type</span> <span class="ident">Service</span> <span class="op">=</span> <span class="ident">Timeout</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">layer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">service</span>: <span class="ident">S</span>) -&gt; <span class="ident">Timeout</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+        <span class="ident">Timeout::new</span>(<span class="ident">service</span>, <span class="self">self</span>.<span class="number">0</span>)
+    }
+}</code></pre></div>
+<p>The above timeout implementation is decoupled from the underlying protocol
+and is also decoupled from client or server concerns. In other words, the
+same timeout middleware could be used in either a client or a server.</p>
+<h2 id="backpressure"><a href="#backpressure">Backpressure</a></h2>
+<p>Calling a <code>Service</code> which is at capacity (i.e., it is temporarily unable to process a
+request) should result in an error. The caller is responsible for ensuring
+that the service is ready to receive the request before calling it.</p>
+<p><code>Service</code> provides a mechanism by which the caller is able to coordinate
+readiness. <code>Service::poll_ready</code> returns <code>Ready</code> if the service expects that
+it is able to process a request.</p>
+<h2 id="be-careful-when-cloning-inner-services"><a href="#be-careful-when-cloning-inner-services">Be careful when cloning inner services</a></h2>
+<p>Services are permitted to panic if <code>call</code> is invoked without obtaining <code>Poll::Ready(Ok(()))</code>
+from <code>poll_ready</code>. You should therefore be careful when cloning services for example to move
+them into boxed futures. Even though the original service is ready, the clone might not be.</p>
+<p>Therefore this kind of code is wrong and might panic:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">struct</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+    <span class="ident">inner</span>: <span class="ident">S</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Service</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">S</span>: <span class="ident">Service</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">R</span>: <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">type</span> <span class="ident">Response</span> <span class="op">=</span> <span class="ident">S::Response</span>;
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">S::Error</span>;
+    <span class="kw">type</span> <span class="ident">Future</span> <span class="op">=</span> <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Response</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll_ready</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">cx</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">Poll</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="ident">Poll::Ready</span>(<span class="prelude-val">Ok</span>(()))
+    }
+
+    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">req</span>: <span class="ident">R</span>) -&gt; <span class="ident"><span class="self">Self</span>::Future</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">clone</span>();
+        <span class="ident">Box::pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="comment">// `inner` might not be ready since its a clone</span>
+            <span class="ident">inner</span>.<span class="ident">call</span>(<span class="ident">req</span>).<span class="kw">await</span>
+        })
+    }
+}</code></pre></div>
+<p>You should instead use <a href="https://doc.rust-lang.org/1.63.0/core/mem/fn.replace.html" title="std::mem::replace"><code>std::mem::replace</code></a> to take the service that was ready:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">struct</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+    <span class="ident">inner</span>: <span class="ident">S</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Service</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">S</span>: <span class="ident">Service</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">R</span>: <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">type</span> <span class="ident">Response</span> <span class="op">=</span> <span class="ident">S::Response</span>;
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">S::Error</span>;
+    <span class="kw">type</span> <span class="ident">Future</span> <span class="op">=</span> <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Response</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll_ready</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">cx</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">Poll</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="ident">Poll::Ready</span>(<span class="prelude-val">Ok</span>(()))
+    }
+
+    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">req</span>: <span class="ident">R</span>) -&gt; <span class="ident"><span class="self">Self</span>::Future</span> {
+        <span class="kw">let</span> <span class="ident">clone</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">clone</span>();
+        <span class="comment">// take the service that was ready</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">std::mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>, <span class="ident">clone</span>);
+        <span class="ident">Box::pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">inner</span>.<span class="ident">call</span>(<span class="ident">req</span>).<span class="kw">await</span>
+        })
+    }
+}</code></pre></div>
+</div></details><h2 id="required-associated-types" class="small-section-header">Required Associated Types<a href="#required-associated-types" class="anchor"></a></h2><div class="methods"><details class="rustdoc-toggle" open><summary><div id="associatedtype.Response" class="method has-srclink"><div class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#313">source</a></div><h4 class="code-header">type <a href="#associatedtype.Response" class="associatedtype">Response</a></h4></div></summary><div class="docblock"><p>Responses given by the service.</p>
+</div></details><details class="rustdoc-toggle" open><summary><div id="associatedtype.Error" class="method has-srclink"><div class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#316">source</a></div><h4 class="code-header">type <a href="#associatedtype.Error" class="associatedtype">Error</a></h4></div></summary><div class="docblock"><p>Errors produced by the service.</p>
+</div></details><details class="rustdoc-toggle" open><summary><div id="associatedtype.Future" class="method has-srclink"><div class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#319">source</a></div><h4 class="code-header">type <a href="#associatedtype.Future" class="associatedtype">Future</a>: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self::<a class="associatedtype" href="trait.Service.html#associatedtype.Response" title="type tower_service::Service::Response">Response</a>, Self::<a class="associatedtype" href="trait.Service.html#associatedtype.Error" title="type tower_service::Service::Error">Error</a>&gt;&gt;</h4></div></summary><div class="docblock"><p>The future response value.</p>
+</div></details></div><h2 id="required-methods" class="small-section-header">Required Methods<a href="#required-methods" class="anchor"></a></h2><div class="methods"><details class="rustdoc-toggle" open><summary><div id="tymethod.poll_ready" class="method has-srclink"><div class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#340">source</a></div><h4 class="code-header">fn <a href="#tymethod.poll_ready" class="fnname">poll_ready</a>(&amp;mut self, cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>, Self::<a class="associatedtype" href="trait.Service.html#associatedtype.Error" title="type tower_service::Service::Error">Error</a>&gt;&gt;</h4></div></summary><div class="docblock"><p>Returns <code>Poll::Ready(Ok(()))</code> when the service is able to process requests.</p>
+<p>If the service is at capacity, then <code>Poll::Pending</code> is returned and the task
+is notified when the service becomes ready again. This function is
+expected to be called while on a task. Generally, this can be done with
+a simple <code>futures::future::poll_fn</code> call.</p>
+<p>If <code>Poll::Ready(Err(_))</code> is returned, the service is no longer able to service requests
+and the caller should discard the service instance.</p>
+<p>Once <code>poll_ready</code> returns <code>Poll::Ready(Ok(()))</code>, a request may be dispatched to the
+service using <code>call</code>. Until a request is dispatched, repeated calls to
+<code>poll_ready</code> must return either <code>Poll::Ready(Ok(()))</code> or <code>Poll::Ready(Err(_))</code>.</p>
+<p>Note that <code>poll_ready</code> may reserve shared resources that are consumed in a subsequent
+invocation of <code>call</code>. Thus, it is critical for implementations to not assume that <code>call</code>
+will always be invoked and to ensure that such resources are released if the service is
+dropped before <code>call</code> is invoked or the future returned by <code>call</code> is dropped before it
+is polled.</p>
+</div></details><details class="rustdoc-toggle" open><summary><div id="tymethod.call" class="method has-srclink"><div class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#354">source</a></div><h4 class="code-header">fn <a href="#tymethod.call" class="fnname">call</a>(&amp;mut self, req: Request) -&gt; Self::<a class="associatedtype" href="trait.Service.html#associatedtype.Future" title="type tower_service::Service::Future">Future</a></h4></div></summary><div class="docblock"><p>Process the request and return the response asynchronously.</p>
+<p>This function is expected to be callable off task. As such,
+implementations should take care to not call <code>poll_ready</code>.</p>
+<p>Before dispatching a request, <code>poll_ready</code> must be called and return
+<code>Poll::Ready(Ok(()))</code>.</p>
+<h5 id="panics"><a href="#panics">Panics</a></h5>
+<p>Implementations are permitted to panic if <code>call</code> is invoked without
+obtaining <code>Poll::Ready(Ok(()))</code> from <code>poll_ready</code>.</p>
+</div></details></div><h2 id="foreign-impls" class="small-section-header">Implementations on Foreign Types<a href="#foreign-impls" class="anchor"></a></h2><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-Service%3CRequest%3E-for-%26%27a%20mut%20S" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#357-372">source</a></span><a href="#impl-Service%3CRequest%3E-for-%26%27a%20mut%20S" class="anchor"></a><h3 class="code-header in-band">impl&lt;'a, S, Request&gt; <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt; for <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.reference.html">&amp;'a mut </a>S <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;S: <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt; + 'a,&nbsp;</span></h3></section></summary><div class="impl-items"><section id="associatedtype.Response-1" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Response-1" class="anchor"></a><h4 class="code-header">type <a href="#associatedtype.Response" class="associatedtype">Response</a> = &lt;S as <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt;&gt;::<a class="associatedtype" href="trait.Service.html#associatedtype.Response" title="type tower_service::Service::Response">Response</a></h4></section><section id="associatedtype.Error-1" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error-1" class="anchor"></a><h4 class="code-header">type <a href="#associatedtype.Error" class="associatedtype">Error</a> = &lt;S as <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt;&gt;::<a class="associatedtype" href="trait.Service.html#associatedtype.Error" title="type tower_service::Service::Error">Error</a></h4></section><section id="associatedtype.Future-1" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Future-1" class="anchor"></a><h4 class="code-header">type <a href="#associatedtype.Future" class="associatedtype">Future</a> = &lt;S as <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt;&gt;::<a class="associatedtype" href="trait.Service.html#associatedtype.Future" title="type tower_service::Service::Future">Future</a></h4></section><section id="method.poll_ready" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#365-367">source</a></span><a href="#method.poll_ready" class="anchor"></a><h4 class="code-header">fn <a href="#tymethod.poll_ready" class="fnname">poll_ready</a>(&amp;mut self, cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>, S::<a class="associatedtype" href="trait.Service.html#associatedtype.Error" title="type tower_service::Service::Error">Error</a>&gt;&gt;</h4></section><section id="method.call" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#369-371">source</a></span><a href="#method.call" class="anchor"></a><h4 class="code-header">fn <a href="#tymethod.call" class="fnname">call</a>(&amp;mut self, request: Request) -&gt; S::<a class="associatedtype" href="trait.Service.html#associatedtype.Future" title="type tower_service::Service::Future">Future</a></h4></section></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-Service%3CRequest%3E-for-Box%3CS%3E" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#374-389">source</a></span><a href="#impl-Service%3CRequest%3E-for-Box%3CS%3E" class="anchor"></a><h3 class="code-header in-band">impl&lt;S, Request&gt; <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt; for <a class="struct" href="https://doc.rust-lang.org/1.63.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;S&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;S: <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt; + ?<a class="trait" href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></h3></section></summary><div class="impl-items"><section id="associatedtype.Response-2" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Response-2" class="anchor"></a><h4 class="code-header">type <a href="#associatedtype.Response" class="associatedtype">Response</a> = &lt;S as <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt;&gt;::<a class="associatedtype" href="trait.Service.html#associatedtype.Response" title="type tower_service::Service::Response">Response</a></h4></section><section id="associatedtype.Error-2" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error-2" class="anchor"></a><h4 class="code-header">type <a href="#associatedtype.Error" class="associatedtype">Error</a> = &lt;S as <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt;&gt;::<a class="associatedtype" href="trait.Service.html#associatedtype.Error" title="type tower_service::Service::Error">Error</a></h4></section><section id="associatedtype.Future-2" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Future-2" class="anchor"></a><h4 class="code-header">type <a href="#associatedtype.Future" class="associatedtype">Future</a> = &lt;S as <a class="trait" href="trait.Service.html" title="trait tower_service::Service">Service</a>&lt;Request&gt;&gt;::<a class="associatedtype" href="trait.Service.html#associatedtype.Future" title="type tower_service::Service::Future">Future</a></h4></section><section id="method.poll_ready-1" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#382-384">source</a></span><a href="#method.poll_ready-1" class="anchor"></a><h4 class="code-header">fn <a href="#tymethod.poll_ready" class="fnname">poll_ready</a>(&amp;mut self, cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>, S::<a class="associatedtype" href="trait.Service.html#associatedtype.Error" title="type tower_service::Service::Error">Error</a>&gt;&gt;</h4></section><section id="method.call-1" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../src/tower_service/lib.rs.html#386-388">source</a></span><a href="#method.call-1" class="anchor"></a><h4 class="code-header">fn <a href="#tymethod.call" class="fnname">call</a>(&amp;mut self, request: Request) -&gt; S::<a class="associatedtype" href="trait.Service.html#associatedtype.Future" title="type tower_service::Service::Future">Future</a></h4></section></div></details><h2 id="implementors" class="small-section-header">Implementors<a href="#implementors" class="anchor"></a></h2><div class="item-list" id="implementors-list"></div><script type="text/javascript" src="../implementors/tower_service/trait.Service.js" data-ignore-extern-crates="alloc" async></script></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="tower_service" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

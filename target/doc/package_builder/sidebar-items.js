@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["PackageBuilder","A helper for building Move packages on-the-fly for testing."]]};

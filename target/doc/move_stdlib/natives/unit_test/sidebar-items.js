@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""],["make_native_create_signers_for_testing",""]],"struct":[["CreateSignersForTestingGasParameters",""],["GasParameters",""]]};

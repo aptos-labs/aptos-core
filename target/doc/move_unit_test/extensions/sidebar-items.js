@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["set_extension_hook","Sets a hook which is called to populate additional native extensions. This can be used to get extensions living outside of the Move repo into the unit testing environment."]]};

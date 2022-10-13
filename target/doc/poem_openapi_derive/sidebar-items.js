@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"attr":[["OpenApi",""],["Webhook",""]],"derive":[["ApiRequest",""],["ApiResponse",""],["Enum",""],["Multipart",""],["NewType",""],["OAuthScopes",""],["Object",""],["ResponseContent",""],["SecurityScheme",""],["Tags",""],["Union",""]]};

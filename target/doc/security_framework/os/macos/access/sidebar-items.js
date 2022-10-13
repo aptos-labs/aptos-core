@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["SecAccess","A type representing access control settings."]]};

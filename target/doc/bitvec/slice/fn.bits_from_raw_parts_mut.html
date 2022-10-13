@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Constructs a `&amp;mut BitSlice` reference from its component data."><meta name="keywords" content="rust, rustlang, rust-lang, bits_from_raw_parts_mut"><title>bits_from_raw_parts_mut in bitvec::slice - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../bitvec/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../bitvec/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In bitvec::slice</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../bitvec/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Function <a href="../index.html">bitvec</a>::<wbr><a href="index.html">slice</a>::<wbr><a class="fn" href="#">bits_from_raw_parts_mut</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/bitvec/slice.rs.html#2080-2091">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust fn"><code>pub unsafe fn bits_from_raw_parts_mut&lt;'a, O, T&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;addr: <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.pointer.html">*mut T</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;head: <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;bits: <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;'a mut <a class="struct" href="struct.BitSlice.html" title="struct bitvec::slice::BitSlice">BitSlice</a>&lt;O, T&gt;&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;O: <a class="trait" href="../order/trait.BitOrder.html" title="trait bitvec::order::BitOrder">BitOrder</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;T: 'a + <a class="trait" href="../store/trait.BitStore.html" title="trait bitvec::store::BitStore">BitStore</a> + <a class="trait" href="../mem/trait.BitMemory.html" title="trait bitvec::mem::BitMemory">BitMemory</a>,&nbsp;</span></code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Constructs a <code>&amp;mut BitSlice</code> reference from its component data.</p>
+<p>This is logically equivalent to <a href="https://doc.rust-lang.org/core/slice/fn.from_raw_parts_mut.html"><code>slice::from_raw_parts_mut</code></a> for <code>[T]</code>.</p>
+<h2 id="lifetimes"><a href="#lifetimes">Lifetimes</a></h2>
+<ul>
+<li><code>'a</code>: The lifetime of the returned bitslice handle. This must be no longer
+than the duration of the referent region, as it is illegal for references to
+dangle.</li>
+</ul>
+<h2 id="type-parameters"><a href="#type-parameters">Type Parameters</a></h2>
+<ul>
+<li><code>O</code>: The ordering of bits within elements <code>T</code>.</li>
+<li><code>T</code>: The type of each memory element in the backing storage region.</li>
+</ul>
+<h2 id="parameters"><a href="#parameters">Parameters</a></h2>
+<ul>
+<li><code>addr</code>: The base address of the memory region that the <code>BitSlice</code> covers.</li>
+<li><code>head</code>: The index of the first live bit in <code>*addr</code>, at which the <code>BitSlice</code>
+begins. This is required to be in the range <code>0 .. T::Mem::BITS</code>.</li>
+<li><code>bits</code>: The number of live bits, beginning at <code>head</code> in <code>*addr</code>, that the
+<code>BitSlice</code> contains. This must be no greater than <code>BitSlice::MAX_BITS</code>.</li>
+</ul>
+<h2 id="returns"><a href="#returns">Returns</a></h2>
+<p>If the input parameters are valid, this returns <code>Some</code> shared reference to a
+<code>BitSlice</code>. The failure conditions causing this to return <code>None</code> are:</p>
+<ul>
+<li><code>head</code> is not less than <a href="../mem/trait.BitMemory.html#associatedconstant.BITS"><code>T::Mem::BITS</code></a></li>
+<li><code>bits</code> is greater than <a href="struct.BitSlice.html#associatedconstant.MAX_BITS"><code>BitSlice::&lt;O, T&gt;::MAX_BITS</code></a></li>
+<li><code>addr</code> is not adequately aligned to <code>T</code></li>
+<li><code>addr</code> is so high in the memory space that the region wraps to the base of the
+memory space</li>
+</ul>
+<h2 id="safety"><a href="#safety">Safety</a></h2>
+<p>The memory region described by the returned <code>BitSlice</code> must be validly allocated
+within the caller’s memory management system. It must also not be reachable for
+the lifetime <code>'a</code> by any path other than references derived from the return
+value.</p>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="bitvec" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""],["make_native_new_aggregator",""]],"struct":[["GasParameters",""],["NewAggregatorGasParameters",""]]};

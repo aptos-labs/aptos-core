@@ -1,0 +1,113 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Making [`Arc`][Arc] itself atomic"><meta name="keywords" content="rust, rustlang, rust-lang, arc_swap"><title>arc_swap - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate arc_swap</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 1.5.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../arc_swap/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">arc_swap</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/arc_swap/lib.rs.html#1-1293">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Making <a href="https://doc.rust-lang.org/1.63.0/alloc/sync/struct.Arc.html" title="Arc"><code>Arc</code></a> itself atomic</p>
+<p>The <a href="type.ArcSwap.html" title="ArcSwap"><code>ArcSwap</code></a> type is a container for an <code>Arc</code> that can be changed atomically. Semantically,
+it is similar to something like <code>Atomic&lt;Arc&lt;T&gt;&gt;</code> (if there was such a thing) or
+<code>RwLock&lt;Arc&lt;T&gt;&gt;</code> (but without the need for the locking). It is optimized for read-mostly
+scenarios, with consistent performance characteristics.</p>
+<h2 id="motivation"><a href="#motivation">Motivation</a></h2>
+<p>There are many situations in which one might want to have some data structure that is often
+read and seldom updated. Some examples might be a configuration of a service, routing tables,
+snapshot of some data that is renewed every few minutes, etc.</p>
+<p>In all these cases one needs:</p>
+<ul>
+<li>Being able to read the current value of the data structure, fast, often and concurrently from
+many threads.</li>
+<li>Using the same version of the data structure over longer period of time ‒ a query should be
+answered by a consistent version of data, a packet should be routed either by an old or by a
+new version of the routing table but not by a combination, etc.</li>
+<li>Perform an update without disrupting the processing.</li>
+</ul>
+<p>The first idea would be to use <a href="https://doc.rust-lang.org/std/sync/struct.RwLock.html"><code>RwLock&lt;T&gt;</code></a> and keep a read-lock for the whole time of
+processing. Update would, however, pause all processing until done.</p>
+<p>Better option would be to have <a href="https://doc.rust-lang.org/std/sync/struct.RwLock.html"><code>RwLock&lt;Arc&lt;T&gt;&gt;</code></a>. Then one would lock, clone the <a href="https://doc.rust-lang.org/1.63.0/alloc/sync/struct.Arc.html" title="Arc">Arc</a>
+and unlock. This suffers from CPU-level contention (on the lock and on the reference count of
+the <a href="https://doc.rust-lang.org/1.63.0/alloc/sync/struct.Arc.html" title="Arc">Arc</a>) which makes it relatively slow. Depending on the implementation, an update may be
+blocked for arbitrary long time by a steady inflow of readers.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">static</span> <span class="ident">ROUTING_TABLE</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RoutingTable</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+    <span class="ident">RwLock::new</span>(<span class="ident">Arc::new</span>(<span class="ident">RoutingTable</span>))
+});
+
+<span class="kw">fn</span> <span class="ident">process_packet</span>(<span class="ident">packet</span>: <span class="ident">Packet</span>) {
+    <span class="kw">let</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">ROUTING_TABLE</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>());
+    <span class="ident">table</span>.<span class="ident">route</span>(<span class="ident">packet</span>);
+}</code></pre></div>
+<p>The <a href="type.ArcSwap.html" title="ArcSwap">ArcSwap</a> can be used instead, which solves the above problems and has better performance
+characteristics than the <a href="https://doc.rust-lang.org/std/sync/struct.RwLock.html">RwLock</a>, both in contended and non-contended scenarios.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">static</span> <span class="ident">ROUTING_TABLE</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">ArcSwap</span><span class="op">&lt;</span><span class="ident">RoutingTable</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+    <span class="ident">ArcSwap::from_pointee</span>(<span class="ident">RoutingTable</span>)
+});
+
+<span class="kw">fn</span> <span class="ident">process_packet</span>(<span class="ident">packet</span>: <span class="ident">Packet</span>) {
+    <span class="kw">let</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">ROUTING_TABLE</span>.<span class="ident">load</span>();
+    <span class="ident">table</span>.<span class="ident">route</span>(<span class="ident">packet</span>);
+}</code></pre></div>
+<h2 id="crate-contents"><a href="#crate-contents">Crate contents</a></h2>
+<p>At the heart of the crate there are <a href="type.ArcSwap.html" title="ArcSwap"><code>ArcSwap</code></a> and <a href="type.ArcSwapOption.html" title="ArcSwapOption"><code>ArcSwapOption</code></a> types, containers for an
+<a href="https://doc.rust-lang.org/1.63.0/alloc/sync/struct.Arc.html" title="Arc"><code>Arc</code></a> and <a href="https://doc.rust-lang.org/1.63.0/core/option/enum.Option.html" title="Option"><code>Option&lt;Arc&gt;</code></a>.</p>
+<p>Technically, these are type aliases for partial instantiations of the <a href="struct.ArcSwapAny.html" title="ArcSwapAny"><code>ArcSwapAny</code></a> type. The
+<a href="struct.ArcSwapAny.html" title="ArcSwapAny"><code>ArcSwapAny</code></a> is more flexible and allows tweaking of many things (can store other things than
+<a href="https://doc.rust-lang.org/1.63.0/alloc/sync/struct.Arc.html" title="Arc"><code>Arc</code></a>s, can configure the locking <a href="strategy/trait.Strategy.html" title="Strategy"><code>Strategy</code></a>). For details about the tweaking, see the
+documentation of the <a href="strategy/index.html" title="strategy"><code>strategy</code></a> module and the <a href="trait.RefCnt.html" title="RefCnt"><code>RefCnt</code></a> trait.</p>
+<p>The <a href="cache/index.html" title="cache"><code>cache</code></a> module provides means for speeding up read access of the contained data at the
+cost of delayed reclamation.</p>
+<p>The <a href="access/index.html" title="access"><code>access</code></a> module can be used to do projections into the contained data to separate parts
+of application from each other (eg. giving a component access to only its own part of
+configuration while still having it reloaded as a whole).</p>
+<h2 id="before-using"><a href="#before-using">Before using</a></h2>
+<p>The data structure is a bit niche. Before using, please check the
+<a href="docs/limitations/index.html" title="docs::limitations">limitations and common pitfalls</a> and the <a href="docs/performance/index.html" title="docs::performance">performance
+characteristics</a>, including choosing the right <a href="docs/performance/index.html#read-operations" title="docs::performance">read
+operation</a>.</p>
+<p>You can also get an inspiration about what’s possible in the <a href="docs/patterns/index.html" title="docs::patterns">common patterns</a>
+section.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+
+<span class="kw">use</span> <span class="ident">arc_swap::ArcSwap</span>;
+<span class="kw">use</span> <span class="ident">crossbeam_utils::thread</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">ArcSwap::from</span>(<span class="ident">Arc::new</span>(<span class="ident">String::default</span>()));
+    <span class="ident">thread::scope</span>(<span class="op">|</span><span class="ident">scope</span><span class="op">|</span> {
+        <span class="ident">scope</span>.<span class="ident">spawn</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">new_conf</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="string">&quot;New configuration&quot;</span>.<span class="ident">to_owned</span>());
+            <span class="ident">config</span>.<span class="ident">store</span>(<span class="ident">new_conf</span>);
+        });
+        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">10</span> {
+            <span class="ident">scope</span>.<span class="ident">spawn</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+                <span class="kw">loop</span> {
+                    <span class="kw">let</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="ident">config</span>.<span class="ident">load</span>();
+                    <span class="kw">if</span> <span class="op">!</span><span class="ident">cfg</span>.<span class="ident">is_empty</span>() {
+                        <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">cfg</span>, <span class="string">&quot;New configuration&quot;</span>);
+                        <span class="kw">return</span>;
+                    }
+                }
+            });
+        }
+    }).<span class="ident">unwrap</span>();
+}</code></pre></div>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.Cache"><code>pub use crate::cache::<a class="struct" href="cache/struct.Cache.html" title="struct arc_swap::cache::Cache">Cache</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.DefaultStrategy"><code>pub use crate::strategy::<a class="type" href="strategy/type.DefaultStrategy.html" title="type arc_swap::strategy::DefaultStrategy">DefaultStrategy</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.IndependentStrategy"><code>pub use crate::strategy::IndependentStrategy;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="access/index.html" title="arc_swap::access mod">access</a></div><div class="item-right docblock-short"><p>Abstracting over accessing parts of stored value.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="cache/index.html" title="arc_swap::cache mod">cache</a></div><div class="item-right docblock-short"><p>Caching handle into the <a href="struct.ArcSwapAny.html" title="ArcSwapAny">ArcSwapAny</a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="docs/index.html" title="arc_swap::docs mod">docs</a></div><div class="item-right docblock-short"><p>Additional documentation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="strategy/index.html" title="arc_swap::strategy mod">strategy</a></div><div class="item-right docblock-short"><p>Strategies for protecting the reference counts.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ArcSwapAny.html" title="arc_swap::ArcSwapAny struct">ArcSwapAny</a></div><div class="item-right docblock-short"><p>An atomic storage for a reference counted smart pointer like <a href="https://doc.rust-lang.org/std/sync/struct.Arc.html"><code>Arc</code></a> or <code>Option&lt;Arc&gt;</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Guard.html" title="arc_swap::Guard struct">Guard</a></div><div class="item-right docblock-short"><p>A temporary storage of the pointer.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.AsRaw.html" title="arc_swap::AsRaw trait">AsRaw</a></div><div class="item-right docblock-short"><p>A trait describing things that can be turned into a raw pointer.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.RefCnt.html" title="arc_swap::RefCnt trait">RefCnt</a></div><div class="item-right docblock-short"><p>A trait describing smart reference counted pointers.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.ArcSwap.html" title="arc_swap::ArcSwap type">ArcSwap</a></div><div class="item-right docblock-short"><p>An atomic storage for <code>Arc</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.ArcSwapOption.html" title="arc_swap::ArcSwapOption type">ArcSwapOption</a></div><div class="item-right docblock-short"><p>An atomic storage for <code>Option&lt;Arc&gt;</code>.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="arc_swap" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

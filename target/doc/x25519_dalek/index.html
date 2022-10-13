@@ -1,0 +1,95 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="x25519-dalek    "><meta name="keywords" content="rust, rustlang, rust-lang, x25519_dalek"><title>x25519_dalek - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../x25519_dalek/index.html"><div class="logo-container"><img src="https://doc.dalek.rs/assets/dalek-logo-clear.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../x25519_dalek/index.html"><div class="logo-container">
+                    <img src="https://doc.dalek.rs/assets/dalek-logo-clear.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate x25519_dalek</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 1.2.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#constants">Constants</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../x25519_dalek/index.html">
+                        <img src="https://doc.dalek.rs/assets/dalek-logo-clear.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">x25519_dalek</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/x25519_dalek/lib.rs.html#17-166">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="x25519-dalek----"><a href="#x25519-dalek----">x25519-dalek  <img src="https://img.shields.io/crates/v/x25519-dalek.svg" alt="" /> <img src="https://docs.rs/x25519-dalek/badge.svg" alt="" /> <img src="https://travis-ci.org/dalek-cryptography/x25519-dalek.svg?branch=master" alt="" /></a></h2>
+<p>A pure-Rust implementation of x25519 elliptic curve Diffie-Hellman key exchange,
+with curve operations provided by
+<a href="https://github.com/dalek-cryptography/curve25519-dalek">curve25519-dalek</a>.</p>
+<p>This crate provides two levels of API: a bare byte-oriented <code>x25519</code>
+function which matches the function specified in <a href="https://tools.ietf.org/html/rfc7748">RFC7748</a>, as
+well as a higher-level Rust API for static and ephemeral Diffie-Hellman.</p>
+<h3 id="examples"><a href="#examples">Examples</a></h3><a href="https://shop.bubblesort.io">
+<img
+  style="float: right; width: auto; height: 300px;"
+  src="https://raw.githubusercontent.com/dalek-cryptography/x25519-dalek/master/res/bubblesort-zines-secret-messages-cover.jpeg"/>
+</a>
+<p>Alice and Bob are two adorable kittens who have lost their mittens, and they
+wish to be able to send secret messages to each other to coordinate finding
+them, otherwise—if their caretaker cat finds out—they will surely be called
+naughty kittens and be given no pie!</p>
+<p>But the two kittens are quite clever.  Even though their paws are still too big
+and the rest of them is 90% fuzziness, these clever kittens have been studying
+up on modern public key cryptography and have learned a nifty trick called
+<em>elliptic curve Diffie-Hellman key exchange</em>.  With the right incantations, the
+kittens will be able to secretly organise to find their mittens, and then spend
+the rest of the afternoon nomming some yummy pie!</p>
+<p>First, Alice uses <code>EphemeralSecret::new()</code> and then
+<code>PublicKey::from()</code> to produce her secret and public keys:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">rand_core::OsRng</span>;
+<span class="kw">use</span> <span class="ident">x25519_dalek</span>::{<span class="ident">EphemeralSecret</span>, <span class="ident">PublicKey</span>};
+
+<span class="kw">let</span> <span class="ident">alice_secret</span> <span class="op">=</span> <span class="ident">EphemeralSecret::new</span>(<span class="ident">OsRng</span>);
+<span class="kw">let</span> <span class="ident">alice_public</span> <span class="op">=</span> <span class="ident">PublicKey::from</span>(<span class="kw-2">&amp;</span><span class="ident">alice_secret</span>);</code></pre></div>
+<p>Bob does the same:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">bob_secret</span> <span class="op">=</span> <span class="ident">EphemeralSecret::new</span>(<span class="ident">OsRng</span>);
+<span class="kw">let</span> <span class="ident">bob_public</span> <span class="op">=</span> <span class="ident">PublicKey::from</span>(<span class="kw-2">&amp;</span><span class="ident">bob_secret</span>);</code></pre></div>
+<p>Alice meows across the room, telling <code>alice_public</code> to Bob, and Bob
+loudly meows <code>bob_public</code> back to Alice.  Alice now computes her
+shared secret with Bob by doing:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">alice_shared_secret</span> <span class="op">=</span> <span class="ident">alice_secret</span>.<span class="ident">diffie_hellman</span>(<span class="kw-2">&amp;</span><span class="ident">bob_public</span>);</code></pre></div>
+<p>Similarly, Bob computes a shared secret by doing:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">bob_shared_secret</span> <span class="op">=</span> <span class="ident">bob_secret</span>.<span class="ident">diffie_hellman</span>(<span class="kw-2">&amp;</span><span class="ident">alice_public</span>);</code></pre></div>
+<p>These secrets are the same:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="macro">assert_eq!</span>(<span class="ident">alice_shared_secret</span>.<span class="ident">as_bytes</span>(), <span class="ident">bob_shared_secret</span>.<span class="ident">as_bytes</span>());</code></pre></div>
+<p>Voilà!  Alice and Bob can now use their shared secret to encrypt their
+meows, for example, by using it to generate a key and nonce for an
+authenticated-encryption cipher.</p>
+<p>This example used the ephemeral DH API, which ensures that secret keys
+cannot be reused; Alice and Bob could instead use the static DH API
+and load a long-term secret key.</p>
+<h2 id="installation"><a href="#installation">Installation</a></h2>
+<p>To install, add the following to your project’s <code>Cargo.toml</code>:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+x25519-dalek = &quot;1&quot;</code></pre></div><h2 id="msrv"><a href="#msrv">MSRV</a></h2>
+<p>Current MSRV is 1.41 for production builds, and 1.48 for running tests.</p>
+<h2 id="documentation"><a href="#documentation">Documentation</a></h2>
+<p>Documentation is available <a href="https://docs.rs/x25519-dalek">here</a>.</p>
+<h2 id="note"><a href="#note">Note</a></h2>
+<p>This code matches the <a href="https://tools.ietf.org/html/rfc7748">RFC7748</a> test vectors.
+The elliptic curve
+operations are provided by <code>curve25519-dalek</code>, which makes a best-effort
+attempt to prevent software side-channels.</p>
+<p>“Secret Messages” cover image and <a href="https://shop.bubblesort.io/products/secret-messages-zine">zine</a>
+copyright © Amy Wibowo (<a href="https://twitter.com/sailorhg">@sailorhg</a>)</p>
+<h2 id="see-also"><a href="#see-also">See also</a></h2>
+<ul>
+<li><a href="https://github.com/RustCrypto/AEADs/tree/master/crypto_box">crypto_box</a>: pure Rust public-key authenticated encryption compatible with
+the NaCl family of encryption libraries (libsodium, TweetNaCl) which uses
+<code>x25519-dalek</code> for key agreement</li>
+</ul>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EphemeralSecret.html" title="x25519_dalek::EphemeralSecret struct">EphemeralSecret</a></div><div class="item-right docblock-short"><p>A short-lived Diffie-Hellman secret key that can only be used to compute a single
+<a href="struct.SharedSecret.html" title="SharedSecret"><code>SharedSecret</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.PublicKey.html" title="x25519_dalek::PublicKey struct">PublicKey</a></div><div class="item-right docblock-short"><p>A Diffie-Hellman public key, corresponding to an <a href="struct.EphemeralSecret.html" title="EphemeralSecret"><code>EphemeralSecret</code></a> or
+<a href="struct.StaticSecret.html" title="StaticSecret"><code>StaticSecret</code></a> key.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SharedSecret.html" title="x25519_dalek::SharedSecret struct">SharedSecret</a></div><div class="item-right docblock-short"><p>The result of a Diffie-Hellman key exchange.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.StaticSecret.html" title="x25519_dalek::StaticSecret struct">StaticSecret</a></div><div class="item-right docblock-short"><p>A Diffie-Hellman secret key that can be used to compute multiple <a href="struct.SharedSecret.html" title="SharedSecret"><code>SharedSecret</code></a>s.</p>
+</div></div></div><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.X25519_BASEPOINT_BYTES.html" title="x25519_dalek::X25519_BASEPOINT_BYTES constant">X25519_BASEPOINT_BYTES</a></div><div class="item-right docblock-short"><p>The X25519 basepoint, for use with the bare, byte-oriented x25519
+function.  This is provided for people who cannot use the typed
+DH API for some reason.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.x25519.html" title="x25519_dalek::x25519 fn">x25519</a></div><div class="item-right docblock-short"><p>The bare, byte-oriented x25519 function, exactly as specified in RFC7748.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="x25519_dalek" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

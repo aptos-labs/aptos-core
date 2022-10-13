@@ -1,0 +1,5 @@
+(function() {var implementors = {};
+implementors["aptos_gas"] = [{"text":"impl <a class=\"trait\" href=\"move_vm_types/gas/trait.GasMeter.html\" title=\"trait move_vm_types::gas::GasMeter\">GasMeter</a> for <a class=\"struct\" href=\"aptos_gas/struct.AptosGasMeter.html\" title=\"struct aptos_gas::AptosGasMeter\">AptosGasMeter</a>","synthetic":false,"types":["aptos_gas::gas_meter::AptosGasMeter"]}];
+implementors["move_vm_test_utils"] = [{"text":"impl&lt;'b&gt; <a class=\"trait\" href=\"move_vm_types/gas/trait.GasMeter.html\" title=\"trait move_vm_types::gas::GasMeter\">GasMeter</a> for <a class=\"struct\" href=\"move_vm_test_utils/gas_schedule/struct.GasStatus.html\" title=\"struct move_vm_test_utils::gas_schedule::GasStatus\">GasStatus</a>&lt;'b&gt;","synthetic":false,"types":["move_vm_test_utils::gas_schedule::GasStatus"]}];
+implementors["move_vm_types"] = [];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

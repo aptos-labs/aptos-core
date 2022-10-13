@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["SecCertificate","A type representing a certificate."]]};

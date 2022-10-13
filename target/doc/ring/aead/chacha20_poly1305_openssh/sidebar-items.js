@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["KEY_LEN","The length of key."],["PACKET_LENGTH_LEN","The length in bytes of the `packet_length` field in a SSH packet."],["TAG_LEN","The length in bytes of an authentication tag."]],"struct":[["OpeningKey","A key for opening packets."],["SealingKey","A key for sealing packets."]]};

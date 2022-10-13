@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"static":[["MODULE_PUBLISHING_FALLBACK_COUNT","Count of times the module publishing fallback was triggered in parallel execution."],["SPECULATIVE_ABORT_COUNT","Count of speculative transaction re-executions due to a failed validation ."]]};

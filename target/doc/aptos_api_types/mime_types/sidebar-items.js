@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["BCS","MIME type to get BCS output"],["BCS_SIGNED_TRANSACTION","MIME type to submit BCS transactions"],["JSON","MIME type to submit JSON transactions and get JSON output"]]};

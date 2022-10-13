@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Loop","A strategy that rapidly spins, without telling the CPU to do any powering down."],["Spin","A strategy that rapidly spins while informing the CPU that it should power down non-essential components via [`core::hint::spin_loop`]."]],"trait":[["RelaxStrategy","A trait implemented by spinning relax strategies."]]};

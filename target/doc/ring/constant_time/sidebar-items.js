@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["verify_slices_are_equal","Returns `Ok(())` if `a == b` and `Err(error::Unspecified)` otherwise. The comparison of `a` and `b` is done in constant time with respect to the contents of each, but NOT in constant time with respect to the lengths of `a` and `b`."]]};

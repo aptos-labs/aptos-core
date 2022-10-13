@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["from_stream","Adapt a `Stream` of incoming connections into an `Accept`."],["poll_fn","Create an `Accept` with a polling function."]],"trait":[["Accept","Asynchronously accept incoming connections."]]};

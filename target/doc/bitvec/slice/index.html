@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A dynamically-sized view into individual bits of a memory region."><meta name="keywords" content="rust, rustlang, rust-lang, slice"><title>bitvec::slice - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../bitvec/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../bitvec/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module slice</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../bitvec/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">bitvec</a>::<wbr><a class="mod" href="#">slice</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/bitvec/slice.rs.html#1-2134">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A dynamically-sized view into individual bits of a memory region.</p>
+<p>You can read the language’s <a href="https://doc.rust-lang.org/std/slice"><code>slice</code> module documentation</a> here.</p>
+<p>This module defines the <a href="struct.BitSlice.html"><code>BitSlice</code></a> region, and all of its associated support
+code.</p>
+<p><code>BitSlice</code> is the primary working type of this crate. It is a wrapper type over
+<code>[T]</code> which enables you to view, manipulate, and take the address of individual
+bits in memory. It behaves in every possible respect exactly like an ordinary
+slice: it is dynamically-sized, and must be held by <code>&amp;</code> or <code>&amp;mut</code> reference,
+just like <code>[T]</code>, and implements every inherent method and trait that <code>[T]</code> does,
+to the absolute limits of what Rust permits.</p>
+<p>The key to <code>BitSlice</code>’s powerful capability is that references to it use a
+special encoding that store, in addition to the address of the base element and
+the bit length, the index of the starting bit in the base element. This custom
+reference encoding has some costs in what APIs are possible – for instance, Rust
+forbids it from supporting <code>&amp;mut BitSlice[index] = bool</code> write indexing – but in
+exchange, enables it to be <em>far</em> more capable than any other bit-slice crate in
+existence.</p>
+<p>Because of the volume of code that must be written to match the <code>[T]</code> standard
+API, this module is organized very differently than the slice implementation in
+the <code>core</code> and <code>std</code> distribution libraries.</p>
+<ul>
+<li>the root module <code>slice</code> contains new APIs that have no counterpart in <code>[T]</code></li>
+<li><code>slice/api</code> contains reïmplementations of the <code>[T]</code> inherent methods</li>
+<li><code>slice/iter</code> implements all of the iteration capability</li>
+<li><code>slice/ops</code> implements the traits in <code>core::ops</code></li>
+<li><code>slice/proxy</code> implements the proxy reference used in place of <code>&amp;mut bool</code></li>
+<li><code>slice/traits</code> implements all other traits not in <code>core::ops</code></li>
+<li>lastly, <code>slice/tests</code> contains all the unit tests.</li>
+</ul>
+<p>!</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BitMut.html" title="bitvec::slice::BitMut struct">BitMut</a></div><div class="item-right docblock-short"><p>Proxy reference type, equivalent to <code>&amp;mut bool</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BitSlice.html" title="bitvec::slice::BitSlice struct">BitSlice</a></div><div class="item-right docblock-short"><p>A slice of individual bits, anywhere in memory.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Chunks.html" title="bitvec::slice::Chunks struct">Chunks</a></div><div class="item-right docblock-short"><p>An iterator over a bit slice in (non-overlapping) chunks (<code>chunk_size</code> bits
+at a time), starting at the beginning of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ChunksExact.html" title="bitvec::slice::ChunksExact struct">ChunksExact</a></div><div class="item-right docblock-short"><p>An iterator over a bit slice in (non-overlapping) chunks (<code>chunk_size</code> bits
+at a time), starting at the beginning of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ChunksExactMut.html" title="bitvec::slice::ChunksExactMut struct">ChunksExactMut</a></div><div class="item-right docblock-short"><p>An iterator over a bit slice in (non-overlapping) mutable chunks
+(<code>chunk_size</code> bits at a time), starting at the beginning of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ChunksMut.html" title="bitvec::slice::ChunksMut struct">ChunksMut</a></div><div class="item-right docblock-short"><p>An iterator over a bit slice in (non-overlapping) mutable chunks
+(<code>chunk_size</code> bits at a time), starting at the beginning of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Iter.html" title="bitvec::slice::Iter struct">Iter</a></div><div class="item-right docblock-short"><p>Immutable slice iterator</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.IterMut.html" title="bitvec::slice::IterMut struct">IterMut</a></div><div class="item-right docblock-short"><p>Mutable bit slice iterator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RChunks.html" title="bitvec::slice::RChunks struct">RChunks</a></div><div class="item-right docblock-short"><p>An iterator over a bit slice in (non-overlapping) chunks (<code>chunk_size</code> bits
+at a time), starting at the end of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RChunksExact.html" title="bitvec::slice::RChunksExact struct">RChunksExact</a></div><div class="item-right docblock-short"><p>An iterator over a bit slice in (non-overlapping) chunks (<code>chunk_size</code> bits
+at a time), starting at the end of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RChunksExactMut.html" title="bitvec::slice::RChunksExactMut struct">RChunksExactMut</a></div><div class="item-right docblock-short"><p>An iterator over a bit slice in (non-overlapping) mutable chunks
+(<code>chunk_size</code> bits at a time), starting at the end of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RChunksMut.html" title="bitvec::slice::RChunksMut struct">RChunksMut</a></div><div class="item-right docblock-short"><p>An iterator over a slice in (non-overlapping) mutable chunks (<code>chunk_size</code>
+bits at a time), starting at the end of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RSplit.html" title="bitvec::slice::RSplit struct">RSplit</a></div><div class="item-right docblock-short"><p>An iterator over subslices separated by bits that match a predicate
+function, starting from the end of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RSplitMut.html" title="bitvec::slice::RSplitMut struct">RSplitMut</a></div><div class="item-right docblock-short"><p>An iterator over subslices separated by bits that match a predicate
+function, starting from the end of the slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RSplitN.html" title="bitvec::slice::RSplitN struct">RSplitN</a></div><div class="item-right docblock-short"><p>An iterator over subslices separated by bits that match a predicate
+function, limited to a given number of splits, starting from the end of the
+slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RSplitNMut.html" title="bitvec::slice::RSplitNMut struct">RSplitNMut</a></div><div class="item-right docblock-short"><p>An iterator over subslices separated by bits that match a predicate
+function, limited to a given number of splits, starting from the end of the
+slice.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Split.html" title="bitvec::slice::Split struct">Split</a></div><div class="item-right docblock-short"><p>An iterator over subslices separated by bits that match a predicate
+function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SplitMut.html" title="bitvec::slice::SplitMut struct">SplitMut</a></div><div class="item-right docblock-short"><p>An iterator over the mutable subslices of the slice which are separated by
+bits that match <code>pred</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SplitN.html" title="bitvec::slice::SplitN struct">SplitN</a></div><div class="item-right docblock-short"><p>An iterator over subslices separated by bits that match a predicate
+function, limited to a given number of splits.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SplitNMut.html" title="bitvec::slice::SplitNMut struct">SplitNMut</a></div><div class="item-right docblock-short"><p>An iterator over subslices separated by bits that match a predicate
+function, limited to a given number of splits.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Windows.html" title="bitvec::slice::Windows struct">Windows</a></div><div class="item-right docblock-short"><p>An iterator over overlapping subslices of length <code>size</code>.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.BitSliceIndex.html" title="bitvec::slice::BitSliceIndex trait">BitSliceIndex</a></div><div class="item-right docblock-short"><p>A helper trait used for indexing operations.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.bits_from_raw_parts.html" title="bitvec::slice::bits_from_raw_parts fn">bits_from_raw_parts</a><a title="unsafe function" href="#"><sup>⚠</sup></a></div><div class="item-right docblock-short"><p>Constructs a <code>&amp;BitSlice</code> reference from its component data.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.bits_from_raw_parts_mut.html" title="bitvec::slice::bits_from_raw_parts_mut fn">bits_from_raw_parts_mut</a><a title="unsafe function" href="#"><sup>⚠</sup></a></div><div class="item-right docblock-short"><p>Constructs a <code>&amp;mut BitSlice</code> reference from its component data.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.from_mut.html" title="bitvec::slice::from_mut fn">from_mut</a></div><div class="item-right docblock-short"><p>Converts a reference to <code>T</code> into a bitslice over one element.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.from_raw_parts.html" title="bitvec::slice::from_raw_parts fn">from_raw_parts</a><a title="unsafe function" href="#"><sup>⚠</sup></a></div><div class="item-right docblock-short"><p>Forms a bitslice from a pointer and a length.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.from_raw_parts_mut.html" title="bitvec::slice::from_raw_parts_mut fn">from_raw_parts_mut</a><a title="unsafe function" href="#"><sup>⚠</sup></a></div><div class="item-right docblock-short"><p>Performs the same functionality as <a href="fn.from_raw_parts.html"><code>from_raw_parts</code></a>, except that a mutable
+bitslice is returned.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.from_ref.html" title="bitvec::slice::from_ref fn">from_ref</a></div><div class="item-right docblock-short"><p>Converts a reference to <code>T</code> into a bitslice over one element.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="bitvec" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

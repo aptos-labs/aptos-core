@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["SecRandom","A source of random data."]]};

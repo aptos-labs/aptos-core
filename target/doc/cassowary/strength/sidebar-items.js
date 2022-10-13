@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["MEDIUM",""],["REQUIRED",""],["STRONG",""],["WEAK",""]],"fn":[["clip","Clips a strength value to the legal range"],["create","Create a constraint as a linear combination of STRONG, MEDIUM and WEAK strengths, corresponding to `a` `b` and `c` respectively. The result is further multiplied by `w`."]]};

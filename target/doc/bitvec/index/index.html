@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Typed metadata of registers."><meta name="keywords" content="rust, rustlang, rust-lang, index"><title>bitvec::index - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../bitvec/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../bitvec/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module index</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../bitvec/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">bitvec</a>::<wbr><a class="mod" href="#">index</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/bitvec/index.rs.html#1-1255">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Typed metadata of registers.</p>
+<p>This module provides types which guarantee certain properties about working with
+individual bits of registers.</p>
+<p>The main advantage of the types in this module is that they provide
+type-dependent range constrictions for index values, making it impossible to
+have an index out of bounds for a register, and creating a sequence of type
+transformations that give assurance about the continued validity of each value
+in its surrounding context.</p>
+<p>By eliminating public constructors from arbitrary integers, <code>bitvec</code> can
+guarantee that only it can produce seed values, and only trusted functions can
+transform their numeric values or types, until the program reaches the property
+it requires. This chain of assurance means that operations that interact with
+memory can be confident in the correctness of their actions and effects.</p>
+<h2 id="type-sequence"><a href="#type-sequence">Type Sequence</a></h2>
+<p>The library produces <code>BitIdx</code> values from region computation. These types cannot
+be publicly constructed, and are only ever the result of pointer analysis. As
+such, they rely on correctness of the memory regions provided to library entry
+points, and those entry points can leverage the Rust type system to ensure
+safety there.</p>
+<p><code>BitIdx</code> is transformed to <code>BitPos</code> through the <code>BitOrder</code> trait, which has an
+associated verification function to prove that implementations are correct.
+<code>BitPos</code> is the only type that can describe memory operations, and is used to
+create selection masks of <code>BitSel</code> and <code>BitMask</code>.
+!</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BitIdx.html" title="bitvec::index::BitIdx struct">BitIdx</a></div><div class="item-right docblock-short"><p>A semantic index of a single bit within a register <code>R</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BitMask.html" title="bitvec::index::BitMask struct">BitMask</a></div><div class="item-right docblock-short"><p>A multi-bit selection mask.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BitPos.html" title="bitvec::index::BitPos struct">BitPos</a></div><div class="item-right docblock-short"><p>An electrical position of a single bit within a register <code>R</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BitSel.html" title="bitvec::index::BitSel struct">BitSel</a></div><div class="item-right docblock-short"><p>A one-hot selection mask, to be applied to a register <code>R</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BitTail.html" title="bitvec::index::BitTail struct">BitTail</a></div><div class="item-right docblock-short"><p>Semantic index of a dead bit <em>after</em> a live region.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.BitRegister.html" title="bitvec::index::BitRegister trait">BitRegister</a></div><div class="item-right docblock-short"><p>Marks that an integer can be used in a processor register.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="bitvec" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

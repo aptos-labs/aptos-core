@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""],["make_native_borrow_address",""]],"struct":[["BorrowAddressGasParameters",""],["GasParameters",""]]};

@@ -1,0 +1,61 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Define a OpenAPI discriminator object."><meta name="keywords" content="rust, rustlang, rust-lang, Union"><title>Union in poem_openapi - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/poem-web/poem/master/favicon.ico"></head><body class="rustdoc derive"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In poem_openapi</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../poem_openapi/index.html">
+                        <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Derive Macro <a href="index.html">poem_openapi</a>::<wbr><a class="derive" href="#">Union</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/poem_openapi_derive/lib.rs.html#50">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust derive"><code>#[derive(Union)]
+{
+    // Attributes available to this derive:
+    #[oai]
+}
+</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Define a OpenAPI discriminator object.</p>
+<h2 id="macro-parameters"><a href="#macro-parameters">Macro parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>discriminator_name</td><td>The name of the property in the payload that will hold the discriminator value.</td><td>string</td><td>Y</td></tr>
+<tr><td>one_of</td><td>Validates the value against exactly one of the subschemas</td><td>bool</td><td>Y</td></tr>
+<tr><td>external_docs</td><td>Specify a external resource for extended documentation</td><td>string</td><td>Y</td></tr>
+<tr><td>rename_all</td><td>Rename all the mapping name according to the given case convention. The possible values are “lowercase”, “UPPERCASE”, “PascalCase”, “camelCase”, “snake_case”, “SCREAMING_SNAKE_CASE”, “kebab-case”, “SCREAMING-KEBAB-CASE”.</td><td>string</td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="item-parameters"><a href="#item-parameters">Item parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>mapping</td><td>Rename the payload value. (Default is the object name)</td><td>string</td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="example-with-discriminator"><a href="#example-with-discriminator">Example with discriminator</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem_openapi</span>::{<span class="ident">Object</span>, <span class="ident">Union</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Object</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">struct</span> <span class="ident">A</span> {
+    <span class="ident">v1</span>: <span class="ident">i32</span>,
+    <span class="ident">v2</span>: <span class="ident">String</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Object</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">struct</span> <span class="ident">B</span> {
+    <span class="ident">v3</span>: <span class="ident">f32</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Union</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="attribute">#[<span class="ident">oai</span>(<span class="ident">discriminator_name</span> <span class="op">=</span> <span class="string">&quot;type&quot;</span>)]</span>
+<span class="kw">enum</span> <span class="ident">MyObj</span> {
+    <span class="ident">A</span>(<span class="ident">A</span>),
+    <span class="ident">B</span>(<span class="ident">B</span>),
+}</code></pre></div>
+<h2 id="example-without-discriminator"><a href="#example-without-discriminator">Example without discriminator</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem_openapi</span>::{<span class="ident">Object</span>, <span class="ident">Union</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Object</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">struct</span> <span class="ident">A</span> {
+    <span class="ident">v1</span>: <span class="ident">i32</span>,
+    <span class="ident">v2</span>: <span class="ident">String</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Union</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">enum</span> <span class="ident">MyObj</span> {
+    <span class="ident">A</span>(<span class="ident">A</span>),
+    <span class="ident">B</span>(<span class="ident">bool</span>),
+    <span class="ident">C</span>(<span class="ident">String</span>),
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="poem_openapi" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

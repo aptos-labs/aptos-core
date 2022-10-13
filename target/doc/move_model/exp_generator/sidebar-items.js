@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["ExpGenerator","A trait that defines a generator for `Exp`."]]};

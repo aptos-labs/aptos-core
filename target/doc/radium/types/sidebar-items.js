@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"type":[["RadiumBool","`AtomicBool`"],["RadiumI16","`AtomicI16`"],["RadiumI32","`AtomicI32`"],["RadiumI64","`AtomicI64`"],["RadiumI8","`AtomicI8`"],["RadiumIsize","`AtomicIsize`"],["RadiumPtr","`AtomicPtr`"],["RadiumU16","`AtomicU16`"],["RadiumU32","`AtomicU32`"],["RadiumU64","`AtomicU64`"],["RadiumU8","`AtomicU8`"],["RadiumUsize","`AtomicUsize`"]]};

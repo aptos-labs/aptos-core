@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"static":[["APTOS_COIN_TYPE",""]]};

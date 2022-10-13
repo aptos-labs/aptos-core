@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["AbstractValueUnit","Unit of abstract value size – a conceptual measurement of the memory space a Move value occupies."]],"type":[["AbstractValueSize",""],["AbstractValueSizePerArg",""],["InternalGasPerAbstractValueUnit",""]]};

@@ -1,0 +1,279 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/registry/src/github.com-1ecc6299db9ec823/h2-0.3.14/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../h2/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../h2/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../h2/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+</pre><pre class="rust"><code><span class="doccomment">//! An asynchronous, HTTP/2 server and client implementation.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This library implements the [HTTP/2] specification. The implementation is</span>
+<span class="doccomment">//! asynchronous, using [futures] as the basis for the API. The implementation</span>
+<span class="doccomment">//! is also decoupled from TCP or TLS details. The user must handle ALPN and</span>
+<span class="doccomment">//! HTTP/1.1 upgrades themselves.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Getting started</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Add the following to your `Cargo.toml` file:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```toml</span>
+<span class="doccomment">//! [dependencies]</span>
+<span class="doccomment">//! h2 = &quot;0.3&quot;</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Layout</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The crate is split into [`client`] and [`server`] modules. Types that are</span>
+<span class="doccomment">//! common to both clients and servers are located at the root of the crate.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! See module level documentation for more details on how to use `h2`.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Handshake</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Both the client and the server require a connection to already be in a state</span>
+<span class="doccomment">//! ready to start the HTTP/2 handshake. This library does not provide</span>
+<span class="doccomment">//! facilities to do this.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! There are three ways to reach an appropriate state to start the HTTP/2</span>
+<span class="doccomment">//! handshake.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! * Opening an HTTP/1.1 connection and performing an [upgrade].</span>
+<span class="doccomment">//! * Opening a connection with TLS and use ALPN to negotiate the protocol.</span>
+<span class="doccomment">//! * Open a connection with prior knowledge, i.e. both the client and the</span>
+<span class="doccomment">//!   server assume that the connection is immediately ready to start the</span>
+<span class="doccomment">//!   HTTP/2 handshake once opened.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Once the connection is ready to start the HTTP/2 handshake, it can be</span>
+<span class="doccomment">//! passed to [`server::handshake`] or [`client::handshake`]. At this point, the</span>
+<span class="doccomment">//! library will start the handshake process, which consists of:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! * The client sends the connection preface (a predefined sequence of 24</span>
+<span class="doccomment">//! octets).</span>
+<span class="doccomment">//! * Both the client and the server sending a SETTINGS frame.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! See the [Starting HTTP/2] in the specification for more details.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Flow control</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! [Flow control] is a fundamental feature of HTTP/2. The `h2` library</span>
+<span class="doccomment">//! exposes flow control to the user.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! An HTTP/2 client or server may not send unlimited data to the peer. When a</span>
+<span class="doccomment">//! stream is initiated, both the client and the server are provided with an</span>
+<span class="doccomment">//! initial window size for that stream.  A window size is the number of bytes</span>
+<span class="doccomment">//! the endpoint can send to the peer. At any point in time, the peer may</span>
+<span class="doccomment">//! increase this window size by sending a `WINDOW_UPDATE` frame. Once a client</span>
+<span class="doccomment">//! or server has sent data filling the window for a stream, no further data may</span>
+<span class="doccomment">//! be sent on that stream until the peer increases the window.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! There is also a **connection level** window governing data sent across all</span>
+<span class="doccomment">//! streams.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Managing flow control for inbound data is done through [`FlowControl`].</span>
+<span class="doccomment">//! Managing flow control for outbound data is done through [`SendStream`]. See</span>
+<span class="doccomment">//! the struct level documentation for those two types for more details.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! [HTTP/2]: https://http2.github.io/</span>
+<span class="doccomment">//! [futures]: https://docs.rs/futures/</span>
+<span class="doccomment">//! [`client`]: client/index.html</span>
+<span class="doccomment">//! [`server`]: server/index.html</span>
+<span class="doccomment">//! [Flow control]: http://httpwg.org/specs/rfc7540.html#FlowControl</span>
+<span class="doccomment">//! [`FlowControl`]: struct.FlowControl.html</span>
+<span class="doccomment">//! [`SendStream`]: struct.SendStream.html</span>
+<span class="doccomment">//! [Starting HTTP/2]: http://httpwg.org/specs/rfc7540.html#starting</span>
+<span class="doccomment">//! [upgrade]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Protocol_upgrade_mechanism</span>
+<span class="doccomment">//! [`server::handshake`]: server/fn.handshake.html</span>
+<span class="doccomment">//! [`client::handshake`]: client/fn.handshake.html</span>
+
+<span class="attribute">#![<span class="ident">doc</span>(<span class="ident">html_root_url</span> <span class="op">=</span> <span class="string">&quot;https://docs.rs/h2/0.3.14&quot;</span>)]</span>
+<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">missing_debug_implementations</span>, <span class="ident">missing_docs</span>)]</span>
+<span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">test</span>, <span class="ident">deny</span>(<span class="ident">warnings</span>))]</span>
+
+<span class="macro">macro_rules!</span> <span class="ident">proto_err</span> {
+    (<span class="ident">conn</span>: $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">msg</span>:<span class="ident">tt</span>)<span class="op">+</span>) =&gt; {
+        <span class="macro">tracing::debug!</span>(<span class="string">&quot;connection error PROTOCOL_ERROR -- {};&quot;</span>, <span class="macro">format_args!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">msg</span>)<span class="op">+</span>))
+    };
+    (<span class="ident">stream</span>: $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">msg</span>:<span class="ident">tt</span>)<span class="op">+</span>) =&gt; {
+        <span class="macro">tracing::debug!</span>(<span class="string">&quot;stream error PROTOCOL_ERROR -- {};&quot;</span>, <span class="macro">format_args!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">msg</span>)<span class="op">+</span>))
+    };
+}
+
+<span class="macro">macro_rules!</span> <span class="ident">ready</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>) =&gt; {
+        <span class="kw">match</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span> {
+            <span class="ident">::std::task::Poll::Ready</span>(<span class="ident">r</span>) =&gt; <span class="ident">r</span>,
+            <span class="ident">::std::task::Poll::Pending</span> =&gt; <span class="kw">return</span> <span class="ident">::std::task::Poll::Pending</span>,
+        }
+    };
+}
+
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>, <span class="ident">allow</span>(<span class="ident">missing_docs</span>))]</span>
+<span class="kw">mod</span> <span class="ident">codec</span>;
+<span class="kw">mod</span> <span class="ident">error</span>;
+<span class="kw">mod</span> <span class="ident">hpack</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>))]</span>
+<span class="kw">mod</span> <span class="ident">proto</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">missing_docs</span>)]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">proto</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>))]</span>
+<span class="kw">mod</span> <span class="ident">frame</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">missing_docs</span>)]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">frame</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">client</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">ext</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">server</span>;
+<span class="kw">mod</span> <span class="ident">share</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">fuzzing</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>, <span class="ident">allow</span>(<span class="ident">missing_docs</span>))]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">fuzz_bridge</span>;
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::error</span>::{<span class="ident">Error</span>, <span class="ident">Reason</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::share</span>::{<span class="ident">FlowControl</span>, <span class="ident">Ping</span>, <span class="ident">PingPong</span>, <span class="ident">Pong</span>, <span class="ident">RecvStream</span>, <span class="ident">SendStream</span>, <span class="ident">StreamId</span>};
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">codec</span>::{<span class="ident">Codec</span>, <span class="ident">SendError</span>, <span class="ident">UserError</span>};
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="h2" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

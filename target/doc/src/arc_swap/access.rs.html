@@ -1,0 +1,939 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/registry/src/github.com-1ecc6299db9ec823/arc-swap-1.5.1/src/access.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>access.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../arc_swap/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">unsafe_code</span>)]</span>
+
+<span class="doccomment">//! Abstracting over accessing parts of stored value.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Sometimes, there&#39;s a big globalish data structure (like a configuration for the whole program).</span>
+<span class="doccomment">//! Then there are parts of the program that need access to up-to-date version of their *part* of</span>
+<span class="doccomment">//! the configuration, but for reasons of code separation and reusability, it is not desirable to</span>
+<span class="doccomment">//! pass the whole configuration to each of the parts.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This module provides means to grant the parts access to the relevant subsets of such global</span>
+<span class="doccomment">//! data structure while masking the fact it is part of the bigger whole from the component.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Note that the [`cache`][crate::cache] module has its own [`Access`][crate::cache::Access] trait</span>
+<span class="doccomment">//! that serves a similar purpose, but with cached access. The signatures are different, therefore</span>
+<span class="doccomment">//! an incompatible trait.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # The general idea</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Each part of the code accepts generic [`Access&lt;T&gt;`][Access] for the `T` of its interest. This</span>
+<span class="doccomment">//! provides means to load current version of the structure behind the scenes and get only the</span>
+<span class="doccomment">//! relevant part, without knowing what the big structure is.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! For technical reasons, the [`Access`] trait is not object safe. If type erasure is desired, it</span>
+<span class="doccomment">//! is possible use the [`DynAccess`][crate::access::DynAccess] instead, which is object safe, but</span>
+<span class="doccomment">//! slightly slower.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! For some cases, it is possible to use [`ArcSwapAny::map`]. If that is not flexible enough, the</span>
+<span class="doccomment">//! [`Map`] type can be created directly.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Note that the [`Access`] trait is also implemented for [`ArcSwapAny`] itself. Additionally,</span>
+<span class="doccomment">//! there&#39;s the [`Constant`][crate::access::Constant] helper type, which is useful mostly for</span>
+<span class="doccomment">//! testing (it doesn&#39;t allow reloading).</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Performance</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! In general, these utilities use [`ArcSwapAny::load`] internally and then apply the provided</span>
+<span class="doccomment">//! transformation. This has several consequences:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! * Limitations of the [`load`][ArcSwapAny::load] apply ‒ including the recommendation to not</span>
+<span class="doccomment">//!   hold the returned guard object for too long, but long enough to get consistency.</span>
+<span class="doccomment">//! * The transformation should be cheap ‒ optimally just borrowing into the structure.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```rust</span>
+<span class="doccomment">//! use std::sync::Arc;</span>
+<span class="doccomment">//! use std::thread::{self, JoinHandle};</span>
+<span class="doccomment">//! use std::time::Duration;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! use arc_swap::ArcSwap;</span>
+<span class="doccomment">//! use arc_swap::access::{Access, Constant, Map};</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! fn work_with_usize&lt;A: Access&lt;usize&gt; + Send + &#39;static&gt;(a: A) -&gt; JoinHandle&lt;()&gt; {</span>
+<span class="doccomment">//!     thread::spawn(move || {</span>
+<span class="doccomment">//!         let mut value = 0;</span>
+<span class="doccomment">//!         while value != 42 {</span>
+<span class="doccomment">//!             let guard = a.load();</span>
+<span class="doccomment">//!             value = *guard;</span>
+<span class="doccomment">//!             println!(&quot;{}&quot;, value);</span>
+<span class="doccomment">//!             // Not strictly necessary, but dropping the guard can free some resources, like</span>
+<span class="doccomment">//!             // slots for tracking what values are still in use. We do it before the sleeping,</span>
+<span class="doccomment">//!             // not at the end of the scope.</span>
+<span class="doccomment">//!             drop(guard);</span>
+<span class="doccomment">//!             thread::sleep(Duration::from_millis(50));</span>
+<span class="doccomment">//!         }</span>
+<span class="doccomment">//!     })</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! // Passing the whole thing directly</span>
+<span class="doccomment">//! // (If we kept another Arc to it, we could change the value behind the scenes)</span>
+<span class="doccomment">//! work_with_usize(Arc::new(ArcSwap::from_pointee(42))).join().unwrap();</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! // Passing a subset of a structure</span>
+<span class="doccomment">//! struct Cfg {</span>
+<span class="doccomment">//!     value: usize,</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! let cfg = Arc::new(ArcSwap::from_pointee(Cfg { value: 0 }));</span>
+<span class="doccomment">//! let thread = work_with_usize(Map::new(Arc::clone(&amp;cfg), |cfg: &amp;Cfg| &amp;cfg.value));</span>
+<span class="doccomment">//! cfg.store(Arc::new(Cfg { value: 42 }));</span>
+<span class="doccomment">//! thread.join().unwrap();</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! // Passing a constant that can&#39;t change. Useful mostly for testing purposes.</span>
+<span class="doccomment">//! work_with_usize(Constant(42)).join().unwrap();</span>
+<span class="doccomment">//! ```</span>
+
+<span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
+<span class="kw">use</span> <span class="ident">std::ops::Deref</span>;
+<span class="kw">use</span> <span class="ident">std::rc::Rc</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::ref_cnt::RefCnt</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::strategy::Strategy</span>;
+<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">ArcSwapAny</span>, <span class="ident">Guard</span>};
+
+<span class="doccomment">/// Abstracts over ways code can get access to a value of type `T`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is the trait that parts of code will use when accessing a subpart of the big data</span>
+<span class="doccomment">/// structure. See the [module documentation](index.html) for details.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// A guard object containing the value and keeping it alive.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// For technical reasons, the library doesn&#39;t allow direct access into the stored value. A</span>
+    <span class="doccomment">/// temporary guard object must be loaded, that keeps the actual value alive for the time of</span>
+    <span class="doccomment">/// use.</span>
+    <span class="kw">type</span> <span class="ident">Guard</span>: <span class="ident">Deref</span><span class="op">&lt;</span><span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span>;
+
+    <span class="doccomment">/// The loading method.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This returns the guard that holds the actual value. Should be called anew each time a fresh</span>
+    <span class="doccomment">/// value is needed.</span>
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span>;
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">A</span>: <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">P</span>: <span class="ident">Deref</span><span class="op">&lt;</span><span class="ident">Target</span> <span class="op">=</span> <span class="ident">A</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">P</span> {
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">A::Guard</span>;
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> {
+        <span class="self">self</span>.<span class="ident">deref</span>().<span class="ident">load</span>()
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RefCnt</span>, <span class="ident">S</span>: <span class="ident">Strategy</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ArcSwapAny</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">Guard</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> {
+        <span class="self">self</span>.<span class="ident">load</span>()
+    }
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DirectDeref</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RefCnt</span>, <span class="ident">S</span>: <span class="ident">Strategy</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">Guard</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span>);
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>: <span class="ident">Strategy</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">DirectDeref</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="ident">deref</span>()
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>: <span class="ident">Strategy</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ArcSwapAny</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">DirectDeref</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">S</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> {
+        <span class="ident">DirectDeref</span>(<span class="self">self</span>.<span class="ident">load</span>())
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>: <span class="ident">Strategy</span><span class="op">&lt;</span><span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">DirectDeref</span><span class="op">&lt;</span><span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="ident">deref</span>()
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>: <span class="ident">Strategy</span><span class="op">&lt;</span><span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ArcSwapAny</span><span class="op">&lt;</span><span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">DirectDeref</span><span class="op">&lt;</span><span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">S</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> {
+        <span class="ident">DirectDeref</span>(<span class="self">self</span>.<span class="ident">load</span>())
+    }
+}
+
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DynGuard</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span>(<span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Deref</span><span class="op">&lt;</span><span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>);
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">DynGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+    }
+}
+
+<span class="doccomment">/// An object-safe version of the [`Access`] trait.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This can be used instead of the [`Access`] trait in case a type erasure is desired. This has</span>
+<span class="doccomment">/// the effect of performance hit (due to boxing of the result and due to dynamic dispatch), but</span>
+<span class="doccomment">/// makes certain code simpler and possibly makes the executable smaller.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is automatically implemented for everything that implements [`Access`].</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Examples</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```rust</span>
+<span class="doccomment">/// use arc_swap::access::{Constant, DynAccess};</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// fn do_something(value: Box&lt;dyn DynAccess&lt;usize&gt; + Send&gt;) {</span>
+<span class="doccomment">///     let v = value.load();</span>
+<span class="doccomment">///     println!(&quot;{}&quot;, *v);</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// do_something(Box::new(Constant(42)));</span>
+<span class="doccomment">/// ```</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">DynAccess</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// The equivalent of [`Access::load`].</span>
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DynGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>;
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">A</span><span class="op">&gt;</span> <span class="ident">DynAccess</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">A</span>
+<span class="kw">where</span>
+    <span class="ident">A</span>: <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="ident">A::Guard</span>: <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DynGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">DynGuard</span>(<span class="ident">Box::new</span>(<span class="ident">Access::load</span>(<span class="self">self</span>)))
+    }
+}
+
+<span class="doccomment">/// [DynAccess] to [Access] wrapper.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// A workaround to allow double-dyn mapping, since `Box&lt;dyn DynAccess&gt;` doesn&#39;t implement [Access]</span>
+<span class="doccomment">/// and [Map] needs that.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```rust</span>
+<span class="doccomment">/// use std::sync::Arc;</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// use arc_swap::ArcSwap;</span>
+<span class="doccomment">/// use arc_swap::access::{AccessConvert, DynAccess, Map};</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// struct Inner {</span>
+<span class="doccomment">///     val: usize,</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// struct Middle {</span>
+<span class="doccomment">///     inner: Inner,</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// struct Outer {</span>
+<span class="doccomment">///     middle: Middle,</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// let outer = Arc::new(ArcSwap::from_pointee(Outer {</span>
+<span class="doccomment">///     middle: Middle {</span>
+<span class="doccomment">///         inner: Inner {</span>
+<span class="doccomment">///             val: 42,</span>
+<span class="doccomment">///         }</span>
+<span class="doccomment">///     }</span>
+<span class="doccomment">/// }));</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// let middle: Arc&lt;dyn DynAccess&lt;Middle&gt;&gt; =</span>
+<span class="doccomment">///     Arc::new(Map::new(outer, |outer: &amp;Outer| &amp;outer.middle));</span>
+<span class="doccomment">/// let inner: Arc&lt;dyn DynAccess&lt;Inner&gt;&gt; =</span>
+<span class="doccomment">///     Arc::new(Map::new(AccessConvert(middle), |middle: &amp;Middle| &amp;middle.inner));</span>
+<span class="doccomment">/// let guard = inner.load();</span>
+<span class="doccomment">/// assert_eq!(42, guard.val);</span>
+<span class="doccomment">/// ```</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AccessConvert</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>(<span class="kw">pub</span> <span class="ident">D</span>);
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">D</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">AccessConvert</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">D</span>: <span class="ident">Deref</span>,
+    <span class="ident">D::Target</span>: <span class="ident">DynAccess</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+{
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">DynGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">load</span>()
+    }
+}
+
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span> {
+    <span class="ident">guard</span>: <span class="ident">G</span>,
+    <span class="ident">projection</span>: <span class="ident">F</span>,
+    <span class="ident">_t</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">R</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">G</span>: <span class="ident">Deref</span><span class="op">&lt;</span><span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">R</span>,
+{
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">R</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">R</span> {
+        (<span class="self">self</span>.<span class="ident">projection</span>)(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">guard</span>)
+    }
+}
+
+<span class="doccomment">/// An adaptor to provide access to a part of larger structure.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is the *active* part of this module. Use the [module documentation](index.html) for the</span>
+<span class="doccomment">/// details.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">T</span>, <span class="ident">F</span><span class="op">&gt;</span> {
+    <span class="ident">access</span>: <span class="ident">A</span>,
+    <span class="ident">projection</span>: <span class="ident">F</span>,
+    <span class="ident">_t</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="kw">fn</span>() -&gt; <span class="ident">T</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">T</span>, <span class="ident">F</span><span class="op">&gt;</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">T</span>, <span class="ident">F</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Creates a new instance.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Parameters</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `access`: Access to the bigger structure. This is usually something like `Arc&lt;ArcSwap&gt;`</span>
+    <span class="doccomment">///   or `&amp;ArcSwap`. It is technically possible to use any other [`Access`] here, though, for</span>
+    <span class="doccomment">///   example to sub-delegate into even smaller structure from a [`Map`] (or generic</span>
+    <span class="doccomment">///   [`Access`]).</span>
+    <span class="doccomment">/// * `projection`: A function (or closure) responsible to providing a reference into the</span>
+    <span class="doccomment">///   bigger bigger structure, selecting just subset of it. In general, it is expected to be</span>
+    <span class="doccomment">///   *cheap* (like only taking reference).</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>(<span class="ident">access</span>: <span class="ident">A</span>, <span class="ident">projection</span>: <span class="ident">F</span>) -&gt; <span class="self">Self</span>
+    <span class="kw">where</span>
+        <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">R</span> <span class="op">+</span> <span class="ident">Clone</span>,
+    {
+        <span class="ident">Map</span> {
+            <span class="ident">access</span>,
+            <span class="ident">projection</span>,
+            <span class="ident">_t</span>: <span class="ident">PhantomData</span>,
+        }
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">T</span>, <span class="ident">F</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">A</span>: <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">R</span> <span class="op">+</span> <span class="ident">Clone</span>,
+{
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">A::Guard</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> {
+        <span class="kw">let</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">access</span>.<span class="ident">load</span>();
+        <span class="ident">MapGuard</span> {
+            <span class="ident">guard</span>,
+            <span class="ident">projection</span>: <span class="self">self</span>.<span class="ident">projection</span>.<span class="ident">clone</span>(),
+            <span class="ident">_t</span>: <span class="ident">PhantomData</span>,
+        }
+    }
+}
+
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Ord</span>, <span class="ident">PartialOrd</span>, <span class="ident">Hash</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ConstantDeref</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">T</span>);
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">ConstantDeref</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+    }
+}
+
+<span class="doccomment">/// Access to an constant.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This wraps a constant value to provide [`Access`] to it. It is constant in the sense that,</span>
+<span class="doccomment">/// unlike [`ArcSwapAny`] and [`Map`], the loaded value will always stay the same (there&#39;s no</span>
+<span class="doccomment">/// remote `store`).</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The purpose is mostly testing and plugging a parameter that works generically from code that</span>
+<span class="doccomment">/// doesn&#39;t need the updating functionality.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Ord</span>, <span class="ident">PartialOrd</span>, <span class="ident">Hash</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Constant</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw">pub</span> <span class="ident">T</span>);
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Clone</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Constant</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">ConstantDeref</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> {
+        <span class="ident">ConstantDeref</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">clone</span>())
+    }
+}
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+<span class="kw">mod</span> <span class="ident">tests</span> {
+    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::<span class="kw">super</span></span>::{<span class="ident">ArcSwap</span>, <span class="ident">ArcSwapOption</span>};
+
+    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+
+    <span class="kw">fn</span> <span class="ident">check_static_dispatch_direct</span><span class="op">&lt;</span><span class="ident">A</span>: <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">a</span>: <span class="ident">A</span>) {
+        <span class="macro">assert_eq!</span>(<span class="number">42</span>, <span class="kw-2">*</span><span class="ident">a</span>.<span class="ident">load</span>());
+    }
+
+    <span class="kw">fn</span> <span class="ident">check_static_dispatch</span><span class="op">&lt;</span><span class="ident">A</span>: <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">a</span>: <span class="ident">A</span>) {
+        <span class="macro">assert_eq!</span>(<span class="number">42</span>, <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">a</span>.<span class="ident">load</span>());
+    }
+
+    <span class="doccomment">/// Tests dispatching statically from arc-swap works</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">static_dispatch</span>() {
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">ArcSwap::from_pointee</span>(<span class="number">42</span>);
+        <span class="ident">check_static_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+        <span class="ident">check_static_dispatch</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+        <span class="ident">check_static_dispatch</span>(<span class="ident">a</span>);
+    }
+
+    <span class="kw">fn</span> <span class="ident">check_dyn_dispatch_direct</span>(<span class="ident">a</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">DynAccess</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>) {
+        <span class="macro">assert_eq!</span>(<span class="number">42</span>, <span class="kw-2">*</span><span class="ident">a</span>.<span class="ident">load</span>());
+    }
+
+    <span class="kw">fn</span> <span class="ident">check_dyn_dispatch</span>(<span class="ident">a</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">DynAccess</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
+        <span class="macro">assert_eq!</span>(<span class="number">42</span>, <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">a</span>.<span class="ident">load</span>());
+    }
+
+    <span class="doccomment">/// Tests we can also do a dynamic dispatch of the companion trait</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">dyn_dispatch</span>() {
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">ArcSwap::from_pointee</span>(<span class="number">42</span>);
+        <span class="ident">check_dyn_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+        <span class="ident">check_dyn_dispatch</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+    }
+
+    <span class="kw">fn</span> <span class="ident">check_transition</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">a</span>: <span class="ident">A</span>)
+    <span class="kw">where</span>
+        <span class="ident">A</span>: <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
+        <span class="ident">A::Guard</span>: <span class="lifetime">&#39;static</span>,
+    {
+        <span class="ident">check_dyn_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>)
+    }
+
+    <span class="doccomment">/// Tests we can easily transition from the static dispatch trait to the dynamic one</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">transition</span>() {
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">ArcSwap::from_pointee</span>(<span class="number">42</span>);
+        <span class="ident">check_transition</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+        <span class="ident">check_transition</span>(<span class="ident">a</span>);
+    }
+
+    <span class="doccomment">/// Test we can dispatch from Arc&lt;ArcSwap&lt;_&gt;&gt; or similar.</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">indirect</span>() {
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">ArcSwap::from_pointee</span>(<span class="number">42</span>));
+        <span class="ident">check_static_dispatch</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+        <span class="ident">check_dyn_dispatch</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+    }
+
+    <span class="kw">struct</span> <span class="ident">Cfg</span> {
+        <span class="ident">value</span>: <span class="ident">usize</span>,
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">map</span>() {
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">ArcSwap::from_pointee</span>(<span class="ident">Cfg</span> { <span class="ident">value</span>: <span class="number">42</span> });
+        <span class="kw">let</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">a</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">a</span>: <span class="kw-2">&amp;</span><span class="ident">Cfg</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">a</span>.<span class="ident">value</span>);
+        <span class="ident">check_static_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">map</span>);
+        <span class="ident">check_dyn_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">map</span>);
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">map_option_some</span>() {
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">ArcSwapOption::from_pointee</span>(<span class="ident">Cfg</span> { <span class="ident">value</span>: <span class="number">42</span> });
+        <span class="kw">let</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">a</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">a</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Cfg</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">c</span>.<span class="ident">value</span>).<span class="ident">unwrap</span>());
+        <span class="ident">check_static_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">map</span>);
+        <span class="ident">check_dyn_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">map</span>);
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">map_option_none</span>() {
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">ArcSwapOption::empty</span>();
+        <span class="kw">let</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">a</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">a</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Cfg</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">c</span>.<span class="ident">value</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">42</span>));
+        <span class="ident">check_static_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">map</span>);
+        <span class="ident">check_dyn_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">map</span>);
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">constant</span>() {
+        <span class="kw">let</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">Constant</span>(<span class="number">42</span>);
+        <span class="ident">check_static_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>);
+        <span class="ident">check_dyn_dispatch_direct</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>);
+        <span class="ident">check_static_dispatch_direct</span>(<span class="ident">c</span>);
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">map_reload</span>() {
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">ArcSwap::from_pointee</span>(<span class="ident">Cfg</span> { <span class="ident">value</span>: <span class="number">0</span> });
+        <span class="kw">let</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">a</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Cfg</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">cfg</span>.<span class="ident">value</span>);
+        <span class="macro">assert_eq!</span>(<span class="number">0</span>, <span class="kw-2">*</span><span class="ident">Access::load</span>(<span class="kw-2">&amp;</span><span class="ident">map</span>));
+        <span class="ident">a</span>.<span class="ident">store</span>(<span class="ident">Arc::new</span>(<span class="ident">Cfg</span> { <span class="ident">value</span>: <span class="number">42</span> }));
+        <span class="macro">assert_eq!</span>(<span class="number">42</span>, <span class="kw-2">*</span><span class="ident">Access::load</span>(<span class="kw-2">&amp;</span><span class="ident">map</span>));
+    }
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="arc_swap" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="`Span` and `Event` key-value data."><meta name="keywords" content="rust, rustlang, rust-lang, field"><title>tracing::field - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tracing/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tracing/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module field</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tracing/index.html">
+                        <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">tracing</a>::<wbr><a class="mod" href="#">field</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tracing/field.rs.html#1-170">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p><code>Span</code> and <code>Event</code> key-value data.</p>
+<p>Spans and events may be annotated with key-value data, referred to as known
+as <em>fields</em>. These fields consist of a mapping from a key (corresponding to
+a <code>&amp;str</code> but represented internally as an array index) to a <a href="../trait.Value.html" title="Value"><code>Value</code></a>.</p>
+<h2 id="values-and-subscribers"><a href="#values-and-subscribers"><code>Value</code>s and <code>Subscriber</code>s</a></h2>
+<p><code>Subscriber</code>s consume <code>Value</code>s as fields attached to <a href="../span/index.html">span</a>s or <a href="../event/struct.Event.html"><code>Event</code></a>s.
+The set of field keys on a given span or is defined on its <a href="../struct.Metadata.html"><code>Metadata</code></a>.
+When a span is created, it provides <a href="../span/struct.Attributes.html"><code>Attributes</code></a> to the <code>Subscriber</code>’s
+<a href="../trait.Subscriber.html#tymethod.new_span"><code>new_span</code></a> method, containing any fields whose values were provided when
+the span was created; and may call the <code>Subscriber</code>’s <a href="../span/struct.Record.html"><code>record</code></a> method
+with additional <a href="../span/struct.Record.html"><code>Record</code></a>s if values are added for more of its fields.
+Similarly, the <a href="../event/struct.Event.html"><code>Event</code></a> type passed to the subscriber’s <a href="../event/struct.Event.html"><code>event</code></a> method
+will contain any fields attached to each event.</p>
+<p><code>tracing</code> represents values as either one of a set of Rust primitives
+(<code>i64</code>, <code>u64</code>, <code>f64</code>, <code>bool</code>, and <code>&amp;str</code>) or using a <code>fmt::Display</code> or
+<code>fmt::Debug</code> implementation. <code>Subscriber</code>s are provided these primitive
+value types as <code>dyn Value</code> trait objects.</p>
+<p>These trait objects can be formatted using <code>fmt::Debug</code>, but may also be
+recorded as typed data by calling the <a href="../trait.Value.html#tymethod.record" title="Value::record"><code>Value::record</code></a> method on these
+trait objects with a <em>visitor</em> implementing the <a href="trait.Visit.html" title="Visit"><code>Visit</code></a> trait. This trait
+represents the behavior used to record values of various types. For example,
+an implementation of <code>Visit</code> might record integers by incrementing counters
+for their field names rather than printing them.</p>
+<h2 id="using-valuable"><a href="#using-valuable">Using <code>valuable</code></a></h2>
+<p><code>tracing</code>’s <a href="../trait.Value.html" title="Value"><code>Value</code></a> trait is intentionally minimalist: it supports only a small
+number of Rust primitives as typed values, and only permits recording
+user-defined types with their <a href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Debug.html"><code>fmt::Debug</code></a> or <a href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Debug.html"><code>fmt::Display</code></a>
+implementations. However, there are some cases where it may be useful to record
+nested values (such as arrays, <code>Vec</code>s, or <code>HashMap</code>s containing values), or
+user-defined <code>struct</code> and <code>enum</code> types without having to format them as
+unstructured text.</p>
+<p>To address <code>Value</code>’s limitations, <code>tracing</code> offers experimental support for
+the <a href="https://crates.io/crates/valuable"><code>valuable</code></a> crate, which provides object-safe inspection of structured
+values. User-defined types can implement the <a href="https://docs.rs/valuable/latest/valuable/trait.Valuable.html"><code>valuable::Valuable</code></a> trait,
+and be recorded as a <code>tracing</code> field by calling their <a href="https://docs.rs/valuable/latest/valuable/trait.Valuable.html#tymethod.as_value"><code>as_value</code></a> method.
+If the <a href="../trait.Subscriber.html"><code>Subscriber</code></a> also supports the <code>valuable</code> crate, it can
+then visit those types fields as structured values using <code>valuable</code>.</p>
+<pre class="ignore" style="white-space:normal;font:inherit;">
+    <strong>Note</strong>: <code>valuable</code> support is an
+    <a href = "../index.html#unstable-features">unstable feature</a>. See
+    the documentation on unstable features for details on how to enable it.
+</pre>
+<p>For example:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore"><code><span class="comment">// Derive `Valuable` for our types:</span>
+<span class="kw">use</span> <span class="ident">valuable::Valuable</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Valuable</span>)]</span>
+<span class="kw">struct</span> <span class="ident">User</span> {
+    <span class="ident">name</span>: <span class="ident">String</span>,
+    <span class="ident">age</span>: <span class="ident">u32</span>,
+    <span class="ident">address</span>: <span class="ident">Address</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Valuable</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Address</span> {
+    <span class="ident">country</span>: <span class="ident">String</span>,
+    <span class="ident">city</span>: <span class="ident">String</span>,
+    <span class="ident">street</span>: <span class="ident">String</span>,
+}
+
+<span class="kw">let</span> <span class="ident">user</span> <span class="op">=</span> <span class="ident">User</span> {
+    <span class="ident">name</span>: <span class="string">&quot;Arwen Undomiel&quot;</span>.<span class="ident">to_string</span>(),
+    <span class="ident">age</span>: <span class="number">3000</span>,
+    <span class="ident">address</span>: <span class="ident">Address</span> {
+        <span class="ident">country</span>: <span class="string">&quot;Middle Earth&quot;</span>.<span class="ident">to_string</span>(),
+        <span class="ident">city</span>: <span class="string">&quot;Rivendell&quot;</span>.<span class="ident">to_string</span>(),
+        <span class="ident">street</span>: <span class="string">&quot;leafy lane&quot;</span>.<span class="ident">to_string</span>(),
+    },
+};
+
+<span class="comment">// Recording `user` as a `valuable::Value` will allow the `tracing` subscriber</span>
+<span class="comment">// to traverse its fields as a nested, typed structure:</span>
+<span class="macro">tracing::info!</span>(<span class="ident">current_user</span> <span class="op">=</span> <span class="ident">user</span>.<span class="ident">as_value</span>());</code></pre></div>
+<p>Alternatively, the [<code>valuable()</code>] function may be used to convert a type
+implementing <a href="https://crates.io/crates/valuable"><code>Valuable</code></a> into a <code>tracing</code> field value.</p>
+<p>When the <code>valuable</code> feature is enabled, the <a href="trait.Visit.html" title="Visit"><code>Visit</code></a> trait will include an
+optional <a href="Visit::record_value"><code>record_value</code></a> method. <code>Visit</code> implementations that wish to
+record <code>valuable</code> values can implement this method with custom behavior.
+If a visitor does not implement <code>record_value</code>, the <a href="https://docs.rs/valuable/latest/valuable/enum.Value.html"><code>valuable::Value</code></a> will
+be forwarded to the visitor’s <a href="trait.Visit.html#tymethod.record_debug"><code>record_debug</code></a> method.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DebugValue.html" title="tracing::field::DebugValue struct">DebugValue</a></div><div class="item-right docblock-short"><p>A <code>Value</code> which serializes as a string using <code>fmt::Debug</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DisplayValue.html" title="tracing::field::DisplayValue struct">DisplayValue</a></div><div class="item-right docblock-short"><p>A <code>Value</code> which serializes using <code>fmt::Display</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Empty.html" title="tracing::field::Empty struct">Empty</a></div><div class="item-right docblock-short"><p>An empty field.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Field.html" title="tracing::field::Field struct">Field</a></div><div class="item-right docblock-short"><p>An opaque key allowing <em>O</em>(1) access to a field in a <code>Span</code>’s key-value
+data.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FieldSet.html" title="tracing::field::FieldSet struct">FieldSet</a></div><div class="item-right docblock-short"><p>Describes the fields present on a span.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Iter.html" title="tracing::field::Iter struct">Iter</a></div><div class="item-right docblock-short"><p>An iterator over a set of fields.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ValueSet.html" title="tracing::field::ValueSet struct">ValueSet</a></div><div class="item-right docblock-short"><p>A set of fields and values for a span.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.AsField.html" title="tracing::field::AsField trait">AsField</a></div><div class="item-right docblock-short"><p>Trait implemented to allow a type to be used as a field key.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Value.html" title="tracing::field::Value trait">Value</a></div><div class="item-right docblock-short"><p>A field value of an erased type.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Visit.html" title="tracing::field::Visit trait">Visit</a></div><div class="item-right docblock-short"><p>Visits typed values.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.debug.html" title="tracing::field::debug fn">debug</a></div><div class="item-right docblock-short"><p>Wraps a type implementing <code>fmt::Debug</code> as a <code>Value</code> that can be
+recorded using its <code>Debug</code> implementation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.display.html" title="tracing::field::display fn">display</a></div><div class="item-right docblock-short"><p>Wraps a type implementing <code>fmt::Display</code> as a <code>Value</code> that can be
+recorded using its <code>Display</code> implementation.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tracing" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

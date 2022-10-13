@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["TreeBuilder","A builder for a tree of `StringItem`s"]]};

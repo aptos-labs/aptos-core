@@ -1,0 +1,112 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A `StatefulWidget` is a widget that can take advantage of some local state to remember things between two draw calls."><meta name="keywords" content="rust, rustlang, rust-lang, StatefulWidget"><title>StatefulWidget in tui::widgets - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tui/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tui/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">StatefulWidget</a></h2><div class="sidebar-elems"><section><div class="block"><h3 class="sidebar-title"><a href="#required-associated-types">Required Associated Types</a></h3><ul><li><a href="#associatedtype.State">State</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#required-methods">Required Methods</a></h3><ul><li><a href="#tymethod.render">render</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#implementors">Implementors</a></h3></div></section><h2 class="location"><a href="index.html">In tui::widgets</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tui/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Trait <a href="../index.html">tui</a>::<wbr><a href="index.html">widgets</a>::<wbr><a class="trait" href="#">StatefulWidget</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tui/widgets/mod.rs.html#181-184">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust trait"><code>pub trait StatefulWidget {
+    type <a href="#associatedtype.State" class="associatedtype">State</a>;
+
+    fn <a href="#tymethod.render" class="fnname">render</a>(self, area: <a class="struct" href="../layout/struct.Rect.html" title="struct tui::layout::Rect">Rect</a>, buf: &amp;mut <a class="struct" href="../buffer/struct.Buffer.html" title="struct tui::buffer::Buffer">Buffer</a>, state: &amp;mut Self::<a class="associatedtype" href="trait.StatefulWidget.html#associatedtype.State" title="type tui::widgets::StatefulWidget::State">State</a>);
+}</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A <code>StatefulWidget</code> is a widget that can take advantage of some local state to remember things
+between two draw calls.</p>
+<p>Most widgets can be drawn directly based on the input parameters. However, some features may
+require some kind of associated state to be implemented.</p>
+<p>For example, the <a href="struct.List.html" title="List"><code>List</code></a> widget can highlight the item currently selected. This can be
+translated in an offset, which is the number of elements to skip in order to have the selected
+item within the viewport currently allocated to this widget. The widget can therefore only
+provide the following behavior: whenever the selected item is out of the viewport scroll to a
+predefined position (making the selected item the last viewable item or the one in the middle
+for example). Nonetheless, if the widget has access to the last computed offset then it can
+implement a natural scrolling experience where the last offset is reused until the selected
+item is out of the viewport.</p>
+<h3 id="examples"><a href="#examples">Examples</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="comment">// Let&#39;s say we have some events to display.</span>
+<span class="kw">struct</span> <span class="ident">Events</span> {
+    <span class="comment">// `items` is the state managed by your application.</span>
+    <span class="ident">items</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+    <span class="comment">// `state` is the state that can be modified by the UI. It stores the index of the selected</span>
+    <span class="comment">// item as well as the offset computed during the previous draw call (used to implement</span>
+    <span class="comment">// natural scrolling).</span>
+    <span class="ident">state</span>: <span class="ident">ListState</span>
+}
+
+<span class="kw">impl</span> <span class="ident">Events</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">items</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) -&gt; <span class="ident">Events</span> {
+        <span class="ident">Events</span> {
+            <span class="ident">items</span>,
+            <span class="ident">state</span>: <span class="ident">ListState::default</span>(),
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_items</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">items</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">items</span> <span class="op">=</span> <span class="ident">items</span>;
+        <span class="comment">// We reset the state as the associated items have changed. This effectively reset</span>
+        <span class="comment">// the selection as well as the stored offset.</span>
+        <span class="self">self</span>.<span class="ident">state</span> <span class="op">=</span> <span class="ident">ListState::default</span>();
+    }
+
+    <span class="comment">// Select the next item. This will not be reflected until the widget is drawn in the</span>
+    <span class="comment">// `Terminal::draw` callback using `Frame::render_stateful_widget`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">selected</span>() {
+            <span class="prelude-val">Some</span>(<span class="ident">i</span>) =&gt; {
+                <span class="kw">if</span> <span class="ident">i</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">items</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span> {
+                    <span class="number">0</span>
+                } <span class="kw">else</span> {
+                    <span class="ident">i</span> <span class="op">+</span> <span class="number">1</span>
+                }
+            }
+            <span class="prelude-val">None</span> =&gt; <span class="number">0</span>,
+        };
+        <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">select</span>(<span class="prelude-val">Some</span>(<span class="ident">i</span>));
+    }
+
+    <span class="comment">// Select the previous item. This will not be reflected until the widget is drawn in the</span>
+    <span class="comment">// `Terminal::draw` callback using `Frame::render_stateful_widget`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">previous</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">selected</span>() {
+            <span class="prelude-val">Some</span>(<span class="ident">i</span>) =&gt; {
+                <span class="kw">if</span> <span class="ident">i</span> <span class="op">==</span> <span class="number">0</span> {
+                    <span class="self">self</span>.<span class="ident">items</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>
+                } <span class="kw">else</span> {
+                    <span class="ident">i</span> <span class="op">-</span> <span class="number">1</span>
+                }
+            }
+            <span class="prelude-val">None</span> =&gt; <span class="number">0</span>,
+        };
+        <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">select</span>(<span class="prelude-val">Some</span>(<span class="ident">i</span>));
+    }
+
+    <span class="comment">// Unselect the currently selected item if any. The implementation of `ListState` makes</span>
+    <span class="comment">// sure that the stored offset is also reset.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unselect</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">select</span>(<span class="prelude-val">None</span>);
+    }
+}
+
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">events</span> <span class="op">=</span> <span class="ident">Events::new</span>(<span class="macro">vec!</span>[
+    <span class="ident">String::from</span>(<span class="string">&quot;Item 1&quot;</span>),
+    <span class="ident">String::from</span>(<span class="string">&quot;Item 2&quot;</span>)
+]);
+
+<span class="kw">loop</span> {
+    <span class="ident">terminal</span>.<span class="ident">draw</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> {
+        <span class="comment">// The items managed by the application are transformed to something</span>
+        <span class="comment">// that is understood by tui.</span>
+        <span class="kw">let</span> <span class="ident">items</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ListItem</span><span class="op">&gt;</span><span class="op">=</span> <span class="ident">events</span>.<span class="ident">items</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">ListItem::new</span>(<span class="ident">i</span>.<span class="ident">as_ref</span>())).<span class="ident">collect</span>();
+        <span class="comment">// The `List` widget is then built with those items.</span>
+        <span class="kw">let</span> <span class="ident">list</span> <span class="op">=</span> <span class="ident">List::new</span>(<span class="ident">items</span>);
+        <span class="comment">// Finally the widget is rendered using the associated state. `events.state` is</span>
+        <span class="comment">// effectively the only thing that we will &quot;remember&quot; from this draw call.</span>
+        <span class="ident">f</span>.<span class="ident">render_stateful_widget</span>(<span class="ident">list</span>, <span class="ident">f</span>.<span class="ident">size</span>(), <span class="kw-2">&amp;mut</span> <span class="ident">events</span>.<span class="ident">state</span>);
+    });
+
+    <span class="comment">// In response to some input events or an external http request or whatever:</span>
+    <span class="ident">events</span>.<span class="ident">next</span>();
+}</code></pre></div>
+</div></details><h2 id="required-associated-types" class="small-section-header">Required Associated Types<a href="#required-associated-types" class="anchor"></a></h2><div class="methods"><div id="associatedtype.State" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/tui/widgets/mod.rs.html#182">source</a></div><h4 class="code-header">type <a href="#associatedtype.State" class="associatedtype">State</a></h4></div></div><h2 id="required-methods" class="small-section-header">Required Methods<a href="#required-methods" class="anchor"></a></h2><div class="methods"><div id="tymethod.render" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/tui/widgets/mod.rs.html#183">source</a></div><h4 class="code-header">fn <a href="#tymethod.render" class="fnname">render</a>(self, area: <a class="struct" href="../layout/struct.Rect.html" title="struct tui::layout::Rect">Rect</a>, buf: &amp;mut <a class="struct" href="../buffer/struct.Buffer.html" title="struct tui::buffer::Buffer">Buffer</a>, state: &amp;mut Self::<a class="associatedtype" href="trait.StatefulWidget.html#associatedtype.State" title="type tui::widgets::StatefulWidget::State">State</a>)</h4></div></div><h2 id="implementors" class="small-section-header">Implementors<a href="#implementors" class="anchor"></a></h2><div class="item-list" id="implementors-list"><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-StatefulWidget" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tui/widgets/list.rs.html#170-257">source</a></span><a href="#impl-StatefulWidget" class="anchor"></a><h3 class="code-header in-band">impl&lt;'a&gt; <a class="trait" href="trait.StatefulWidget.html" title="trait tui::widgets::StatefulWidget">StatefulWidget</a> for <a class="struct" href="struct.List.html" title="struct tui::widgets::List">List</a>&lt;'a&gt;</h3></section></summary><div class="impl-items"><section id="associatedtype.State-1" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.State-1" class="anchor"></a><h4 class="code-header">type <a href="#associatedtype.State" class="associatedtype">State</a> = <a class="struct" href="struct.ListState.html" title="struct tui::widgets::ListState">ListState</a></h4></section></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-StatefulWidget-1" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tui/widgets/table.rs.html#357-468">source</a></span><a href="#impl-StatefulWidget-1" class="anchor"></a><h3 class="code-header in-band">impl&lt;'a&gt; <a class="trait" href="trait.StatefulWidget.html" title="trait tui::widgets::StatefulWidget">StatefulWidget</a> for <a class="struct" href="struct.Table.html" title="struct tui::widgets::Table">Table</a>&lt;'a&gt;</h3></section></summary><div class="impl-items"><section id="associatedtype.State-2" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.State-2" class="anchor"></a><h4 class="code-header">type <a href="#associatedtype.State" class="associatedtype">State</a> = <a class="struct" href="struct.TableState.html" title="struct tui::widgets::TableState">TableState</a></h4></section></div></details></div><script type="text/javascript" src="../../implementors/tui/widgets/trait.StatefulWidget.js" data-ignore-extern-crates="" async></script></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tui" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

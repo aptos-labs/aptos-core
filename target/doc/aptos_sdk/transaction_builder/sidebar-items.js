@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["aptos_stdlib",""]],"struct":[["DualAttestationMessage",""],["TransactionBuilder",""],["TransactionFactory",""]]};

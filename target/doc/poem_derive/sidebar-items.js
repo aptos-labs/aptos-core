@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"attr":[["handler","Wrap an asynchronous function as an `Endpoint`."]]};

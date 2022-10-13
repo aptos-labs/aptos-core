@@ -1,0 +1,121 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Define a OpenAPI response."><meta name="keywords" content="rust, rustlang, rust-lang, ApiResponse"><title>ApiResponse in poem_openapi - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/poem-web/poem/master/favicon.ico"></head><body class="rustdoc derive"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../poem_openapi/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In poem_openapi</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../poem_openapi/index.html">
+                        <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Derive Macro <a href="index.html">poem_openapi</a>::<wbr><a class="derive" href="#">ApiResponse</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/poem_openapi_derive/lib.rs.html#59">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust derive"><code>#[derive(ApiResponse)]
+{
+    // Attributes available to this derive:
+    #[oai]
+}
+</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Define a OpenAPI response.</p>
+<h2 id="macro-parameters"><a href="#macro-parameters">Macro parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>bad_request_handler</td><td>Sets a custom bad request handler, it can convert error to the value of the this response type.</td><td>string</td><td>Y</td></tr>
+<tr><td>header</td><td>Add an extra header</td><td><a href="derive.ApiResponse.html#extra-header-parameters"><code>ExtraHeader</code></a></td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="item-parameters"><a href="#item-parameters">Item parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>status</td><td>HTTP status code. If omitted, it is a default response type.</td><td>u16</td><td>Y</td></tr>
+<tr><td>content_type</td><td>Specify the content type.</td><td>string</td><td>Y</td></tr>
+<tr><td>actual_type</td><td>Specifies the actual response type</td><td>string</td><td>Y</td></tr>
+<tr><td>header</td><td>Add an extra header</td><td><a href="derive.ApiResponse.html#extra-header-parameters"><code>ExtraHeader</code></a></td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="header-parameters"><a href="#header-parameters">Header parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>deprecated</td><td>Header deprecated</td><td>String</td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="extra-header-parameters"><a href="#extra-header-parameters">Extra header parameters</a></h2><div><table><thead><tr><th>Attribute</th><th>description</th><th>Type</th><th>Optional</th></tr></thead><tbody>
+<tr><td>name</td><td>Header name</td><td>String</td><td>N</td></tr>
+<tr><td>type</td><td>Header type</td><td>String</td><td>N</td></tr>
+<tr><td>description</td><td>Header description</td><td>String</td><td>Y</td></tr>
+<tr><td>deprecated</td><td>Header deprecated</td><td>bool</td><td>Y</td></tr>
+</tbody></table>
+</div><h2 id="example-response-headers"><a href="#example-response-headers">Example response headers</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem_openapi</span>::{<span class="ident">payload::PlainText</span>, <span class="ident">ApiResponse</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">ApiResponse</span>)]</span>
+<span class="kw">enum</span> <span class="ident">CreateUserResponse</span> {
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">200</span>)]</span>
+    <span class="prelude-val">Ok</span>(<span class="attribute">#[<span class="ident">oai</span>(<span class="ident">header</span> <span class="op">=</span> <span class="string">&quot;X-Id&quot;</span>)]</span> <span class="ident">String</span>),
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">201</span>)]</span>
+    <span class="ident">OkWithBody</span>(<span class="ident">PlainText</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">header</span> <span class="op">=</span> <span class="string">&quot;X-Id&quot;</span>)]</span> <span class="ident">String</span>),
+}</code></pre></div>
+<h2 id="example-extra-headers"><a href="#example-extra-headers">Example extra headers</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem_openapi::ApiResponse</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">ApiResponse</span>)]</span>
+<span class="attribute">#[<span class="ident">oai</span>(
+    <span class="ident">header</span>(<span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;X-ExtraHeader-1&quot;</span>, <span class="kw">type</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>),
+    <span class="ident">header</span>(<span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;X-ExtraHeader-2&quot;</span>, <span class="kw">type</span> <span class="op">=</span> <span class="string">&quot;i32&quot;</span>),
+)]</span>
+<span class="kw">enum</span> <span class="ident">CreateUserResponse</span> {
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">200</span>, <span class="ident">header</span>(<span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;X-ExtraHeader-3&quot;</span>, <span class="kw">type</span> <span class="op">=</span> <span class="string">&quot;f32&quot;</span>))]</span>
+    <span class="prelude-val">Ok</span>,
+}</code></pre></div>
+<h2 id="example-with-bad-request-handler"><a href="#example-with-bad-request-handler">Example with bad request handler</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem::Error</span>;
+<span class="kw">use</span> <span class="ident">poem_openapi</span>::{<span class="ident">payload::PlainText</span>, <span class="ident">ApiResponse</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">ApiResponse</span>)]</span>
+<span class="attribute">#[<span class="ident">oai</span>(<span class="ident">bad_request_handler</span> <span class="op">=</span> <span class="string">&quot;bad_request_handler&quot;</span>)]</span>
+<span class="kw">enum</span> <span class="ident">CreateUserResponse</span> {
+    <span class="doccomment">/// Returns when the user is successfully created.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">200</span>)]</span>
+    <span class="prelude-val">Ok</span>,
+    <span class="doccomment">/// Returns when the user already exists.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">409</span>)]</span>
+    <span class="ident">UserAlreadyExists</span>,
+    <span class="doccomment">/// Returns when the request parameters is incorrect.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">400</span>)]</span>
+    <span class="ident">BadRequest</span>(<span class="ident">PlainText</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>),
+}
+
+<span class="comment">// Convert error to `CreateUserResponse::BadRequest`.</span>
+<span class="kw">fn</span> <span class="ident">bad_request_handler</span>(<span class="ident">err</span>: <span class="ident">Error</span>) -&gt; <span class="ident">CreateUserResponse</span> {
+    <span class="ident">CreateUserResponse::BadRequest</span>(<span class="ident">PlainText</span>(<span class="macro">format!</span>(<span class="string">&quot;error: {}&quot;</span>, <span class="ident">err</span>.<span class="ident">to_string</span>())))
+}</code></pre></div>
+<h2 id="example-as-an-error-type"><a href="#example-as-an-error-type">Example as an error type</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem::Error</span>;
+<span class="kw">use</span> <span class="ident">poem_openapi</span>::{<span class="ident">payload</span>::{<span class="ident">PlainText</span>, <span class="ident">Json</span>}, <span class="ident">ApiResponse</span>, <span class="ident">Object</span>, <span class="ident">OpenApi</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Object</span>)]</span>
+<span class="kw">struct</span> <span class="ident">CreateUserRequest</span> {
+    <span class="ident">username</span>: <span class="ident">String</span>,
+    <span class="ident">nickname</span>: <span class="ident">String</span>,
+    <span class="ident">email</span>: <span class="ident">String</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">ApiResponse</span>)]</span>
+<span class="kw">enum</span> <span class="ident">CreateUserResponse</span> {
+    <span class="doccomment">/// Returns when the user is successfully created.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">200</span>)]</span>
+    <span class="prelude-val">Ok</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">ApiResponse</span>)]</span>
+<span class="kw">enum</span> <span class="ident">CreateUserResponseError</span> {
+    <span class="doccomment">/// Returns when the user already exists.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">409</span>)]</span>
+    <span class="ident">UserAlreadyExists</span>,
+    <span class="doccomment">/// Returns when the request parameters is incorrect.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">status</span> <span class="op">=</span> <span class="number">400</span>)]</span>
+    <span class="ident">BadRequest</span>(<span class="ident">PlainText</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>),
+}
+
+<span class="kw">struct</span> <span class="ident">UserApi</span>;
+
+<span class="attribute">#[<span class="ident">OpenApi</span>]</span>
+<span class="kw">impl</span> <span class="ident">UserApi</span> {
+    <span class="doccomment">/// Create a new user.</span>
+    <span class="attribute">#[<span class="ident">oai</span>(<span class="ident">path</span> <span class="op">=</span> <span class="string">&quot;/user&quot;</span>, <span class="ident">method</span> <span class="op">=</span> <span class="string">&quot;post&quot;</span>)]</span>
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">create</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">user</span>: <span class="ident">Json</span><span class="op">&lt;</span><span class="ident">CreateUserRequest</span><span class="op">&gt;</span>,
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">CreateUserResponse</span>, <span class="ident">CreateUserResponseError</span><span class="op">&gt;</span> {
+        <span class="macro">todo!</span>()
+    }
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="poem_openapi" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

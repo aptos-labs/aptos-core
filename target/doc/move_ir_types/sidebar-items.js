@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":[["sp","Macro used to create a tuple-like pattern match for Spanned"]],"mod":[["ast",""],["location",""],["spec_language_ast",""]]};

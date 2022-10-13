@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["ProofFetcher","Defines the trait for fetching proof from the DB"]]};

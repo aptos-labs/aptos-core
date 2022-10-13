@@ -1,0 +1,165 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Securely zero memory with a simple trait (Zeroize) built on stable Rust primitives which guarantee the operation will not be “optimized away”."><meta name="keywords" content="rust, rustlang, rust-lang, zeroize"><title>zeroize - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../zeroize/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../zeroize/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate zeroize</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 1.3.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#derives">Derive Macros</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../zeroize/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">zeroize</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/zeroize/lib.rs.html#1-629">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Securely zero memory with a simple trait (<a href="https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html">Zeroize</a>) built on stable Rust
+primitives which guarantee the operation will not be “optimized away”.</p>
+<h3 id="about"><a href="#about">About</a></h3>
+<p><a href="http://www.daemonology.net/blog/2014-09-04-how-to-zero-a-buffer.html">Zeroing memory securely is hard</a> - compilers optimize for performance, and
+in doing so they love to “optimize away” unnecessary zeroing calls. There are
+many documented “tricks” to attempt to avoid these optimizations and ensure
+that a zeroing routine is performed reliably.</p>
+<p>This crate isn’t about tricks: it uses <a href="https://doc.rust-lang.org/core/ptr/fn.write_volatile.html">core::ptr::write_volatile</a>
+and <a href="https://doc.rust-lang.org/stable/core/sync/atomic/index.html">core::sync::atomic</a> memory fences to provide easy-to-use, portable
+zeroing behavior which works on all of Rust’s core number types and slices
+thereof, implemented in pure Rust with no usage of FFI or assembly.</p>
+<ul>
+<li>No insecure fallbacks!</li>
+<li>No dependencies!</li>
+<li>No FFI or inline assembly! <strong>WASM friendly</strong> (and tested)!</li>
+<li><code>#![no_std]</code> i.e. <strong>embedded-friendly</strong>!</li>
+<li>No functionality besides securely zeroing memory!</li>
+<li>(Optional) Custom derive support for zeroing complex structures</li>
+</ul>
+<h3 id="minimum-supported-rust-version"><a href="#minimum-supported-rust-version">Minimum Supported Rust Version</a></h3>
+<p>Requires Rust <strong>1.47</strong> or newer.</p>
+<p>In the future, we reserve the right to change MSRV (i.e. MSRV is out-of-scope
+for this crate’s SemVer guarantees), however when we do it will be accompanied
+by a minor version bump.</p>
+<h3 id="usage"><a href="#usage">Usage</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">zeroize::Zeroize</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="comment">// Protip: don&#39;t embed secrets in your source code.</span>
+    <span class="comment">// This is just an example.</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">secret</span> <span class="op">=</span> <span class="string">b&quot;Air shield password: 1,2,3,4,5&quot;</span>.<span class="ident">to_vec</span>();
+    <span class="comment">// [ ... ] open the air shield here</span>
+
+    <span class="comment">// Now that we&#39;re done using the secret, zero it out.</span>
+    <span class="ident">secret</span>.<span class="ident">zeroize</span>();
+}</code></pre></div>
+<p>The <a href="https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html">Zeroize</a> trait is impl’d on all of Rust’s core scalar types including
+integers, floats, <code>bool</code>, and <code>char</code>.</p>
+<p>Additionally, it’s implemented on slices and <code>IterMut</code>s of the above types.</p>
+<p>When the <code>alloc</code> feature is enabled (which it is by default), it’s also
+impl’d for <code>Vec&lt;T&gt;</code> for the above types as well as <code>String</code>, where it provides
+<a href="https://doc.rust-lang.org/std/vec/struct.Vec.html#method.clear">Vec::clear()</a> / <a href="https://doc.rust-lang.org/std/string/struct.String.html#method.clear">String::clear()</a>-like behavior (truncating to zero-length)
+but ensures the backing memory is securely zeroed with some caveats.
+(NOTE: see “Stack/Heap Zeroing Notes” for important <code>Vec</code>/<code>String</code> details)</p>
+<p>The <a href="https://docs.rs/zeroize/latest/zeroize/trait.DefaultIsZeroes.html">DefaultIsZeroes</a> marker trait can be impl’d on types which also
+impl <a href="https://doc.rust-lang.org/std/default/trait.Default.html">Default</a>, which implements <a href="https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html">Zeroize</a> by overwriting a value with
+the default value.</p>
+<h3 id="custom-derive-support"><a href="#custom-derive-support">Custom Derive Support</a></h3>
+<p>This crate has custom derive support for the <code>Zeroize</code> trait,
+gated under the <code>zeroize</code> crate’s <code>zeroize_derive</code> Cargo feature,
+which automatically calls <code>zeroize()</code> on all members of a struct
+or tuple struct.</p>
+<p>Additionally it supports the following attribute:</p>
+<ul>
+<li><code>#[zeroize(drop)]</code>: call <code>zeroize()</code> when this item is dropped</li>
+</ul>
+<p>Example which derives <code>Drop</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">zeroize::Zeroize</span>;
+
+<span class="comment">// This struct will be zeroized on drop</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Zeroize</span>)]</span>
+<span class="attribute">#[<span class="ident">zeroize</span>(<span class="ident">drop</span>)]</span>
+<span class="kw">struct</span> <span class="ident">MyStruct</span>([<span class="ident">u8</span>; <span class="number">32</span>]);</code></pre></div>
+<p>Example which does not derive <code>Drop</code> (useful for e.g. <code>Copy</code> types)</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;derive&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident">zeroize::Zeroize</span>;
+
+<span class="comment">// This struct will *NOT* be zeroized on drop</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Zeroize</span>)]</span>
+<span class="kw">struct</span> <span class="ident">MyStruct</span>([<span class="ident">u8</span>; <span class="number">32</span>]);</code></pre></div>
+<h3 id="zeroizingz-wrapper-for-zeroizing-arbitrary-values-on-drop"><a href="#zeroizingz-wrapper-for-zeroizing-arbitrary-values-on-drop"><code>Zeroizing&lt;Z&gt;</code>: wrapper for zeroizing arbitrary values on drop</a></h3>
+<p><code>Zeroizing&lt;Z: Zeroize&gt;</code> is a generic wrapper type that impls <code>Deref</code>
+and <code>DerefMut</code>, allowing access to an inner value of type <code>Z</code>, and also
+impls a <code>Drop</code> handler which calls <code>zeroize()</code> on its contents:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">zeroize::Zeroizing</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">secret</span> <span class="op">=</span> <span class="ident">Zeroizing::new</span>([<span class="number">0u8</span>; <span class="number">5</span>]);
+
+    <span class="comment">// Set the air shield password</span>
+    <span class="comment">// Protip (again): don&#39;t embed secrets in your source code.</span>
+    <span class="ident">secret</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>]);
+    <span class="macro">assert_eq!</span>(<span class="ident">secret</span>.<span class="ident">as_ref</span>(), <span class="kw-2">&amp;</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>]);
+
+    <span class="comment">// The contents of `secret` will be automatically zeroized on drop</span>
+}</code></pre></div>
+<h3 id="what-guarantees-does-this-crate-provide"><a href="#what-guarantees-does-this-crate-provide">What guarantees does this crate provide?</a></h3>
+<p>This crate guarantees the following:</p>
+<ol>
+<li>The zeroing operation can’t be “optimized away” by the compiler.</li>
+<li>All subsequent reads to memory will see “zeroized” values.</li>
+</ol>
+<p>LLVM’s volatile semantics ensure #1 is true.</p>
+<p>Additionally, thanks to work by the <a href="https://github.com/rust-lang/unsafe-code-guidelines">Unsafe Code Guidelines Working Group</a>,
+we can now fairly confidently say #2 is true as well. Previously there were
+worries that the approach used by this crate (mixing volatile and
+non-volatile accesses) was undefined behavior due to language contained
+in the documentation for <code>write_volatile</code>, however after some discussion
+<a href="https://github.com/rust-lang/rust/pull/60972">these remarks have been removed</a> and the specific usage pattern in this
+crate is considered to be well-defined.</p>
+<p>Additionally this crate leverages <a href="https://doc.rust-lang.org/stable/core/sync/atomic/fn.compiler_fence.html">compiler_fence</a> from
+<a href="https://doc.rust-lang.org/stable/core/sync/atomic/index.html">core::sync::atomic</a> with the strictest ordering (<a href="https://doc.rust-lang.org/std/sync/atomic/enum.Ordering.html#variant.SeqCst">Ordering::SeqCst</a>)
+as a precaution to help ensure reads are not reordered before memory has
+been zeroed.</p>
+<p>All of that said, there is still potential for microarchitectural attacks
+(ala Spectre/Meltdown) to leak “zeroized” secrets through covert channels.
+This crate makes no guarantees that zeroized values cannot be leaked
+through such channels, as they represent flaws in the underlying hardware.</p>
+<h3 id="stackheap-zeroing-notes"><a href="#stackheap-zeroing-notes">Stack/Heap Zeroing Notes</a></h3>
+<p>This crate can be used to zero values from either the stack or the heap.</p>
+<p>However, be aware several operations in Rust can unintentionally leave
+copies of data in memory. This includes but is not limited to:</p>
+<ul>
+<li>Moves and <code>Copy</code></li>
+<li>Heap reallocation when using <code>Vec</code> and <code>String</code></li>
+<li>Borrowers of a reference making copies of the data</li>
+</ul>
+<p><a href="https://doc.rust-lang.org/std/pin/struct.Pin.html"><code>Pin</code></a> can be leveraged in conjunction with this crate to ensure
+data kept on the stack isn’t moved.</p>
+<p>The <code>Zeroize</code> impls for <code>Vec</code> and <code>String</code> zeroize the entire capacity of
+their backing buffer, but cannot guarantee copies of the data were not
+previously made by buffer reallocation. It’s therefore important when
+attempting to zeroize such buffers to initialize them to the correct
+capacity, and take care to prevent subsequent reallocation.</p>
+<p>The <code>secrecy</code> crate provides higher-level abstractions for eliminating
+usage patterns which can cause reallocations:</p>
+<p><a href="https://crates.io/crates/secrecy">https://crates.io/crates/secrecy</a></p>
+<h3 id="what-about-clearing-registers-mlock-mprotect-etc"><a href="#what-about-clearing-registers-mlock-mprotect-etc">What about: clearing registers, mlock, mprotect, etc?</a></h3>
+<p>This crate is focused on providing simple, unobtrusive support for reliably
+zeroing memory using the best approach possible on stable Rust.</p>
+<p>Clearing registers is a difficult problem that can’t easily be solved by
+something like a crate, and requires either inline ASM or rustc support.
+See <a href="https://github.com/rust-lang/rust/issues/17046">https://github.com/rust-lang/rust/issues/17046</a> for background on
+this particular problem.</p>
+<p>Other memory protection mechanisms are interesting and useful, but often
+overkill (e.g. defending against RAM scraping or attackers with swap access).
+In as much as there may be merit to these approaches, there are also many
+other crates that already implement more sophisticated memory protections.
+Such protections are explicitly out-of-scope for this crate.</p>
+<p>Zeroing memory is <a href="https://github.com/veorq/cryptocoding#clean-memory-of-secret-data">good cryptographic hygiene</a> and this crate seeks to promote
+it in the most unobtrusive manner possible. This includes omitting complex
+<code>unsafe</code> memory protection systems and just trying to make the best memory
+zeroing crate available.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Zeroizing.html" title="zeroize::Zeroizing struct">Zeroizing</a></div><div class="item-right docblock-short"><p><code>Zeroizing</code> is a a wrapper for any <code>Z: Zeroize</code> type which implements a
+<code>Drop</code> handler which zeroizes dropped values.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.DefaultIsZeroes.html" title="zeroize::DefaultIsZeroes trait">DefaultIsZeroes</a></div><div class="item-right docblock-short"><p>Marker trait for types whose <code>Default</code> is the desired zeroization result</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TryZeroize.html" title="zeroize::TryZeroize trait">TryZeroize</a></div><div class="item-right docblock-short"><p>Fallible trait for representing cases where zeroization may or may not be
+possible.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Zeroize.html" title="zeroize::Zeroize trait">Zeroize</a></div><div class="item-right docblock-short"><p>Trait for securely erasing types from memory</p>
+</div></div></div><h2 id="derives" class="small-section-header"><a href="#derives">Derive Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.Zeroize.html" title="zeroize::Zeroize derive">Zeroize</a></div><div class="item-right docblock-short"><p>Derive the <code>Zeroize</code> trait.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="zeroize" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

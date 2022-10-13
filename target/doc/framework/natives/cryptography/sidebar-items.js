@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["bls12381",""],["ed25519",""],["multi_ed25519",""],["ristretto255",""],["ristretto255_point","A crate which extends Move with a RistrettoPoint struct that points to a Rust-native curve25519_dalek::ristretto::RistrettoPoint."],["ristretto255_scalar",""],["secp256k1",""]]};

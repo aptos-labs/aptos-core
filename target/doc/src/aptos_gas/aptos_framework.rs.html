@@ -1,0 +1,219 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `aptos-move/aptos-gas/src/aptos_framework.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>aptos_framework.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../aptos_gas/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../aptos_gas/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../aptos_gas/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+</pre><pre class="rust"><code><span class="comment">// Copyright (c) Aptos</span>
+<span class="comment">// SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::gas_meter::EXECUTION_GAS_MULTIPLIER</span> <span class="kw">as</span> <span class="ident">MUL</span>;
+<span class="kw">use</span> <span class="ident">framework::natives::GasParameters</span>;
+
+<span class="macro">crate::natives::define_gas_parameters_for_natives!</span>(<span class="ident">GasParameters</span>, <span class="string">&quot;aptos_framework&quot;</span>, [
+    [.<span class="ident">account</span>.<span class="ident">create_address</span>.<span class="ident">base</span>, <span class="string">&quot;account.create_address.base&quot;</span>, <span class="number">300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">account</span>.<span class="ident">create_signer</span>.<span class="ident">base</span>, <span class="string">&quot;account.create_signer.base&quot;</span>, <span class="number">300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">bls12381</span>.<span class="ident">base</span>, <span class="string">&quot;bls12381.base&quot;</span>, <span class="number">150</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">bls12381</span>.<span class="ident">per_pubkey_deserialize</span>, <span class="string">&quot;bls12381.per_pubkey_deserialize&quot;</span>, <span class="number">109_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">bls12381</span>.<span class="ident">per_pubkey_aggregate</span>, <span class="string">&quot;bls12381.per_pubkey_aggregate&quot;</span>, <span class="number">4_200</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">bls12381</span>.<span class="ident">per_pubkey_subgroup_check</span>, <span class="string">&quot;bls12381.per_pubkey_subgroup_check&quot;</span>, <span class="number">370_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">bls12381</span>.<span class="ident">per_sig_deserialize</span>, <span class="string">&quot;bls12381.per_sig_deserialize&quot;</span>, <span class="number">222_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">bls12381</span>.<span class="ident">per_sig_aggregate</span>, <span class="string">&quot;bls12381.per_sig_aggregate&quot;</span>, <span class="number">11_650</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">bls12381</span>.<span class="ident">per_sig_subgroup_check</span>, <span class="string">&quot;bls12381.per_sig_subgroup_check&quot;</span>, <span class="number">460_500</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">bls12381</span>.<span class="ident">per_sig_verify</span>, <span class="string">&quot;bls12381.per_sig_verify&quot;</span>, <span class="number">8_485_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">bls12381</span>.<span class="ident">per_pop_verify</span>, <span class="string">&quot;bls12381.per_pop_verify&quot;</span>, <span class="number">10_300_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">bls12381</span>.<span class="ident">per_pairing</span>, <span class="string">&quot;bls12381.per_pairing&quot;</span>, <span class="number">4_013_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">bls12381</span>.<span class="ident">per_msg_hashing</span>, <span class="string">&quot;bls12381.per_msg_hashing&quot;</span>, <span class="number">1_540_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">bls12381</span>.<span class="ident">per_byte_hashing</span>, <span class="string">&quot;bls12381.per_byte_hashing&quot;</span>, <span class="number">50</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">ed25519</span>.<span class="ident">base</span>, <span class="string">&quot;signature.base&quot;</span>, <span class="number">150</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ed25519</span>.<span class="ident">per_pubkey_deserialize</span>, <span class="string">&quot;signature.per_pubkey_deserialize&quot;</span>, <span class="number">38_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ed25519</span>.<span class="ident">per_pubkey_small_order_check</span>, <span class="string">&quot;signature.per_pubkey_small_order_check&quot;</span>, <span class="number">6_350</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ed25519</span>.<span class="ident">per_sig_deserialize</span>, <span class="string">&quot;signature.per_sig_deserialize&quot;</span>, <span class="number">375</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ed25519</span>.<span class="ident">per_sig_strict_verify</span>, <span class="string">&quot;signature.per_sig_strict_verify&quot;</span>, <span class="number">267_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ed25519</span>.<span class="ident">per_msg_hashing_base</span>, <span class="string">&quot;signature.per_msg_hashing_base&quot;</span>, <span class="number">3_240</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ed25519</span>.<span class="ident">per_msg_byte_hashing</span>, <span class="string">&quot;signature.per_msg_byte_hashing&quot;</span>, <span class="number">60</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">secp256k1</span>.<span class="ident">base</span>, <span class="string">&quot;secp256k1.base&quot;</span>, <span class="number">150</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">secp256k1</span>.<span class="ident">ecdsa_recover</span>, <span class="string">&quot;secp256k1.ecdsa_recover&quot;</span>, <span class="number">1_610_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">ristretto255</span>.<span class="ident">basepoint_mul</span>, <span class="string">&quot;ristretto255.basepoint_mul&quot;</span>, <span class="number">128_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">basepoint_double_mul</span>, <span class="string">&quot;ristretto255.basepoint_double_mul&quot;</span>, <span class="number">440_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_add</span>, <span class="string">&quot;ristretto255.point_add&quot;</span>, <span class="number">2_135</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_compress</span>, <span class="string">&quot;ristretto255.point_compress&quot;</span>, <span class="number">40_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_decompress</span>, <span class="string">&quot;ristretto255.point_decompress&quot;</span>, <span class="number">40_500</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_equals</span>, <span class="string">&quot;ristretto255.point_equals&quot;</span>, <span class="number">2_300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_from_64_uniform_bytes</span>, <span class="string">&quot;ristretto255.point_from_64_uniform_bytes&quot;</span>, <span class="number">81_500</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_identity</span>, <span class="string">&quot;ristretto255.point_identity&quot;</span>, <span class="number">150</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_mul</span>, <span class="string">&quot;ristretto255.point_mul&quot;</span>, <span class="number">471_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_neg</span>, <span class="string">&quot;ristretto255.point_neg&quot;</span>, <span class="number">360</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_sub</span>, <span class="string">&quot;ristretto255.point_sub&quot;</span>, <span class="number">2_130</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">point_parse_arg</span>, <span class="string">&quot;ristretto255.point_parse_arg&quot;</span>, <span class="number">150</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+
+    <span class="comment">// TODO(Alin): These SHA512 gas costs could be unified with the costs in our future SHA512 module</span>
+    <span class="comment">// (assuming same implementation complexity, which might not be the case</span>
+    [.<span class="ident">ristretto255</span>.<span class="ident">sha512_per_byte</span>, <span class="string">&quot;ristretto255.scalar_sha512_per_byte&quot;</span>, <span class="number">60</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">sha512_per_hash</span>, <span class="string">&quot;ristretto255.scalar_sha512_per_hash&quot;</span>, <span class="number">3_240</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_add</span>, <span class="string">&quot;ristretto255.scalar_add&quot;</span>, <span class="number">770</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_reduced_from_32_bytes</span>, <span class="string">&quot;ristretto255.scalar_reduced_from_32_bytes&quot;</span>, <span class="number">710</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_uniform_from_64_bytes</span>, <span class="string">&quot;ristretto255.scalar_uniform_from_64_bytes&quot;</span>, <span class="number">1_245</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_from_u128</span>, <span class="string">&quot;ristretto255.scalar_from_u128&quot;</span>, <span class="number">175</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_from_u64</span>, <span class="string">&quot;ristretto255.scalar_from_u64&quot;</span>, <span class="number">175</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_invert</span>, <span class="string">&quot;ristretto255.scalar_invert&quot;</span>, <span class="number">110_000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_is_canonical</span>, <span class="string">&quot;ristretto255.scalar_is_canonical&quot;</span>, <span class="number">1_150</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_mul</span>, <span class="string">&quot;ristretto255.scalar_mul&quot;</span>, <span class="number">1_065</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_neg</span>, <span class="string">&quot;ristretto255.scalar_neg&quot;</span>, <span class="number">725</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_sub</span>, <span class="string">&quot;ristretto255.scalar_sub&quot;</span>, <span class="number">1_060</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">ristretto255</span>.<span class="ident">scalar_parse_arg</span>, <span class="string">&quot;ristretto255.scalar_parse_arg&quot;</span>, <span class="number">150</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">hash</span>.<span class="ident">sip_hash</span>.<span class="ident">base</span>, <span class="string">&quot;hash.sip_hash.base&quot;</span>, <span class="number">1000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">hash</span>.<span class="ident">sip_hash</span>.<span class="ident">per_byte</span>, <span class="string">&quot;hash.sip_hash.per_byte&quot;</span>, <span class="number">20</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">hash</span>.<span class="ident">keccak256</span>.<span class="ident">base</span>, <span class="ident">optional</span> <span class="string">&quot;hash.keccak256.base&quot;</span>, <span class="number">4000</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">hash</span>.<span class="ident">keccak256</span>.<span class="ident">per_byte</span>, <span class="ident">optional</span> <span class="string">&quot;hash.keccak256.per_byte&quot;</span>, <span class="number">45</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">type_info</span>.<span class="ident">type_of</span>.<span class="ident">base</span>, <span class="string">&quot;type_info.type_of.base&quot;</span>, <span class="number">300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    <span class="comment">// TODO(Gas): the on-chain name is wrong...</span>
+    [.<span class="ident">type_info</span>.<span class="ident">type_of</span>.<span class="ident">per_byte_in_str</span>, <span class="string">&quot;type_info.type_of.per_abstract_memory_unit&quot;</span>, <span class="number">5</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">type_info</span>.<span class="ident">type_name</span>.<span class="ident">base</span>, <span class="string">&quot;type_info.type_name.base&quot;</span>, <span class="number">300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    <span class="comment">// TODO(Gas): the on-chain name is wrong...</span>
+    [.<span class="ident">type_info</span>.<span class="ident">type_name</span>.<span class="ident">per_byte_in_str</span>, <span class="string">&quot;type_info.type_name.per_abstract_memory_unit&quot;</span>, <span class="number">5</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">util</span>.<span class="ident">from_bytes</span>.<span class="ident">base</span>, <span class="string">&quot;util.from_bytes.base&quot;</span>, <span class="number">300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">util</span>.<span class="ident">from_bytes</span>.<span class="ident">per_byte</span>, <span class="string">&quot;util.from_bytes.per_byte&quot;</span>, <span class="number">5</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">transaction_context</span>.<span class="ident">get_script_hash</span>.<span class="ident">base</span>, <span class="string">&quot;transaction_context.get_script_hash.base&quot;</span>, <span class="number">200</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">code</span>.<span class="ident">request_publish</span>.<span class="ident">base</span>, <span class="string">&quot;code.request_publish.base&quot;</span>, <span class="number">500</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">code</span>.<span class="ident">request_publish</span>.<span class="ident">per_byte</span>, <span class="string">&quot;code.request_publish.per_byte&quot;</span>, <span class="number">2</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    <span class="comment">// Note(Gas): These are storage operations so the values should not be multiplied.</span>
+    [.<span class="ident">event</span>.<span class="ident">write_to_event_store</span>.<span class="ident">base</span>, <span class="string">&quot;event.write_to_event_store.base&quot;</span>, <span class="number">500_000</span>],
+    <span class="comment">// TODO(Gas): the on-chain name is wrong...</span>
+    [.<span class="ident">event</span>.<span class="ident">write_to_event_store</span>.<span class="ident">per_abstract_value_unit</span>, <span class="string">&quot;event.write_to_event_store.per_abstract_memory_unit&quot;</span>, <span class="number">5_000</span>],
+
+    [.<span class="ident">state_storage</span>.<span class="ident">get_usage</span>.<span class="ident">base_cost</span>, <span class="string">&quot;state_storage.get_usage.base&quot;</span>, <span class="number">500</span> <span class="op">*</span> <span class="ident">MUL</span>],
+
+    [.<span class="ident">aggregator</span>.<span class="ident">add</span>.<span class="ident">base</span>, <span class="string">&quot;aggregator.add.base&quot;</span>, <span class="number">300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">aggregator</span>.<span class="ident">read</span>.<span class="ident">base</span>, <span class="string">&quot;aggregator.read.base&quot;</span>, <span class="number">300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">aggregator</span>.<span class="ident">sub</span>.<span class="ident">base</span>, <span class="string">&quot;aggregator.sub.base&quot;</span>, <span class="number">300</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">aggregator</span>.<span class="ident">destroy</span>.<span class="ident">base</span>, <span class="string">&quot;aggregator.destroy.base&quot;</span>, <span class="number">500</span> <span class="op">*</span> <span class="ident">MUL</span>],
+    [.<span class="ident">aggregator_factory</span>.<span class="ident">new_aggregator</span>.<span class="ident">base</span>, <span class="string">&quot;aggregator_factory.new_aggregator.base&quot;</span>, <span class="number">500</span> <span class="op">*</span> <span class="ident">MUL</span>]
+]);
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="aptos_gas" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

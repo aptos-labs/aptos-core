@@ -1,0 +1,113 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Pins a value on the stack."><meta name="keywords" content="rust, rustlang, rust-lang, pin"><title>pin in tokio - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc macro"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In tokio</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../tokio/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Macro <a href="index.html">tokio</a>::<wbr><a class="macro" href="#">pin</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/tokio/macros/pin.rs.html#125-144">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><div class="example-wrap"><pre class="rust macro"><code><span class="macro">macro_rules!</span> <span class="ident">pin</span> {
+    ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span>:<span class="ident">ident</span>),<span class="kw-2">*</span>) =&gt; { ... };
+    ($(
+            <span class="kw">let</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span>:<span class="ident">ident</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>;
+    )<span class="kw-2">*</span>) =&gt; { ... };
+}</code></pre></div>
+</div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Pins a value on the stack.</p>
+<p>Calls to <code>async fn</code> return anonymous <a href="https://doc.rust-lang.org/1.63.0/core/future/future/trait.Future.html"><code>Future</code></a> values that are <code>!Unpin</code>.
+These values must be pinned before they can be polled. Calling <code>.await</code> will
+handle this, but consumes the future. If it is required to call <code>.await</code> on
+a <code>&amp;mut _</code> reference, the caller is responsible for pinning the future.</p>
+<p>Pinning may be done by allocating with <a href="https://doc.rust-lang.org/1.63.0/alloc/boxed/struct.Box.html#method.pin"><code>Box::pin</code></a> or by using the stack
+with the <code>pin!</code> macro.</p>
+<p>The following will <strong>fail to compile</strong>:</p>
+
+<div class='information'><div class='tooltip compile_fail'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered compile_fail"><code><span class="kw">async</span> <span class="kw">fn</span> <span class="ident">my_async_fn</span>() {
+    <span class="comment">// async logic here</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">future</span> <span class="op">=</span> <span class="ident">my_async_fn</span>();
+    (<span class="kw-2">&amp;mut</span> <span class="ident">future</span>).<span class="kw">await</span>;
+}</code></pre></div>
+<p>To make this work requires pinning:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::pin</span>;
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">my_async_fn</span>() {
+    <span class="comment">// async logic here</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">future</span> <span class="op">=</span> <span class="ident">my_async_fn</span>();
+    <span class="macro">pin!</span>(<span class="ident">future</span>);
+
+    (<span class="kw-2">&amp;mut</span> <span class="ident">future</span>).<span class="kw">await</span>;
+}</code></pre></div>
+<p>Pinning is useful when using <code>select!</code> and stream operators that require <code>T: Stream + Unpin</code>.</p>
+<h2 id="usage"><a href="#usage">Usage</a></h2>
+<p>The <code>pin!</code> macro takes <strong>identifiers</strong> as arguments. It does <strong>not</strong> work
+with expressions.</p>
+<p>The following does not compile as an expression is passed to <code>pin!</code>.</p>
+
+<div class='information'><div class='tooltip compile_fail'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered compile_fail"><code><span class="kw">async</span> <span class="kw">fn</span> <span class="ident">my_async_fn</span>() {
+    <span class="comment">// async logic here</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">future</span> <span class="op">=</span> <span class="macro">pin!</span>(<span class="ident">my_async_fn</span>());
+    (<span class="kw-2">&amp;mut</span> <span class="ident">future</span>).<span class="kw">await</span>;
+}</code></pre></div>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Using with select:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio</span>::{<span class="ident">pin</span>, <span class="ident">select</span>};
+<span class="kw">use</span> <span class="ident">tokio_stream</span>::{<span class="self">self</span> <span class="kw">as</span> <span class="ident">stream</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">my_async_fn</span>() {
+    <span class="comment">// async logic here</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream::iter</span>(<span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
+
+    <span class="kw">let</span> <span class="ident">future</span> <span class="op">=</span> <span class="ident">my_async_fn</span>();
+    <span class="macro">pin!</span>(<span class="ident">future</span>);
+
+    <span class="kw">loop</span> {
+        <span class="macro">select!</span> {
+            <span class="kw">_</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">future</span> =&gt; {
+                <span class="comment">// Stop looping `future` will be polled after completion</span>
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Some</span>(<span class="ident">val</span>) <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">next</span>() =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;got value = {}&quot;</span>, <span class="ident">val</span>);
+            }
+        }
+    }
+}</code></pre></div>
+<p>Because assigning to a variable followed by pinning is common, there is also
+a variant of the macro that supports doing both in one go.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio</span>::{<span class="ident">pin</span>, <span class="ident">select</span>};
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">my_async_fn</span>() {
+    <span class="comment">// async logic here</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">pin!</span> {
+        <span class="kw">let</span> <span class="ident">future1</span> <span class="op">=</span> <span class="ident">my_async_fn</span>();
+        <span class="kw">let</span> <span class="ident">future2</span> <span class="op">=</span> <span class="ident">my_async_fn</span>();
+    }
+
+    <span class="macro">select!</span> {
+        <span class="kw">_</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">future1</span> =&gt; {}
+        <span class="kw">_</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">future2</span> =&gt; {}
+    }
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="tokio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

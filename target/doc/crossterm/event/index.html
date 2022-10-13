@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A module to read events."><meta name="keywords" content="rust, rustlang, rust-lang, event"><title>crossterm::event - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../crossterm/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../crossterm/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module event</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../crossterm/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">crossterm</a>::<wbr><a class="mod" href="#">event</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/crossterm/event.rs.html#1-548">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A module to read events.</p>
+<h2 id="event"><a href="#event">Event</a></h2>
+<p>The <code>event</code> module provides the functionality to read keyboard, mouse and terminal resize events.</p>
+<ul>
+<li>
+<p>The <a href="fn.read.html"><code>read</code></a> function returns an <a href="enum.Event.html"><code>Event</code></a> immediately
+(if available) or blocks until an <a href="enum.Event.html"><code>Event</code></a> is available.</p>
+</li>
+<li>
+<p>The <a href="fn.poll.html"><code>poll</code></a> function allows you to check if there is or isn’t an <a href="enum.Event.html"><code>Event</code></a> available
+within the given period of time. In other words - if subsequent call to the <a href="fn.read.html"><code>read</code></a>
+function will block or not.</p>
+</li>
+</ul>
+<p>It’s <strong>not allowed</strong> to call these functions from different threads or combine them with the
+<a href="struct.EventStream.html"><code>EventStream</code></a>. You’re allowed to either:</p>
+<ul>
+<li>use the <a href="fn.read.html"><code>read</code></a> &amp; <a href="fn.poll.html"><code>poll</code></a> functions on any, but same, thread</li>
+<li>or the <a href="struct.EventStream.html"><code>EventStream</code></a>.</li>
+</ul>
+<p><strong>Make sure to enable <a href="../terminal/#raw-mode">raw mode</a> in order for keyboard events to work properly</strong></p>
+<h3 id="mouse-events"><a href="#mouse-events">Mouse Events</a></h3>
+<p>Mouse events are not enabled by default. You have to enable them with the
+<a href="struct.EnableMouseCapture.html"><code>EnableMouseCapture</code></a> command. See <a href="../index.html#command-api">Command API</a>
+for more information.</p>
+<h3 id="examples"><a href="#examples">Examples</a></h3>
+<p>Blocking read:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">crossterm::event</span>::{<span class="ident">read</span>, <span class="ident">Event</span>};
+
+<span class="kw">fn</span> <span class="ident">print_events</span>() -&gt; <span class="ident">crossterm::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">loop</span> {
+        <span class="comment">// `read()` blocks until an `Event` is available</span>
+        <span class="kw">match</span> <span class="ident">read</span>()<span class="question-mark">?</span> {
+            <span class="ident">Event::Key</span>(<span class="ident">event</span>) =&gt; <span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">event</span>),
+            <span class="ident">Event::Mouse</span>(<span class="ident">event</span>) =&gt; <span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">event</span>),
+            <span class="ident">Event::Resize</span>(<span class="ident">width</span>, <span class="ident">height</span>) =&gt; <span class="macro">println!</span>(<span class="string">&quot;New size {}x{}&quot;</span>, <span class="ident">width</span>, <span class="ident">height</span>),
+        }
+    }
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p>Non-blocking read:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::time::Duration</span>;
+
+<span class="kw">use</span> <span class="ident">crossterm::event</span>::{<span class="ident">poll</span>, <span class="ident">read</span>, <span class="ident">Event</span>};
+
+<span class="kw">fn</span> <span class="ident">print_events</span>() -&gt; <span class="ident">crossterm::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">loop</span> {
+        <span class="comment">// `poll()` waits for an `Event` for a given time period</span>
+        <span class="kw">if</span> <span class="ident">poll</span>(<span class="ident">Duration::from_millis</span>(<span class="number">500</span>))<span class="question-mark">?</span> {
+            <span class="comment">// It&#39;s guaranteed that the `read()` won&#39;t block when the `poll()`</span>
+            <span class="comment">// function returns `true`</span>
+            <span class="kw">match</span> <span class="ident">read</span>()<span class="question-mark">?</span> {
+                <span class="ident">Event::Key</span>(<span class="ident">event</span>) =&gt; <span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">event</span>),
+                <span class="ident">Event::Mouse</span>(<span class="ident">event</span>) =&gt; <span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">event</span>),
+                <span class="ident">Event::Resize</span>(<span class="ident">width</span>, <span class="ident">height</span>) =&gt; <span class="macro">println!</span>(<span class="string">&quot;New size {}x{}&quot;</span>, <span class="ident">width</span>, <span class="ident">height</span>),
+            }
+        } <span class="kw">else</span> {
+            <span class="comment">// Timeout expired and no `Event` is available</span>
+        }
+    }
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p>Check the <a href="https://github.com/crossterm-rs/crossterm/tree/master/examples">examples</a> folder for more of
+them (<code>event-*</code>).</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DisableMouseCapture.html" title="crossterm::event::DisableMouseCapture struct">DisableMouseCapture</a></div><div class="item-right docblock-short"><p>A command that disables mouse event capturing.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EnableMouseCapture.html" title="crossterm::event::EnableMouseCapture struct">EnableMouseCapture</a></div><div class="item-right docblock-short"><p>A command that enables mouse event capturing.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.KeyEvent.html" title="crossterm::event::KeyEvent struct">KeyEvent</a></div><div class="item-right docblock-short"><p>Represents a key event.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.KeyModifiers.html" title="crossterm::event::KeyModifiers struct">KeyModifiers</a></div><div class="item-right docblock-short"><p>Represents key modifiers (shift, control, alt).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.MouseEvent.html" title="crossterm::event::MouseEvent struct">MouseEvent</a></div><div class="item-right docblock-short"><p>Represents a mouse event.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Event.html" title="crossterm::event::Event enum">Event</a></div><div class="item-right docblock-short"><p>Represents an event.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.KeyCode.html" title="crossterm::event::KeyCode enum">KeyCode</a></div><div class="item-right docblock-short"><p>Represents a key.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.MouseButton.html" title="crossterm::event::MouseButton enum">MouseButton</a></div><div class="item-right docblock-short"><p>Represents a mouse button.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.MouseEventKind.html" title="crossterm::event::MouseEventKind enum">MouseEventKind</a></div><div class="item-right docblock-short"><p>A mouse event kind.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.poll.html" title="crossterm::event::poll fn">poll</a></div><div class="item-right docblock-short"><p>Checks if there is an <a href="enum.Event.html"><code>Event</code></a> available.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.read.html" title="crossterm::event::read fn">read</a></div><div class="item-right docblock-short"><p>Reads a single <a href="enum.Event.html"><code>Event</code></a>.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="crossterm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

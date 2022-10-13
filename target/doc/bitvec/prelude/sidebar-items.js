@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["base","The base symbols, containing only the minimum needed to use the crate."],["macros","Macros available for default export."],["trait_methods","Imports trait methods without importing the traits themselves."],["traits","Traits available for default export."],["types","Datatypes available for default export."]]};

@@ -1,0 +1,330 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Instruments a function to create and enter a `tracing` span every time the function is called."><meta name="keywords" content="rust, rustlang, rust-lang, instrument"><title>instrument in tracing - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc attr"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../tracing/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../tracing/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In tracing</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../tracing/index.html">
+                        <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Attribute Macro <a href="index.html">tracing</a>::<wbr><a class="attr" href="#">instrument</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/tracing_attributes/lib.rs.html#552-555">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust attr"><code>#[instrument]</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Instruments a function to create and enter a <code>tracing</code> <a href="https://docs.rs/tracing/latest/tracing/span/index.html">span</a> every time
+the function is called.</p>
+<p>Unless overriden, a span with the <a href="https://docs.rs/tracing/latest/tracing/struct.Level.html#associatedconstant.INFO"><code>INFO</code></a> <a href="https://docs.rs/tracing/latest/tracing/struct.Level.html">level</a> will be generated.
+The generated span’s name will be the name of the function.
+By default, all arguments to the function are included as fields on the
+span. Arguments that are <code>tracing</code> <a href="https://docs.rs/tracing/latest/tracing/field/trait.Value.html#foreign-impls">primitive types</a> implementing the
+<a href="https://docs.rs/tracing/latest/tracing/field/trait.Value.html."><code>Value</code> trait</a> will be recorded as fields of that type. Types which do
+not implement <code>Value</code> will be recorded using <a href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Debug.html" title="std::fmt::Debug"><code>std::fmt::Debug</code></a>.</p>
+<h2 id="overriding-span-attributes"><a href="#overriding-span-attributes">Overriding Span Attributes</a></h2>
+<p>To change the <a href="https://docs.rs/tracing/latest/tracing/struct.Metadata.html#method.name">name</a> of the generated span, add a <code>name</code> argument to the
+<code>#[instrument]</code> macro, followed by an equals sign and a string literal. For
+example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="comment">// The generated span&#39;s name will be &quot;my_span&quot; rather than &quot;my_function&quot;.</span>
+<span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;my_span&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>() {
+    <span class="comment">// ... do something incredibly interesting and important ...</span>
+}</code></pre></div>
+<p>To override the <a href="https://docs.rs/tracing/latest/tracing/struct.Metadata.html#method.target">target</a> of the generated span, add a <code>target</code> argument to
+the <code>#[instrument]</code> macro, followed by an equals sign and a string literal
+for the new target. The <a href="https://docs.rs/tracing/latest/tracing/struct.Metadata.html#method.module_path">module path</a> is still recorded separately. For
+example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">my_module</span> {
+    <span class="comment">// The generated span&#39;s target will be &quot;my_crate::some_special_target&quot;,</span>
+    <span class="comment">// rather than &quot;my_crate::my_module&quot;.</span>
+    <span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">target</span> <span class="op">=</span> <span class="string">&quot;my_crate::some_special_target&quot;</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>() {
+        <span class="comment">// ... all kinds of neat code in here ...</span>
+    }
+}</code></pre></div>
+<p>Finally, to override the <a href="https://docs.rs/tracing/latest/tracing/struct.Level.html">level</a> of the generated span, add a <code>level</code>
+argument, followed by an equals sign and a string literal with the name of
+the desired level. Level names are not case sensitive. For example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// The span&#39;s level will be TRACE rather than INFO.</span>
+<span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">level</span> <span class="op">=</span> <span class="string">&quot;trace&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>() {
+    <span class="comment">// ... I have written a truly marvelous implementation of this function,</span>
+    <span class="comment">// which this example is too narrow to contain ...</span>
+}</code></pre></div>
+<h2 id="skipping-fields"><a href="#skipping-fields">Skipping Fields</a></h2>
+<p>To skip recording one or more arguments to a function or method, pass
+the argument’s name inside the <code>skip()</code> argument on the <code>#[instrument]</code>
+macro. This can be used when an argument to an instrumented function does
+not implement <a href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Debug.html"><code>fmt::Debug</code></a>, or to exclude an argument with a verbose or
+costly <code>Debug</code> implementation. Note that:</p>
+<ul>
+<li>multiple argument names can be passed to <code>skip</code>.</li>
+<li>arguments passed to <code>skip</code> do <em>not</em> need to implement <code>fmt::Debug</code>.</li>
+</ul>
+<p>You can also use <code>skip_all</code> to skip all arguments.</p>
+<h3 id="examples"><a href="#examples">Examples</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// This type doesn&#39;t implement `fmt::Debug`!</span>
+<span class="kw">struct</span> <span class="ident">NonDebug</span>;
+
+<span class="comment">// `arg` will be recorded, while `non_debug` will not.</span>
+<span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">skip</span>(<span class="ident">non_debug</span>))]</span>
+<span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">arg</span>: <span class="ident">usize</span>, <span class="ident">non_debug</span>: <span class="ident">NonDebug</span>) {
+    <span class="comment">// ...</span>
+}
+
+<span class="comment">// These arguments are huge</span>
+<span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">skip_all</span>)]</span>
+<span class="kw">fn</span> <span class="ident">my_big_data_function</span>(<span class="ident">large</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">also_large</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">String</span><span class="op">&gt;</span>) {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Skipping the <code>self</code> parameter:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">struct</span> <span class="ident">MyType</span> {
+   <span class="ident">data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="comment">// Suppose this buffer is often quite long...</span>
+}
+
+<span class="kw">impl</span> <span class="ident">MyType</span> {
+    <span class="comment">// Suppose we don&#39;t want to print an entire kilobyte of `data`</span>
+    <span class="comment">// every time this is called...</span>
+    <span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">skip</span>(<span class="self">self</span>))]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_method</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">an_interesting_argument</span>: <span class="ident">usize</span>) {
+         <span class="comment">// ... do something (hopefully, using all that `data`!)</span>
+    }
+}</code></pre></div>
+<h2 id="adding-fields"><a href="#adding-fields">Adding Fields</a></h2>
+<p>Additional fields (key-value pairs with arbitrary data) may be added to the
+generated span using the <code>fields</code> argument on the <code>#[instrument]</code> macro. Any
+Rust expression can be used as a field value in this manner. These
+expressions will be evaluated at the beginning of the function’s body, so
+arguments to the function may be used in these expressions. Field names may
+also be specified <em>without</em> values. Doing so will result in an <a href="https://docs.rs/tracing/latest/tracing/field/struct.Empty.html">empty field</a>
+whose value may be recorded later within the function body.</p>
+<p>This supports the same <a href="https://docs.rs/tracing/latest/tracing/#recording-fields">field syntax</a> as the <code>span!</code> and <code>event!</code> macros.</p>
+<p>Note that overlap between the names of fields and (non-skipped) arguments
+will result in a compile error.</p>
+<h3 id="examples-1"><a href="#examples-1">Examples</a></h3>
+<p>Adding a new field based on the value of an argument:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="comment">// This will record a field named &quot;i&quot; with the value of `i` *and* a field</span>
+<span class="comment">// named &quot;next&quot; with the value of `i` + 1.</span>
+<span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">fields</span>(<span class="ident">next</span> <span class="op">=</span> <span class="ident">i</span> <span class="op">+</span> <span class="number">1</span>))]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">i</span>: <span class="ident">usize</span>) {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Recording specific properties of a struct as their own fields:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="comment">// This will record the request&#39;s URI and HTTP method as their own separate</span>
+<span class="comment">// fields.</span>
+<span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">fields</span>(<span class="ident">http</span>.<span class="ident">uri</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">uri</span>(), <span class="ident">http</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">method</span>()))]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_request</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span>(<span class="ident">req</span>: <span class="ident">http::Request</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span>) -&gt; <span class="ident">http::Response</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span> {
+    <span class="comment">// ... handle the request ...</span>
+}</code></pre></div>
+<p>This can be used in conjunction with <code>skip</code> or <code>skip_all</code> to record only
+some fields of a struct:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// Remember the struct with the very large `data` field from the earlier</span>
+<span class="comment">// example? Now it also has a `name`, which we might want to include in</span>
+<span class="comment">// our span.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">struct</span> <span class="ident">MyType</span> {
+   <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
+   <span class="ident">data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">MyType</span> {
+    <span class="comment">// This will skip the `data` field, but will include `self.name`,</span>
+    <span class="comment">// formatted using `fmt::Display`.</span>
+    <span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">skip</span>(<span class="self">self</span>), <span class="ident">fields</span>(<span class="self">self</span>.<span class="ident">name</span> <span class="op">=</span> <span class="op">%</span><span class="self">self</span>.<span class="ident">name</span>))]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_method</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">an_interesting_argument</span>: <span class="ident">usize</span>) {
+         <span class="comment">// ... do something (hopefully, using all that `data`!)</span>
+    }
+}</code></pre></div>
+<p>Adding an empty field to be recorded later:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="comment">// This function does a very interesting and important mathematical calculation.</span>
+<span class="comment">// Suppose we want to record both the inputs to the calculation *and* its result...</span>
+<span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">fields</span>(<span class="ident">result</span>))]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">do_calculation</span>(<span class="ident">input_1</span>: <span class="ident">usize</span>, <span class="ident">input_2</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
+    <span class="comment">// Rerform the calculation.</span>
+    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">input_1</span> <span class="op">+</span> <span class="ident">input_2</span>;
+
+    <span class="comment">// Record the result as part of the current span.</span>
+    <span class="ident">tracing::Span::current</span>().<span class="ident">record</span>(<span class="string">&quot;result&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">result</span>);
+
+    <span class="comment">// Now, the result will also be included on this event!</span>
+    <span class="macro">tracing::info!</span>(<span class="string">&quot;calculation complete!&quot;</span>);
+
+    <span class="comment">// ... etc ...</span>
+}</code></pre></div>
+<h2 id="examples-2"><a href="#examples-2">Examples</a></h2>
+<p>Instrumenting a function:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">my_arg</span>: <span class="ident">usize</span>) {
+    <span class="comment">// This event will be recorded inside a span named `my_function` with the</span>
+    <span class="comment">// field `my_arg`.</span>
+    <span class="macro">tracing::info!</span>(<span class="string">&quot;inside my_function!&quot;</span>);
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Setting the level for the generated span:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">level</span> <span class="op">=</span> <span class="string">&quot;debug&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>() {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Overriding the generated span’s name:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;my_name&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>() {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Overriding the generated span’s target:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">target</span> <span class="op">=</span> <span class="string">&quot;my_target&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>() {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Overriding the generated span’s parent:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">parent</span> <span class="op">=</span> <span class="prelude-val">None</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>() {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// A struct which owns a span handle.</span>
+<span class="kw">struct</span> <span class="ident">MyStruct</span>
+{
+    <span class="ident">span</span>: <span class="ident">tracing::Span</span>
+}
+
+<span class="kw">impl</span> <span class="ident">MyStruct</span>
+{
+    <span class="comment">// Use the struct&#39;s `span` field as the parent span</span>
+    <span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">parent</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">span</span>, <span class="ident">skip</span>(<span class="self">self</span>))]</span>
+    <span class="kw">fn</span> <span class="ident">my_method</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {}
+}</code></pre></div>
+<p>Specifying <a href="https://docs.rs/tracing/latest/tracing/struct.Span.html#method.follows_from"><code>follows_from</code></a> relationships:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">follows_from</span> <span class="op">=</span> <span class="ident">causes</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">causes</span>: <span class="kw-2">&amp;</span>[<span class="ident">tracing::Id</span>]) {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Any expression of type <code>impl IntoIterator&lt;Item = impl Into&lt;Option&lt;Id&gt;&gt;&gt;</code>
+may be provided to <code>follows_from</code>; e.g.:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">follows_from</span> <span class="op">=</span> [<span class="ident">cause</span>]</span>)]
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">cause</span>: <span class="kw-2">&amp;</span><span class="ident">tracing::span::EnteredSpan</span>) {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>To skip recording an argument, pass the argument’s name to the <code>skip</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">struct</span> <span class="ident">NonDebug</span>;
+
+<span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">skip</span>(<span class="ident">non_debug</span>))]</span>
+<span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">arg</span>: <span class="ident">usize</span>, <span class="ident">non_debug</span>: <span class="ident">NonDebug</span>) {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>To add an additional context to the span, pass key-value pairs to <code>fields</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">fields</span>(<span class="ident">foo</span><span class="op">=</span><span class="string">&quot;bar&quot;</span>, <span class="ident">id</span><span class="op">=</span><span class="number">1</span>, <span class="ident">show</span><span class="op">=</span><span class="bool-val">true</span>))]</span>
+<span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">arg</span>: <span class="ident">usize</span>) {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Adding the <code>ret</code> argument to <code>#[instrument]</code> will emit an event with the function’s
+return value when the function returns:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">ret</span>)]</span>
+<span class="kw">fn</span> <span class="ident">my_function</span>() -&gt; <span class="ident">i32</span> {
+    <span class="number">42</span>
+}</code></pre></div>
+<p>The return value event will have the same level as the span generated by <code>#[instrument]</code>.
+By default, this will be <a href="https://docs.rs/tracing/latest/tracing/struct.Level.html#associatedconstant.INFO"><code>INFO</code></a>, but if the level is overridden, the event will be at the same
+level.</p>
+<p><strong>Note</strong>:  if the function returns a <code>Result&lt;T, E&gt;</code>, <code>ret</code> will record returned values if and
+only if the function returns <a href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html#variant.Ok" title="Result::Ok"><code>Result::Ok</code></a>.</p>
+<p>By default, returned values will be recorded using their <a href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Debug.html" title="std::fmt::Debug"><code>std::fmt::Debug</code></a> implementations.
+If a returned value implements <a href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Display.html" title="std::fmt::Display"><code>std::fmt::Display</code></a>, it can be recorded using its <code>Display</code>
+implementation instead, by writing <code>ret(Display)</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">ret</span>(<span class="ident">Display</span>))]</span>
+<span class="kw">fn</span> <span class="ident">my_function</span>() -&gt; <span class="ident">i32</span> {
+    <span class="number">42</span>
+}</code></pre></div>
+<p>If the function returns a <code>Result&lt;T, E&gt;</code> and <code>E</code> implements <code>std::fmt::Display</code>, you can add
+<code>err</code> or <code>err(Display)</code> to emit error events when the function returns <code>Err</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">err</span>)]</span>
+<span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">arg</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">std::io::Error</span><span class="op">&gt;</span> {
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p>By default, error values will be recorded using their <code>std::fmt::Display</code> implementations.
+If an error implements <code>std::fmt::Debug</code>, it can be recorded using its <code>Debug</code> implementation
+instead, by writing <code>err(Debug)</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">err</span>(<span class="ident">Debug</span>))]</span>
+<span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">arg</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">std::io::Error</span><span class="op">&gt;</span> {
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p>If a <code>target</code> is specified, both the <code>ret</code> and <code>err</code> arguments will emit outputs to
+the declared target (or the default channel if <code>target</code> is not specified).</p>
+<p>The <code>ret</code> and <code>err</code> arguments can be combined in order to record an event if a
+function returns <a href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html#variant.Ok" title="Result::Ok"><code>Result::Ok</code></a> or <a href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html#variant.Err" title="Result::Err"><code>Result::Err</code></a>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">err</span>, <span class="ident">ret</span>)]</span>
+<span class="kw">fn</span> <span class="ident">my_function</span>(<span class="ident">arg</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">std::io::Error</span><span class="op">&gt;</span> {
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p><code>async fn</code>s may also be instrumented:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">instrument</span>]</span>
+<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">my_function</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>It also works with <a href="https://crates.io/crates/async-trait">async-trait</a>
+(a crate that allows defining async functions in traits,
+something not currently possible in Rust),
+and hopefully most libraries that exhibit similar behaviors:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
+
+<span class="attribute">#[<span class="ident">async_trait</span>]</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Foo</span> {
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">foo</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">arg</span>: <span class="ident">usize</span>);
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">struct</span> <span class="ident">FooImpl</span>(<span class="ident">usize</span>);
+
+<span class="attribute">#[<span class="ident">async_trait</span>]</span>
+<span class="kw">impl</span> <span class="ident">Foo</span> <span class="kw">for</span> <span class="ident">FooImpl</span> {
+    <span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">fields</span>(<span class="ident">value</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>, <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>()))]</span>
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">foo</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">arg</span>: <span class="ident">usize</span>) {}
+}</code></pre></div>
+<p>Note than on <code>async-trait</code> &lt;= 0.1.43, references to the <code>Self</code>
+type inside the <code>fields</code> argument were only allowed when the instrumented
+function is a method (i.e., the function receives <code>self</code> as an argument).
+For example, this <em>used to not work</em> because the instrument function
+didn’t receive <code>self</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
+
+<span class="attribute">#[<span class="ident">async_trait</span>]</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Bar</span> {
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">bar</span>();
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">struct</span> <span class="ident">BarImpl</span>(<span class="ident">usize</span>);
+
+<span class="attribute">#[<span class="ident">async_trait</span>]</span>
+<span class="kw">impl</span> <span class="ident">Bar</span> <span class="kw">for</span> <span class="ident">BarImpl</span> {
+    <span class="attribute">#[<span class="ident">instrument</span>(<span class="ident">fields</span>(<span class="ident">tmp</span> <span class="op">=</span> <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>()))]</span>
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">bar</span>() {}
+}</code></pre></div>
+<p>Instead, you should manually rewrite any <code>Self</code> types as the type for
+which you implement the trait: <code>#[instrument(fields(tmp = std::any::type_name::&lt;Bar&gt;()))]</code>
+(or maybe you can just bump <code>async-trait</code>).</p>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="tracing" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

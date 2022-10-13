@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Runs the provided blocking function on the current thread without blocking the executor."><meta name="keywords" content="rust, rustlang, rust-lang, block_in_place"><title>block_in_place in tokio::task - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In tokio::task</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tokio/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Function <a href="../index.html">tokio</a>::<wbr><a href="index.html">task</a>::<wbr><a class="fn" href="#">block_in_place</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tokio/task/blocking.rs.html#73-78">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust fn"><code>pub fn block_in_place&lt;F, R&gt;(f: F) -&gt; R <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/ops/function/trait.FnOnce.html" title="trait core::ops::function::FnOnce">FnOnce</a>() -&gt; R,&nbsp;</span></code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Runs the provided blocking function on the current thread without
+blocking the executor.</p>
+<p>In general, issuing a blocking call or performing a lot of compute in a
+future without yielding is problematic, as it may prevent the executor
+from driving other tasks forward. Calling this function informs the
+executor that the currently executing task is about to block the thread,
+so the executor is able to hand off any other tasks it has to a new
+worker thread before that happens. See the <a href="../index.html#cpu-bound-tasks-and-blocking-code">CPU-bound tasks and blocking
+code</a> section for more information.</p>
+<p>Be aware that although this function avoids starving other independently
+spawned tasks, any other code running concurrently in the same task will
+be suspended during the call to <code>block_in_place</code>. This can happen e.g.
+when using the <a href="../macro.join.html"><code>join!</code></a> macro. To avoid this issue, use
+<a href="fn.spawn_blocking.html"><code>spawn_blocking</code></a> instead of <code>block_in_place</code>.</p>
+<p>Note that this function cannot be used within a <a href="../runtime/struct.Builder.html#method.new_current_thread"><code>current_thread</code></a> runtime
+because in this case there are no other worker threads to hand off tasks
+to. On the other hand, calling the function outside a runtime is
+allowed. In this case, <code>block_in_place</code> just calls the provided closure
+normally.</p>
+<p>Code running behind <code>block_in_place</code> cannot be cancelled. When you shut
+down the executor, it will wait indefinitely for all blocking operations
+to finish. You can use <a href="../runtime/struct.Runtime.html#method.shutdown_timeout"><code>shutdown_timeout</code></a> to stop waiting for them
+after a certain timeout. Be aware that this will still not cancel the
+tasks — they are simply allowed to keep running after the method
+returns.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::task</span>;
+
+<span class="ident">task::block_in_place</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+    <span class="comment">// do some compute-heavy work or call synchronous code</span>
+});</code></pre></div>
+<p>Code running inside <code>block_in_place</code> may use <code>block_on</code> to reenter the
+async context.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::task</span>;
+<span class="kw">use</span> <span class="ident">tokio::runtime::Handle</span>;
+
+<span class="ident">task::block_in_place</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+    <span class="ident">Handle::current</span>().<span class="ident">block_on</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="comment">// do something async</span>
+    });
+});</code></pre></div>
+<h2 id="panics"><a href="#panics">Panics</a></h2>
+<p>This function panics if called from a <a href="../runtime/struct.Builder.html#method.new_current_thread"><code>current_thread</code></a> runtime.</p>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tokio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

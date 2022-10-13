@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A persistent vector."><meta name="keywords" content="rust, rustlang, rust-lang, vector"><title>im::vector - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../im/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../im/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module vector</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../im/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">im</a>::<wbr><a class="mod" href="#">vector</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/im/vector/mod.rs.html#5-2745">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A persistent vector.</p>
+<p>This is a sequence of elements in insertion order - if you need a
+list of things, any kind of list of things, this is what you’re
+looking for.</p>
+<p>It’s implemented as an <a href="https://infoscience.epfl.ch/record/213452/files/rrbvector.pdf">RRB vector</a> with <a href="http://deepsea.inria.fr/pasl/chunkedseq.pdf">smart
+head/tail chunking</a>. In performance terms, this means
+that practically every operation is O(log n), except push/pop on
+both sides, which will be O(1) amortised, and O(log n) in the
+worst case. In practice, the push/pop operations will be
+blindingly fast, nearly on par with the native
+<a href="https://doc.rust-lang.org/std/collections/struct.VecDeque.html"><code>VecDeque</code></a>, and other operations will have decent, if
+not high, performance, but they all have more or less the same
+O(log n) complexity, so you don’t need to keep their performance
+characteristics in mind - everything, even splitting and merging,
+is safe to use and never too slow.</p>
+<h3 id="performance-notes"><a href="#performance-notes">Performance Notes</a></h3>
+<p>Because of the head/tail chunking technique, until you push a
+number of items above double the tree’s branching factor (that’s
+<code>self.len()</code> = 2 × <em>k</em> (where <em>k</em> = 64) = 128) on either side, the
+data structure is still just a handful of arrays, not yet an RRB
+tree, so you’ll see performance and memory characteristics fairly
+close to <a href="https://doc.rust-lang.org/std/vec/struct.Vec.html"><code>Vec</code></a> or <a href="https://doc.rust-lang.org/std/collections/struct.VecDeque.html"><code>VecDeque</code></a>.</p>
+<p>This means that the structure always preallocates four chunks of
+size <em>k</em> (<em>k</em> being the tree’s branching factor), equivalent to a
+<a href="https://doc.rust-lang.org/std/vec/struct.Vec.html"><code>Vec</code></a> with an initial capacity of 256. Beyond that, it will
+allocate tree nodes of capacity <em>k</em> as needed.</p>
+<p>In addition, vectors start out as single chunks, and only expand into the
+full data structure once you go past the chunk size. This makes them
+perform identically to <a href="https://doc.rust-lang.org/std/vec/struct.Vec.html"><code>Vec</code></a> at small sizes.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Chunks.html" title="im::vector::Chunks struct">Chunks</a></div><div class="item-right docblock-short"><p>An iterator over the leaf nodes of a vector.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ChunksMut.html" title="im::vector::ChunksMut struct">ChunksMut</a></div><div class="item-right docblock-short"><p>A mutable iterator over the leaf nodes of a vector.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ConsumingIter.html" title="im::vector::ConsumingIter struct">ConsumingIter</a></div><div class="item-right docblock-short"><p>A consuming iterator over vectors with values of type <code>A</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Iter.html" title="im::vector::Iter struct">Iter</a></div><div class="item-right docblock-short"><p>An iterator over vectors with values of type <code>A</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.IterMut.html" title="im::vector::IterMut struct">IterMut</a></div><div class="item-right docblock-short"><p>A mutable iterator over vectors with values of type <code>A</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RRBPool.html" title="im::vector::RRBPool struct">RRBPool</a></div><div class="item-right docblock-short"><p>A memory pool for <code>Vector</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Vector.html" title="im::vector::Vector struct">Vector</a></div><div class="item-right docblock-short"><p>A persistent vector.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Focus.html" title="im::vector::Focus enum">Focus</a></div><div class="item-right docblock-short"><p>Focused indexing over a <a href="enum.Vector.html"><code>Vector</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.FocusMut.html" title="im::vector::FocusMut enum">FocusMut</a></div><div class="item-right docblock-short"><p>A mutable version of <a href="enum.Focus.html"><code>Focus</code></a>.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="im" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

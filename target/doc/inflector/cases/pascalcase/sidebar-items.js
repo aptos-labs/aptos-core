@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["is_pascal_case","Determines if a `&str` is pascalCase bool``"],["to_pascal_case","Converts a `&str` to pascalCase `String`"]]};

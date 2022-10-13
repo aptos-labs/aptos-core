@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["InvalidLength","The error type returned when key and/or nonce used in stream cipher initialization had an invalid length."],["LoopError","The error type returned when stream cipher has reached the end of a keystream."],["OverflowError","The error type returned when a cipher position can not be represented by the requested type."]]};

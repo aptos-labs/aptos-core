@@ -1,0 +1,84 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="SSL/TLS encryption support using Secure Transport."><meta name="keywords" content="rust, rustlang, rust-lang, secure_transport"><title>security_framework::secure_transport - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../security_framework/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../security_framework/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module secure_transport</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../security_framework/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">security_framework</a>::<wbr><a class="mod" href="#">secure_transport</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/security_framework/secure_transport.rs.html#1-1840">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>SSL/TLS encryption support using Secure Transport.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>To connect as a client to a server with a certificate trusted by the system:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::io::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">std::net::TcpStream</span>;
+<span class="kw">use</span> <span class="ident">security_framework::secure_transport::ClientBuilder</span>;
+
+<span class="kw">let</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">TcpStream::connect</span>(<span class="string">&quot;google.com:443&quot;</span>).<span class="ident">unwrap</span>();
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">ClientBuilder::new</span>().<span class="ident">handshake</span>(<span class="string">&quot;google.com&quot;</span>, <span class="ident">stream</span>).<span class="ident">unwrap</span>();
+
+<span class="ident">stream</span>.<span class="ident">write_all</span>(<span class="string">b&quot;GET / HTTP/1.0\r\n\r\n&quot;</span>).<span class="ident">unwrap</span>();
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+<span class="ident">stream</span>.<span class="ident">read_to_end</span>(<span class="kw-2">&amp;mut</span> <span class="ident">page</span>).<span class="ident">unwrap</span>();
+<span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">String::from_utf8_lossy</span>(<span class="kw-2">&amp;</span><span class="ident">page</span>));</code></pre></div>
+<p>To connect to a server with a certificate that’s <em>not</em> trusted by the
+system, specify the root certificates for the server’s chain to the
+<code>ClientBuilder</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::io::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">std::net::TcpStream</span>;
+<span class="kw">use</span> <span class="ident">security_framework::secure_transport::ClientBuilder</span>;
+
+<span class="kw">let</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">TcpStream::connect</span>(<span class="string">&quot;my_server.com:443&quot;</span>).<span class="ident">unwrap</span>();
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">ClientBuilder::new</span>()
+                     .<span class="ident">anchor_certificates</span>(<span class="kw-2">&amp;</span>[<span class="ident">root_cert</span>])
+                     .<span class="ident">handshake</span>(<span class="string">&quot;my_server.com&quot;</span>, <span class="ident">stream</span>)
+                     .<span class="ident">unwrap</span>();
+
+<span class="ident">stream</span>.<span class="ident">write_all</span>(<span class="string">b&quot;GET / HTTP/1.0\r\n\r\n&quot;</span>).<span class="ident">unwrap</span>();
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+<span class="ident">stream</span>.<span class="ident">read_to_end</span>(<span class="kw-2">&amp;mut</span> <span class="ident">page</span>).<span class="ident">unwrap</span>();
+<span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">String::from_utf8_lossy</span>(<span class="kw-2">&amp;</span><span class="ident">page</span>));</code></pre></div>
+<p>For more advanced configuration, the <code>SslContext</code> type can be used directly.</p>
+<p>To run a server:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::net::TcpListener</span>;
+<span class="kw">use</span> <span class="ident">std::thread</span>;
+<span class="kw">use</span> <span class="ident">security_framework::secure_transport</span>::{<span class="ident">SslContext</span>, <span class="ident">SslProtocolSide</span>, <span class="ident">SslConnectionType</span>};
+
+<span class="comment">// Create a TCP listener and start accepting on it.</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">listener</span> <span class="op">=</span> <span class="ident">TcpListener::bind</span>(<span class="string">&quot;0.0.0.0:443&quot;</span>).<span class="ident">unwrap</span>();
+
+<span class="kw">for</span> <span class="ident">stream</span> <span class="kw">in</span> <span class="ident">listener</span>.<span class="ident">incoming</span>() {
+    <span class="kw">let</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">unwrap</span>();
+    <span class="ident">thread::spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+        <span class="comment">// Create a new context configured to operate on the server side of</span>
+        <span class="comment">// a traditional SSL/TLS session.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">SslContext::new</span>(<span class="ident">SslProtocolSide::SERVER</span>, <span class="ident">SslConnectionType::STREAM</span>)
+                          .<span class="ident">unwrap</span>();
+
+        <span class="comment">// Install the certificate chain that we will be using.</span>
+        <span class="ident">ctx</span>.<span class="ident">set_certificate</span>(<span class="ident">identity</span>, <span class="kw-2">&amp;</span>[<span class="ident">intermediate_cert</span>, <span class="ident">root_cert</span>]).<span class="ident">unwrap</span>();
+
+        <span class="comment">// Perform the SSL/TLS handshake and get our stream.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">handshake</span>(<span class="ident">stream</span>).<span class="ident">unwrap</span>();
+    });
+}
+</code></pre></div>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ClientBuilder.html" title="security_framework::secure_transport::ClientBuilder struct">ClientBuilder</a></div><div class="item-right docblock-short"><p>A builder type to simplify the creation of client side <code>SslStream</code>s.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.MidHandshakeClientBuilder.html" title="security_framework::secure_transport::MidHandshakeClientBuilder struct">MidHandshakeClientBuilder</a></div><div class="item-right docblock-short"><p>An SSL stream midway through the handshake process.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.MidHandshakeSslStream.html" title="security_framework::secure_transport::MidHandshakeSslStream struct">MidHandshakeSslStream</a></div><div class="item-right docblock-short"><p>An SSL stream midway through the handshake process.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ServerBuilder.html" title="security_framework::secure_transport::ServerBuilder struct">ServerBuilder</a></div><div class="item-right docblock-short"><p>A builder type to simplify the creation of server-side <code>SslStream</code>s.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SessionState.html" title="security_framework::secure_transport::SessionState struct">SessionState</a></div><div class="item-right docblock-short"><p>Specifies the state of a TLS session.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SslAuthenticate.html" title="security_framework::secure_transport::SslAuthenticate struct">SslAuthenticate</a></div><div class="item-right docblock-short"><p>Specifies a server’s requirement for client certificates.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SslClientCertificateState.html" title="security_framework::secure_transport::SslClientCertificateState struct">SslClientCertificateState</a></div><div class="item-right docblock-short"><p>Specifies the state of client certificate processing.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SslConnectionType.html" title="security_framework::secure_transport::SslConnectionType struct">SslConnectionType</a></div><div class="item-right docblock-short"><p>Specifies the type of TLS session.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SslContext.html" title="security_framework::secure_transport::SslContext struct">SslContext</a></div><div class="item-right docblock-short"><p>A Secure Transport SSL/TLS context object.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SslProtocol.html" title="security_framework::secure_transport::SslProtocol struct">SslProtocol</a></div><div class="item-right docblock-short"><p>Specifies protocol versions.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SslProtocolSide.html" title="security_framework::secure_transport::SslProtocolSide struct">SslProtocolSide</a></div><div class="item-right docblock-short"><p>Specifies a side of a TLS session.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SslStream.html" title="security_framework::secure_transport::SslStream struct">SslStream</a></div><div class="item-right docblock-short"><p>A type implementing SSL/TLS encryption over an underlying stream.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.ClientHandshakeError.html" title="security_framework::secure_transport::ClientHandshakeError enum">ClientHandshakeError</a></div><div class="item-right docblock-short"><p>An error or intermediate state after a TLS handshake attempt.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.HandshakeError.html" title="security_framework::secure_transport::HandshakeError enum">HandshakeError</a></div><div class="item-right docblock-short"><p>An error or intermediate state after a TLS handshake attempt.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="security_framework" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Marks async function to be executed by the selected runtime. This macro helps set up a `Runtime` without requiring the user to use Runtime or Builder directly."><meta name="keywords" content="rust, rustlang, rust-lang, main"><title>main in tokio_macros - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc attr"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../tokio_macros/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../tokio_macros/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In tokio_macros</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../tokio_macros/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Attribute Macro <a href="index.html">tokio_macros</a>::<wbr><a class="attr" href="#">main</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/tokio_macros/lib.rs.html#199-201">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust attr"><code>#[main]</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Marks async function to be executed by the selected runtime. This macro
+helps set up a <code>Runtime</code> without requiring the user to use
+<a href="../tokio/runtime/struct.Runtime.html">Runtime</a> or
+<a href="../tokio/runtime/struct.Builder.html">Builder</a> directly.</p>
+<p>Note: This macro is designed to be simplistic and targets applications that
+do not require a complex setup. If the provided functionality is not
+sufficient, you may be interested in using
+<a href="../tokio/runtime/struct.Builder.html">Builder</a>, which provides a more
+powerful interface.</p>
+<p>Note: This macro can be used on any function and not just the <code>main</code>
+function. Using it on a non-main function makes the function behave as if it
+was synchronous by starting a new runtime each time it is called. If the
+function is called often, it is preferable to create the runtime using the
+runtime builder so the runtime can be reused across calls.</p>
+<h2 id="multi-threaded-runtime"><a href="#multi-threaded-runtime">Multi-threaded runtime</a></h2>
+<p>To use the multi-threaded runtime, the macro can be configured using</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">tokio::main</span>(<span class="ident">flavor</span> <span class="op">=</span> <span class="string">&quot;multi_thread&quot;</span>, <span class="ident">worker_threads</span> <span class="op">=</span> <span class="number">10</span>)]</span></code></pre></div>
+<p>The <code>worker_threads</code> option configures the number of worker threads, and
+defaults to the number of cpus on the system. This is the default flavor.</p>
+<p>Note: The multi-threaded runtime requires the <code>rt-multi-thread</code> feature
+flag.</p>
+<h2 id="current-thread-runtime"><a href="#current-thread-runtime">Current thread runtime</a></h2>
+<p>To use the single-threaded runtime known as the <code>current_thread</code> runtime,
+the macro can be configured using</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">tokio::main</span>(<span class="ident">flavor</span> <span class="op">=</span> <span class="string">&quot;current_thread&quot;</span>)]</span></code></pre></div>
+<h3 id="function-arguments"><a href="#function-arguments">Function arguments:</a></h3>
+<p>Arguments are allowed for any functions aside from <code>main</code> which is special</p>
+<h3 id="usage"><a href="#usage">Usage</a></h3><h4 id="using-the-multi-thread-runtime"><a href="#using-the-multi-thread-runtime">Using the multi-thread runtime</a></h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+}</code></pre></div>
+<p>Equivalent code not using <code>#[tokio::main]</code></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio::runtime::Builder::new_multi_thread</span>()
+        .<span class="ident">enable_all</span>()
+        .<span class="ident">build</span>()
+        .<span class="ident">unwrap</span>()
+        .<span class="ident">block_on</span>(<span class="kw">async</span> {
+            <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+        })
+}</code></pre></div>
+<h4 id="using-current-thread-runtime"><a href="#using-current-thread-runtime">Using current thread runtime</a></h4>
+<p>The basic scheduler is single-threaded.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">tokio::main</span>(<span class="ident">flavor</span> <span class="op">=</span> <span class="string">&quot;current_thread&quot;</span>)]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+}</code></pre></div>
+<p>Equivalent code not using <code>#[tokio::main]</code></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio::runtime::Builder::new_current_thread</span>()
+        .<span class="ident">enable_all</span>()
+        .<span class="ident">build</span>()
+        .<span class="ident">unwrap</span>()
+        .<span class="ident">block_on</span>(<span class="kw">async</span> {
+            <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+        })
+}</code></pre></div>
+<h4 id="set-number-of-worker-threads"><a href="#set-number-of-worker-threads">Set number of worker threads</a></h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">tokio::main</span>(<span class="ident">worker_threads</span> <span class="op">=</span> <span class="number">2</span>)]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+}</code></pre></div>
+<p>Equivalent code not using <code>#[tokio::main]</code></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio::runtime::Builder::new_multi_thread</span>()
+        .<span class="ident">worker_threads</span>(<span class="number">2</span>)
+        .<span class="ident">enable_all</span>()
+        .<span class="ident">build</span>()
+        .<span class="ident">unwrap</span>()
+        .<span class="ident">block_on</span>(<span class="kw">async</span> {
+            <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+        })
+}</code></pre></div>
+<h4 id="configure-the-runtime-to-start-with-time-paused"><a href="#configure-the-runtime-to-start-with-time-paused">Configure the runtime to start with time paused</a></h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">tokio::main</span>(<span class="ident">flavor</span> <span class="op">=</span> <span class="string">&quot;current_thread&quot;</span>, <span class="ident">start_paused</span> <span class="op">=</span> <span class="bool-val">true</span>)]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+}</code></pre></div>
+<p>Equivalent code not using <code>#[tokio::main]</code></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio::runtime::Builder::new_current_thread</span>()
+        .<span class="ident">enable_all</span>()
+        .<span class="ident">start_paused</span>(<span class="bool-val">true</span>)
+        .<span class="ident">build</span>()
+        .<span class="ident">unwrap</span>()
+        .<span class="ident">block_on</span>(<span class="kw">async</span> {
+            <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+        })
+}</code></pre></div>
+<p>Note that <code>start_paused</code> requires the <code>test-util</code> feature to be enabled.</p>
+<h4 id="rename-package"><a href="#rename-package">Rename package</a></h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio</span> <span class="kw">as</span> <span class="ident">tokio1</span>;
+
+<span class="attribute">#[<span class="ident">tokio1::main</span>(<span class="kw">crate</span> <span class="op">=</span> <span class="string">&quot;tokio1&quot;</span>)]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+}</code></pre></div>
+<p>Equivalent code not using <code>#[tokio::main]</code></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio</span> <span class="kw">as</span> <span class="ident">tokio1</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio1::runtime::Builder::new_multi_thread</span>()
+        .<span class="ident">enable_all</span>()
+        .<span class="ident">build</span>()
+        .<span class="ident">unwrap</span>()
+        .<span class="ident">block_on</span>(<span class="kw">async</span> {
+            <span class="macro">println!</span>(<span class="string">&quot;Hello world&quot;</span>);
+        })
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="tokio_macros" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

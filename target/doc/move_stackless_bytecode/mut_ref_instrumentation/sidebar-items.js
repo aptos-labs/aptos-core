@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Type","Represents a type."]],"struct":[["FunctionEnv",""],["Loc","Locations"],["MutRefInstrumenter",""]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["ModuleCache","Simple in-memory module cache"],["SyncModuleCache","Simple in-memory module cache that implements Sync"]],"trait":[["GetModule","A persistent storage that can fetch the bytecode for a given module id TODO: do we want to implement this in a way that allows clients to cache struct layouts?"]]};

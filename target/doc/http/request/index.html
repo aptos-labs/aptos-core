@@ -1,0 +1,52 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="HTTP request types."><meta name="keywords" content="rust, rustlang, rust-lang, request"><title>http::request - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../http/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../http/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module request</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../http/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">http</a>::<wbr><a class="mod" href="#">request</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/http/request.rs.html#1-1096">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>HTTP request types.</p>
+<p>This module contains structs related to HTTP requests, notably the
+<code>Request</code> type itself as well as a builder to create requests. Typically
+you’ll import the <code>http::Request</code> type rather than reaching into this
+module itself.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Creating a <code>Request</code> to send</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http</span>::{<span class="ident">Request</span>, <span class="ident">Response</span>};
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
+    .<span class="ident">uri</span>(<span class="string">&quot;https://www.rust-lang.org/&quot;</span>)
+    .<span class="ident">header</span>(<span class="string">&quot;User-Agent&quot;</span>, <span class="string">&quot;my-awesome-agent/1.0&quot;</span>);
+
+<span class="kw">if</span> <span class="ident">needs_awesome_header</span>() {
+    <span class="ident">request</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">header</span>(<span class="string">&quot;Awesome&quot;</span>, <span class="string">&quot;yes&quot;</span>);
+}
+
+<span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">send</span>(<span class="ident">request</span>.<span class="ident">body</span>(()).<span class="ident">unwrap</span>());
+
+<span class="kw">fn</span> <span class="ident">send</span>(<span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) -&gt; <span class="ident">Response</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="comment">// ...</span>
+}</code></pre></div>
+<p>Inspecting a request to see what was sent.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">http</span>::{<span class="ident">Request</span>, <span class="ident">Response</span>, <span class="ident">StatusCode</span>};
+
+<span class="kw">fn</span> <span class="ident">respond_to</span>(<span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) -&gt; <span class="ident">http::Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">if</span> <span class="ident">req</span>.<span class="ident">uri</span>() <span class="op">!</span><span class="op">=</span> <span class="string">&quot;/awesome-url&quot;</span> {
+        <span class="kw">return</span> <span class="ident">Response::builder</span>()
+            .<span class="ident">status</span>(<span class="ident">StatusCode::NOT_FOUND</span>)
+            .<span class="ident">body</span>(())
+    }
+
+    <span class="kw">let</span> <span class="ident">has_awesome_header</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">headers</span>().<span class="ident">contains_key</span>(<span class="string">&quot;Awesome&quot;</span>);
+    <span class="kw">let</span> <span class="ident">body</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">body</span>();
+
+    <span class="comment">// ...</span>
+}</code></pre></div>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Builder.html" title="http::request::Builder struct">Builder</a></div><div class="item-right docblock-short"><p>An HTTP request builder</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Parts.html" title="http::request::Parts struct">Parts</a></div><div class="item-right docblock-short"><p>Component parts of an HTTP <code>Request</code></p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Request.html" title="http::request::Request struct">Request</a></div><div class="item-right docblock-short"><p>Represents an HTTP request.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="http" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["ProverOptions",""]],"fn":[["run_move_prover",""]],"struct":[["Prove","Run the Move Prover on the package at `path`. If no path is provided defaults to current directory. Use `.. prove .. -- <options>` to pass on options to the prover."],["ProverTest","Data representing the configuration of a prover test."]]};

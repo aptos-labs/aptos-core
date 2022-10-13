@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["Formattable","A type that can be formatted."]]};

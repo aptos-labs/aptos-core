@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["basic","Basic diff functions"],["format_table","Setup unicode-formatted table for prettytable"],["lcs","Common functions for Longest common subsequences on slice."],["text","Utils for diff text"]]};

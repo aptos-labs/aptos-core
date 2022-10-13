@@ -1,0 +1,265 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Poem is a full-featured and easy-to-use web framework with the Rust programming language."><meta name="keywords" content="rust, rustlang, rust-lang, poem"><title>poem - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/poem-web/poem/master/favicon.ico"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../poem/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../poem/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate poem</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 1.3.40</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li><li><a href="#attributes">Attribute Macros</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../poem/index.html">
+                        <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">poem</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/poem/lib.rs.html#1-307">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Poem is a full-featured and easy-to-use web framework with the Rust
+programming language.</p>
+<h2 id="table-of-contents"><a href="#table-of-contents">Table of contents</a></h2>
+<ul>
+<li><a href="#quickstart">Quickstart</a></li>
+<li><a href="#endpoint">Endpoint</a></li>
+<li><a href="#extractors">Extractors</a></li>
+<li><a href="#routing">Routing</a></li>
+<li><a href="#responses">Responses</a></li>
+<li><a href="#handling-errors">Handling errors</a></li>
+<li><a href="#middleware">Middleware</a></li>
+<li><a href="#crate-features">Crate features</a></li>
+</ul>
+<h2 id="quickstart"><a href="#quickstart">Quickstart</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem</span>::{<span class="ident">get</span>, <span class="ident">handler</span>, <span class="ident">listener::TcpListener</span>, <span class="ident">web::Path</span>, <span class="ident">IntoResponse</span>, <span class="ident">Route</span>, <span class="ident">Server</span>};
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">hello</span>(<span class="ident">Path</span>(<span class="ident">name</span>): <span class="ident">Path</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) -&gt; <span class="ident">String</span> {
+    <span class="macro">format!</span>(<span class="string">&quot;hello: {}&quot;</span>, <span class="ident">name</span>)
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">std::io::Error</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">Route::new</span>().<span class="ident">at</span>(<span class="string">&quot;/hello/:name&quot;</span>, <span class="ident">get</span>(<span class="ident">hello</span>));
+    <span class="ident">Server::new</span>(<span class="ident">TcpListener::bind</span>(<span class="string">&quot;127.0.0.1:3000&quot;</span>))
+        .<span class="ident">run</span>(<span class="ident">app</span>)
+        .<span class="kw">await</span>
+}</code></pre></div>
+<h2 id="endpoint"><a href="#endpoint">Endpoint</a></h2>
+<p>The <a href="endpoint/trait.Endpoint.html" title="Endpoint"><code>Endpoint</code></a> trait represents a type that can handle HTTP requests, and
+it returns the <code>Result&lt;T: IntoResponse, Error&gt;</code> type.</p>
+<p>The <a href="attr.handler.html" title="handler"><code>handler</code></a> macro is used to convert a function into an endpoint.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem</span>::{
+    <span class="ident">error::NotFoundError</span>, <span class="ident">handler</span>, <span class="ident">http::StatusCode</span>, <span class="ident">test::TestClient</span>, <span class="ident">Endpoint</span>, <span class="ident">Request</span>,
+    <span class="prelude-ty">Result</span>,
+};
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">return_str</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+    <span class="string">&quot;hello&quot;</span>
+}
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">return_err</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, <span class="ident">NotFoundError</span><span class="op">&gt;</span> {
+    <span class="prelude-val">Err</span>(<span class="ident">NotFoundError</span>)
+}
+
+<span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">TestClient::new</span>(<span class="ident">return_str</span>).<span class="ident">get</span>(<span class="string">&quot;/&quot;</span>).<span class="ident">send</span>().<span class="kw">await</span>;
+<span class="ident">resp</span>.<span class="ident">assert_status_is_ok</span>();
+<span class="ident">resp</span>.<span class="ident">assert_text</span>(<span class="string">&quot;hello&quot;</span>).<span class="kw">await</span>;
+
+<span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">TestClient::new</span>(<span class="ident">return_err</span>).<span class="ident">get</span>(<span class="string">&quot;/&quot;</span>).<span class="ident">send</span>().<span class="kw">await</span>;
+<span class="ident">resp</span>.<span class="ident">assert_status</span>(<span class="ident">StatusCode::NOT_FOUND</span>);</code></pre></div>
+<h2 id="extractors"><a href="#extractors">Extractors</a></h2>
+<p>The extractor is used to extract something from the HTTP request.</p>
+<p><code>Poem</code> provides some <a href="web/trait.FromRequest.html">commonly used extractors</a> for
+extracting something from HTTP requests.</p>
+<p>In the following example, the <code>index</code> function uses 3 extractors to extract
+the remote address, HTTP method and URI.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem</span>::{
+    <span class="ident">handler</span>,
+    <span class="ident">http</span>::{<span class="ident">Method</span>, <span class="ident">Uri</span>},
+    <span class="ident">web::RemoteAddr</span>,
+};
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">index</span>(<span class="ident">remote_addr</span>: <span class="kw-2">&amp;</span><span class="ident">RemoteAddr</span>, <span class="ident">method</span>: <span class="ident">Method</span>, <span class="ident">uri</span>: <span class="kw-2">&amp;</span><span class="ident">Uri</span>) {}</code></pre></div>
+<p>By default, the extractor will return a <code>400 Bad Request</code> when an error
+occurs, but sometimes you may want to change this behavior, so you can
+handle the error yourself.</p>
+<p>In the following example, when the <a href="web/struct.Query.html"><code>Query</code></a> extractor fails, it
+will return a <code>503 Internal Server</code> response and the reason for the error.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem</span>::{
+    <span class="ident">error::ParseQueryError</span>, <span class="ident">handler</span>, <span class="ident">http::StatusCode</span>, <span class="ident">web::Query</span>, <span class="ident">IntoResponse</span>, <span class="ident">Response</span>,
+    <span class="prelude-ty">Result</span>,
+};
+<span class="kw">use</span> <span class="ident">serde::Deserialize</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Deserialize</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Params</span> {
+    <span class="ident">name</span>: <span class="ident">String</span>,
+}
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">index</span>(<span class="ident">res</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Query</span><span class="op">&lt;</span><span class="ident">Params</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">IntoResponse</span><span class="op">&gt;</span> {
+    <span class="kw">match</span> <span class="ident">res</span> {
+        <span class="prelude-val">Ok</span>(<span class="ident">Query</span>(<span class="ident">params</span>)) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">params</span>.<span class="ident">name</span>.<span class="ident">into_response</span>()),
+        <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="kw">if</span> <span class="ident">err</span>.<span class="ident">is</span>::<span class="op">&lt;</span><span class="ident">ParseQueryError</span><span class="op">&gt;</span>() =&gt; <span class="prelude-val">Ok</span>(<span class="ident">Response::builder</span>()
+            .<span class="ident">status</span>(<span class="ident">StatusCode::INTERNAL_SERVER_ERROR</span>)
+            .<span class="ident">body</span>(<span class="ident">err</span>.<span class="ident">to_string</span>())),
+        <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">err</span>),
+    }
+}</code></pre></div>
+<h2 id="routing"><a href="#routing">Routing</a></h2>
+<p>There are three available routes.</p>
+<ul>
+<li><a href="struct.Route.html" title="Route"><code>Route</code></a> Routing for path</li>
+<li><a href="struct.RouteDomain.html" title="RouteDomain"><code>RouteDomain</code></a> Routing for domain</li>
+<li><a href="struct.RouteMethod.html" title="RouteMethod"><code>RouteMethod</code></a> Routing for HTTP method</li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem</span>::{<span class="ident">get</span>, <span class="ident">handler</span>, <span class="ident">post</span>, <span class="ident">web::Path</span>, <span class="ident">Route</span>};
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_user</span>(<span class="ident">id</span>: <span class="ident">Path</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {}
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">delete_user</span>(<span class="ident">id</span>: <span class="ident">Path</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {}
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">create_user</span>() {}
+
+<span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">Route::new</span>()
+    .<span class="ident">at</span>(<span class="string">&quot;/user/:id&quot;</span>, <span class="ident">get</span>(<span class="ident">get_user</span>).<span class="ident">delete</span>(<span class="ident">delete_user</span>))
+    .<span class="ident">at</span>(<span class="string">&quot;/user&quot;</span>, <span class="ident">post</span>(<span class="ident">create_user</span>));</code></pre></div>
+<p>You can create custom extractors, see also <a href="web/trait.FromRequest.html" title="FromRequest"><code>FromRequest</code></a>.</p>
+<h2 id="responses"><a href="#responses">Responses</a></h2>
+<p>All types that can be converted to HTTP response <a href="struct.Response.html" title="Response"><code>Response</code></a> should
+implement <a href="web/trait.IntoResponse.html" title="IntoResponse"><code>IntoResponse</code></a>.</p>
+<p>In the following example, the <code>string_response</code> and <code>status_response</code>
+functions return the <code>String</code> and <code>StatusCode</code> types, because <code>Poem</code> has
+implemented the <a href="web/trait.IntoResponse.html" title="IntoResponse"><code>IntoResponse</code></a> trait for them.</p>
+<p>The <code>no_response</code> function does not return a value. We can think that
+its return type is <code>()</code>, and <code>Poem</code> also implements <a href="web/trait.IntoResponse.html" title="IntoResponse"><code>IntoResponse</code></a> for
+<code>()</code>, which is always converted to <code>200 OK</code>.</p>
+<p>The <code>result_response</code> function returns a <code>Result</code> type, which means that an
+error may occur.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem</span>::{<span class="ident">handler</span>, <span class="ident">http::StatusCode</span>, <span class="prelude-ty">Result</span>};
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">string_response</span>() -&gt; <span class="ident">String</span> {
+    <span class="macro">todo!</span>()
+}
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">status_response</span>() -&gt; <span class="ident">StatusCode</span> {
+    <span class="macro">todo!</span>()
+}
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">no_response</span>() {}
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">result_response</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
+    <span class="macro">todo!</span>()
+}</code></pre></div>
+<h2 id="handling-errors"><a href="#handling-errors">Handling errors</a></h2>
+<p>The following example returns customized content when
+<a href="error/struct.NotFoundError.html"><code>NotFoundError</code></a> occurs.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem</span>::{
+    <span class="ident">error::NotFoundError</span>, <span class="ident">handler</span>, <span class="ident">http::StatusCode</span>, <span class="ident">EndpointExt</span>, <span class="ident">IntoResponse</span>, <span class="ident">Response</span>, <span class="ident">Route</span>,
+};
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">foo</span>() {}
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">bar</span>() {}
+
+<span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span>
+    <span class="ident">Route::new</span>()
+        .<span class="ident">at</span>(<span class="string">&quot;/foo&quot;</span>, <span class="ident">foo</span>)
+        .<span class="ident">at</span>(<span class="string">&quot;/bar&quot;</span>, <span class="ident">bar</span>)
+        .<span class="ident">catch_error</span>(<span class="op">|</span><span class="ident">err</span>: <span class="ident">NotFoundError</span><span class="op">|</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">Response::builder</span>()
+                .<span class="ident">status</span>(<span class="ident">StatusCode::NOT_FOUND</span>)
+                .<span class="ident">body</span>(<span class="string">&quot;custom not found&quot;</span>)
+        });</code></pre></div>
+<h2 id="middleware"><a href="#middleware">Middleware</a></h2>
+<p>You can call the <a href="endpoint/trait.EndpointExt.html#method.with"><code>with</code></a> method on the <a href="endpoint/trait.Endpoint.html" title="Endpoint"><code>Endpoint</code></a> to
+apply a middleware to an endpoint. It actually converts the original
+endpoint to a new endpoint.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">poem</span>::{<span class="ident">handler</span>, <span class="ident">middleware::Tracing</span>, <span class="ident">EndpointExt</span>, <span class="ident">Route</span>};
+
+<span class="attribute">#[<span class="ident">handler</span>]</span>
+<span class="kw">fn</span> <span class="ident">index</span>() {}
+
+<span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">Route::new</span>().<span class="ident">at</span>(<span class="string">&quot;/&quot;</span>, <span class="ident">index</span>).<span class="ident">with</span>(<span class="ident">Tracing</span>);</code></pre></div>
+<p>You can create your own middleware, see also <a href="middleware/trait.Middleware.html" title="Middleware"><code>Middleware</code></a>.</p>
+<h2 id="crate-features"><a href="#crate-features">Crate features</a></h2>
+<p>To avoid compiling unused dependencies, <code>Poem</code> gates certain features, all
+of which are disabled by default:</p>
+<div><table><thead><tr><th>Feature</th><th>Description</th></tr></thead><tbody>
+<tr><td>server</td><td>Server and listener APIs(enable by default)</td></tr>
+<tr><td>compression</td><td>Support decompress request body and compress response body</td></tr>
+<tr><td>cookie</td><td>Support for Cookie</td></tr>
+<tr><td>csrf</td><td>Support for Cross-Site Request Forgery (CSRF) protection</td></tr>
+<tr><td>multipart</td><td>Support for Multipart</td></tr>
+<tr><td>native-tls</td><td>Support for HTTP server over TLS with <a href="https://crates.io/crates/native-tls"><code>native-tls</code></a></td></tr>
+<tr><td>openssl-tls</td><td>Support for HTTP server over TLS with <a href="https://crates.io/crates/openssl"><code>openssl-tls</code></a></td></tr>
+<tr><td>opentelemetry</td><td>Support for opentelemetry</td></tr>
+<tr><td>prometheus</td><td>Support for Prometheus</td></tr>
+<tr><td>redis-session</td><td>Support for RedisSession</td></tr>
+<tr><td>rustls</td><td>Support for HTTP server over TLS with <a href="https://crates.io/crates/rustls"><code>rustls</code></a></td></tr>
+<tr><td>session</td><td>Support for session</td></tr>
+<tr><td>sse</td><td>Support Server-Sent Events (SSE)</td></tr>
+<tr><td>tempfile</td><td>Support for <a href="https://crates.io/crates/tempfile"><code>tempfile</code></a></td></tr>
+<tr><td>tower-compat</td><td>Adapters for <code>tower::Layer</code> and <code>tower::Service</code>.</td></tr>
+<tr><td>websocket</td><td>Support for WebSocket</td></tr>
+<tr><td>anyhow</td><td>Integrate with the <a href="https://crates.io/crates/anyhow"><code>anyhow</code></a> crate.</td></tr>
+<tr><td>eyre06</td><td>Integrate with version 0.6.x of the <a href="https://crates.io/crates/eyre"><code>eyre</code></a> crate.</td></tr>
+<tr><td>i18n</td><td>Support for internationalization</td></tr>
+<tr><td>acme</td><td>Support for ACME(Automatic Certificate Management Environment)</td></tr>
+<tr><td>tokio-metrics</td><td>Integrate with the <a href="https://crates.io/crates/tokio-metrics"><code>tokio-metrics</code></a> crate.</td></tr>
+<tr><td>embed</td><td>Integrate with <a href="https://crates.io/crates/rust-embed"><code>rust-embed</code></a> crate.</td></tr>
+<tr><td>xml</td><td>Integrate with <a href="https://crates.io/crates/quick-xml"><code>quick-xml</code></a> crate.</td></tr>
+</tbody></table>
+</div></div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.Error"><code>pub use error::<a class="struct" href="error/struct.Error.html" title="struct poem::error::Error">Error</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Result"><code>pub use error::<a class="type" href="error/type.Result.html" title="type poem::error::Result">Result</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Middleware"><code>pub use middleware::<a class="trait" href="middleware/trait.Middleware.html" title="trait poem::middleware::Middleware">Middleware</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.FromRequest"><code>pub use web::<a class="trait" href="web/trait.FromRequest.html" title="trait poem::web::FromRequest">FromRequest</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.IntoResponse"><code>pub use web::<a class="trait" href="web/trait.IntoResponse.html" title="trait poem::web::IntoResponse">IntoResponse</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.RequestBody"><code>pub use web::<a class="struct" href="web/struct.RequestBody.html" title="struct poem::web::RequestBody">RequestBody</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="endpoint/index.html" title="poem::endpoint mod">endpoint</a></div><div class="item-right docblock-short"><p>Endpoint related types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="error/index.html" title="poem::error mod">error</a></div><div class="item-right docblock-short"><p>Some common error types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="http/index.html" title="poem::http mod">http</a></div><div class="item-right docblock-short"><p>A general purpose library of common HTTP types</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="listener/index.html" title="poem::listener mod">listener</a></div><div class="item-right docblock-short"><p>Commonly used listeners.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="middleware/index.html" title="poem::middleware mod">middleware</a></div><div class="item-right docblock-short"><p>Commonly used middleware.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="web/index.html" title="poem::web mod">web</a></div><div class="item-right docblock-short"><p>Commonly used as the type of extractor or response.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Body.html" title="poem::Body struct">Body</a></div><div class="item-right docblock-short"><p>A body object for requests and responses.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.OnUpgrade.html" title="poem::OnUpgrade struct">OnUpgrade</a></div><div class="item-right docblock-short"><p>A future for a possible HTTP upgrade.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Request.html" title="poem::Request struct">Request</a></div><div class="item-right docblock-short"><p>Represents an HTTP request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RequestBuilder.html" title="poem::RequestBuilder struct">RequestBuilder</a></div><div class="item-right docblock-short"><p>An request builder.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RequestParts.html" title="poem::RequestParts struct">RequestParts</a></div><div class="item-right docblock-short"><p>Component parts of an HTTP Request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Response.html" title="poem::Response struct">Response</a></div><div class="item-right docblock-short"><p>Represents an HTTP response.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ResponseBuilder.html" title="poem::ResponseBuilder struct">ResponseBuilder</a></div><div class="item-right docblock-short"><p>An response builder.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ResponseParts.html" title="poem::ResponseParts struct">ResponseParts</a></div><div class="item-right docblock-short"><p>Component parts of an HTTP Response.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Route.html" title="poem::Route struct">Route</a></div><div class="item-right docblock-short"><p>Routing object</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RouteDomain.html" title="poem::RouteDomain struct">RouteDomain</a></div><div class="item-right docblock-short"><p>Routing object for <code>HOST</code> header</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RouteMethod.html" title="poem::RouteMethod struct">RouteMethod</a></div><div class="item-right docblock-short"><p>Routing object for HTTP methods</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RouteScheme.html" title="poem::RouteScheme struct">RouteScheme</a></div><div class="item-right docblock-short"><p>Routing object for request scheme</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Server.html" title="poem::Server struct">Server</a></div><div class="item-right docblock-short"><p>An HTTP Server.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Upgraded.html" title="poem::Upgraded struct">Upgraded</a></div><div class="item-right docblock-short"><p>An upgraded HTTP connection.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Addr.html" title="poem::Addr enum">Addr</a></div><div class="item-right docblock-short"><p>An network address.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Endpoint.html" title="poem::Endpoint trait">Endpoint</a></div><div class="item-right docblock-short"><p>An HTTP request handler.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.EndpointExt.html" title="poem::EndpointExt trait">EndpointExt</a></div><div class="item-right docblock-short"><p>Extension trait for <a href="endpoint/trait.Endpoint.html" title="Endpoint"><code>Endpoint</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.IntoEndpoint.html" title="poem::IntoEndpoint trait">IntoEndpoint</a></div><div class="item-right docblock-short"><p>Represents a type that can convert into endpoint.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.connect.html" title="poem::connect fn">connect</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().connect(ep)</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.delete.html" title="poem::delete fn">delete</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().delete(ep)</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get.html" title="poem::get fn">get</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().get(ep)</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.head.html" title="poem::head fn">head</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().head(ep)</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.options.html" title="poem::options fn">options</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().options(ep)</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.patch.html" title="poem::patch fn">patch</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().patch(ep)</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.post.html" title="poem::post fn">post</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().post(ep)</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.put.html" title="poem::put fn">put</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().put(ep)</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.trace.html" title="poem::trace fn">trace</a></div><div class="item-right docblock-short"><p>A helper function, similar to <code>RouteMethod::new().trace(ep)</code>.</p>
+</div></div></div><h2 id="attributes" class="small-section-header"><a href="#attributes">Attribute Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="attr" href="attr.async_trait.html" title="poem::async_trait attr">async_trait</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="attr" href="attr.handler.html" title="poem::handler attr">handler</a></div><div class="item-right docblock-short"><p>Wrap an asynchronous function as an <code>Endpoint</code>.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="poem" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

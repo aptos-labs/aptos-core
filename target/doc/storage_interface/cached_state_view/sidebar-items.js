@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["CachedDbStateView",""],["CachedStateView","`CachedStateView` is like a snapshot of the global state comprised of state view at two levels, persistent storage and memory."],["StateCache",""]]};

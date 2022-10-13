@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Decoder","Reads HTTP chunks and sends back real data."],["Encoder","Splits the incoming data into HTTP chunks."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["accept","The `Accept` trait and supporting types."],["conn","Lower-level Server connection API."]],"struct":[["Builder","A builder for a `Server`."],["Server","A listening HTTP server that accepts connections in both HTTP1 and HTTP2 by default."]]};

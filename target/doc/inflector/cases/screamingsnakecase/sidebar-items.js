@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["is_screaming_snake_case","Determines of a `&str` is `SCREAMING_SNAKE_CASE`"],["to_screaming_snake_case","Converts a `&str` to `SCREAMING_SNAKE_CASE` `String`"]]};

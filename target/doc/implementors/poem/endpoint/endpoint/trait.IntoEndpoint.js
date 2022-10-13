@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["poem"] = [];
+implementors["poem_openapi"] = [{"text":"impl&lt;T:&nbsp;<a class=\"trait\" href=\"poem_openapi/trait.OpenApi.html\" title=\"trait poem_openapi::OpenApi\">OpenApi</a>, W:&nbsp;<a class=\"trait\" href=\"poem_openapi/trait.Webhook.html\" title=\"trait poem_openapi::Webhook\">Webhook</a>&gt; <a class=\"trait\" href=\"poem/endpoint/endpoint/trait.IntoEndpoint.html\" title=\"trait poem::endpoint::endpoint::IntoEndpoint\">IntoEndpoint</a> for <a class=\"struct\" href=\"poem_openapi/struct.OpenApiService.html\" title=\"struct poem_openapi::OpenApiService\">OpenApiService</a>&lt;T, W&gt;","synthetic":false,"types":["poem_openapi::openapi::OpenApiService"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

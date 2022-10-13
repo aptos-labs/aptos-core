@@ -1,0 +1,169 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `mirai_annotations` crate."><meta name="keywords" content="rust, rustlang, rust-lang, mirai_annotations"><title>mirai_annotations - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../mirai_annotations/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../mirai_annotations/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate mirai_annotations</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 1.12.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#macros">Macros</a></li><li><a href="#enums">Enums</a></li><li><a href="#constants">Constants</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../mirai_annotations/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">mirai_annotations</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/mirai_annotations/lib.rs.html#8-1129">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.abstract_value.html" title="mirai_annotations::abstract_value macro">abstract_value</a></div><div class="item-right docblock-short"><p>Provides a way to specify a value that should be treated abstractly by the verifier.
+The concrete argument provides type information to the verifier and a meaning for
+the expression when compiled by the rust compiler.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.add_tag.html" title="mirai_annotations::add_tag macro">add_tag</a></div><div class="item-right docblock-short"><p>Equivalent to a no op when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to associate (tag) the value with the given type.
+Typically the type will be private to a scope so that only privileged code can add the tag.
+Once added, a tag cannot be removed and the tagged value may not be modified.
+To determine if a value has been tagged, use the has_tag! macro.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.assume.html" title="mirai_annotations::assume macro">assume</a></div><div class="item-right docblock-short"><p>Equivalent to a no op when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition unless it can
+prove it to be false.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.assume_preconditions.html" title="mirai_annotations::assume_preconditions macro">assume_preconditions</a></div><div class="item-right docblock-short"><p>Equivalent to a no op when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume that the preconditions of the next
+function call have been met.
+This is to be used when the precondition has been inferred and involves private state that
+cannot be constrained by a normal assumption.
+Note that it is bad style for an API to rely on preconditions that cannot be checked by the
+caller, so this is only here for supporting legacy APIs.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.assume_unreachable.html" title="mirai_annotations::assume_unreachable macro">assume_unreachable</a></div><div class="item-right docblock-short"><p>Equivalent to unreachable! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume that the annotation statement cannot be reached.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.assumed_postcondition.html" title="mirai_annotations::assumed_postcondition macro">assumed_postcondition</a></div><div class="item-right docblock-short"><p>Equivalent to a no op when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition at the
+point where it appears in a function, but to also add it a postcondition that can
+be assumed by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_assume.html" title="mirai_annotations::checked_assume macro">checked_assume</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition unless it can
+prove it to be false.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_assume_eq.html" title="mirai_annotations::checked_assume_eq macro">checked_assume_eq</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition unless it can
+prove it to be false.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_assume_ne.html" title="mirai_annotations::checked_assume_ne macro">checked_assume_ne</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert_ne! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition unless it can
+prove it to be false.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_postcondition.html" title="mirai_annotations::checked_postcondition macro">checked_postcondition</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to verify the condition at the
+point where it appears in a function, but to also add it a postcondition that can
+be assumed by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_postcondition_eq.html" title="mirai_annotations::checked_postcondition_eq macro">checked_postcondition_eq</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to verify the condition at the
+point where it appears in a function, but to also add it a postcondition that can
+be assumed by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_postcondition_ne.html" title="mirai_annotations::checked_postcondition_ne macro">checked_postcondition_ne</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert_ne! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to verify the condition at the
+point where it appears in a function, but to also add it a postcondition that can
+be assumed by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_precondition.html" title="mirai_annotations::checked_precondition macro">checked_precondition</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition at the
+point where it appears in a function, but to also add it a precondition that must
+be verified by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_precondition_eq.html" title="mirai_annotations::checked_precondition_eq macro">checked_precondition_eq</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition at the
+point where it appears in a function, but to also add it a precondition that must
+be verified by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_precondition_ne.html" title="mirai_annotations::checked_precondition_ne macro">checked_precondition_ne</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert_ne! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition at the
+point where it appears in a function, but to also add it a precondition that must
+be verified by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_verify.html" title="mirai_annotations::checked_verify macro">checked_verify</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to check the condition and
+emit a diagnostic unless it can prove it to be true.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_verify_eq.html" title="mirai_annotations::checked_verify_eq macro">checked_verify_eq</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to check the condition and
+emit a diagnostic unless it can prove it to be true.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.checked_verify_ne.html" title="mirai_annotations::checked_verify_ne macro">checked_verify_ne</a></div><div class="item-right docblock-short"><p>Equivalent to the standard assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to check the condition and
+emit a diagnostic unless it can prove it to be true.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_assume.html" title="mirai_annotations::debug_checked_assume macro">debug_checked_assume</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition unless it can
+prove it to be false.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_assume_eq.html" title="mirai_annotations::debug_checked_assume_eq macro">debug_checked_assume_eq</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition unless it can
+prove it to be false.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_assume_ne.html" title="mirai_annotations::debug_checked_assume_ne macro">debug_checked_assume_ne</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert_ne! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition unless it can
+prove it to be false.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_postcondition.html" title="mirai_annotations::debug_checked_postcondition macro">debug_checked_postcondition</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to verify the condition at the
+point where it appears in a function, but to also add it a postcondition that can
+be assumed by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_postcondition_eq.html" title="mirai_annotations::debug_checked_postcondition_eq macro">debug_checked_postcondition_eq</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to verify the condition at the
+point where it appears in a function, but to also add it a postcondition that can
+be assumed by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_postcondition_ne.html" title="mirai_annotations::debug_checked_postcondition_ne macro">debug_checked_postcondition_ne</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert_ne! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to verify the condition at the
+point where it appears in a function, but to also add it a postcondition that can
+be assumed by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_precondition.html" title="mirai_annotations::debug_checked_precondition macro">debug_checked_precondition</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition at the
+point where it appears in a function, but to also add it a precondition that must
+be verified by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_precondition_eq.html" title="mirai_annotations::debug_checked_precondition_eq macro">debug_checked_precondition_eq</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition at the
+point where it appears in a function, but to also add it a precondition that must
+be verified by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_precondition_ne.html" title="mirai_annotations::debug_checked_precondition_ne macro">debug_checked_precondition_ne</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert_ne! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition at the
+point where it appears in a function, but to also add it a precondition that must
+be verified by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_verify.html" title="mirai_annotations::debug_checked_verify macro">debug_checked_verify</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to check the condition and
+emit a diagnostic unless it can prove it to be true.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_verify_eq.html" title="mirai_annotations::debug_checked_verify_eq macro">debug_checked_verify_eq</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert_eq! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to check the condition and
+emit a diagnostic unless it can prove it to be true.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug_checked_verify_ne.html" title="mirai_annotations::debug_checked_verify_ne macro">debug_checked_verify_ne</a></div><div class="item-right docblock-short"><p>Equivalent to the standard debug_assert_ne! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to check the condition and
+emit a diagnostic unless it can prove it to be true.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.does_not_have_tag.html" title="mirai_annotations::does_not_have_tag macro">does_not_have_tag</a></div><div class="item-right docblock-short"><p>Provides a way to check if a value has <em>not</em> been tagged with a type using add_tag!.
+When compiled with an unmodified Rust compiler, this results in true.
+When compiled with MIRAI, this will be true if none data flows into the argument of this
+call has gone via a call to add_tag!.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.get_model_field.html" title="mirai_annotations::get_model_field macro">get_model_field</a></div><div class="item-right docblock-short"><p>Retrieves the value of the specified model field, or the given default value if the model field
+is not set.
+This function has no meaning outside of a verification
+condition and should not be used with checked or debug_checked conditions.
+For example: precondition!(get_model_field!(x, f) &gt; 1).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.has_tag.html" title="mirai_annotations::has_tag macro">has_tag</a></div><div class="item-right docblock-short"><p>Provides a way to check if a value has been tagged with a type, using the add_tag! macro.
+When compiled with an unmodified Rust compiler, this results in true.
+When compiled with MIRAI, this will be true if all data flows into the argument of this
+call has gone via a call to add_tag!.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.postcondition.html" title="mirai_annotations::postcondition macro">postcondition</a></div><div class="item-right docblock-short"><p>Equivalent to a no op when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to verify the condition at the
+point where it appears in a function, but to also add it a postcondition that can
+be assumed by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.precondition.html" title="mirai_annotations::precondition macro">precondition</a></div><div class="item-right docblock-short"><p>Equivalent to a no op when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to assume the condition at the
+point where it appears in a function, but to also add it a precondition that must
+be verified by the caller of the function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.result.html" title="mirai_annotations::result macro">result</a></div><div class="item-right docblock-short"><p>Provides a way to refer to the result value of an abstract or contract function without
+specifying an actual value anywhere.
+This macro expands to unimplemented!() unless the program is compiled with MIRAI.
+It result should therefore not be assigned to a variable unless the assignment is contained
+inside a specification macro argument list.
+It may, however, be the return value of the function, which should never be called and
+therefore unimplemented!() is the right behavior for it at runtime.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.set_model_field.html" title="mirai_annotations::set_model_field macro">set_model_field</a></div><div class="item-right docblock-short"><p>Sets the value of the specified model field.
+A model field does not exist at runtime and is invisible to the Rust compiler.
+This macro expands to nothing unless the program is compiled with MIRAI.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.tag_propagation_set.html" title="mirai_annotations::tag_propagation_set macro">tag_propagation_set</a></div><div class="item-right docblock-short"><p>Provide a way to create tag propagation sets. It is equivalent to bitwise-or of all its arguments.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.unrecoverable.html" title="mirai_annotations::unrecoverable macro">unrecoverable</a></div><div class="item-right docblock-short"><p>Terminates the program with a panic that is tagged as being an unrecoverable error.
+Use this for errors that arise in correct programs due to external factors.
+For example, if a file that is essential for running cannot be found for some reason.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.verify.html" title="mirai_annotations::verify macro">verify</a></div><div class="item-right docblock-short"><p>Equivalent to a no op when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to check the condition and
+emit a diagnostic unless it can prove it to be true.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.verify_unreachable.html" title="mirai_annotations::verify_unreachable macro">verify_unreachable</a></div><div class="item-right docblock-short"><p>Equivalent to unreachable! when used with an unmodified Rust compiler.
+When compiled with MIRAI, this causes MIRAI to verify that the annotation statement cannot be reached.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.TagPropagation.html" title="mirai_annotations::TagPropagation enum">TagPropagation</a></div><div class="item-right docblock-short"><p>An enum type of controllable operations for MIRAI tag types.
+In general, the result of the operation corresponding to an enum value will
+get tagged with all of the tags of the operands.</p>
+</div></div></div><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.TAG_PROPAGATION_ALL.html" title="mirai_annotations::TAG_PROPAGATION_ALL constant">TAG_PROPAGATION_ALL</a></div><div class="item-right docblock-short"><p>A tag propagation set indicating a tag is propagated by all operations.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.TagPropagationSet.html" title="mirai_annotations::TagPropagationSet type">TagPropagationSet</a></div><div class="item-right docblock-short"><p>A type used to specify how tag types transfer over operations. The type is an alias of <code>u128</code>.
+Each bit of the bit vector controls the transfer function for an operation.
+If a bit is set to one, the corresponding operation will propagate the tag.
+If a bit is set to zero, the corresponding operation will block the tag.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="mirai_annotations" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

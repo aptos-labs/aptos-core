@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["spin","A naïve spinning mutex."]],"struct":[["Mutex","A spin-based lock providing mutually exclusive access to data."],["MutexGuard","A generic guard that will protect some data access and uses either a ticket lock or a normal spin mutex."]]};

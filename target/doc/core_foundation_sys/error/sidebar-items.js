@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["CFErrorCopyDescription",""],["CFErrorGetCode",""],["CFErrorGetDomain",""],["CFErrorGetTypeID",""]],"static":[["kCFErrorDomainCocoa",""],["kCFErrorDomainMach",""],["kCFErrorDomainOSStatus",""],["kCFErrorDomainPOSIX",""]],"struct":[["__CFError",""]],"type":[["CFErrorRef",""]]};

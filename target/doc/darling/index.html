@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Darling"><meta name="keywords" content="rust, rustlang, rust-lang, darling"><title>darling - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../darling/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../darling/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate darling</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.14.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#macros">Macros</a></li><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../darling/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">darling</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/darling/lib.rs.html#1-107">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="darling"><a href="#darling">Darling</a></h2>
+<p>Darling is a tool for declarative attribute parsing in proc macro implementations.</p>
+<h3 id="design"><a href="#design">Design</a></h3>
+<p>Darling takes considerable design inspiration from <a href="https://serde.rs"><code>serde</code></a>. A data structure that can be
+read from any attribute implements <code>FromMeta</code> (or has an implementation automatically
+generated using <code>derive</code>). Any crate can provide <code>FromMeta</code> implementations, even one not
+specifically geared towards proc-macro authors.</p>
+<p>Proc-macro crates should provide their own structs which implement or derive <code>FromDeriveInput</code>,
+<code>FromField</code>, <code>FromVariant</code>, <code>FromGenerics</code>, <em>et alia</em> to gather settings relevant to their operation.</p>
+<h3 id="attributes"><a href="#attributes">Attributes</a></h3>
+<p>There are a number of attributes that <code>darling</code> exposes to enable finer-grained control over the code
+it generates.</p>
+<ul>
+<li><strong>Field renaming</strong>: You can use <code>#[darling(rename=&quot;new_name&quot;)]</code> on a field to change the name Darling looks for.
+You can also use <code>#[darling(rename_all=&quot;...&quot;)]</code> at the struct or enum level to apply a casing rule to all fields or variants.</li>
+<li><strong>Map function</strong>: You can use <code>#[darling(map=&quot;path::to::function&quot;)]</code> to run code on a field before its stored in the struct.</li>
+<li><strong>Default values</strong>: You can use <code>#[darling(default)]</code> at the type or field level to use that type’s default value to fill
+in values not specified by the caller.</li>
+<li><strong>Skipped fields</strong>: You can skip a variant or field using <code>#[darling(skip)]</code>. Fields marked with this will fall back to
+<code>Default::default()</code> for their value, but you can override that with an explicit default or a value from the type-level default.</li>
+</ul>
+<h3 id="forwarded-fields"><a href="#forwarded-fields">Forwarded Fields</a></h3>
+<p>All derivable traits except <code>FromMeta</code> support forwarding some fields from the input AST to the derived struct.
+These fields are matched up by identifier <strong>before</strong> <code>rename</code> attribute values are considered,
+allowing you to use their names for your own properties.
+The deriving struct is responsible for making sure the types of fields it chooses to declare are compatible with this table.</p>
+<p>A deriving struct is free to include or exclude any of the fields below.</p>
+<h4 id="fromderiveinput"><a href="#fromderiveinput"><code>FromDeriveInput</code></a></h4><div><table><thead><tr><th>Field name</th><th>Type</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>ident</code></td><td><code>syn::Ident</code></td><td>The identifier of the passed-in type</td></tr>
+<tr><td><code>vis</code></td><td><code>syn::Visibility</code></td><td>The visibility of the passed-in type</td></tr>
+<tr><td><code>generics</code></td><td><code>T: darling::FromGenerics</code></td><td>The generics of the passed-in type. This can be <code>syn::Generics</code>, <code>darling::ast::Generics</code>, or any compatible type.</td></tr>
+<tr><td><code>data</code></td><td><code>darling::ast::Data</code></td><td>The body of the passed-in type</td></tr>
+<tr><td><code>attrs</code></td><td><code>Vec&lt;syn::Attribute&gt;</code></td><td>The forwarded attributes from the passed in type. These are controlled using the <code>forward_attrs</code> attribute.</td></tr>
+</tbody></table>
+</div><h4 id="fromfield"><a href="#fromfield"><code>FromField</code></a></h4><div><table><thead><tr><th>Field name</th><th>Type</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>ident</code></td><td><code>Option&lt;syn::Ident&gt;</code></td><td>The identifier of the passed-in field, or <code>None</code> for tuple fields</td></tr>
+<tr><td><code>vis</code></td><td><code>syn::Visibility</code></td><td>The visibility of the passed-in field</td></tr>
+<tr><td><code>ty</code></td><td><code>syn::Type</code></td><td>The type of the passed-in field</td></tr>
+<tr><td><code>attrs</code></td><td><code>Vec&lt;syn::Attribute&gt;</code></td><td>The forwarded attributes from the passed in field. These are controlled using the <code>forward_attrs</code> attribute.</td></tr>
+</tbody></table>
+</div><h4 id="fromtypeparam"><a href="#fromtypeparam"><code>FromTypeParam</code></a></h4><div><table><thead><tr><th>Field name</th><th>Type</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>ident</code></td><td><code>syn::Ident</code></td><td>The identifier of the passed-in type param</td></tr>
+<tr><td><code>bounds</code></td><td><code>Vec&lt;syn::TypeParamBound&gt;</code></td><td>The bounds applied to the type param</td></tr>
+<tr><td><code>default</code></td><td><code>Option&lt;syn::Type&gt;</code></td><td>The default type of the parameter, if one exists</td></tr>
+<tr><td><code>attrs</code></td><td><code>Vec&lt;syn::Attribute&gt;</code></td><td>The forwarded attributes from the passed in type param. These are controlled using the <code>forward_attrs</code> attribute.</td></tr>
+</tbody></table>
+</div><h4 id="fromvariant"><a href="#fromvariant"><code>FromVariant</code></a></h4><div><table><thead><tr><th>Field name</th><th>Type</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>ident</code></td><td><code>syn::Ident</code></td><td>The identifier of the passed-in variant</td></tr>
+<tr><td><code>discriminant</code></td><td><code>Option&lt;syn::Expr&gt;</code></td><td>For a variant such as <code>Example = 2</code>, the <code>2</code></td></tr>
+<tr><td><code>fields</code></td><td><code>Option&lt;darling::ast::Fields&lt;__&gt;&gt;</code></td><td>The fields associated with the variant</td></tr>
+<tr><td><code>attrs</code></td><td><code>Vec&lt;syn::Attribute&gt;</code></td><td>The forwarded attributes from the passed in variant. These are controlled using the <code>forward_attrs</code> attribute.</td></tr>
+</tbody></table>
+</div></div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="ast/index.html" title="darling::ast mod">ast</a></div><div class="item-right docblock-short"><p>Utility types for working with the AST.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="error/index.html" title="darling::error mod">error</a></div><div class="item-right docblock-short"><p>The <code>darling::Error</code> type, the multiple error <code>Accumulator</code>, and their internals.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="usage/index.html" title="darling::usage mod">usage</a></div><div class="item-right docblock-short"><p>Traits and types used for tracking the usage of generic parameters through a proc-macro input.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="util/index.html" title="darling::util mod">util</a></div><div class="item-right docblock-short"><p>Utility types for attribute parsing.</p>
+</div></div></div><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.uses_lifetimes.html" title="darling::uses_lifetimes macro">uses_lifetimes</a></div><div class="item-right docblock-short"><p>Generator for <code>UsesLifetimes</code> impls that unions the used lifetimes of the selected fields.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.uses_type_params.html" title="darling::uses_type_params macro">uses_type_params</a></div><div class="item-right docblock-short"><p>Generator for <code>UsesTypeParam</code> impls that unions the used type parameters of the selected fields.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Error.html" title="darling::Error struct">Error</a></div><div class="item-right docblock-short"><p>An error encountered during attribute parsing.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FromAttributes.html" title="darling::FromAttributes trait">FromAttributes</a></div><div class="item-right docblock-short"><p>Create an instance by parsing a list of attributes.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FromDeriveInput.html" title="darling::FromDeriveInput trait">FromDeriveInput</a></div><div class="item-right docblock-short"><p>Creates an instance by parsing an entire proc-macro <code>derive</code> input,
+including the, identity, generics, and visibility of the type.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FromField.html" title="darling::FromField trait">FromField</a></div><div class="item-right docblock-short"><p>Creates an instance by parsing an individual field and its attributes.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FromGenericParam.html" title="darling::FromGenericParam trait">FromGenericParam</a></div><div class="item-right docblock-short"><p>Creates an instance by parsing a specific <code>syn::GenericParam</code>.
+This can be a type param, a lifetime, or a const param.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FromGenerics.html" title="darling::FromGenerics trait">FromGenerics</a></div><div class="item-right docblock-short"><p>Creates an instance by parsing an entire generics declaration, including the
+<code>where</code> clause.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FromMeta.html" title="darling::FromMeta trait">FromMeta</a></div><div class="item-right docblock-short"><p>Create an instance from an item in an attribute declaration.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FromTypeParam.html" title="darling::FromTypeParam trait">FromTypeParam</a></div><div class="item-right docblock-short"><p>Creates an instance by parsing an individual type_param and its attributes.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FromVariant.html" title="darling::FromVariant trait">FromVariant</a></div><div class="item-right docblock-short"><p>Creates an instance from a specified <code>syn::Variant</code>.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Result.html" title="darling::Result type">Result</a></div><div class="item-right docblock-short"><p>An alias of <code>Result</code> specific to attribute parsing.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="darling" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

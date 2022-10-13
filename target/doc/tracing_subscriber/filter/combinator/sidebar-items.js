@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["And","Combines two `Filter`s so that spans and events are enabled if and only if both filters return `true`."],["Not","Inverts the result of a `Filter`."],["Or","Combines two `Filter`s so that spans and events are enabled if either filter returns `true`."]]};

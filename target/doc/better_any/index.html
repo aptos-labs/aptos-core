@@ -1,0 +1,67 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Better Any"><meta name="keywords" content="rust, rustlang, rust-lang, better_any"><title>better_any - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../better_any/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../better_any/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate better_any</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.1.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#macros">Macros</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li><li><a href="#attributes">Attribute Macros</a></li><li><a href="#derives">Derive Macros</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../better_any/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">better_any</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/better_any/lib.rs.html#1-398">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="better-any"><a href="#better-any">Better Any</a></h2>
+<p>Rust RFC for <code>non_static_type_id</code> feature has been reverted.
+Which means in foreseeable future there will be no built-in way in rust to get type id for non-static type
+let alone safely use it to downcast to a particular type.</p>
+<p>This crate provides tools to do these things safely for types with single lifetime.
+Although looks like it is technically possible to extend this approach for multiple lifetimes,
+consistent api and derive macro would be much harder to create and use because of the necessity
+to properly handle lifetime relations.
+Feel free to create an issue if you have actual use case where you need this functionality for multiple lifetimes.</p>
+<p>Also it has better downcasting that allows you do downcast not just from <code>dyn Tid</code> (like <code>dyn Any</code>) but from
+any trait object that implements <code>Tid</code>.
+So there is no more need to extend your traits with<code> fn to_any(&amp;self)-&gt; &amp;dyn Any</code></p>
+<p>MSRV: <code>1.41.0-stable</code></p>
+<h4 id="usage"><a href="#usage">Usage</a></h4>
+<p>Basically in places where before you have used <code>dyn Any</code> you can use <code>dyn Tid&lt;'a&gt;</code></p>
+<ul>
+<li>If your type is generic you should derive <code>Tid</code> implementation for it with <code>Tid</code> derive macro.
+Then to retrieve back concrete type <code>&lt;dyn Tid&gt;::downcast_*</code> methods should be used.</li>
+<li>If your type is not generic/implements Any you can create <code>dyn Any</code> and convert it to <code>dyn Tid</code>.
+Then to retrieve back concrete type <code>&lt;dyn Tid&gt;::downcast_any_*</code> methods should be used</li>
+<li>If your type is not generic and local to your crate you also can derive <code>Tid</code> but then you need to be careful
+to use methods that corresponds to the way you create <code>dyn Tid</code> for that particular type.
+Otherwise downcasting will return <code>None</code>.</li>
+</ul>
+<p>If all your types can implement <code>Tid</code> to avoid confusion
+recommended way is to use first option even if some types implement <code>Any</code>.
+If there are some types that implement <code>Any</code> and can’t implement <code>Tid</code> (i.e. types from other library),
+recommended way is to use second option for all types that implement <code>Any</code> to reduce confusion to minimum.</p>
+<h4 id="interoperability-with-any"><a href="#interoperability-with-any">Interoperability with Any</a></h4>
+<p>Unfortunately you can’t just use <code>Tid</code> everywhere because currently it is impossible
+to implement <code>Tid</code> for <code>T:Any</code> since it would conflict with any other possible <code>Tid</code> implementation.
+To overcome this limitation there is a <code>From</code> impl to go from <code>dyn Any</code> to <code>dyn Tid</code>
+But <code>Any</code> and <code>Tid</code> deliberately return different type ids because otherwise <code>Type&lt;'a&gt;</code> and <code>Type&lt;'static&gt;</code>
+would be indistinguishable and it would allow to go from <code>Type&lt;'static&gt;</code> to <code>Type&lt;'a&gt;</code> via <code>dyn Tid</code>
+which is obviously unsound for invariant and contravariant structs.</p>
+<p>Although if you are using <code>dyn Trait</code> where <code>Trait:Tid</code> all of this wouldn’t work,
+and you are left with <code>Tid</code> only.</p>
+<h4 id="safety"><a href="#safety">Safety</a></h4>
+<p>It is safe because created trait object preserve lifetime information,
+thus allowing us to safely downcast with proper lifetime.
+Otherwise internally it is plain old <code>Any</code>.</p>
+</div></details><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.type_id.html" title="better_any::type_id macro">type_id</a></div><div class="item-right docblock-short"><p>Simple version of derive macro to not pull all proc macro dependencies in simple cases
+when all structs are not generic</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Tid.html" title="better_any::Tid trait">Tid</a></div><div class="item-right docblock-short"><p>This trait indicates that this type can be converted to
+trait object with typeid while preserving lifetime information.
+Extends <code>Any</code> functionality for types with single lifetime</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TidAble.html" title="better_any::TidAble trait">TidAble</a></div><div class="item-right docblock-short"><p>This trait indicates that you can substitute this type as a type parameter to
+another type so that resulting type could implement <code>Tid</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TidExt.html" title="better_any::TidExt trait">TidExt</a></div><div class="item-right docblock-short"><p>Extension trait that contains actual downcasting methods.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.typeid_of.html" title="better_any::typeid_of fn">typeid_of</a></div><div class="item-right docblock-short"><p>Returns type id of <code>T</code></p>
+</div></div></div><h2 id="attributes" class="small-section-header"><a href="#attributes">Attribute Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="attr" href="attr.impl_tid.html" title="better_any::impl_tid attr">impl_tid</a></div><div class="item-right docblock-short"><p>Attribute macro that makes your implementation of <code>TidAble</code> safe
+Use it when you can’t use derive e.g. for trait object.</p>
+</div></div></div><h2 id="derives" class="small-section-header"><a href="#derives">Derive Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.Tid.html" title="better_any::Tid derive">Tid</a></div><div class="item-right docblock-short"><p>Derive macro to implement traits from this crate</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="better_any" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

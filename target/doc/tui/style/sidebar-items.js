@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Color",""]],"struct":[["Modifier","Modifier changes the way a piece of text is displayed."],["Style","Style let you control the main characteristics of the displayed elements."]]};

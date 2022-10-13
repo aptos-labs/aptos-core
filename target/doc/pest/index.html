@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="pest. The Elegant Parser"><meta name="keywords" content="rust, rustlang, rust-lang, pest"><title>pest - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../pest/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../pest/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate pest</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 2.3.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#macros">Macros</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../pest/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">pest</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/pest/lib.rs.html#9-109">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="pest-the-elegant-parser"><a href="#pest-the-elegant-parser">pest. The Elegant Parser</a></h2>
+<p>pest is a general purpose parser written in Rust with a focus on accessibility, correctness,
+and performance. It uses parsing expression grammars (or <a href="https://en.wikipedia.org/wiki/Parsing_expression_grammar">PEG</a>) as input, which are similar in
+spirit to regular expressions, but which offer the enhanced expressivity needed to parse
+complex languages.</p>
+<h3 id="getting-started"><a href="#getting-started">Getting started</a></h3>
+<p>The recommended way to start parsing with pest is to read the official <a href="https://pest-parser.github.io/book">book</a>.</p>
+<p>Other helpful resources:</p>
+<ul>
+<li>API reference on <a href="https://docs.rs/pest">docs.rs</a></li>
+<li>play with grammars and share them on our <a href="https://pest-parser.github.io/#editor">fiddle</a></li>
+<li>leave feedback, ask questions, or greet us on <a href="https://gitter.im/dragostis/pest">Gitter</a></li>
+</ul>
+<h3 id="usage"><a href="#usage">Usage</a></h3>
+<p>The core of pest is the trait <a href="trait.Parser.html"><code>Parser</code></a>, which provides an interface to the parsing
+functionality.</p>
+<p>The accompanying crate <code>pest_derive</code> can automatically generate a <a href="trait.Parser.html"><code>Parser</code></a> from a PEG
+grammar. Using <code>pest_derive</code> is highly encouraged, but it is also possible to implement
+<a href="trait.Parser.html"><code>Parser</code></a> manually if required.</p>
+<h3 id="pest-files"><a href="#pest-files"><code>.pest</code> files</a></h3>
+<p>Grammar definitions reside in custom <code>.pest</code> files located in the crate <code>src</code> directory.
+Parsers are automatically generated from these files using <code>#[derive(Parser)]</code> and a special
+<code>#[grammar = &quot;...&quot;]</code> attribute on a dummy struct.</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore"><code><span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Parser</span>)]</span>
+<span class="attribute">#[<span class="ident">grammar</span> <span class="op">=</span> <span class="string">&quot;path/to/my_grammar.pest&quot;</span>]</span> <span class="comment">// relative to src</span>
+<span class="kw">struct</span> <span class="ident">MyParser</span>;</code></pre></div>
+<p>The syntax of <code>.pest</code> files is documented in the <a href="https://docs.rs/pest_derive/"><code>pest_derive</code> crate</a>.</p>
+<h3 id="inline-grammars"><a href="#inline-grammars">Inline grammars</a></h3>
+<p>Grammars can also be inlined by using the <code>#[grammar_inline = &quot;...&quot;]</code> attribute.</p>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="error/index.html" title="pest::error mod">error</a></div><div class="item-right docblock-short"><p>Types for different kinds of parsing failures.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="iterators/index.html" title="pest::iterators mod">iterators</a></div><div class="item-right docblock-short"><p>Types and iterators for parser output.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="prec_climber/index.html" title="pest::prec_climber mod">prec_climber</a></div><div class="item-right docblock-short"><p>Constructs useful in infix operator parsing with the precedence climbing method.</p>
+</div></div></div><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.fails_with.html" title="pest::fails_with macro">fails_with</a></div><div class="item-right docblock-short"><p>Testing tool that compares produced errors.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.parses_to.html" title="pest::parses_to macro">parses_to</a></div><div class="item-right docblock-short"><p>Testing tool that compares produced tokens.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Lines.html" title="pest::Lines struct">Lines</a></div><div class="item-right docblock-short"><p>Line iterator for Spans, created by <a href="struct.Span.html#method.lines"><code>Span::lines()</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.LinesSpan.html" title="pest::LinesSpan struct">LinesSpan</a></div><div class="item-right docblock-short"><p>Line iterator for Spans, created by <a href="struct.Span.html#method.lines_span"><code>Span::lines_span()</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ParserState.html" title="pest::ParserState struct">ParserState</a></div><div class="item-right docblock-short"><p>The complete state of a <a href="trait.Parser.html"><code>Parser</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Position.html" title="pest::Position struct">Position</a></div><div class="item-right docblock-short"><p>A cursor position in a <code>&amp;str</code> which provides useful methods to manually parse that string.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Span.html" title="pest::Span struct">Span</a></div><div class="item-right docblock-short"><p>A span over a <code>&amp;str</code>. It is created from either <a href="struct.Position.html#method.span">two <code>Position</code>s</a> or from a <a href="../iterators/struct.Pair.html#method.span"><code>Pair</code></a>.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Atomicity.html" title="pest::Atomicity enum">Atomicity</a></div><div class="item-right docblock-short"><p>The current atomicity of a <a href="struct.ParserState.html"><code>ParserState</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Lookahead.html" title="pest::Lookahead enum">Lookahead</a></div><div class="item-right docblock-short"><p>The current lookahead status of a <a href="struct.ParserState.html"><code>ParserState</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.MatchDir.html" title="pest::MatchDir enum">MatchDir</a></div><div class="item-right docblock-short"><p>Match direction for the stack. Used in <code>PEEK[a..b]</code>/<code>stack_match_peek_slice</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Token.html" title="pest::Token enum">Token</a></div><div class="item-right docblock-short"><p>A token generated by a <code>Parser</code>.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Parser.html" title="pest::Parser trait">Parser</a></div><div class="item-right docblock-short"><p>A trait with a single method that parses strings.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.RuleType.html" title="pest::RuleType trait">RuleType</a></div><div class="item-right docblock-short"><p>A trait which parser rules must implement.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.set_call_limit.html" title="pest::set_call_limit fn">set_call_limit</a></div><div class="item-right docblock-short"><p>Sets the maximum call limit for the parser state
+to prevent stack overflows or excessive execution times
+in some grammars.
+If set, the calls are tracked as a running total
+over all non-terminal rules that can nest closures
+(which are passed to transform the parser state).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.state.html" title="pest::state fn">state</a></div><div class="item-right docblock-short"><p>Creates a <code>ParserState</code> from a <code>&amp;str</code>, supplying it to a closure <code>f</code>.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.ParseResult.html" title="pest::ParseResult type">ParseResult</a></div><div class="item-right docblock-short"><p>Type alias to simplify specifying the return value of chained closures.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="pest" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

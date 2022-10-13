@@ -1,0 +1,152 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Object Tapping"><meta name="keywords" content="rust, rustlang, rust-lang, tap"><title>wyz::tap - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../wyz/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../wyz/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module tap</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#traits">Traits</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../wyz/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">wyz</a>::<wbr><a class="mod" href="#">tap</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/wyz/tap.rs.html#1-913">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Object Tapping</p>
+<p>This crate provides traits for transparently inserting operations into a method
+chain. All traits take and return the object on which they act by value, and run
+a provided function on a borrow of the value.</p>
+<p>This allows methods that do not chain (such as mutators with <code>&amp;mut self -&gt; ()</code>
+signatures) to be chained.</p>
+<p>The traits in this crate provide methods that run some function, <code>Fn(&amp;T)</code> or
+<code>Fn(&amp;mut T)</code>, on a value <code>T</code> without changing the binding status of that value.</p>
+<h2 id="value-tapping"><a href="#value-tapping">Value Tapping</a></h2>
+<p>The primary trait of this crate is <a href="trait.Tap.html"><code>Tap</code></a>, which provides two methods: <a href="trait.Tap.html"><code>tap</code></a>
+and <a href="trait.Tap.html#method.tap_mut"><code>tap_mut</code></a>. These provide immutable or mutable, respectively, borrows of
+the tapped value to a user-provided function. The user function must not have a
+return value.</p>
+<p>This permits using inspector-style (<code>Fn(&amp;Self)</code>) or mutator-style
+(<code>Fn(&amp;mut Self)</code>) functions in a method chain without breaks or reduction of
+access to the main value.</p>
+<p>Tap methods never change the type of the object on which they are called. The
+<code>mut</code>-suffixed methods <em>are</em> permitted to change the <em>value</em> of their object.</p>
+<h2 id="trait-tapping"><a href="#trait-tapping">Trait Tapping</a></h2>
+<p>Rust does not have subtyping in the object-oriented sense; rather, it uses
+traits to indicate relationships between types and bring behavior of an interior
+type to the exterior type. This crate provides taps that use the standard
+conversion traits in order to assist in running tap methods generically.</p>
+<h3 id="borrowed-tapping"><a href="#borrowed-tapping">Borrowed Tapping</a></h3>
+<p>The traits <code>std::borrow::Borrow</code> and <code>std::borrow::BorrowMut</code> allow container
+types to behave as their contained types in borrowed contexts. The <a href="trait.TapBorrow.html"><code>TapBorrow</code></a>
+trait provides methods, <a href="trait.TapBorrow.html#method.tap_borrow"><code>tap_borrow</code></a> and <a href="trait.TapBorrow.html#method.tap_borrow_mut"><code>tap_borrow_mut</code></a>, which depend on
+<code>Borrow</code> and <code>BorrowMut</code>, respectively, to run the user-provided function on the
+borrowed interior type.</p>
+<p>This is useful for inspecting the interior of a <code>Cow</code> or other data structures
+that abstract away the exact container type but provide uniform access to the
+underlying data.</p>
+<h3 id="polymorphic-tapping"><a href="#polymorphic-tapping">Polymorphic Tapping</a></h3>
+<p>The traits <code>std::convert::AsRef</code> and <code>std::convert::AsMut</code> allow composed types
+to be used by reference as their component types. The <a href="trait.TapAsRef.html"><code>TapAsRef</code></a> trait
+provides methods, <a href="trait.TapAsRef.html#method.tap_ref"><code>tap_ref</code></a> and <a href="trait.TapAsRef.html#method.tap_ref_mut"><code>tap_ref_mut</code></a>, which depend on <code>AsRef</code> and
+<code>AsMut</code>, respectively, to run the user-provided function on the referred
+component type.</p>
+<p>This is useful for working with types like <code>Path</code>, which are commonly used as
+generic targets such as <code>&lt;P: AsRef&lt;Path&gt;&gt;</code>. All such types <code>P</code> may have
+<code>.tap_ref</code> called upon them with methods implemented on <code>Path</code>.</p>
+<blockquote>
+<p>Note: <code>Borrow</code> and <code>AsRef</code> are generic traits, which a type can implement many
+times with different targets. As such, the referent type must be specified in
+the tapped function. This can be done with a named method, or by marking the
+type of the closure argument: <code>|x: &amp;Referent| ...</code>.</p>
+</blockquote>
+<h3 id="dereferenced-tapping"><a href="#dereferenced-tapping">Dereferenced Tapping</a></h3>
+<p>The traits <code>std::ops::Deref</code> and <code>std::ops::DerefMut</code> may be used to make owning
+containers transparently defer to their contained data. This is used by <code>Vec</code>
+and <code>String</code>, for example, to behave like <code>[T]</code> and <code>str</code> implicitly.</p>
+<p>The <a href="trait.TapDeref.html"><code>TapDeref</code></a> trait provides <a href="trait.TapDeref.html#method.tap_deref"><code>tap_deref</code></a> and <a href="trait.TapDeref.html#method.tap_deref_mut"><code>tap_deref_mut</code></a> which call
+<code>Deref</code> or <code>DerefMut</code>, respectively, on the tapped value before running the
+provided function on the produced <code>Deref::Target</code> value.</p>
+<p>Since <code>Deref</code> may only be implemented once, this trait does not require any
+extra type information in its tap calls.</p>
+<h2 id="conditional-tapping"><a href="#conditional-tapping">Conditional Tapping</a></h2>
+<p>Additional traits are provided to only invoke the tap when certain conditions
+are met in the value being tapped.</p>
+<h3 id="boolean-tapping"><a href="#boolean-tapping">Boolean Tapping</a></h3>
+<p>The [<code>TapBool</code>] trait, with methods [<code>tap_true</code>], [<code>tap_false</code>], and their
+associated <code>_mut</code> variants, run the provided function only when the value is of
+the correct variant. This trait is implemented on <code>bool</code> by default, and is
+left open so that user crates may implement it on their own <code>bool</code>-like types.</p>
+<h3 id="optional-tapping"><a href="#optional-tapping">Optional Tapping</a></h3>
+<p>The <a href="trait.TapOption.html"><code>TapOption</code></a> trait, with methods <a href="trait.TapOption.html#method.tap_some"><code>tap_some</code></a>, <a href="trait.TapOption.html#method.tap_some_mut"><code>tap_some_mut</code></a>, and
+<a href="trait.TapOption.html#method.tap_none"><code>tap_none</code></a>, run the provided function only when the <code>Option</code> is of the
+matching variant. The <code>tap_some</code> methods pass <code>&amp;T</code> or <code>&amp;mut T</code> to their
+function; <code>tap_none</code> passes nothing.</p>
+<p>Note that <code>tap_some_mut</code> may change the value of the inner object, but it cannot
+change the <code>Option</code> from <code>Some</code> to <code>None</code>. If this behavior is desired, use
+<code>tap_mut</code> to modify the <code>Option</code> wrapper directly, rather than <code>tap_some_mut</code> to
+change the interior value.</p>
+<h3 id="result-tapping"><a href="#result-tapping">Result Tapping</a></h3>
+<p>This acts exactly like <code>TapOption</code>, except that the alternate case has a value
+that may be modified. It thus has methods <a href="trait.TapResult.html#method.tap_ok"><code>tap_ok</code></a>, <a href="trait.TapResult.html#method.tap_err"><code>tap_err</code></a>, and the
+associated <code>_mut</code> variants.</p>
+<h3 id="debug-tapping"><a href="#debug-tapping">Debug Tapping</a></h3>
+<p>All methods in the crate have a sibling method with the exact same name and
+signature, except that the name is suffixed with <code>_dbg</code>. This method runs the
+normal tap in a debug build, and is removed in release builds.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">wyz::tap::TapOption</span>;
+
+<span class="prelude-val">Some</span>(<span class="number">5i32</span>).<span class="ident">tap_some_dbg</span>(<span class="op">|</span><span class="ident">n</span><span class="op">|</span> <span class="macro">debug!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">n</span>));</code></pre></div>
+<p>This emits a debug trace when the crate is built in debug mode, and does nothing
+when the crate is built in release mode.</p>
+<h2 id="usage"><a href="#usage">Usage</a></h2>
+<p>Import the trait or traits you wish to use, with <code>use wyz::tap::Tap;</code>, and then
+attach <code>.tap</code> methods on the end of any expression you want to inspect or
+modify. These methods never change the type or binding status of the object to
+which they are attached, and can be added or removed without affecting
+neighboring code.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>This uses <code>tap_mut</code> to modify a vector using methods that cannot be chained, and
+without converting to an iterator and re-collecting.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">wyz::tap::Tap</span>;
+
+<span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">5</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">4</span>, <span class="number">3</span>]
+  .<span class="ident">tap_mut</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">sort</span>())
+  .<span class="ident">tap_mut</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">iter_mut</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">e</span> <span class="kw-2">*</span><span class="op">=</span> <span class="number">2</span>))
+  .<span class="ident">tap_mut</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">reverse</span>());
+<span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">v</span>, <span class="kw-2">&amp;</span>[<span class="number">10</span>, <span class="number">8</span>, <span class="number">6</span>, <span class="number">4</span>, <span class="number">2</span>]);</code></pre></div>
+<p>This uses <code>tap_some</code> to implement a conditional flag.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">wyz::tap::TapOption</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">flag</span> <span class="op">=</span> <span class="bool-val">false</span>;
+
+<span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="prelude-val">None</span>::<span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span>.<span class="ident">tap_some</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">flag</span> <span class="op">=</span> <span class="bool-val">true</span>);
+<span class="macro">assert!</span>(<span class="ident">n</span>.<span class="ident">is_none</span>());
+<span class="macro">assert!</span>(<span class="op">!</span><span class="ident">flag</span>);
+
+<span class="kw">let</span> <span class="ident">n</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">1</span>).<span class="ident">tap_some</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">flag</span> <span class="op">=</span> <span class="bool-val">true</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">n</span>.<span class="ident">unwrap</span>(), <span class="number">1</span>);
+<span class="macro">assert!</span>(<span class="ident">flag</span>);</code></pre></div>
+<p>And this uses <code>tap_err</code> to log errors without suppressing them.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">wyz::tap::TapResult</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">err_ct</span> <span class="op">=</span> <span class="number">0</span>;
+
+{
+ <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">action</span> <span class="op">=</span> <span class="op">|</span><span class="ident">e</span>: <span class="op">&amp;&amp;</span><span class="ident">str</span><span class="op">|</span> {
+  <span class="ident">err_ct</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+  <span class="macro">eprintln!</span>(<span class="string">&quot;ERROR: {}&quot;</span>, <span class="ident">e</span>);
+ };
+
+ <span class="prelude-val">Ok</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span>(<span class="string">&quot;success&quot;</span>).<span class="ident">tap_err</span>(<span class="kw-2">&amp;mut</span> <span class="ident">action</span>);
+ <span class="prelude-val">Err</span>::<span class="op">&lt;</span>(), <span class="kw">_</span><span class="op">&gt;</span>(<span class="string">&quot;failure&quot;</span>).<span class="ident">tap_err</span>(<span class="kw-2">&amp;mut</span> <span class="ident">action</span>);
+} <span class="comment">// I didn&#39;t want to write the closure twice</span>
+
+<span class="macro">assert_eq!</span>(<span class="ident">err_ct</span>, <span class="number">1</span>);
+<span class="comment">//  printed &quot;ERROR: failure&quot;</span></code></pre></div>
+<p>!</p>
+</div></details><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Tap.html" title="wyz::tap::Tap trait">Tap</a></div><div class="item-right docblock-short"><p>Value Tap</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TapAsRef.html" title="wyz::tap::TapAsRef trait">TapAsRef</a></div><div class="item-right docblock-short"><p>Referential Tap</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TapBorrow.html" title="wyz::tap::TapBorrow trait">TapBorrow</a></div><div class="item-right docblock-short"><p>Borrowing Tap</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TapDeref.html" title="wyz::tap::TapDeref trait">TapDeref</a></div><div class="item-right docblock-short"><p>Dereferencing Tap</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TapOption.html" title="wyz::tap::TapOption trait">TapOption</a></div><div class="item-right docblock-short"><p>Optional Tap</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TapResult.html" title="wyz::tap::TapResult trait">TapResult</a></div><div class="item-right docblock-short"><p>Result Tap</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wyz" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

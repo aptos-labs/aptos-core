@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/git/checkouts/move-0639dd674f581c30/c49400c/language/move-prover/interpreter/src/shared/variant.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>variant.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../move_stackless_bytecode_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../move_stackless_bytecode_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../move_stackless_bytecode_interpreter/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+</pre><pre class="rust"><code><span class="comment">// Copyright (c) The Diem Core Contributors</span>
+<span class="comment">// Copyright (c) The Move Contributors</span>
+<span class="comment">// SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="kw">use</span> <span class="ident">move_model::model::FunctionEnv</span>;
+<span class="kw">use</span> <span class="ident">move_stackless_bytecode</span>::{
+    <span class="ident">function_target::FunctionTarget</span>,
+    <span class="ident">function_target_pipeline</span>::{<span class="ident">FunctionTargetsHolder</span>, <span class="ident">FunctionVariant</span>, <span class="ident">VerificationFlavor</span>},
+};
+
+<span class="comment">// TODO (mengxu): find a better way to determine which variant to call</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">choose_variant</span><span class="op">&lt;</span><span class="lifetime">&#39;env</span><span class="op">&gt;</span>(
+    <span class="ident">holder</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;env</span> <span class="ident">FunctionTargetsHolder</span>,
+    <span class="ident">func_env</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;env</span> <span class="ident">FunctionEnv</span><span class="op">&lt;</span><span class="lifetime">&#39;env</span><span class="op">&gt;</span>,
+) -&gt; <span class="ident">FunctionTarget</span><span class="op">&lt;</span><span class="lifetime">&#39;env</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">target_variant</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">for</span> (<span class="ident">variant</span>, <span class="ident">target</span>) <span class="kw">in</span> <span class="ident">holder</span>.<span class="ident">get_targets</span>(<span class="ident">func_env</span>) {
+        <span class="comment">// regular verification variant is preferred, baseline version is the second choice</span>
+        <span class="kw">match</span> <span class="ident">variant</span> {
+            <span class="ident">FunctionVariant::Baseline</span> =&gt; {
+                <span class="kw">if</span> <span class="ident">target_variant</span>.<span class="ident">is_none</span>() {
+                    <span class="ident">target_variant</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">target</span>);
+                }
+            }
+            <span class="ident">FunctionVariant::Verification</span>(<span class="ident">VerificationFlavor::Regular</span>) =&gt; {
+                <span class="comment">// TODO (mengxu): think about a way to handle ghost type parameters</span>
+                <span class="kw">if</span> <span class="ident">target</span>.<span class="ident">data</span>.<span class="ident">ghost_type_param_count</span> <span class="op">==</span> <span class="number">0</span> {
+                    <span class="ident">target_variant</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">target</span>);
+                }
+            }
+            <span class="kw">_</span> =&gt; (),
+        }
+    }
+    <span class="ident">target_variant</span>.<span class="ident">unwrap</span>()
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="move_stackless_bytecode_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

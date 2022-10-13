@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["run_test_impl",""]],"struct":[["CompiledState",""],["ProcessedModule",""]],"trait":[["MoveTestAdapter",""]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["CoinStoreResource","The balance resource held under an account."]]};

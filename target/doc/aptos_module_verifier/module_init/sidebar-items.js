@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["is_signer_or_signer_reference",""],["verify_module_init_function",""]]};

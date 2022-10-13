@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["IntrinsicDecl","An information pack that holds the intrinsic declaration"],["IntrinsicsAnnotation","Hosts all intrinsic declarations"]]};

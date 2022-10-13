@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This crate defines a Wadler-style pretty-printing API."><meta name="keywords" content="rust, rustlang, rust-lang, pretty"><title>pretty - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../pretty/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../pretty/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate pretty</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.10.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../pretty/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">pretty</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/pretty/lib.rs.html#1-1723">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This crate defines a
+<a href="http://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf">Wadler-style</a>
+pretty-printing API.</p>
+<p>Start with with the static functions of <a href="enum.Doc.html">Doc</a>.</p>
+<h3 id="quick-start"><a href="#quick-start">Quick start</a></h3>
+<p>Let’s pretty-print simple sexps!  We want to pretty print sexps like</p>
+<div class="example-wrap"><pre class="language-lisp"><code>(1 2 3)</code></pre></div>
+<p>or, if the line would be too long, like</p>
+<div class="example-wrap"><pre class="language-lisp"><code>((1)
+ (2 3)
+ (4 5 6))</code></pre></div>
+<p>A <em>simple symbolic expression</em> consists of a numeric <em>atom</em> or a nested ordered <em>list</em> of
+symbolic expression children.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">enum</span> <span class="ident">SExp</span> {
+    <span class="ident">Atom</span>(<span class="ident">u32</span>),
+    <span class="ident">List</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SExp</span><span class="op">&gt;</span>),
+}
+<span class="kw">use</span> <span class="ident">SExp</span>::<span class="kw-2">*</span>;</code></pre></div>
+<p>We define a simple conversion to a <a href="enum.Doc.html">Doc</a>.  Atoms are rendered as strings; lists
+are recursively rendered, with spaces between children where appropriate.  Children are
+<a href="">nested</a> and <a href="">grouped</a>, allowing them to be laid out in a single line as appropriate.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">impl</span> <span class="ident">SExp</span> {
+    <span class="doccomment">/// Return a pretty printed format of self.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_doc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">RcDoc</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
+            <span class="ident">Atom</span>(<span class="kw-2">ref</span> <span class="ident">x</span>) =&gt; <span class="ident">RcDoc::as_string</span>(<span class="ident">x</span>),
+            <span class="ident">List</span>(<span class="kw-2">ref</span> <span class="ident">xs</span>) =&gt;
+                <span class="ident">RcDoc::text</span>(<span class="string">&quot;(&quot;</span>)
+                    .<span class="ident">append</span>(<span class="ident">RcDoc::intersperse</span>(<span class="ident">xs</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">to_doc</span>()), <span class="ident">Doc::line</span>()).<span class="ident">nest</span>(<span class="number">1</span>).<span class="ident">group</span>())
+                    .<span class="ident">append</span>(<span class="ident">RcDoc::text</span>(<span class="string">&quot;)&quot;</span>))
+        }
+    }
+}</code></pre></div>
+<p>Next, we convert the <a href="enum.Doc.html">Doc</a> to a plain old string.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">impl</span> <span class="ident">SExp</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_pretty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">width</span>: <span class="ident">usize</span>) -&gt; <span class="ident">String</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+        <span class="self">self</span>.<span class="ident">to_doc</span>().<span class="ident">render</span>(<span class="ident">width</span>, <span class="kw-2">&amp;mut</span> <span class="ident">w</span>).<span class="ident">unwrap</span>();
+        <span class="ident">String::from_utf8</span>(<span class="ident">w</span>).<span class="ident">unwrap</span>()
+    }
+}</code></pre></div>
+<p>And finally we can test that the nesting and grouping behaves as we expected.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">atom</span> <span class="op">=</span> <span class="ident">SExp::Atom</span>(<span class="number">5</span>);
+<span class="macro">assert_eq!</span>(<span class="string">&quot;5&quot;</span>, <span class="ident">atom</span>.<span class="ident">to_pretty</span>(<span class="number">10</span>));
+<span class="kw">let</span> <span class="ident">list</span> <span class="op">=</span> <span class="ident">SExp::List</span>(<span class="macro">vec!</span>[<span class="ident">SExp::Atom</span>(<span class="number">1</span>), <span class="ident">SExp::Atom</span>(<span class="number">2</span>), <span class="ident">SExp::Atom</span>(<span class="number">3</span>)]);
+<span class="macro">assert_eq!</span>(<span class="string">&quot;(1 2 3)&quot;</span>, <span class="ident">list</span>.<span class="ident">to_pretty</span>(<span class="number">10</span>));
+<span class="macro">assert_eq!</span>(<span class="string">&quot;\
+(1
+ 2
+ 3)&quot;</span>, <span class="ident">list</span>.<span class="ident">to_pretty</span>(<span class="number">5</span>));</code></pre></div>
+<h3 id="advanced-usage"><a href="#advanced-usage">Advanced usage</a></h3>
+<p>There’s a more efficient pattern that uses the <a href="trait.DocAllocator.html">DocAllocator</a> trait, as
+implemented by <a href="struct.BoxAllocator.html">BoxAllocator</a>, to allocate
+<a href="struct.DocBuilder.html">DocBuilder</a> instances.  See
+<a href="https://github.com/freebroccolo/pretty.rs/blob/master/examples/trees.rs#L39">examples/trees.rs</a>
+for this approach.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Arena.html" title="pretty::Arena struct">Arena</a></div><div class="item-right docblock-short"><p>An arena which can be used to allocate <code>Doc</code> values.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BoxAllocator.html" title="pretty::BoxAllocator struct">BoxAllocator</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BoxDoc.html" title="pretty::BoxDoc struct">BoxDoc</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DocBuilder.html" title="pretty::DocBuilder struct">DocBuilder</a></div><div class="item-right docblock-short"><p>The <code>DocBuilder</code> type allows for convenient appending of documents even for arena allocated
+documents by storing the arena inline.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FmtWrite.html" title="pretty::FmtWrite struct">FmtWrite</a></div><div class="item-right docblock-short"><p>Writes to something implementing <code>std::fmt::Write</code></p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.IoWrite.html" title="pretty::IoWrite struct">IoWrite</a></div><div class="item-right docblock-short"><p>Writes to something implementing <code>std::io::Write</code></p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Pretty.html" title="pretty::Pretty struct">Pretty</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RcAllocator.html" title="pretty::RcAllocator struct">RcAllocator</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RcDoc.html" title="pretty::RcDoc struct">RcDoc</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RefDoc.html" title="pretty::RefDoc struct">RefDoc</a></div><div class="item-right docblock-short"><p>Newtype wrapper for <code>&amp;Doc</code></p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.BuildDoc.html" title="pretty::BuildDoc enum">BuildDoc</a></div><div class="item-right docblock-short"><p>Either a <code>Doc</code> or a pointer to a <code>Doc</code> (<code>D</code>)</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Doc.html" title="pretty::Doc enum">Doc</a></div><div class="item-right docblock-short"><p>The concrete document type. This type is not meant to be used directly. Instead use the static
+functions on <code>Doc</code> or the methods on an <code>DocAllocator</code>.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.DocAllocator.html" title="pretty::DocAllocator trait">DocAllocator</a></div><div class="item-right docblock-short"><p>The <code>DocAllocator</code> trait abstracts over a type which can allocate (pointers to) <code>Doc</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.DocPtr.html" title="pretty::DocPtr trait">DocPtr</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Render.html" title="pretty::Render trait">Render</a></div><div class="item-right docblock-short"><p>Trait representing the operations necessary to render a document</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.RenderAnnotated.html" title="pretty::RenderAnnotated trait">RenderAnnotated</a></div><div class="item-right docblock-short"><p>Trait representing the operations necessary to write an annotated document.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.StaticDoc.html" title="pretty::StaticDoc trait">StaticDoc</a></div><div class="item-right docblock-short"></div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.SmallText.html" title="pretty::SmallText type">SmallText</a></div><div class="item-right docblock-short"></div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="pretty" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

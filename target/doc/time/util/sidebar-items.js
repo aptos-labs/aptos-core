@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["days_in_year","Get the number of calendar days in a given year."],["days_in_year_month","Get the number of days in the month of a given year."],["is_leap_year","Returns if the provided year is a leap year in the proleptic Gregorian calendar. Uses astronomical year numbering."],["weeks_in_year","Get the number of weeks in the ISO year."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""],["make_native_type_name",""],["make_native_type_of",""]],"struct":[["GasParameters",""],["TypeNameGasParameters",""],["TypeOfGasParameters",""]]};

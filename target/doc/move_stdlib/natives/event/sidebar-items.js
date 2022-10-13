@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""],["make_native_write_to_event_store",""]],"struct":[["GasParameters",""],["WriteToEventStoreGasParameters",""]]};

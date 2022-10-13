@@ -1,0 +1,107 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="PBKDF2 derivation and verification."><meta name="keywords" content="rust, rustlang, rust-lang, pbkdf2"><title>ring::pbkdf2 - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ring/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../ring/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module pbkdf2</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#statics">Statics</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ring/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">ring</a>::<wbr><a class="mod" href="#">pbkdf2</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/ring/pbkdf2.rs.html#15-272">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>PBKDF2 derivation and verification.</p>
+<p>Use <code>derive</code> to derive PBKDF2 outputs. Use <code>verify</code> to verify secret
+against previously-derived outputs.</p>
+<p>PBKDF2 is specified in <a href="https://tools.ietf.org/html/rfc2898#section-5.2">RFC 2898 Section 5.2</a> with test vectors given in
+<a href="https://tools.ietf.org/html/rfc6070">RFC 6070</a>. See also <a href="http://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-132.pdf">NIST Special Publication 800-132</a>.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2><h3 id="password-database-example"><a href="#password-database-example">Password Database Example</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">ring</span>::{<span class="ident">digest</span>, <span class="ident">pbkdf2</span>};
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">collections::HashMap</span>, <span class="ident">num::NonZeroU32</span>};
+
+<span class="kw">static</span> <span class="ident">PBKDF2_ALG</span>: <span class="ident">pbkdf2::Algorithm</span> <span class="op">=</span> <span class="ident">pbkdf2::PBKDF2_HMAC_SHA256</span>;
+<span class="kw">const</span> <span class="ident">CREDENTIAL_LEN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">digest::SHA256_OUTPUT_LEN</span>;
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Credential</span> <span class="op">=</span> [<span class="ident">u8</span>; <span class="ident">CREDENTIAL_LEN</span>];
+
+<span class="kw">enum</span> <span class="ident">Error</span> {
+    <span class="ident">WrongUsernameOrPassword</span>
+}
+
+<span class="kw">struct</span> <span class="ident">PasswordDatabase</span> {
+    <span class="ident">pbkdf2_iterations</span>: <span class="ident">NonZeroU32</span>,
+    <span class="ident">db_salt_component</span>: [<span class="ident">u8</span>; <span class="number">16</span>],
+
+    <span class="comment">// Normally this would be a persistent database.</span>
+    <span class="ident">storage</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Credential</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">PasswordDatabase</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_password</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">username</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">password</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
+        <span class="kw">let</span> <span class="ident">salt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">salt</span>(<span class="ident">username</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">to_store</span>: <span class="ident">Credential</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="ident">CREDENTIAL_LEN</span>];
+        <span class="ident">pbkdf2::derive</span>(<span class="ident">PBKDF2_ALG</span>, <span class="self">self</span>.<span class="ident">pbkdf2_iterations</span>, <span class="kw-2">&amp;</span><span class="ident">salt</span>,
+                       <span class="ident">password</span>.<span class="ident">as_bytes</span>(), <span class="kw-2">&amp;mut</span> <span class="ident">to_store</span>);
+        <span class="self">self</span>.<span class="ident">storage</span>.<span class="ident">insert</span>(<span class="ident">String::from</span>(<span class="ident">username</span>), <span class="ident">to_store</span>);
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_password</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">username</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">attempted_password</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>)
+                           -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">storage</span>.<span class="ident">get</span>(<span class="ident">username</span>) {
+           <span class="prelude-val">Some</span>(<span class="ident">actual_password</span>) =&gt; {
+               <span class="kw">let</span> <span class="ident">salt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">salt</span>(<span class="ident">username</span>);
+               <span class="ident">pbkdf2::verify</span>(<span class="ident">PBKDF2_ALG</span>, <span class="self">self</span>.<span class="ident">pbkdf2_iterations</span>, <span class="kw-2">&amp;</span><span class="ident">salt</span>,
+                              <span class="ident">attempted_password</span>.<span class="ident">as_bytes</span>(),
+                              <span class="ident">actual_password</span>)
+                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error::WrongUsernameOrPassword</span>)
+           },
+
+           <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::WrongUsernameOrPassword</span>)
+        }
+    }
+
+    <span class="comment">// The salt should have a user-specific component so that an attacker</span>
+    <span class="comment">// cannot crack one password for multiple users in the database. It</span>
+    <span class="comment">// should have a database-unique component so that an attacker cannot</span>
+    <span class="comment">// crack the same user&#39;s password across databases in the unfortunate</span>
+    <span class="comment">// but common case that the user has used the same password for</span>
+    <span class="comment">// multiple systems.</span>
+    <span class="kw">fn</span> <span class="ident">salt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">username</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">salt</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="self">self</span>.<span class="ident">db_salt_component</span>.<span class="ident">len</span>() <span class="op">+</span>
+                                          <span class="ident">username</span>.<span class="ident">as_bytes</span>().<span class="ident">len</span>());
+        <span class="ident">salt</span>.<span class="ident">extend</span>(<span class="self">self</span>.<span class="ident">db_salt_component</span>.<span class="ident">as_ref</span>());
+        <span class="ident">salt</span>.<span class="ident">extend</span>(<span class="ident">username</span>.<span class="ident">as_bytes</span>());
+        <span class="ident">salt</span>
+    }
+}
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="comment">// Normally these parameters would be loaded from a configuration file.</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">PasswordDatabase</span> {
+        <span class="ident">pbkdf2_iterations</span>: <span class="ident">NonZeroU32::new</span>(<span class="number">100_000</span>).<span class="ident">unwrap</span>(),
+        <span class="ident">db_salt_component</span>: [
+            <span class="comment">// This value was generated from a secure PRNG.</span>
+            <span class="number">0xd6</span>, <span class="number">0x26</span>, <span class="number">0x98</span>, <span class="number">0xda</span>, <span class="number">0xf4</span>, <span class="number">0xdc</span>, <span class="number">0x50</span>, <span class="number">0x52</span>,
+            <span class="number">0x24</span>, <span class="number">0xf2</span>, <span class="number">0x27</span>, <span class="number">0xd1</span>, <span class="number">0xfe</span>, <span class="number">0x39</span>, <span class="number">0x01</span>, <span class="number">0x8a</span>
+        ],
+        <span class="ident">storage</span>: <span class="ident">HashMap::new</span>(),
+    };
+
+    <span class="ident">db</span>.<span class="ident">store_password</span>(<span class="string">&quot;alice&quot;</span>, <span class="string">&quot;@74d7]404j|W}6u&quot;</span>);
+
+    <span class="comment">// An attempt to log in with the wrong password fails.</span>
+    <span class="macro">assert!</span>(<span class="ident">db</span>.<span class="ident">verify_password</span>(<span class="string">&quot;alice&quot;</span>, <span class="string">&quot;wrong password&quot;</span>).<span class="ident">is_err</span>());
+
+    <span class="comment">// Normally there should be an expoentially-increasing delay between</span>
+    <span class="comment">// attempts to further protect against online attacks.</span>
+
+    <span class="comment">// An attempt to log in with the right password succeeds.</span>
+    <span class="macro">assert!</span>(<span class="ident">db</span>.<span class="ident">verify_password</span>(<span class="string">&quot;alice&quot;</span>, <span class="string">&quot;@74d7]404j|W}6u&quot;</span>).<span class="ident">is_ok</span>());
+}</code></pre></div>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Algorithm.html" title="ring::pbkdf2::Algorithm struct">Algorithm</a></div><div class="item-right docblock-short"><p>A PBKDF2 algorithm.</p>
+</div></div></div><h2 id="statics" class="small-section-header"><a href="#statics">Statics</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="static" href="static.PBKDF2_HMAC_SHA1.html" title="ring::pbkdf2::PBKDF2_HMAC_SHA1 static">PBKDF2_HMAC_SHA1</a></div><div class="item-right docblock-short"><p>PBKDF2 using HMAC-SHA1.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.PBKDF2_HMAC_SHA256.html" title="ring::pbkdf2::PBKDF2_HMAC_SHA256 static">PBKDF2_HMAC_SHA256</a></div><div class="item-right docblock-short"><p>PBKDF2 using HMAC-SHA256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.PBKDF2_HMAC_SHA384.html" title="ring::pbkdf2::PBKDF2_HMAC_SHA384 static">PBKDF2_HMAC_SHA384</a></div><div class="item-right docblock-short"><p>PBKDF2 using HMAC-SHA384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.PBKDF2_HMAC_SHA512.html" title="ring::pbkdf2::PBKDF2_HMAC_SHA512 static">PBKDF2_HMAC_SHA512</a></div><div class="item-right docblock-short"><p>PBKDF2 using HMAC-SHA512.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.derive.html" title="ring::pbkdf2::derive fn">derive</a></div><div class="item-right docblock-short"><p>Fills <code>out</code> with the key derived using PBKDF2 with the given inputs.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.verify.html" title="ring::pbkdf2::verify fn">verify</a></div><div class="item-right docblock-short"><p>Verifies that a previously-derived (e.g., using <code>derive</code>) PBKDF2 value
+matches the PBKDF2 value derived from the other inputs.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ring" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

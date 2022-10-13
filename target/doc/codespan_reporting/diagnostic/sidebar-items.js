@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["LabelStyle",""],["Severity","A severity level for diagnostic messages."]],"struct":[["Diagnostic","Represents a diagnostic message that can provide information like errors and warnings to the user."],["Label","A label describing an underlined region of code associated with a diagnostic."]]};

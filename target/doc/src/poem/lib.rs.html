@@ -1,0 +1,625 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/registry/src/github.com-1ecc6299db9ec823/poem-1.3.40/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/poem-web/poem/master/favicon.ico"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../poem/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../poem/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../poem/index.html">
+                        <img src="https://raw.githubusercontent.com/poem-web/poem/master/logo.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Poem is a full-featured and easy-to-use web framework with the Rust</span>
+<span class="doccomment">//! programming language.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Table of contents</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! - [Quickstart](#quickstart)</span>
+<span class="doccomment">//! - [Endpoint](#endpoint)</span>
+<span class="doccomment">//! - [Extractors](#extractors)</span>
+<span class="doccomment">//! - [Routing](#routing)</span>
+<span class="doccomment">//! - [Responses](#responses)</span>
+<span class="doccomment">//! - [Handling errors](#handling-errors)</span>
+<span class="doccomment">//! - [Middleware](#middleware)</span>
+<span class="doccomment">//! - [Crate features](#crate-features)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Quickstart</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```no_run</span>
+<span class="doccomment">//! use poem::{get, handler, listener::TcpListener, web::Path, IntoResponse, Route, Server};</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn hello(Path(name): Path&lt;String&gt;) -&gt; String {</span>
+<span class="doccomment">//!     format!(&quot;hello: {}&quot;, name)</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[tokio::main]</span>
+<span class="doccomment">//! async fn main() -&gt; Result&lt;(), std::io::Error&gt; {</span>
+<span class="doccomment">//!     let app = Route::new().at(&quot;/hello/:name&quot;, get(hello));</span>
+<span class="doccomment">//!     Server::new(TcpListener::bind(&quot;127.0.0.1:3000&quot;))</span>
+<span class="doccomment">//!         .run(app)</span>
+<span class="doccomment">//!         .await</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Endpoint</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The [`Endpoint`] trait represents a type that can handle HTTP requests, and</span>
+<span class="doccomment">//! it returns the `Result&lt;T: IntoResponse, Error&gt;` type.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The [`handler`] macro is used to convert a function into an endpoint.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use poem::{</span>
+<span class="doccomment">//!     error::NotFoundError, handler, http::StatusCode, test::TestClient, Endpoint, Request,</span>
+<span class="doccomment">//!     Result,</span>
+<span class="doccomment">//! };</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn return_str() -&gt; &amp;&#39;static str {</span>
+<span class="doccomment">//!     &quot;hello&quot;</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn return_err() -&gt; Result&lt;&amp;&#39;static str, NotFoundError&gt; {</span>
+<span class="doccomment">//!     Err(NotFoundError)</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # tokio::runtime::Runtime::new().unwrap().block_on(async {</span>
+<span class="doccomment">//! let resp = TestClient::new(return_str).get(&quot;/&quot;).send().await;</span>
+<span class="doccomment">//! resp.assert_status_is_ok();</span>
+<span class="doccomment">//! resp.assert_text(&quot;hello&quot;).await;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! let resp = TestClient::new(return_err).get(&quot;/&quot;).send().await;</span>
+<span class="doccomment">//! resp.assert_status(StatusCode::NOT_FOUND);</span>
+<span class="doccomment">//! # });</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Extractors</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The extractor is used to extract something from the HTTP request.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! `Poem` provides some [commonly used extractors](web::FromRequest) for</span>
+<span class="doccomment">//! extracting something from HTTP requests.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! In the following example, the `index` function uses 3 extractors to extract</span>
+<span class="doccomment">//! the remote address, HTTP method and URI.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```rust</span>
+<span class="doccomment">//! use poem::{</span>
+<span class="doccomment">//!     handler,</span>
+<span class="doccomment">//!     http::{Method, Uri},</span>
+<span class="doccomment">//!     web::RemoteAddr,</span>
+<span class="doccomment">//! };</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn index(remote_addr: &amp;RemoteAddr, method: Method, uri: &amp;Uri) {}</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! By default, the extractor will return a `400 Bad Request` when an error</span>
+<span class="doccomment">//! occurs, but sometimes you may want to change this behavior, so you can</span>
+<span class="doccomment">//! handle the error yourself.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! In the following example, when the [`Query`](web::Query) extractor fails, it</span>
+<span class="doccomment">//! will return a `503 Internal Server` response and the reason for the error.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use poem::{</span>
+<span class="doccomment">//!     error::ParseQueryError, handler, http::StatusCode, web::Query, IntoResponse, Response,</span>
+<span class="doccomment">//!     Result,</span>
+<span class="doccomment">//! };</span>
+<span class="doccomment">//! use serde::Deserialize;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[derive(Debug, Deserialize)]</span>
+<span class="doccomment">//! struct Params {</span>
+<span class="doccomment">//!     name: String,</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn index(res: Result&lt;Query&lt;Params&gt;&gt;) -&gt; Result&lt;impl IntoResponse&gt; {</span>
+<span class="doccomment">//!     match res {</span>
+<span class="doccomment">//!         Ok(Query(params)) =&gt; Ok(params.name.into_response()),</span>
+<span class="doccomment">//!         Err(err) if err.is::&lt;ParseQueryError&gt;() =&gt; Ok(Response::builder()</span>
+<span class="doccomment">//!             .status(StatusCode::INTERNAL_SERVER_ERROR)</span>
+<span class="doccomment">//!             .body(err.to_string())),</span>
+<span class="doccomment">//!         Err(err) =&gt; Err(err),</span>
+<span class="doccomment">//!     }</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Routing</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! There are three available routes.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! - [`Route`] Routing for path</span>
+<span class="doccomment">//! - [`RouteDomain`] Routing for domain</span>
+<span class="doccomment">//! - [`RouteMethod`] Routing for HTTP method</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use poem::{get, handler, post, web::Path, Route};</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! async fn get_user(id: Path&lt;String&gt;) {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! async fn delete_user(id: Path&lt;String&gt;) {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! async fn create_user() {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! let app = Route::new()</span>
+<span class="doccomment">//!     .at(&quot;/user/:id&quot;, get(get_user).delete(delete_user))</span>
+<span class="doccomment">//!     .at(&quot;/user&quot;, post(create_user));</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! You can create custom extractors, see also [`FromRequest`].</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Responses</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! All types that can be converted to HTTP response [`Response`] should</span>
+<span class="doccomment">//! implement [`IntoResponse`].</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! In the following example, the `string_response` and `status_response`</span>
+<span class="doccomment">//! functions return the `String` and `StatusCode` types, because `Poem` has</span>
+<span class="doccomment">//! implemented the [`IntoResponse`] trait for them.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The `no_response` function does not return a value. We can think that</span>
+<span class="doccomment">//! its return type is `()`, and `Poem` also implements [`IntoResponse`] for</span>
+<span class="doccomment">//! `()`, which is always converted to `200 OK`.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The `result_response` function returns a `Result` type, which means that an</span>
+<span class="doccomment">//! error may occur.</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use poem::{handler, http::StatusCode, Result};</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn string_response() -&gt; String {</span>
+<span class="doccomment">//!     todo!()</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn status_response() -&gt; StatusCode {</span>
+<span class="doccomment">//!     todo!()</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn no_response() {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn result_response() -&gt; Result&lt;String&gt; {</span>
+<span class="doccomment">//!     todo!()</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Handling errors</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The following example returns customized content when</span>
+<span class="doccomment">//! [`NotFoundError`](error::NotFoundError) occurs.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use poem::{</span>
+<span class="doccomment">//!     error::NotFoundError, handler, http::StatusCode, EndpointExt, IntoResponse, Response, Route,</span>
+<span class="doccomment">//! };</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn foo() {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn bar() {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! let app =</span>
+<span class="doccomment">//!     Route::new()</span>
+<span class="doccomment">//!         .at(&quot;/foo&quot;, foo)</span>
+<span class="doccomment">//!         .at(&quot;/bar&quot;, bar)</span>
+<span class="doccomment">//!         .catch_error(|err: NotFoundError| async move {</span>
+<span class="doccomment">//!             Response::builder()</span>
+<span class="doccomment">//!                 .status(StatusCode::NOT_FOUND)</span>
+<span class="doccomment">//!                 .body(&quot;custom not found&quot;)</span>
+<span class="doccomment">//!         });</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Middleware</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! You can call the [`with`](EndpointExt::with) method on the [`Endpoint`] to</span>
+<span class="doccomment">//! apply a middleware to an endpoint. It actually converts the original</span>
+<span class="doccomment">//! endpoint to a new endpoint.</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use poem::{handler, middleware::Tracing, EndpointExt, Route};</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[handler]</span>
+<span class="doccomment">//! fn index() {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! let app = Route::new().at(&quot;/&quot;, index).with(Tracing);</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! You can create your own middleware, see also [`Middleware`].</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Crate features</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! To avoid compiling unused dependencies, `Poem` gates certain features, all</span>
+<span class="doccomment">//! of which are disabled by default:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! |Feature           |Description                     |</span>
+<span class="doccomment">//! |------------------|--------------------------------|</span>
+<span class="doccomment">//! | server | Server and listener APIs(enable by default) |</span>
+<span class="doccomment">//! |compression  | Support decompress request body and compress response body |</span>
+<span class="doccomment">//! |cookie            | Support for Cookie             |</span>
+<span class="doccomment">//! |csrf | Support for Cross-Site Request Forgery (CSRF) protection |</span>
+<span class="doccomment">//! |multipart         | Support for Multipart          |</span>
+<span class="doccomment">//! |native-tls        | Support for HTTP server over TLS with [`native-tls`](https://crates.io/crates/native-tls)  |</span>
+<span class="doccomment">//! |openssl-tls        | Support for HTTP server over TLS with [`openssl-tls`](https://crates.io/crates/openssl)  |</span>
+<span class="doccomment">//! |opentelemetry     | Support for opentelemetry    |</span>
+<span class="doccomment">//! |prometheus        | Support for Prometheus       |</span>
+<span class="doccomment">//! |redis-session     | Support for RedisSession     |</span>
+<span class="doccomment">//! |rustls            | Support for HTTP server over TLS with [`rustls`](https://crates.io/crates/rustls)  |</span>
+<span class="doccomment">//! |session           | Support for session    |</span>
+<span class="doccomment">//! |sse               | Support Server-Sent Events (SSE)       |</span>
+<span class="doccomment">//! |tempfile          | Support for [`tempfile`](https://crates.io/crates/tempfile) |</span>
+<span class="doccomment">//! |tower-compat      | Adapters for `tower::Layer` and `tower::Service`. |</span>
+<span class="doccomment">//! |websocket         | Support for WebSocket          |</span>
+<span class="doccomment">//! | anyhow        | Integrate with the [`anyhow`](https://crates.io/crates/anyhow) crate. |</span>
+<span class="doccomment">//! | eyre06        | Integrate with version 0.6.x of the [`eyre`](https://crates.io/crates/eyre) crate. |</span>
+<span class="doccomment">//! | i18n          | Support for internationalization |</span>
+<span class="doccomment">//! | acme | Support for ACME(Automatic Certificate Management Environment) |</span>
+<span class="doccomment">//! | tokio-metrics | Integrate with the [`tokio-metrics`](https://crates.io/crates/tokio-metrics) crate. |</span>
+<span class="doccomment">//! | embed  | Integrate with [`rust-embed`](https://crates.io/crates/rust-embed) crate. |</span>
+<span class="doccomment">//! | xml | Integrate with [`quick-xml`](https://crates.io/crates/quick-xml) crate. |</span>
+
+<span class="attribute">#![<span class="ident">doc</span>(<span class="ident">html_favicon_url</span> <span class="op">=</span> <span class="string">&quot;https://raw.githubusercontent.com/poem-web/poem/master/favicon.ico&quot;</span>)]</span>
+<span class="attribute">#![<span class="ident">doc</span>(<span class="ident">html_logo_url</span> <span class="op">=</span> <span class="string">&quot;https://raw.githubusercontent.com/poem-web/poem/master/logo.png&quot;</span>)]</span>
+<span class="attribute">#![<span class="ident">forbid</span>(<span class="ident">unsafe_code</span>)]</span>
+<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">private_in_public</span>, <span class="ident">unreachable_pub</span>)]</span>
+<span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
+<span class="attribute">#![<span class="ident">warn</span>(<span class="ident">missing_docs</span>)]</span>
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">endpoint</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">error</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;i18n&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;i18n&quot;</span>)))]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">i18n</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;server&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;server&quot;</span>)))]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">listener</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">middleware</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;session&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;session&quot;</span>)))]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">session</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test&quot;</span>)))]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">test</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">web</span>;
+
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">http</span>;
+
+<span class="kw">mod</span> <span class="ident">addr</span>;
+<span class="kw">mod</span> <span class="ident">body</span>;
+<span class="kw">mod</span> <span class="ident">request</span>;
+<span class="kw">mod</span> <span class="ident">response</span>;
+<span class="kw">mod</span> <span class="ident">route</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;server&quot;</span>)]</span>
+<span class="kw">mod</span> <span class="ident">server</span>;
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">addr::Addr</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">body::Body</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">endpoint</span>::{<span class="ident">Endpoint</span>, <span class="ident">EndpointExt</span>, <span class="ident">IntoEndpoint</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">error</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">middleware::Middleware</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">poem_derive::handler</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">request</span>::{<span class="ident">OnUpgrade</span>, <span class="ident">Request</span>, <span class="ident">RequestBuilder</span>, <span class="ident">RequestParts</span>, <span class="ident">Upgraded</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">response</span>::{<span class="ident">Response</span>, <span class="ident">ResponseBuilder</span>, <span class="ident">ResponseParts</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">route</span>::{
+    <span class="ident">connect</span>, <span class="ident">delete</span>, <span class="ident">get</span>, <span class="ident">head</span>, <span class="ident">options</span>, <span class="ident">patch</span>, <span class="ident">post</span>, <span class="ident">put</span>, <span class="ident">trace</span>, <span class="ident">Route</span>, <span class="ident">RouteDomain</span>, <span class="ident">RouteMethod</span>,
+    <span class="ident">RouteScheme</span>,
+};
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;server&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">server::Server</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">web</span>::{<span class="ident">FromRequest</span>, <span class="ident">IntoResponse</span>, <span class="ident">RequestBody</span>};
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="poem" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

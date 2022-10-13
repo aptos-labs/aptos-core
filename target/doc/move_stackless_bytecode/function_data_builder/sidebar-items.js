@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["FunctionDataBuilder","A builder for `FunctionData`."],["FunctionDataBuilderOptions",""]]};

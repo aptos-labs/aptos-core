@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["ParsedAddress",""]],"struct":[["NumericalAddress","Numerical address represents non-named address values or the assigned value of a named address"]]};

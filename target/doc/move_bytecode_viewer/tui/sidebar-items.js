@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["text_builder",""],["tui_interface",""]],"struct":[["TUI",""]]};

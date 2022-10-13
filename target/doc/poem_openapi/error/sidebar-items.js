@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["ContentTypeError","Content type error."]],"struct":[["AuthorizationError","Authorization error."],["ParseMultipartError","Parse multipart error."],["ParseParamError","Parameter error."],["ParsePathError","Parameter error."],["ParseRequestPayloadError","Parse request payload error."]]};

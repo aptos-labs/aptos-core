@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Abigen","The ABI generator."],["AbigenOptions","Options passed into the ABI generator."]]};

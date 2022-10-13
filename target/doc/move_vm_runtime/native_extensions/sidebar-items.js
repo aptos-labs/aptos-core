@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["NativeContextExtensions","A data type to represent a heterogeneous collection of extensions which are available to native functions. A value to this is passed into the session function execution."]]};

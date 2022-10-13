@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Lsb0","Traverses a register from `LSbit` to `MSbit`."],["Msb0","Traverses a register from `MSbit` to `LSbit`."]],"trait":[["BitOrder","An ordering over a register."]],"type":[["LocalBits","A default bit ordering."]]};

@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Main decompression function. Keeps decompressing data from `in_buf` until the `in_buf` is empty, `out` is full, the end of the deflate stream is hit, or there is an error in the deflate stream."><meta name="keywords" content="rust, rustlang, rust-lang, decompress"><title>decompress in miniz_oxide::inflate::core - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../miniz_oxide/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../miniz_oxide/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In miniz_oxide::inflate::core</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../miniz_oxide/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Function <a href="../../index.html">miniz_oxide</a>::<wbr><a href="../index.html">inflate</a>::<wbr><a href="index.html">core</a>::<wbr><a class="fn" href="#">decompress</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../../src/miniz_oxide/inflate/core.rs.html#1067-1700">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust fn"><code>pub fn decompress(<br>&nbsp;&nbsp;&nbsp;&nbsp;r: &amp;mut <a class="struct" href="struct.DecompressorOxide.html" title="struct miniz_oxide::inflate::core::DecompressorOxide">DecompressorOxide</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;in_buf: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.63.0/core/primitive.u8.html">u8</a>], <br>&nbsp;&nbsp;&nbsp;&nbsp;out: &amp;mut [<a class="primitive" href="https://doc.rust-lang.org/1.63.0/core/primitive.u8.html">u8</a>], <br>&nbsp;&nbsp;&nbsp;&nbsp;out_pos: <a class="primitive" href="https://doc.rust-lang.org/1.63.0/core/primitive.usize.html">usize</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;flags: <a class="primitive" href="https://doc.rust-lang.org/1.63.0/core/primitive.u32.html">u32</a><br>) -&gt; (<a class="enum" href="../enum.TINFLStatus.html" title="enum miniz_oxide::inflate::TINFLStatus">TINFLStatus</a>, <a class="primitive" href="https://doc.rust-lang.org/1.63.0/core/primitive.usize.html">usize</a>, <a class="primitive" href="https://doc.rust-lang.org/1.63.0/core/primitive.usize.html">usize</a>)</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Main decompression function. Keeps decompressing data from <code>in_buf</code> until the <code>in_buf</code> is
+empty, <code>out</code> is full, the end of the deflate stream is hit, or there is an error in the
+deflate stream.</p>
+<h2 id="arguments"><a href="#arguments">Arguments</a></h2>
+<p><code>r</code> is a <a href="struct.DecompressorOxide.html" title="DecompressorOxide"><code>DecompressorOxide</code></a> struct with the state of this stream.</p>
+<p><code>in_buf</code> is a reference to the compressed data that is to be decompressed. The decompressor will
+start at the first byte of this buffer.</p>
+<p><code>out</code> is a reference to the buffer that will store the decompressed data, and that
+stores previously decompressed data if any.</p>
+<ul>
+<li>The offset given by <code>out_pos</code> indicates where in the output buffer slice writing should start.</li>
+<li>If <a href="inflate_flags/constant.TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF.html" title="TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF"><code>TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF</code></a> is not set, the output buffer is used in a
+wrapping manner, and it’s size is required to be a power of 2.</li>
+<li>The decompression function normally needs access to 32KiB of the previously decompressed data
+(or to the beginning of the decompressed data if less than 32KiB has been decompressed.)
+<ul>
+<li>If this data is not available, decompression may fail.</li>
+<li>Some deflate compressors allow specifying a window size which limits match distances to
+less than this, or alternatively an RLE mode where matches will only refer to the previous byte
+and thus allows a smaller output buffer. The window size can be specified in the zlib
+header structure, however, the header data should not be relied on to be correct.</li>
+</ul>
+</li>
+</ul>
+<p><code>flags</code> indicates settings and status to the decompression function.</p>
+<ul>
+<li>The <a href="inflate_flags/constant.TINFL_FLAG_HAS_MORE_INPUT.html" title="TINFL_FLAG_HAS_MORE_INPUT"><code>TINFL_FLAG_HAS_MORE_INPUT</code></a> has to be specified if more compressed data is to be provided
+in a subsequent call to this function.</li>
+<li>See the the <a href="inflate_flags/index.html" title="inflate_flags"><code>inflate_flags</code></a> module for details on other flags.</li>
+</ul>
+<h2 id="returns"><a href="#returns">Returns</a></h2>
+<p>Returns a tuple containing the status of the compressor, the number of input bytes read, and the
+number of bytes output to <code>out</code>.</p>
+<p>This function shouldn’t panic pending any bugs.</p>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="miniz_oxide" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

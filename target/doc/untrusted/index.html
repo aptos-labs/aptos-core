@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="untrusted.rs: Safe, fast, zero-panic, zero-crashing, zero-allocation parsing of untrusted inputs in Rust."><meta name="keywords" content="rust, rustlang, rust-lang, untrusted"><title>untrusted - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../untrusted/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../untrusted/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate untrusted</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.7.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../untrusted/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">untrusted</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/untrusted/untrusted.rs.html#15-374">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>untrusted.rs: Safe, fast, zero-panic, zero-crashing, zero-allocation
+parsing of untrusted inputs in Rust.</p>
+<p><code>git clone https://github.com/briansmith/untrusted</code></p>
+<p>untrusted.rs goes beyond Rust’s normal safety guarantees by  also
+guaranteeing that parsing will be panic-free, as long as
+<code>untrusted::Input::as_slice_less_safe()</code> is not used. It avoids copying
+data and heap allocation and strives to prevent common pitfalls such as
+accidentally parsing input bytes multiple times. In order to meet these
+goals, untrusted.rs is limited in functionality such that it works best for
+input languages with a small fixed amount of lookahead such as ASN.1, TLS,
+TCP/IP, and many other networking, IPC, and related protocols. Languages
+that require more lookahead and/or backtracking require some significant
+contortions to parse using this framework. It would not be realistic to use
+it for parsing programming language code, for example.</p>
+<p>The overall pattern for using untrusted.rs is:</p>
+<ol>
+<li>
+<p>Write a recursive-descent-style parser for the input language, where the
+input data is given as a <code>&amp;mut untrusted::Reader</code> parameter to each
+function. Each function should have a return type of <code>Result&lt;V, E&gt;</code> for
+some value type <code>V</code> and some error type <code>E</code>, either or both of which may
+be <code>()</code>. Functions for parsing the lowest-level language constructs
+should be defined. Those lowest-level functions will parse their inputs
+using <code>::read_byte()</code>, <code>Reader::peek()</code>, and similar functions.
+Higher-level language constructs are then parsed by calling the
+lower-level functions in sequence.</p>
+</li>
+<li>
+<p>Wrap the top-most functions of your recursive-descent parser in
+functions that take their input data as an <code>untrusted::Input</code>. The
+wrapper functions should call the <code>Input</code>’s <code>read_all</code> (or a variant
+thereof) method. The wrapper functions are the only ones that should be
+exposed outside the parser’s module.</p>
+</li>
+<li>
+<p>After receiving the input data to parse, wrap it in an <code>untrusted::Input</code>
+using <code>untrusted::Input::from()</code> as early as possible. Pass the
+<code>untrusted::Input</code> to the wrapper functions when they need to be parsed.</p>
+</li>
+</ol>
+<p>In general parsers built using <code>untrusted::Reader</code> do not need to explicitly
+check for end-of-input unless they are parsing optional constructs, because
+<code>Reader::read_byte()</code> will return <code>Err(EndOfInput)</code> on end-of-input.
+Similarly, parsers using <code>untrusted::Reader</code> generally don’t need to check
+for extra junk at the end of the input as long as the parser’s API uses the
+pattern described above, as <code>read_all</code> and its variants automatically check
+for trailing junk. <code>Reader::skip_to_end()</code> must be used when any remaining
+unread input should be ignored without triggering an error.</p>
+<p>untrusted.rs works best when all processing of the input data is done
+through the <code>untrusted::Input</code> and <code>untrusted::Reader</code> types. In
+particular, avoid trying to parse input data using functions that take
+byte slices. However, when you need to access a part of the input data as
+a slice to use a function that isn’t written using untrusted.rs,
+<code>Input::as_slice_less_safe()</code> can be used.</p>
+<p>It is recommend to use <code>use untrusted;</code> and then <code>untrusted::Input</code>,
+<code>untrusted::Reader</code>, etc., instead of using <code>use untrusted::*</code>. Qualifying
+the names with <code>untrusted</code> helps remind the reader of the code that it is
+dealing with <em>untrusted</em> input.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p><a href="https://github.com/briansmith/ring"><em>ring</em></a>’s parser for the subset of
+ASN.1 DER it needs to understand,
+<a href="https://github.com/briansmith/ring/blob/master/src/der.rs"><code>ring::der</code></a>,
+is built on top of untrusted.rs. <em>ring</em> also uses untrusted.rs to parse ECC
+public keys, RSA PKCS#1 1.5 padding, and for all other parsing it does.</p>
+<p>All of <a href="https://github.com/briansmith/webpki">webpki</a>’s parsing of X.509
+certificates (also ASN.1 DER) is done using untrusted.rs.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EndOfInput.html" title="untrusted::EndOfInput struct">EndOfInput</a></div><div class="item-right docblock-short"><p>The error type used to indicate the end of the input was reached before the
+operation could be completed.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Input.html" title="untrusted::Input struct">Input</a></div><div class="item-right docblock-short"><p>A wrapper around <code>&amp;'a [u8]</code> that helps in writing panic-free code.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Mark.html" title="untrusted::Mark struct">Mark</a></div><div class="item-right docblock-short"><p>An index into the already-parsed input of a <code>Reader</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Reader.html" title="untrusted::Reader struct">Reader</a></div><div class="item-right docblock-short"><p>A read-only, forward-only* cursor into the data in an <code>Input</code>.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.read_all_optional.html" title="untrusted::read_all_optional fn">read_all_optional</a></div><div class="item-right docblock-short"><p>Calls <code>read</code> with the given input as a <code>Reader</code>, ensuring that <code>read</code>
+consumed the entire input. When <code>input</code> is <code>None</code>, <code>read</code> will be
+called with <code>None</code>.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="untrusted" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

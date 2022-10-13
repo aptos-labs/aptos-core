@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["AccountAddress","A struct that represents an account address."],["AccountAddressParseError",""]]};

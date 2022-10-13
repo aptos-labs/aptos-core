@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["AggregatorValue","Helpful trait for e.g. extracting u128 value out of TransactionWrite that we know is for aggregator (i.e. if we have seen a DeltaOp for the same access path)."],["ChangeSetExt","Extension of `ChangeSet` that also holds deltas."],["TransactionOutputExt","Extension of `TransactionOutput` that also holds `DeltaChangeSet`"]]};

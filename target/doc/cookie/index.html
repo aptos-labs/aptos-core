@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="HTTP cookie parsing and cookie jar management."><meta name="keywords" content="rust, rustlang, rust-lang, cookie"><title>cookie - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../cookie/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../cookie/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate cookie</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.16.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../cookie/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">cookie</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/cookie/lib.rs.html#1-1402">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>HTTP cookie parsing and cookie jar management.</p>
+<p>This crates provides the <a href="struct.Cookie.html" title="Cookie"><code>Cookie</code></a> type, representing an HTTP cookie, and
+the <a href="struct.CookieJar.html" title="CookieJar"><code>CookieJar</code></a> type, which manages a collection of cookies for session
+management, recording changes as they are made, and optional automatic
+cookie encryption and signing.</p>
+<h2 id="usage"><a href="#usage">Usage</a></h2>
+<p>Add the following to the <code>[dependencies]</code> section of your <code>Cargo.toml</code>:</p>
+<div class="example-wrap"><pre class="language-toml"><code>cookie = &quot;0.16&quot;</code></pre></div><h2 id="features"><a href="#features">Features</a></h2>
+<p>This crate exposes several features, all of which are disabled by default:</p>
+<ul>
+<li>
+<p><strong><code>percent-encode</code></strong></p>
+<p>Enables <em>percent encoding and decoding</em> of names and values in cookies.</p>
+<p>When this feature is enabled, the <a href="struct.Cookie.html#method.encoded" title="Cookie::encoded()"><code>Cookie::encoded()</code></a> and
+<a href="struct.Cookie.html#method.parse_encoded" title="Cookie::parse_encoded()"><code>Cookie::parse_encoded()</code></a> methods are available. The <code>encoded</code> method
+returns a wrapper around a <code>Cookie</code> whose <code>Display</code> implementation
+percent-encodes the name and value of the cookie. The <code>parse_encoded</code>
+method percent-decodes the name and value of a <code>Cookie</code> during parsing.</p>
+</li>
+<li>
+<p><strong><code>signed</code></strong></p>
+<p>Enables <em>signed</em> cookies via <a href="struct.CookieJar.html#method.signed" title="CookieJar::signed()"><code>CookieJar::signed()</code></a>.</p>
+<p>When this feature is enabled, the <a href="struct.CookieJar.html#method.signed" title="CookieJar::signed()"><code>CookieJar::signed()</code></a> method,
+<a href="struct.SignedJar.html" title="SignedJar"><code>SignedJar</code></a> type, and <a href="struct.Key.html" title="Key"><code>Key</code></a> type are available. The jar acts as “child
+jar”; operations on the jar automatically sign and verify cookies as they
+are added and retrieved from the parent jar.</p>
+</li>
+<li>
+<p><strong><code>private</code></strong></p>
+<p>Enables <em>private</em> (authenticated, encrypted) cookies via
+<a href="struct.CookieJar.html#method.private" title="CookieJar::private()"><code>CookieJar::private()</code></a>.</p>
+<p>When this feature is enabled, the <a href="struct.CookieJar.html#method.private" title="CookieJar::private()"><code>CookieJar::private()</code></a> method,
+<a href="struct.PrivateJar.html" title="PrivateJar"><code>PrivateJar</code></a> type, and <a href="struct.Key.html" title="Key"><code>Key</code></a> type are available. The jar acts as “child
+jar”; operations on the jar automatically encrypt and decrypt/authenticate
+cookies as they are added and retrieved from the parent jar.</p>
+</li>
+<li>
+<p><strong><code>key-expansion</code></strong></p>
+<p>Enables <em>key expansion</em> or <em>key derivation</em> via <a href="struct.Key.html#method.derive_from" title="Key::derive_from()"><code>Key::derive_from()</code></a>.</p>
+<p>When this feature is enabled, and either <code>signed</code> or <code>private</code> are <em>also</em>
+enabled, the <a href="struct.Key.html#method.derive_from" title="Key::derive_from()"><code>Key::derive_from()</code></a> method is available. The method can be
+used to derive a <code>Key</code> structure appropriate for use with signed and
+private jars from cryptographically valid key material that is shorter in
+length than the full key.</p>
+</li>
+<li>
+<p><strong><code>secure</code></strong></p>
+<p>A meta-feature that simultaneously enables <code>signed</code>, <code>private</code>, and
+<code>key-expansion</code>.</p>
+</li>
+</ul>
+<p>You can enable features via <code>Cargo.toml</code>:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies.cookie]
+features = [&quot;secure&quot;, &quot;percent-encode&quot;]</code></pre></div></div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.time"><code>pub use <a class="mod" href="../time/index.html" title="mod time">time</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Cookie.html" title="cookie::Cookie struct">Cookie</a></div><div class="item-right docblock-short"><p>Representation of an HTTP cookie.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.CookieBuilder.html" title="cookie::CookieBuilder struct">CookieBuilder</a></div><div class="item-right docblock-short"><p>Structure that follows the builder pattern for building <code>Cookie</code> structs.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.CookieJar.html" title="cookie::CookieJar struct">CookieJar</a></div><div class="item-right docblock-short"><p>A collection of cookies that tracks its modifications.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Delta.html" title="cookie::Delta struct">Delta</a></div><div class="item-right docblock-short"><p>Iterator over the changes to a cookie jar.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Display.html" title="cookie::Display struct">Display</a></div><div class="item-right docblock-short"><p>Wrapper around <code>Cookie</code> whose <code>Display</code> implementation either
+percent-encodes the cookie’s name and value, skips displaying the cookie’s
+parameters (only displaying it’s name and value), or both.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Iter.html" title="cookie::Iter struct">Iter</a></div><div class="item-right docblock-short"><p>Iterator over all of the cookies in a jar.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Key.html" title="cookie::Key struct">Key</a></div><div class="item-right docblock-short"><p>A cryptographic master key for use with <code>Signed</code> and/or <code>Private</code> jars.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.PrivateJar.html" title="cookie::PrivateJar struct">PrivateJar</a></div><div class="item-right docblock-short"><p>A child cookie jar that provides authenticated encryption for its cookies.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SignedJar.html" title="cookie::SignedJar struct">SignedJar</a></div><div class="item-right docblock-short"><p>A child cookie jar that authenticates its cookies.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Expiration.html" title="cookie::Expiration enum">Expiration</a></div><div class="item-right docblock-short"><p>A cookie’s expiration: either session or a date-time.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.ParseError.html" title="cookie::ParseError enum">ParseError</a></div><div class="item-right docblock-short"><p>Enum corresponding to a parsing error.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.SameSite.html" title="cookie::SameSite enum">SameSite</a></div><div class="item-right docblock-short"><p>The <code>SameSite</code> cookie attribute.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="cookie" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

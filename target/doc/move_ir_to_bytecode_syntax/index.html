@@ -1,0 +1,155 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Grammar"><meta name="keywords" content="rust, rustlang, rust-lang, move_ir_to_bytecode_syntax"><title>move_ir_to_bytecode_syntax - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../move_ir_to_bytecode_syntax/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../move_ir_to_bytecode_syntax/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate move_ir_to_bytecode_syntax</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.1.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#modules">Modules</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../move_ir_to_bytecode_syntax/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">move_ir_to_bytecode_syntax</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/move_ir_to_bytecode_syntax/lib.rs.html#5-197">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="grammar"><a href="#grammar">Grammar</a></h2><h3 id="identifiers"><a href="#identifiers">Identifiers</a></h3><div class="example-wrap"><pre class="language-text"><code>f ∈ FieldName     // [a-zA-Z$_][a-zA-Z0-9$_]*
+p ∈ ProcedureName // [a-zA-Z$_][a-zA-Z0-9$_]*
+m ∈ ModuleName    // [a-zA-Z$_][a-zA-Z0-9$_]*
+n ∈ StructName    // [a-zA-Z$_][a-zA-Z0-9$_]*
+x ∈ Var           // [a-zA-Z$_][a-zA-Z0-9$_]*</code></pre></div><h3 id="types"><a href="#types">Types</a></h3><div class="example-wrap"><pre class="language-text"><code>k ∈ Kind ::=
+  | R // Linear resource struct value. Must be used, cannot be copied
+  | V // Non-resource struct value. Can be silently discarded, can be copied
+
+g ∈ GroundType ::=
+  | bool
+  | u8        // unsigned 8 bit integer
+  | u64       // unsigned 64 bit integer
+  | u128      // unsigned 128 bit integer
+  | address   // 32 byte account address
+  | bytearray // immutable, arbitrarily sized array of bytes
+
+d ∈ ModuleAlias ::=
+  | m         // module name that is an alias to a declared module, addr.m
+  | Self      // current module
+
+t ∈ BaseType ::=
+  | g     // ground type
+  | k#d.n // struct &#39;n&#39; declared in the module referenced by &#39;d&#39; with kind &#39;k&#39;
+          // the kind &#39;k&#39; cannot differ from the declared kind
+
+𝛕 ∈ Type ::=
+  | t      // base type
+  | &amp;t     // immutable reference to a base type
+  | &amp;mut t // mutable reference to a base type
+
+𝛕-list ∈ [Type] ::=
+  | unit            // empty type list.
+                    // in the actual syntax, it is represented by the abscense of a type
+  | 𝛕_1 * ... * 𝛕_j // &#39;j&#39; &gt;= 1. list of multiple types. used for multiple return values</code></pre></div><h3 id="values"><a href="#values">Values</a></h3><div class="example-wrap"><pre class="language-text"><code>u ∈ Unsigned64        // Unsigned, 64-bit Integer
+addr ∈ AccountAddress // addresses of blockchain accounts
+bytes ∈ vector&lt;u8&gt;    // byte array of arbitrary length
+v ∈ Value ::=
+  | true
+  | false
+  | u        // u64 literal
+  | 0xaddr   // 32 byte address literal
+  | b&quot;bytes&quot; // arbitrary length bytearray literal</code></pre></div><h3 id="expressions"><a href="#expressions">Expressions</a></h3><div class="example-wrap"><pre class="language-text"><code>o ∈ VarOp ::=
+  | copy(x) // returns value bound to &#39;x&#39;
+  | move(x) // moves the value out of &#39;x&#39;, i.e. returns the value and makes &#39;x&#39; unusable
+
+r ∈ ReferenceOp ::=
+  | &amp;x        // type: &#39;t -&gt; &amp;mut t&#39;
+              // creates an exclusive, mutable reference to a local
+  | &amp;e.f      // type: &#39;&amp;t_1 -&gt; &amp;t_2&#39; or &#39;&amp;mut t_1 -&gt; &amp;mut t_2&#39;
+              // borrows a new reference to field &#39;f&#39; of the struct &#39;t_1&#39;. inherits exclusive or shared from parent
+              // &#39;t_1&#39; must be a struct declared in the current module, i.e. &#39;f&#39; is &quot;private&quot;
+  | *e        // type: &#39;&amp;t -&gt; t&#39; or &#39;&amp;mut t -&gt; t&#39;. Dereferencing. Not valid for resources
+
+e ∈ Exp ::=
+  | v
+  | o
+  | r
+  | n { f_1: e_1, ... , f_j: e_j } // type: &#39;𝛕-list -&gt; k#Self.n&#39;
+                                   // &quot;constructor&quot; for &#39;n&#39;
+                                   // &quot;packs&quot; the values, binding them to the fields, and creates a new instance of &#39;n&#39;
+                                   // &#39;n&#39; must be declared in the current module
+  // boolean operators
+  | !e_1
+  | e_1 || e_2
+  | e_1 &amp;&amp; e_2
+  // u64 operators
+  | e_1 &gt;= e_2
+  | e_1 &lt;= e_2
+  | e_1 &gt; e_2
+  | e_1 &lt; e_2
+  | e_1 + e_2
+  | e_1 - e_2
+  | e_1 * e_2
+  | e_1 / e_2
+  | e_1 % e_2
+  | e_1 ^ e_2
+  | e_1 | e_2
+  | e_g &amp; e_2
+  // operators over any ground type
+  | e_1 == e_2
+  | e_1 != e_2</code></pre></div><h3 id="commands"><a href="#commands">Commands</a></h3><div class="example-wrap"><pre class="language-text"><code>// module operators are available only inside the module that declares n.
+mop ∈ ModuleOp ::=
+  | move_from&lt;n&gt;(e)      // type: &#39;address -&gt; Self.n&#39;
+                         // removes the resource struct &#39;n&#39; at the specified address
+                         // fails if there is no resource present for &#39;Self.n&#39;
+  | borrow_global&lt;n&gt;(e)  // type: &#39;address -&gt; &amp;mut Self.n&#39;
+                         // borrows a mutable reference to the resource struct &#39;n&#39; at the specified address
+                         // fails if there is no resource
+                         // fails if it is already borrowed in this transaction&#39;s execution
+  | exists&lt;n&gt;(e)         // type: &#39;address -&gt; bool&#39;, s.t. &#39;n&#39; is a resource struct
+                         // returns &#39;true&#39; if the resource struct &#39;n&#39; at the specified address exists
+                         // returns &#39;false&#39; otherwise
+
+builtin ∈ Builtin ::=
+  | create_account(e)         // type: &#39;addr -&gt; unit&#39;
+                              // creates new account at the specified address, failing if it already exists
+  | release(e)                // type: &#39;&amp;t -&gt; unit&#39; or &#39;&amp;mut t -&gt; unit&#39;
+                              // releases the reference given
+  | freeze(x)                 // type: &#39;&amp;mut t -&gt; &amp;t&#39;
+                              // coerce a mutable reference to an immutable reference
+
+call ∈ Call ::=
+  | mop
+  | builtin
+  | d.p(e_1, ..., e_j) // procedure &#39;p&#39; defined in the module referenced by &#39;d&#39;
+
+c ∈ Cmd ::=
+  | x = e                               // assign the result of evaluating &#39;e&#39; to &#39;x&#39;
+  | x_1, ..., x_j = call                // Invokes &#39;call&#39;, assigns result to &#39;x_1&#39; to &#39;x_j&#39;
+  | call                                // Invokes &#39;call&#39; that has a return type of &#39;unit&#39;
+  | *x = e                              // mutation, s.t. &#39;x: &amp;mut t&#39; and &#39;e: t&#39; and &#39;t&#39; is not of resource kind
+  | assert(e_1, e_2)                    // type: &#39;bool * u64 -&gt; unit&#39;
+                                        // halts execution with error code &#39;e_2&#39; if &#39;e_1&#39; evaluates to &#39;false&#39;
+  | break                               // exit a loop
+  | continue                            // return to the top of a loop
+  | return e_1, ..., e_n                // return values from procedure
+  | n { f_1: x_1, ... , f_j: x_j } = e  // &quot;de-constructor&quot; for &#39;n&#39;
+                                        // &quot;unpacks&quot; a struct value &#39;e: _#Self.n&#39;
+                                        // value for &#39;f_i&#39; is bound to local &#39;x_i&#39;</code></pre></div><h3 id="statements"><a href="#statements">Statements</a></h3><div class="example-wrap"><pre class="language-text"><code>s ∈ Stmt ::=
+  | if (e) { s_1 } else { s_2 } // conditional
+  | if (e) { s }                // conditional without else branch
+  | while (e) { s }             // while loop
+  | loop { s }                  // loops forever
+  | c;                          // command
+  | s_1 s_2                     // sequencing</code></pre></div><h3 id="imports"><a href="#imports">Imports</a></h3><div class="example-wrap"><pre class="language-text"><code> idecl ∈ Import ::=
+   | import addr.m_1 as m_2; // imports &#39;addr.m_1&#39; with the alias &#39;m_2&#39;
+   | import addr.m_1;        // imports &#39;addr.m_1&#39; with the alias &#39;m_1&#39;</code></pre></div><h3 id="modules"><a href="#modules">Modules</a></h3><div class="example-wrap"><pre class="language-text"><code>sdecl ∈ StructDecl ::=
+  | resource n { f_1: t_1, ..., f_j: t_j } // declaration of a resource struct
+  | struct n { f_1: t_1, ..., f_j: t_j }   // declaration of a non-resource (value) struct
+                                           // s.t. any &#39;t_i&#39; is not of resource kind
+
+body ∈ ProcedureBody ::=
+ | let x_1; ... let x_j; s // The locals declared in this procedure, and the code for that procedure
+
+pdecl ∈ ProcedureDecl ::=
+  | (public?) p(x_1: 𝛕_1, ..., x_j: 𝛕_j): 𝛕-list { body } // declaration of a defined procedure
+                                                         // the procedure may be public, or internal to the module
+  | native (public?) p(x_1: 𝛕_1, ..., x_j: 𝛕_j): 𝛕-list; // declaration of a native procedure
+                                                        // the implementation is provided by the VM
+                                                        // the procedure may be public, or internal to the module
+
+mdecl ∈ ModuleDecl ::=
+  | module m { idecl_1 ... idecl_i sdecl_1 ... sdecl_j pdecl_1 ... pdecl_k }</code></pre></div><h3 id="transaction-scripts"><a href="#transaction-scripts">Transaction Scripts</a></h3><div class="example-wrap"><pre class="language-text"><code>TransactionScript ::=
+  // declaration of the transaction scripts procedure
+  // the &#39;main&#39; procedure must be &#39;public&#39; and any parameters must have a ground type
+  | idecl_1 ... idecl_i public main(x_1: g_1, ..., x_j: g_j) { s }</code></pre></div></div></details><h2 id="modules-1" class="small-section-header"><a href="#modules-1">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="syntax/index.html" title="move_ir_to_bytecode_syntax::syntax mod">syntax</a></div><div class="item-right docblock-short"></div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="move_ir_to_bytecode_syntax" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

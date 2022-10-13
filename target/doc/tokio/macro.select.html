@@ -1,0 +1,379 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Waits on multiple concurrent branches, returning when the first branch completes, cancelling the remaining branches."><meta name="keywords" content="rust, rustlang, rust-lang, select"><title>select in tokio - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc macro"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In tokio</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../tokio/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Macro <a href="index.html">tokio</a>::<wbr><a class="macro" href="#">select</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/tokio/macros/select.rs.html#394-606">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><div class="example-wrap"><pre class="rust macro"><code><span class="macro">macro_rules!</span> <span class="ident">select</span> {
+    (@ {
+        <span class="comment">// The index of the future to poll first (in bias mode), or the RNG</span>
+        <span class="comment">// expression to use to pick a future to poll first.</span>
+        <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>;
+
+        <span class="comment">// One `_` for each branch in the `select!` macro. Passing this to</span>
+        <span class="comment">// `count!` converts $skip to an integer.</span>
+        ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">count</span>:<span class="ident">tt</span>)<span class="op">*</span> )
+
+        <span class="comment">// Normalized select branches. `( $skip )` is a set of `_` characters.</span>
+        <span class="comment">// There is one `_` for each select branch **before** this one. Given</span>
+        <span class="comment">// that all input futures are stored in a tuple, $skip is useful for</span>
+        <span class="comment">// generating a pattern to reference the future for the current branch.</span>
+        <span class="comment">// $skip is also used as an argument to `count!`, returning the index of</span>
+        <span class="comment">// the current select branch.</span>
+        $( ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">skip</span>:<span class="ident">tt</span>)<span class="op">*</span> ) <span class="macro-nonterminal">$</span><span class="macro-nonterminal">bind</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fut</span>:<span class="ident">expr</span>, <span class="kw">if</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">c</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">handle</span>:<span class="ident">expr</span>, )<span class="op">+</span>
+
+        <span class="comment">// Fallback expression used when all select branches have been disabled.</span>
+        ; <span class="macro-nonterminal">$</span><span class="kw">else</span>:<span class="macro-nonterminal">expr</span>
+
+    }) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } ) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="kw">else</span> =&gt; <span class="macro-nonterminal">$</span><span class="kw">else</span>:<span class="macro-nonterminal">expr</span> $(,)<span class="question-mark">?</span>) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span>, <span class="kw">if</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">c</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">h</span>:<span class="ident">block</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">h</span>:<span class="ident">block</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span>, <span class="kw">if</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">c</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">h</span>:<span class="ident">block</span> $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">h</span>:<span class="ident">block</span> $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span>, <span class="kw">if</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">c</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">h</span>:<span class="ident">expr</span> ) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">h</span>:<span class="ident">expr</span> ) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span>, <span class="kw">if</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">c</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">h</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    (@ { <span class="ident">start</span><span class="op">=</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">start</span>:<span class="ident">expr</span>; ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">h</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    (<span class="ident">biased</span>; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    ( <span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">pat</span> <span class="op">=</span> $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> ) =&gt; { ... };
+    () =&gt; { ... };
+}</code></pre></div>
+</div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Waits on multiple concurrent branches, returning when the <strong>first</strong> branch
+completes, cancelling the remaining branches.</p>
+<p>The <code>select!</code> macro must be used inside of async functions, closures, and
+blocks.</p>
+<p>The <code>select!</code> macro accepts one or more branches with the following pattern:</p>
+<div class="example-wrap"><pre class="language-text"><code>&lt;pattern&gt; = &lt;async expression&gt; (, if &lt;precondition&gt;)? =&gt; &lt;handler&gt;,</code></pre></div>
+<p>Additionally, the <code>select!</code> macro may include a single, optional <code>else</code>
+branch, which evaluates if none of the other branches match their patterns:</p>
+<div class="example-wrap"><pre class="language-text"><code>else =&gt; &lt;expression&gt;</code></pre></div>
+<p>The macro aggregates all <code>&lt;async expression&gt;</code> expressions and runs them
+concurrently on the <strong>current</strong> task. Once the <strong>first</strong> expression
+completes with a value that matches its <code>&lt;pattern&gt;</code>, the <code>select!</code> macro
+returns the result of evaluating the completed branch’s <code>&lt;handler&gt;</code>
+expression.</p>
+<p>Additionally, each branch may include an optional <code>if</code> precondition. If the
+precondition returns <code>false</code>, then the branch is disabled. The provided
+<code>&lt;async expression&gt;</code> is still evaluated but the resulting future is never
+polled. This capability is useful when using <code>select!</code> within a loop.</p>
+<p>The complete lifecycle of a <code>select!</code> expression is as follows:</p>
+<ol>
+<li>Evaluate all provided <code>&lt;precondition&gt;</code> expressions. If the precondition
+returns <code>false</code>, disable the branch for the remainder of the current call
+to <code>select!</code>. Re-entering <code>select!</code> due to a loop clears the “disabled”
+state.</li>
+<li>Aggregate the <code>&lt;async expression&gt;</code>s from each branch, including the
+disabled ones. If the branch is disabled, <code>&lt;async expression&gt;</code> is still
+evaluated, but the resulting future is not polled.</li>
+<li>Concurrently await on the results for all remaining <code>&lt;async expression&gt;</code>s.</li>
+<li>Once an <code>&lt;async expression&gt;</code> returns a value, attempt to apply the value
+to the provided <code>&lt;pattern&gt;</code>, if the pattern matches, evaluate <code>&lt;handler&gt;</code>
+and return. If the pattern <strong>does not</strong> match, disable the current branch
+and for the remainder of the current call to <code>select!</code>. Continue from step 3.</li>
+<li>If <strong>all</strong> branches are disabled, evaluate the <code>else</code> expression. If no
+else branch is provided, panic.</li>
+</ol>
+<h2 id="runtime-characteristics"><a href="#runtime-characteristics">Runtime characteristics</a></h2>
+<p>By running all async expressions on the current task, the expressions are
+able to run <strong>concurrently</strong> but not in <strong>parallel</strong>. This means all
+expressions are run on the same thread and if one branch blocks the thread,
+all other expressions will be unable to continue. If parallelism is
+required, spawn each async expression using <a href="task/fn.spawn.html"><code>tokio::spawn</code></a> and pass the
+join handle to <code>select!</code>.</p>
+<h2 id="fairness"><a href="#fairness">Fairness</a></h2>
+<p>By default, <code>select!</code> randomly picks a branch to check first. This provides
+some level of fairness when calling <code>select!</code> in a loop with branches that
+are always ready.</p>
+<p>This behavior can be overridden by adding <code>biased;</code> to the beginning of the
+macro usage. See the examples for details. This will cause <code>select</code> to poll
+the futures in the order they appear from top to bottom. There are a few
+reasons you may want this:</p>
+<ul>
+<li>The random number generation of <code>tokio::select!</code> has a non-zero CPU cost</li>
+<li>Your futures may interact in a way where known polling order is significant</li>
+</ul>
+<p>But there is an important caveat to this mode. It becomes your responsibility
+to ensure that the polling order of your futures is fair. If for example you
+are selecting between a stream and a shutdown future, and the stream has a
+huge volume of messages and zero or nearly zero time between them, you should
+place the shutdown future earlier in the <code>select!</code> list to ensure that it is
+always polled, and will not be ignored due to the stream being constantly
+ready.</p>
+<h2 id="panics"><a href="#panics">Panics</a></h2>
+<p>The <code>select!</code> macro panics if all branches are disabled <strong>and</strong> there is no
+provided <code>else</code> branch. A branch is disabled when the provided <code>if</code>
+precondition returns <code>false</code> <strong>or</strong> when the pattern does not match the
+result of <code>&lt;async expression&gt;</code>.</p>
+<h2 id="cancellation-safety"><a href="#cancellation-safety">Cancellation safety</a></h2>
+<p>When using <code>select!</code> in a loop to receive messages from multiple sources,
+you should make sure that the receive call is cancellation safe to avoid
+losing messages. This section goes through various common methods and
+describes whether they are cancel safe.  The lists in this section are not
+exhaustive.</p>
+<p>The following methods are cancellation safe:</p>
+<ul>
+<li><a href="sync/mpsc/struct.Receiver.html#method.recv"><code>tokio::sync::mpsc::Receiver::recv</code></a></li>
+<li><a href="sync/mpsc/struct.UnboundedReceiver.html#method.recv"><code>tokio::sync::mpsc::UnboundedReceiver::recv</code></a></li>
+<li><a href="sync/broadcast/struct.Receiver.html#method.recv"><code>tokio::sync::broadcast::Receiver::recv</code></a></li>
+<li><a href="sync/watch/struct.Receiver.html#method.changed"><code>tokio::sync::watch::Receiver::changed</code></a></li>
+<li><a href="net/struct.TcpListener.html#method.accept"><code>tokio::net::TcpListener::accept</code></a></li>
+<li><a href="net/struct.UnixListener.html#method.accept"><code>tokio::net::UnixListener::accept</code></a></li>
+<li><a href="signal/unix/struct.Signal.html#method.recv"><code>tokio::signal::unix::Signal::recv</code></a></li>
+<li><a href="io/trait.AsyncReadExt.html#method.read"><code>tokio::io::AsyncReadExt::read</code></a> on any <code>AsyncRead</code></li>
+<li><a href="io/trait.AsyncReadExt.html#method.read_buf"><code>tokio::io::AsyncReadExt::read_buf</code></a> on any <code>AsyncRead</code></li>
+<li><a href="io/trait.AsyncWriteExt.html#method.write"><code>tokio::io::AsyncWriteExt::write</code></a> on any <code>AsyncWrite</code></li>
+<li><a href="io/trait.AsyncWriteExt.html#method.write_buf"><code>tokio::io::AsyncWriteExt::write_buf</code></a> on any <code>AsyncWrite</code></li>
+<li><a href="https://docs.rs/tokio-stream/0.1/tokio_stream/trait.StreamExt.html#method.next"><code>tokio_stream::StreamExt::next</code></a> on any <code>Stream</code></li>
+<li><a href="https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.next"><code>futures::stream::StreamExt::next</code></a> on any <code>Stream</code></li>
+</ul>
+<p>The following methods are not cancellation safe and can lead to loss of data:</p>
+<ul>
+<li><a href="io/trait.AsyncReadExt.html#method.read_exact"><code>tokio::io::AsyncReadExt::read_exact</code></a></li>
+<li><a href="io/trait.AsyncReadExt.html#method.read_to_end"><code>tokio::io::AsyncReadExt::read_to_end</code></a></li>
+<li><a href="io/trait.AsyncReadExt.html#method.read_to_string"><code>tokio::io::AsyncReadExt::read_to_string</code></a></li>
+<li><a href="io/trait.AsyncWriteExt.html#method.write_all"><code>tokio::io::AsyncWriteExt::write_all</code></a></li>
+</ul>
+<p>The following methods are not cancellation safe because they use a queue for
+fairness and cancellation makes you lose your place in the queue:</p>
+<ul>
+<li><a href="sync/struct.Mutex.html#method.lock"><code>tokio::sync::Mutex::lock</code></a></li>
+<li><a href="sync/struct.RwLock.html#method.read"><code>tokio::sync::RwLock::read</code></a></li>
+<li><a href="sync/struct.RwLock.html#method.write"><code>tokio::sync::RwLock::write</code></a></li>
+<li><a href="sync/struct.Semaphore.html#method.acquire"><code>tokio::sync::Semaphore::acquire</code></a></li>
+<li><a href="sync/struct.Notify.html#method.notified"><code>tokio::sync::Notify::notified</code></a></li>
+</ul>
+<p>To determine whether your own methods are cancellation safe, look for the
+location of uses of <code>.await</code>. This is because when an asynchronous method is
+cancelled, that always happens at an <code>.await</code>. If your function behaves
+correctly even if it is restarted while waiting at an <code>.await</code>, then it is
+cancellation safe.</p>
+<p>Be aware that cancelling something that is not cancellation safe is not
+necessarily wrong. For example, if you are cancelling a task because the
+application is shutting down, then you probably don’t care that partially
+read data is lost.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Basic select with two branches.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">async</span> <span class="kw">fn</span> <span class="ident">do_stuff_async</span>() {
+    <span class="comment">// async work</span>
+}
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">more_async_work</span>() {
+    <span class="comment">// more here</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">tokio::select!</span> {
+        <span class="kw">_</span> <span class="op">=</span> <span class="ident">do_stuff_async</span>() =&gt; {
+            <span class="macro">println!</span>(<span class="string">&quot;do_stuff_async() completed first&quot;</span>)
+        }
+        <span class="kw">_</span> <span class="op">=</span> <span class="ident">more_async_work</span>() =&gt; {
+            <span class="macro">println!</span>(<span class="string">&quot;more_async_work() completed first&quot;</span>)
+        }
+    };
+}</code></pre></div>
+<p>Basic stream selecting.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio_stream</span>::{<span class="self">self</span> <span class="kw">as</span> <span class="ident">stream</span>, <span class="ident">StreamExt</span>};
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream1</span> <span class="op">=</span> <span class="ident">stream::iter</span>(<span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream2</span> <span class="op">=</span> <span class="ident">stream::iter</span>(<span class="macro">vec!</span>[<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>]);
+
+    <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> <span class="macro">tokio::select!</span> {
+        <span class="ident">v</span> <span class="op">=</span> <span class="ident">stream1</span>.<span class="ident">next</span>() =&gt; <span class="ident">v</span>.<span class="ident">unwrap</span>(),
+        <span class="ident">v</span> <span class="op">=</span> <span class="ident">stream2</span>.<span class="ident">next</span>() =&gt; <span class="ident">v</span>.<span class="ident">unwrap</span>(),
+    };
+
+    <span class="macro">assert!</span>(<span class="ident">next</span> <span class="op">==</span> <span class="number">1</span> <span class="op">|</span><span class="op">|</span> <span class="ident">next</span> <span class="op">==</span> <span class="number">4</span>);
+}</code></pre></div>
+<p>Collect the contents of two streams. In this example, we rely on pattern
+matching and the fact that <code>stream::iter</code> is “fused”, i.e. once the stream
+is complete, all calls to <code>next()</code> return <code>None</code>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio_stream</span>::{<span class="self">self</span> <span class="kw">as</span> <span class="ident">stream</span>, <span class="ident">StreamExt</span>};
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream1</span> <span class="op">=</span> <span class="ident">stream::iter</span>(<span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream2</span> <span class="op">=</span> <span class="ident">stream::iter</span>(<span class="macro">vec!</span>[<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>]);
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">values</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+
+    <span class="kw">loop</span> {
+        <span class="macro">tokio::select!</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span> <span class="ident">stream1</span>.<span class="ident">next</span>() =&gt; <span class="ident">values</span>.<span class="ident">push</span>(<span class="ident">v</span>),
+            <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span> <span class="ident">stream2</span>.<span class="ident">next</span>() =&gt; <span class="ident">values</span>.<span class="ident">push</span>(<span class="ident">v</span>),
+            <span class="kw">else</span> =&gt; <span class="kw">break</span>,
+        }
+    }
+
+    <span class="ident">values</span>.<span class="ident">sort</span>();
+    <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>], <span class="kw-2">&amp;</span><span class="ident">values</span>[..]);
+}</code></pre></div>
+<p>Using the same future in multiple <code>select!</code> expressions can be done by passing
+a reference to the future. Doing so requires the future to be <a href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Unpin.html"><code>Unpin</code></a>. A
+future can be made <a href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Unpin.html"><code>Unpin</code></a> by either using <a href="https://doc.rust-lang.org/1.63.0/alloc/boxed/struct.Box.html#method.pin"><code>Box::pin</code></a> or stack pinning.</p>
+<p>Here, a stream is consumed for at most 1 second.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio_stream</span>::{<span class="self">self</span> <span class="kw">as</span> <span class="ident">stream</span>, <span class="ident">StreamExt</span>};
+<span class="kw">use</span> <span class="ident">tokio::time</span>::{<span class="self">self</span>, <span class="ident">Duration</span>};
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream::iter</span>(<span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]);
+    <span class="kw">let</span> <span class="ident">sleep</span> <span class="op">=</span> <span class="ident">time::sleep</span>(<span class="ident">Duration::from_secs</span>(<span class="number">1</span>));
+    <span class="macro">tokio::pin!</span>(<span class="ident">sleep</span>);
+
+    <span class="kw">loop</span> {
+        <span class="macro">tokio::select!</span> {
+            <span class="ident">maybe_v</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">next</span>() =&gt; {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span> <span class="ident">maybe_v</span> {
+                    <span class="macro">println!</span>(<span class="string">&quot;got = {}&quot;</span>, <span class="ident">v</span>);
+                } <span class="kw">else</span> {
+                    <span class="kw">break</span>;
+                }
+            }
+            <span class="kw">_</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">sleep</span> =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;timeout&quot;</span>);
+                <span class="kw">break</span>;
+            }
+        }
+    }
+}</code></pre></div>
+<p>Joining two values using <code>select!</code>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::sync::oneshot</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> (<span class="ident">tx1</span>, <span class="kw-2">mut</span> <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">oneshot::channel</span>();
+    <span class="kw">let</span> (<span class="ident">tx2</span>, <span class="kw-2">mut</span> <span class="ident">rx2</span>) <span class="op">=</span> <span class="ident">oneshot::channel</span>();
+
+    <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="ident">tx1</span>.<span class="ident">send</span>(<span class="string">&quot;first&quot;</span>).<span class="ident">unwrap</span>();
+    });
+
+    <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="ident">tx2</span>.<span class="ident">send</span>(<span class="string">&quot;second&quot;</span>).<span class="ident">unwrap</span>();
+    });
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">a</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+
+    <span class="kw">while</span> <span class="ident">a</span>.<span class="ident">is_none</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">b</span>.<span class="ident">is_none</span>() {
+        <span class="macro">tokio::select!</span> {
+            <span class="ident">v1</span> <span class="op">=</span> (<span class="kw-2">&amp;mut</span> <span class="ident">rx1</span>), <span class="kw">if</span> <span class="ident">a</span>.<span class="ident">is_none</span>() =&gt; <span class="ident">a</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">v1</span>.<span class="ident">unwrap</span>()),
+            <span class="ident">v2</span> <span class="op">=</span> (<span class="kw-2">&amp;mut</span> <span class="ident">rx2</span>), <span class="kw">if</span> <span class="ident">b</span>.<span class="ident">is_none</span>() =&gt; <span class="ident">b</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">v2</span>.<span class="ident">unwrap</span>()),
+        }
+    }
+
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> (<span class="ident">a</span>.<span class="ident">unwrap</span>(), <span class="ident">b</span>.<span class="ident">unwrap</span>());
+
+    <span class="macro">assert_eq!</span>(<span class="ident">res</span>.<span class="number">0</span>, <span class="string">&quot;first&quot;</span>);
+    <span class="macro">assert_eq!</span>(<span class="ident">res</span>.<span class="number">1</span>, <span class="string">&quot;second&quot;</span>);
+}</code></pre></div>
+<p>Using the <code>biased;</code> mode to control polling order.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count</span> <span class="op">=</span> <span class="number">0u8</span>;
+
+    <span class="kw">loop</span> {
+        <span class="macro">tokio::select!</span> {
+            <span class="comment">// If you run this example without `biased;`, the polling order is</span>
+            <span class="comment">// pseudo-random, and the assertions on the value of count will</span>
+            <span class="comment">// (probably) fail.</span>
+            <span class="ident">biased</span>;
+
+            <span class="kw">_</span> <span class="op">=</span> <span class="kw">async</span> {}, <span class="kw">if</span> <span class="ident">count</span> <span class="op">&lt;</span> <span class="number">1</span> =&gt; {
+                <span class="ident">count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                <span class="macro">assert_eq!</span>(<span class="ident">count</span>, <span class="number">1</span>);
+            }
+            <span class="kw">_</span> <span class="op">=</span> <span class="kw">async</span> {}, <span class="kw">if</span> <span class="ident">count</span> <span class="op">&lt;</span> <span class="number">2</span> =&gt; {
+                <span class="ident">count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                <span class="macro">assert_eq!</span>(<span class="ident">count</span>, <span class="number">2</span>);
+            }
+            <span class="kw">_</span> <span class="op">=</span> <span class="kw">async</span> {}, <span class="kw">if</span> <span class="ident">count</span> <span class="op">&lt;</span> <span class="number">3</span> =&gt; {
+                <span class="ident">count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                <span class="macro">assert_eq!</span>(<span class="ident">count</span>, <span class="number">3</span>);
+            }
+            <span class="kw">_</span> <span class="op">=</span> <span class="kw">async</span> {}, <span class="kw">if</span> <span class="ident">count</span> <span class="op">&lt;</span> <span class="number">4</span> =&gt; {
+                <span class="ident">count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                <span class="macro">assert_eq!</span>(<span class="ident">count</span>, <span class="number">4</span>);
+            }
+
+            <span class="kw">else</span> =&gt; {
+                <span class="kw">break</span>;
+            }
+        };
+    }
+}</code></pre></div>
+<h3 id="avoid-racy-if-preconditions"><a href="#avoid-racy-if-preconditions">Avoid racy <code>if</code> preconditions</a></h3>
+<p>Given that <code>if</code> preconditions are used to disable <code>select!</code> branches, some
+caution must be used to avoid missing values.</p>
+<p>For example, here is <strong>incorrect</strong> usage of <code>sleep</code> with <code>if</code>. The objective
+is to repeatedly run an asynchronous task for up to 50 milliseconds.
+However, there is a potential for the <code>sleep</code> completion to be missed.</p>
+
+<div class='information'><div class='tooltip should_panic'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered should_panic"><code><span class="kw">use</span> <span class="ident">tokio::time</span>::{<span class="self">self</span>, <span class="ident">Duration</span>};
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">some_async_work</span>() {
+    <span class="comment">// do work</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">sleep</span> <span class="op">=</span> <span class="ident">time::sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">50</span>));
+    <span class="macro">tokio::pin!</span>(<span class="ident">sleep</span>);
+
+    <span class="kw">while</span> <span class="op">!</span><span class="ident">sleep</span>.<span class="ident">is_elapsed</span>() {
+        <span class="macro">tokio::select!</span> {
+            <span class="kw">_</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">sleep</span>, <span class="kw">if</span> <span class="op">!</span><span class="ident">sleep</span>.<span class="ident">is_elapsed</span>() =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;operation timed out&quot;</span>);
+            }
+            <span class="kw">_</span> <span class="op">=</span> <span class="ident">some_async_work</span>() =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;operation completed&quot;</span>);
+            }
+        }
+    }
+
+    <span class="macro">panic!</span>(<span class="string">&quot;This example shows how not to do it!&quot;</span>);
+}</code></pre></div>
+<p>In the above example, <code>sleep.is_elapsed()</code> may return <code>true</code> even if
+<code>sleep.poll()</code> never returned <code>Ready</code>. This opens up a potential race
+condition where <code>sleep</code> expires between the <code>while !sleep.is_elapsed()</code>
+check and the call to <code>select!</code> resulting in the <code>some_async_work()</code> call to
+run uninterrupted despite the sleep having elapsed.</p>
+<p>One way to write the above example without the race would be:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::time</span>::{<span class="self">self</span>, <span class="ident">Duration</span>};
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">some_async_work</span>() {
+    <span class="comment">// do work</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">sleep</span> <span class="op">=</span> <span class="ident">time::sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">50</span>));
+    <span class="macro">tokio::pin!</span>(<span class="ident">sleep</span>);
+
+    <span class="kw">loop</span> {
+        <span class="macro">tokio::select!</span> {
+            <span class="kw">_</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">sleep</span> =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;operation timed out&quot;</span>);
+                <span class="kw">break</span>;
+            }
+            <span class="kw">_</span> <span class="op">=</span> <span class="ident">some_async_work</span>() =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;operation completed&quot;</span>);
+            }
+        }
+    }
+}</code></pre></div>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="tokio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

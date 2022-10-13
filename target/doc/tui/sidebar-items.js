@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["backend",""],["buffer",""],["layout",""],["style","`style` contains the primitives used to control how your user interface will look."],["symbols",""],["terminal",""],["text","Primitives for styled text."],["widgets","`widgets` is a collection of types that implement [`Widget`] or [`StatefulWidget`] or both."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Access","An access to local or global state"],["Offset","Offset of an access path: either a field, vector index, or global key"],["RootAddress",""]],"struct":[["AccessPath",""],["ReadWriteSet",""],["Root",""],["TrieNode",""]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["LoadedFunctionInstantiation",""],["SerializedReturnValues","Serialized return values from function/script execution Simple struct is designed just to convey meaning behind serialized values"],["Session",""]]};

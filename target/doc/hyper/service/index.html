@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Asynchronous Services"><meta name="keywords" content="rust, rustlang, rust-lang, service"><title>hyper::service - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../hyper/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../hyper/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module service</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../hyper/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">hyper</a>::<wbr><a class="mod" href="#">service</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/hyper/service/mod.rs.html#1-55">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Asynchronous Services</p>
+<p>A <a href="trait.Service.html"><code>Service</code></a> is a trait representing an asynchronous
+function of a request to a response. It’s similar to
+<code>async fn(Request) -&gt; Result&lt;Response, Error&gt;</code>.</p>
+<p>The argument and return value isn’t strictly required to be for HTTP.
+Therefore, hyper uses several “trait aliases” to reduce clutter around
+bounds. These are:</p>
+<ul>
+<li><code>HttpService</code>: This is blanketly implemented for all types that
+implement <code>Service&lt;http::Request&lt;B1&gt;, Response = http::Response&lt;B2&gt;&gt;</code>.</li>
+<li><code>MakeService</code>: When a <code>Service</code> returns a new <code>Service</code> as its “response”,
+we consider it a <code>MakeService</code>. Again, blanketly implemented in those cases.</li>
+<li><code>MakeConnection</code>: A <code>Service</code> that returns a “connection”, a type that
+implements <code>AsyncRead</code> and <code>AsyncWrite</code>.</li>
+</ul>
+<h2 id="httpservice"><a href="#httpservice">HttpService</a></h2>
+<p>In hyper, especially in the server setting, a <code>Service</code> is usually bound
+to a single connection. It defines how to respond to <strong>all</strong> requests that
+connection will receive.</p>
+<p>The helper <a href="fn.service_fn.html"><code>service_fn</code></a> should be sufficient for most cases, but
+if you need to implement <code>Service</code> for a type manually, you can follow the example
+in <code>service_struct_impl.rs</code>.</p>
+<h2 id="makeservice"><a href="#makeservice">MakeService</a></h2>
+<p>Since a <code>Service</code> is bound to a single connection, a <a href="../server/struct.Server.html"><code>Server</code></a>
+needs a way to make them as it accepts connections. This is what a
+<code>MakeService</code> does.</p>
+<p>Resources that need to be shared by all <code>Service</code>s can be put into a
+<code>MakeService</code>, and then passed to individual <code>Service</code>s when <code>call</code>
+is called.</p>
+</div></details><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Service.html" title="hyper::service::Service trait">Service</a></div><div class="item-right docblock-short"><p>An asynchronous function from a <code>Request</code> to a <code>Response</code>.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.make_service_fn.html" title="hyper::service::make_service_fn fn">make_service_fn</a></div><div class="item-right docblock-short"><p>Create a <code>MakeService</code> from a function.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.service_fn.html" title="hyper::service::service_fn fn">service_fn</a></div><div class="item-right docblock-short"><p>Create a <code>Service</code> from a function.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="hyper" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

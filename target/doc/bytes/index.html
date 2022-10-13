@@ -1,0 +1,66 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Provides abstractions for working with bytes."><meta name="keywords" content="rust, rustlang, rust-lang, bytes"><title>bytes - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../bytes/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../bytes/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate bytes</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 1.2.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../bytes/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">bytes</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/bytes/lib.rs.html#1-116">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Provides abstractions for working with bytes.</p>
+<p>The <code>bytes</code> crate provides an efficient byte buffer structure
+(<a href="struct.Bytes.html"><code>Bytes</code></a>) and traits for working with buffer
+implementations (<a href="trait.Buf.html"><code>Buf</code></a>, <a href="trait.BufMut.html"><code>BufMut</code></a>).</p>
+<h2 id="bytes"><a href="#bytes"><code>Bytes</code></a></h2>
+<p><code>Bytes</code> is an efficient container for storing and operating on contiguous
+slices of memory. It is intended for use primarily in networking code, but
+could have applications elsewhere as well.</p>
+<p><code>Bytes</code> values facilitate zero-copy network programming by allowing multiple
+<code>Bytes</code> objects to point to the same underlying memory. This is managed by
+using a reference count to track when the memory is no longer needed and can
+be freed.</p>
+<p>A <code>Bytes</code> handle can be created directly from an existing byte store (such as <code>&amp;[u8]</code>
+or <code>Vec&lt;u8&gt;</code>), but usually a <code>BytesMut</code> is used first and written to. For
+example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">bytes</span>::{<span class="ident">BytesMut</span>, <span class="ident">BufMut</span>};
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">BytesMut::with_capacity</span>(<span class="number">1024</span>);
+<span class="ident">buf</span>.<span class="ident">put</span>(<span class="kw-2">&amp;</span><span class="string">b&quot;hello world&quot;</span>[..]);
+<span class="ident">buf</span>.<span class="ident">put_u16</span>(<span class="number">1234</span>);
+
+<span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">split</span>();
+<span class="macro">assert_eq!</span>(<span class="ident">a</span>, <span class="string">b&quot;hello world\x04\xD2&quot;</span>[..]);
+
+<span class="ident">buf</span>.<span class="ident">put</span>(<span class="kw-2">&amp;</span><span class="string">b&quot;goodbye world&quot;</span>[..]);
+
+<span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">split</span>();
+<span class="macro">assert_eq!</span>(<span class="ident">b</span>, <span class="string">b&quot;goodbye world&quot;</span>[..]);
+
+<span class="macro">assert_eq!</span>(<span class="ident">buf</span>.<span class="ident">capacity</span>(), <span class="number">998</span>);</code></pre></div>
+<p>In the above example, only a single buffer of 1024 is allocated. The handles
+<code>a</code> and <code>b</code> will share the underlying buffer and maintain indices tracking
+the view into the buffer represented by the handle.</p>
+<p>See the <a href="struct.Bytes.html">struct docs</a> for more details.</p>
+<h2 id="buf-bufmut"><a href="#buf-bufmut"><code>Buf</code>, <code>BufMut</code></a></h2>
+<p>These two traits provide read and write access to buffers. The underlying
+storage may or may not be in contiguous memory. For example, <code>Bytes</code> is a
+buffer that guarantees contiguous memory, but a <a href="https://en.wikipedia.org/wiki/Rope_(data_structure)">rope</a> stores the bytes in
+disjoint chunks. <code>Buf</code> and <code>BufMut</code> maintain cursors tracking the current
+position in the underlying byte storage. When bytes are read or written, the
+cursor is advanced.</p>
+<h3 id="relation-with-read-and-write"><a href="#relation-with-read-and-write">Relation with <code>Read</code> and <code>Write</code></a></h3>
+<p>At first glance, it may seem that <code>Buf</code> and <code>BufMut</code> overlap in
+functionality with <code>std::io::Read</code> and <code>std::io::Write</code>. However, they
+serve different purposes. A buffer is the value that is provided as an
+argument to <code>Read::read</code> and <code>Write::write</code>. <code>Read</code> and <code>Write</code> may then
+perform a syscall, which has the potential of failing. Operations on <code>Buf</code>
+and <code>BufMut</code> are infallible.</p>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="buf/index.html" title="bytes::buf mod">buf</a></div><div class="item-right docblock-short"><p>Utilities for working with buffers.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Bytes.html" title="bytes::Bytes struct">Bytes</a></div><div class="item-right docblock-short"><p>A cheaply cloneable and sliceable chunk of contiguous memory.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BytesMut.html" title="bytes::BytesMut struct">BytesMut</a></div><div class="item-right docblock-short"><p>A unique reference to a contiguous slice of memory.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Buf.html" title="bytes::Buf trait">Buf</a></div><div class="item-right docblock-short"><p>Read bytes from a buffer.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.BufMut.html" title="bytes::BufMut trait">BufMut</a></div><div class="item-right docblock-short"><p>A trait for values that provide sequential write access to bytes.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="bytes" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

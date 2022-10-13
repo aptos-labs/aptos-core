@@ -1,0 +1,103 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Utilities for tracking time."><meta name="keywords" content="rust, rustlang, rust-lang, time"><title>tokio::time - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module time</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tokio/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">tokio</a>::<wbr><a class="mod" href="#">time</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tokio/time/mod.rs.html#1-114">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Utilities for tracking time.</p>
+<p>This module provides a number of types for executing code after a set period
+of time.</p>
+<ul>
+<li>
+<p><a href="struct.Sleep.html" title="Sleep"><code>Sleep</code></a> is a future that does no work and completes at a specific <a href="struct.Instant.html" title="Instant"><code>Instant</code></a>
+in time.</p>
+</li>
+<li>
+<p><a href="fn.interval.html"><code>Interval</code></a> is a stream yielding a value at a fixed period. It is
+initialized with a <a href="https://doc.rust-lang.org/1.63.0/core/time/struct.Duration.html" title="Duration"><code>Duration</code></a> and repeatedly yields each time the duration
+elapses.</p>
+</li>
+<li>
+<p><a href="struct.Timeout.html" title="Timeout"><code>Timeout</code></a>: Wraps a future or stream, setting an upper bound to the amount
+of time it is allowed to execute. If the future or stream does not
+complete in time, then it is canceled and an error is returned.</p>
+</li>
+</ul>
+<p>These types are sufficient for handling a large number of scenarios
+involving time.</p>
+<p>These types must be used from within the context of the <a href="../runtime/struct.Runtime.html"><code>Runtime</code></a>.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Wait 100ms and print “100 ms have elapsed”</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::time::Duration</span>;
+<span class="kw">use</span> <span class="ident">tokio::time::sleep</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
+    <span class="macro">println!</span>(<span class="string">&quot;100 ms have elapsed&quot;</span>);
+}</code></pre></div>
+<p>Require that an operation takes no more than 1s.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::time</span>::{<span class="ident">timeout</span>, <span class="ident">Duration</span>};
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">long_future</span>() {
+    <span class="comment">// do work here</span>
+}
+
+<span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">1</span>), <span class="ident">long_future</span>()).<span class="kw">await</span>;
+
+<span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;operation timed out&quot;</span>);
+}</code></pre></div>
+<p>A simple example using <a href="fn.interval.html"><code>interval</code></a> to execute a task every two seconds.</p>
+<p>The difference between <a href="fn.interval.html"><code>interval</code></a> and <a href="fn.sleep.html" title="sleep"><code>sleep</code></a> is that an <a href="fn.interval.html"><code>interval</code></a>
+measures the time since the last tick, which means that <code>.tick().await</code> may
+wait for a shorter time than the duration specified for the interval
+if some time has passed between calls to <code>.tick().await</code>.</p>
+<p>If the tick in the example below was replaced with <a href="fn.sleep.html" title="sleep"><code>sleep</code></a>, the task
+would only be executed once every three seconds, and not every two
+seconds.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::time</span>;
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">task_that_takes_a_second</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;hello&quot;</span>);
+    <span class="ident">time::sleep</span>(<span class="ident">time::Duration::from_secs</span>(<span class="number">1</span>)).<span class="kw">await</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">time::interval</span>(<span class="ident">time::Duration::from_secs</span>(<span class="number">2</span>));
+    <span class="kw">for</span> <span class="ident">_i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">5</span> {
+        <span class="ident">interval</span>.<span class="ident">tick</span>().<span class="kw">await</span>;
+        <span class="ident">task_that_takes_a_second</span>().<span class="kw">await</span>;
+    }
+}</code></pre></div>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.Duration"><code>pub use std::time::<a class="struct" href="https://doc.rust-lang.org/1.63.0/core/time/struct.Duration.html" title="struct core::time::Duration">Duration</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="error/index.html" title="tokio::time::error mod">error</a></div><div class="item-right docblock-short"><p>Time error types.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Instant.html" title="tokio::time::Instant struct">Instant</a></div><div class="item-right docblock-short"><p>A measurement of a monotonically nondecreasing clock.
+Opaque and useful only with <code>Duration</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Interval.html" title="tokio::time::Interval struct">Interval</a></div><div class="item-right docblock-short"><p>Interval returned by <a href="fn.interval.html" title="interval"><code>interval</code></a> and <a href="fn.interval_at.html" title="interval_at"><code>interval_at</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Sleep.html" title="tokio::time::Sleep struct">Sleep</a></div><div class="item-right docblock-short"><p>Future returned by <a href="fn.sleep.html"><code>sleep</code></a> and <a href="fn.sleep_until.html"><code>sleep_until</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Timeout.html" title="tokio::time::Timeout struct">Timeout</a></div><div class="item-right docblock-short"><p>Future returned by <a href="fn.timeout.html"><code>timeout</code></a> and <a href="fn.timeout_at.html"><code>timeout_at</code></a>.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.MissedTickBehavior.html" title="tokio::time::MissedTickBehavior enum">MissedTickBehavior</a></div><div class="item-right docblock-short"><p>Defines the behavior of an <a href="struct.Interval.html" title="Interval"><code>Interval</code></a> when it misses a tick.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.interval.html" title="tokio::time::interval fn">interval</a></div><div class="item-right docblock-short"><p>Creates new <a href="struct.Interval.html" title="Interval"><code>Interval</code></a> that yields with interval of <code>period</code>. The first
+tick completes immediately. The default <a href="enum.MissedTickBehavior.html" title="MissedTickBehavior"><code>MissedTickBehavior</code></a> is
+<a href="enum.MissedTickBehavior.html#variant.Burst"><code>Burst</code></a>, but this can be configured
+by calling <a href="struct.Interval.html#method.set_missed_tick_behavior"><code>set_missed_tick_behavior</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.interval_at.html" title="tokio::time::interval_at fn">interval_at</a></div><div class="item-right docblock-short"><p>Creates new <a href="struct.Interval.html" title="Interval"><code>Interval</code></a> that yields with interval of <code>period</code> with the
+first tick completing at <code>start</code>. The default <a href="enum.MissedTickBehavior.html" title="MissedTickBehavior"><code>MissedTickBehavior</code></a> is
+<a href="enum.MissedTickBehavior.html#variant.Burst"><code>Burst</code></a>, but this can be configured
+by calling <a href="struct.Interval.html#method.set_missed_tick_behavior"><code>set_missed_tick_behavior</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.sleep.html" title="tokio::time::sleep fn">sleep</a></div><div class="item-right docblock-short"><p>Waits until <code>duration</code> has elapsed.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.sleep_until.html" title="tokio::time::sleep_until fn">sleep_until</a></div><div class="item-right docblock-short"><p>Waits until <code>deadline</code> is reached.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.timeout.html" title="tokio::time::timeout fn">timeout</a></div><div class="item-right docblock-short"><p>Requires a <code>Future</code> to complete before the specified duration has elapsed.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.timeout_at.html" title="tokio::time::timeout_at fn">timeout_at</a></div><div class="item-right docblock-short"><p>Requires a <code>Future</code> to complete before the specified instant in time.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tokio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

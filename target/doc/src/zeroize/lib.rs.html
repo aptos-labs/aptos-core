@@ -1,0 +1,1267 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/registry/src/github.com-1ecc6299db9ec823/zeroize-1.3.0/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../zeroize/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../zeroize/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../zeroize/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Securely zero memory with a simple trait ([Zeroize]) built on stable Rust</span>
+<span class="doccomment">//! primitives which guarantee the operation will not be &quot;optimized away&quot;.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## About</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! [Zeroing memory securely is hard] - compilers optimize for performance, and</span>
+<span class="doccomment">//! in doing so they love to &quot;optimize away&quot; unnecessary zeroing calls. There are</span>
+<span class="doccomment">//! many documented &quot;tricks&quot; to attempt to avoid these optimizations and ensure</span>
+<span class="doccomment">//! that a zeroing routine is performed reliably.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This crate isn&#39;t about tricks: it uses [core::ptr::write_volatile]</span>
+<span class="doccomment">//! and [core::sync::atomic] memory fences to provide easy-to-use, portable</span>
+<span class="doccomment">//! zeroing behavior which works on all of Rust&#39;s core number types and slices</span>
+<span class="doccomment">//! thereof, implemented in pure Rust with no usage of FFI or assembly.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! - No insecure fallbacks!</span>
+<span class="doccomment">//! - No dependencies!</span>
+<span class="doccomment">//! - No FFI or inline assembly! **WASM friendly** (and tested)!</span>
+<span class="doccomment">//! - `#![no_std]` i.e. **embedded-friendly**!</span>
+<span class="doccomment">//! - No functionality besides securely zeroing memory!</span>
+<span class="doccomment">//! - (Optional) Custom derive support for zeroing complex structures</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## Minimum Supported Rust Version</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Requires Rust **1.47** or newer.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! In the future, we reserve the right to change MSRV (i.e. MSRV is out-of-scope</span>
+<span class="doccomment">//! for this crate&#39;s SemVer guarantees), however when we do it will be accompanied</span>
+<span class="doccomment">//! by a minor version bump.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## Usage</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use zeroize::Zeroize;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! fn main() {</span>
+<span class="doccomment">//!     // Protip: don&#39;t embed secrets in your source code.</span>
+<span class="doccomment">//!     // This is just an example.</span>
+<span class="doccomment">//!     let mut secret = b&quot;Air shield password: 1,2,3,4,5&quot;.to_vec();</span>
+<span class="doccomment">//!     // [ ... ] open the air shield here</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!     // Now that we&#39;re done using the secret, zero it out.</span>
+<span class="doccomment">//!     secret.zeroize();</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The [Zeroize] trait is impl&#39;d on all of Rust&#39;s core scalar types including</span>
+<span class="doccomment">//! integers, floats, `bool`, and `char`.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Additionally, it&#39;s implemented on slices and `IterMut`s of the above types.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! When the `alloc` feature is enabled (which it is by default), it&#39;s also</span>
+<span class="doccomment">//! impl&#39;d for `Vec&lt;T&gt;` for the above types as well as `String`, where it provides</span>
+<span class="doccomment">//! [Vec::clear()] / [String::clear()]-like behavior (truncating to zero-length)</span>
+<span class="doccomment">//! but ensures the backing memory is securely zeroed with some caveats.</span>
+<span class="doccomment">//! (NOTE: see &quot;Stack/Heap Zeroing Notes&quot; for important `Vec`/`String` details)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The [DefaultIsZeroes] marker trait can be impl&#39;d on types which also</span>
+<span class="doccomment">//! impl [Default], which implements [Zeroize] by overwriting a value with</span>
+<span class="doccomment">//! the default value.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## Custom Derive Support</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This crate has custom derive support for the `Zeroize` trait,</span>
+<span class="doccomment">//! gated under the `zeroize` crate&#39;s `zeroize_derive` Cargo feature,</span>
+<span class="doccomment">//! which automatically calls `zeroize()` on all members of a struct</span>
+<span class="doccomment">//! or tuple struct.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Additionally it supports the following attribute:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! - `#[zeroize(drop)]`: call `zeroize()` when this item is dropped</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Example which derives `Drop`:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! # #[cfg(feature = &quot;derive&quot;)]</span>
+<span class="doccomment">//! # {</span>
+<span class="doccomment">//! use zeroize::Zeroize;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! // This struct will be zeroized on drop</span>
+<span class="doccomment">//! #[derive(Zeroize)]</span>
+<span class="doccomment">//! #[zeroize(drop)]</span>
+<span class="doccomment">//! struct MyStruct([u8; 32]);</span>
+<span class="doccomment">//! # }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Example which does not derive `Drop` (useful for e.g. `Copy` types)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! #[cfg(feature = &quot;derive&quot;)]</span>
+<span class="doccomment">//! # {</span>
+<span class="doccomment">//! use zeroize::Zeroize;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! // This struct will *NOT* be zeroized on drop</span>
+<span class="doccomment">//! #[derive(Copy, Clone, Zeroize)]</span>
+<span class="doccomment">//! struct MyStruct([u8; 32]);</span>
+<span class="doccomment">//! # }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## `Zeroizing&lt;Z&gt;`: wrapper for zeroizing arbitrary values on drop</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! `Zeroizing&lt;Z: Zeroize&gt;` is a generic wrapper type that impls `Deref`</span>
+<span class="doccomment">//! and `DerefMut`, allowing access to an inner value of type `Z`, and also</span>
+<span class="doccomment">//! impls a `Drop` handler which calls `zeroize()` on its contents:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use zeroize::Zeroizing;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! fn main() {</span>
+<span class="doccomment">//!     let mut secret = Zeroizing::new([0u8; 5]);</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!     // Set the air shield password</span>
+<span class="doccomment">//!     // Protip (again): don&#39;t embed secrets in your source code.</span>
+<span class="doccomment">//!     secret.copy_from_slice(&amp;[1, 2, 3, 4, 5]);</span>
+<span class="doccomment">//!     assert_eq!(secret.as_ref(), &amp;[1, 2, 3, 4, 5]);</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!     // The contents of `secret` will be automatically zeroized on drop</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## What guarantees does this crate provide?</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This crate guarantees the following:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! 1. The zeroing operation can&#39;t be &quot;optimized away&quot; by the compiler.</span>
+<span class="doccomment">//! 2. All subsequent reads to memory will see &quot;zeroized&quot; values.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! LLVM&#39;s volatile semantics ensure #1 is true.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Additionally, thanks to work by the [Unsafe Code Guidelines Working Group],</span>
+<span class="doccomment">//! we can now fairly confidently say #2 is true as well. Previously there were</span>
+<span class="doccomment">//! worries that the approach used by this crate (mixing volatile and</span>
+<span class="doccomment">//! non-volatile accesses) was undefined behavior due to language contained</span>
+<span class="doccomment">//! in the documentation for `write_volatile`, however after some discussion</span>
+<span class="doccomment">//! [these remarks have been removed] and the specific usage pattern in this</span>
+<span class="doccomment">//! crate is considered to be well-defined.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Additionally this crate leverages [compiler_fence] from</span>
+<span class="doccomment">//! [core::sync::atomic] with the strictest ordering ([Ordering::SeqCst])</span>
+<span class="doccomment">//! as a precaution to help ensure reads are not reordered before memory has</span>
+<span class="doccomment">//! been zeroed.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! All of that said, there is still potential for microarchitectural attacks</span>
+<span class="doccomment">//! (ala Spectre/Meltdown) to leak &quot;zeroized&quot; secrets through covert channels.</span>
+<span class="doccomment">//! This crate makes no guarantees that zeroized values cannot be leaked</span>
+<span class="doccomment">//! through such channels, as they represent flaws in the underlying hardware.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## Stack/Heap Zeroing Notes</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This crate can be used to zero values from either the stack or the heap.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! However, be aware several operations in Rust can unintentionally leave</span>
+<span class="doccomment">//! copies of data in memory. This includes but is not limited to:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! - Moves and `Copy`</span>
+<span class="doccomment">//! - Heap reallocation when using `Vec` and `String`</span>
+<span class="doccomment">//! - Borrowers of a reference making copies of the data</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! [`Pin`][pin] can be leveraged in conjunction with this crate to ensure</span>
+<span class="doccomment">//! data kept on the stack isn&#39;t moved.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The `Zeroize` impls for `Vec` and `String` zeroize the entire capacity of</span>
+<span class="doccomment">//! their backing buffer, but cannot guarantee copies of the data were not</span>
+<span class="doccomment">//! previously made by buffer reallocation. It&#39;s therefore important when</span>
+<span class="doccomment">//! attempting to zeroize such buffers to initialize them to the correct</span>
+<span class="doccomment">//! capacity, and take care to prevent subsequent reallocation.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The `secrecy` crate provides higher-level abstractions for eliminating</span>
+<span class="doccomment">//! usage patterns which can cause reallocations:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! &lt;https://crates.io/crates/secrecy&gt;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## What about: clearing registers, mlock, mprotect, etc?</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This crate is focused on providing simple, unobtrusive support for reliably</span>
+<span class="doccomment">//! zeroing memory using the best approach possible on stable Rust.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Clearing registers is a difficult problem that can&#39;t easily be solved by</span>
+<span class="doccomment">//! something like a crate, and requires either inline ASM or rustc support.</span>
+<span class="doccomment">//! See &lt;https://github.com/rust-lang/rust/issues/17046&gt; for background on</span>
+<span class="doccomment">//! this particular problem.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Other memory protection mechanisms are interesting and useful, but often</span>
+<span class="doccomment">//! overkill (e.g. defending against RAM scraping or attackers with swap access).</span>
+<span class="doccomment">//! In as much as there may be merit to these approaches, there are also many</span>
+<span class="doccomment">//! other crates that already implement more sophisticated memory protections.</span>
+<span class="doccomment">//! Such protections are explicitly out-of-scope for this crate.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Zeroing memory is [good cryptographic hygiene] and this crate seeks to promote</span>
+<span class="doccomment">//! it in the most unobtrusive manner possible. This includes omitting complex</span>
+<span class="doccomment">//! `unsafe` memory protection systems and just trying to make the best memory</span>
+<span class="doccomment">//! zeroing crate available.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! [Zeroize]: https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html</span>
+<span class="doccomment">//! [Zeroing memory securely is hard]: http://www.daemonology.net/blog/2014-09-04-how-to-zero-a-buffer.html</span>
+<span class="doccomment">//! [Vec::clear()]: https://doc.rust-lang.org/std/vec/struct.Vec.html#method.clear</span>
+<span class="doccomment">//! [String::clear()]: https://doc.rust-lang.org/std/string/struct.String.html#method.clear</span>
+<span class="doccomment">//! [DefaultIsZeroes]: https://docs.rs/zeroize/latest/zeroize/trait.DefaultIsZeroes.html</span>
+<span class="doccomment">//! [Default]: https://doc.rust-lang.org/std/default/trait.Default.html</span>
+<span class="doccomment">//! [core::ptr::write_volatile]: https://doc.rust-lang.org/core/ptr/fn.write_volatile.html</span>
+<span class="doccomment">//! [Unsafe Code Guidelines Working Group]: https://github.com/rust-lang/unsafe-code-guidelines</span>
+<span class="doccomment">//! [these remarks have been removed]: https://github.com/rust-lang/rust/pull/60972</span>
+<span class="doccomment">//! [core::sync::atomic]: https://doc.rust-lang.org/stable/core/sync/atomic/index.html</span>
+<span class="doccomment">//! [Ordering::SeqCst]: https://doc.rust-lang.org/std/sync/atomic/enum.Ordering.html#variant.SeqCst</span>
+<span class="doccomment">//! [compiler_fence]: https://doc.rust-lang.org/stable/core/sync/atomic/fn.compiler_fence.html</span>
+<span class="doccomment">//! [pin]: https://doc.rust-lang.org/std/pin/struct.Pin.html</span>
+<span class="doccomment">//! [good cryptographic hygiene]: https://github.com/veorq/cryptocoding#clean-memory-of-secret-data</span>
+
+<span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
+<span class="attribute">#![<span class="ident">doc</span>(<span class="ident">html_root_url</span> <span class="op">=</span> <span class="string">&quot;https://docs.rs/zeroize/1.3.0&quot;</span>)]</span>
+<span class="attribute">#![<span class="ident">warn</span>(<span class="ident">missing_docs</span>, <span class="ident">rust_2018_idioms</span>, <span class="ident">unused_qualifications</span>)]</span>
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">test</span>, <span class="ident">macro_use</span>)]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;zeroize_derive&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;zeroize_derive&quot;</span>)))]</span>
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">zeroize_derive::Zeroize</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86&quot;</span>, <span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>))]</span>
+<span class="kw">mod</span> <span class="ident">x86</span>;
+
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">ops</span>, <span class="ident">ptr</span>, <span class="ident">slice::IterMut</span>, <span class="ident">sync::atomic</span>};
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">boxed::Box</span>, <span class="ident">string::String</span>, <span class="ident">vec::Vec</span>};
+
+<span class="doccomment">/// Trait for securely erasing types from memory</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Zeroize</span> {
+    <span class="doccomment">/// Zero out this object from memory using Rust intrinsics which ensure the</span>
+    <span class="doccomment">/// zeroization operation is not &quot;optimized away&quot; by the compiler.</span>
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
+}
+
+<span class="doccomment">/// Marker trait for types whose `Default` is the desired zeroization result</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">DefaultIsZeroes</span>: <span class="ident">Copy</span> <span class="op">+</span> <span class="ident">Default</span> <span class="op">+</span> <span class="ident">Sized</span> {}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroize</span> <span class="kw">for</span> <span class="ident">Z</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">DefaultIsZeroes</span>,
+{
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="ident">volatile_write</span>(<span class="self">self</span>, <span class="ident">Z::default</span>());
+        <span class="ident">atomic_fence</span>();
+    }
+}
+
+<span class="macro">macro_rules!</span> <span class="ident">impl_zeroize_with_default</span> {
+    ($(<span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>),<span class="op">+</span>) =&gt; {
+        $(<span class="kw">impl</span> <span class="ident">DefaultIsZeroes</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="kw">type</span> {})<span class="op">+</span>
+    };
+}
+
+<span class="macro">impl_zeroize_with_default!</span>(<span class="macro-nonterminal">i8</span>, <span class="ident">i16</span>, <span class="ident">i32</span>, <span class="ident">i64</span>, <span class="ident">i128</span>, <span class="ident">isize</span>);
+<span class="macro">impl_zeroize_with_default!</span>(<span class="ident">u8</span>, <span class="ident">u16</span>, <span class="ident">u32</span>, <span class="ident">u64</span>, <span class="ident">u128</span>, <span class="ident">usize</span>);
+<span class="macro">impl_zeroize_with_default!</span>(<span class="ident">f32</span>, <span class="ident">f64</span>, <span class="ident">char</span>, <span class="ident">bool</span>);
+
+<span class="doccomment">/// Implement `Zeroize` on arrays of types that impl `Zeroize`</span>
+<span class="macro">macro_rules!</span> <span class="ident">impl_zeroize_for_array</span> {
+    ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">size</span>:<span class="ident">expr</span>),<span class="op">+</span>) =&gt; {
+        $(
+            <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroize</span> <span class="kw">for</span> [<span class="ident">Z</span>; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">size</span>]
+            <span class="kw">where</span>
+                <span class="ident">Z</span>: <span class="ident">Zeroize</span>
+            {
+                <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+                    <span class="self">self</span>.<span class="ident">iter_mut</span>().<span class="ident">zeroize</span>();
+                }
+            }
+        )<span class="op">+</span>
+     };
+}
+
+<span class="comment">// TODO(tarcieri): const generics</span>
+<span class="macro">impl_zeroize_for_array!</span>(
+    <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>, <span class="number">10</span>, <span class="number">11</span>, <span class="number">12</span>, <span class="number">13</span>, <span class="number">14</span>, <span class="number">15</span>, <span class="number">16</span>, <span class="number">17</span>, <span class="number">18</span>, <span class="number">19</span>, <span class="number">20</span>, <span class="number">21</span>, <span class="number">22</span>, <span class="number">23</span>, <span class="number">24</span>, <span class="number">25</span>, <span class="number">26</span>,
+    <span class="number">27</span>, <span class="number">28</span>, <span class="number">29</span>, <span class="number">30</span>, <span class="number">31</span>, <span class="number">32</span>, <span class="number">33</span>, <span class="number">34</span>, <span class="number">35</span>, <span class="number">36</span>, <span class="number">37</span>, <span class="number">38</span>, <span class="number">39</span>, <span class="number">40</span>, <span class="number">41</span>, <span class="number">42</span>, <span class="number">43</span>, <span class="number">44</span>, <span class="number">45</span>, <span class="number">46</span>, <span class="number">47</span>, <span class="number">48</span>, <span class="number">49</span>, <span class="number">50</span>,
+    <span class="number">51</span>, <span class="number">52</span>, <span class="number">53</span>, <span class="number">54</span>, <span class="number">55</span>, <span class="number">56</span>, <span class="number">57</span>, <span class="number">58</span>, <span class="number">59</span>, <span class="number">60</span>, <span class="number">61</span>, <span class="number">62</span>, <span class="number">63</span>, <span class="number">64</span>
+);
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroize</span> <span class="kw">for</span> <span class="ident">IterMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="self">self</span> {
+            <span class="ident">elem</span>.<span class="ident">zeroize</span>();
+        }
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroize</span> <span class="kw">for</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
+            <span class="ident">value</span>.<span class="ident">zeroize</span>();
+
+            <span class="comment">// Ensures self is None and that the value was dropped. Without the take, the drop</span>
+            <span class="comment">// of the (zeroized) value isn&#39;t called, which might lead to a leak or other</span>
+            <span class="comment">// unexpected behavior. For example, if this were Option&lt;Vec&lt;T&gt;&gt;, the above call to</span>
+            <span class="comment">// zeroize would not free the allocated memory, but the the `take` call will.</span>
+            <span class="self">self</span>.<span class="ident">take</span>();
+        }
+
+        <span class="comment">// Ensure that if the `Option` were previously `Some` but a value was copied/moved out</span>
+        <span class="comment">// that the remaining space in the `Option` is zeroized.</span>
+        <span class="comment">//</span>
+        <span class="comment">// Safety:</span>
+        <span class="comment">//</span>
+        <span class="comment">// The memory pointed to by `self` is valid for `mem::size_of::&lt;Self&gt;()` bytes.</span>
+        <span class="comment">// It is also properly aligned, because `u8` has an alignment of `1`.</span>
+        <span class="kw">unsafe</span> {
+            <span class="ident">volatile_set</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="number">0</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>());
+        }
+
+        <span class="comment">// Ensures self is overwritten with the default bit pattern. volatile_write can&#39;t be</span>
+        <span class="comment">// used because Option&lt;Z&gt; is not copy.</span>
+        <span class="comment">//</span>
+        <span class="comment">// Safety:</span>
+        <span class="comment">//</span>
+        <span class="comment">// self is safe to replace with the default, which the take() call above should have</span>
+        <span class="comment">// already done semantically. Any value which needed to be dropped will have been</span>
+        <span class="comment">// done so by take().</span>
+        <span class="kw">unsafe</span> { <span class="ident">ptr::write_volatile</span>(<span class="self">self</span>, <span class="ident">Option::default</span>()) }
+
+        <span class="ident">atomic_fence</span>();
+    }
+}
+
+<span class="doccomment">/// Impl `Zeroize` on slices of types that can be zeroized with `Default`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This impl can eventually be optimized using an memset intrinsic,</span>
+<span class="doccomment">/// such as `core::intrinsics::volatile_set_memory`. For that reason the blanket</span>
+<span class="doccomment">/// impl on slices is bounded by `DefaultIsZeroes`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// To zeroize a mut slice of `Z: Zeroize` which does not impl</span>
+<span class="doccomment">/// `DefaultIsZeroes`, call `iter_mut().zeroize()`.</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroize</span> <span class="kw">for</span> [<span class="ident">Z</span>]
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">DefaultIsZeroes</span>,
+{
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">len</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">core::isize::MAX</span> <span class="kw">as</span> <span class="ident">usize</span>);
+        <span class="comment">// Safety:</span>
+        <span class="comment">//</span>
+        <span class="comment">// This is safe, because the slice is well aligned and is backed by a single allocated</span>
+        <span class="comment">// object for at least `self.len()` elements of type `Z`.</span>
+        <span class="comment">// `self.len()` is also not larger than an `isize`, because of the assertion above.</span>
+        <span class="comment">// The memory of the slice should not wrap around the address space.</span>
+        <span class="kw">unsafe</span> { <span class="ident">volatile_set</span>(<span class="self">self</span>.<span class="ident">as_mut_ptr</span>(), <span class="ident">Z::default</span>(), <span class="self">self</span>.<span class="ident">len</span>()) };
+        <span class="ident">atomic_fence</span>();
+    }
+}
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)))]</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroize</span> <span class="kw">for</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="doccomment">/// &quot;Best effort&quot; zeroization for `Vec`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Ensures the entire capacity of the `Vec` is zeroed. Cannot ensure that</span>
+    <span class="doccomment">/// previous reallocations did not leave values on the heap.</span>
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">iter_mut</span>().<span class="ident">zeroize</span>();
+
+        <span class="comment">// Zero the capacity of the `Vec` that is not initialized.</span>
+        {
+            <span class="comment">// Safety:</span>
+            <span class="comment">//</span>
+            <span class="comment">// This is safe, because `Vec` never allocates more than `isize::MAX` bytes.</span>
+            <span class="comment">// This exact use case is even mentioned in the documentation of `pointer::add`.</span>
+            <span class="kw">let</span> <span class="ident">extra_capacity_start</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">as_mut_ptr</span>().<span class="ident">add</span>(<span class="self">self</span>.<span class="ident">len</span>()) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span> };
+            <span class="kw">let</span> <span class="ident">extra_capacity_len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">capacity</span>().<span class="ident">saturating_sub</span>(<span class="self">self</span>.<span class="ident">len</span>());
+
+            <span class="comment">// Safety:</span>
+            <span class="comment">// The memory pointed to by `extra_capacity_start` is valid for `extra_capacity_len *</span>
+            <span class="comment">// mem::size_of::&lt;Z&gt;()` bytes, because the allocation of the `Vec` has enough reported</span>
+            <span class="comment">// capacity for elements of type `Z`.</span>
+            <span class="comment">// It is also properly aligned, because the `T` here is `u8`, which has an alignment of</span>
+            <span class="comment">// `1`.</span>
+            <span class="comment">// `extra_capacity_len` is not larger than an `isize`, because `Vec` never allocates</span>
+            <span class="comment">// more than `isize::MAX` bytes.</span>
+            <span class="comment">// The `Vec` allocation also guarantees to never wrap around the address space.</span>
+            <span class="kw">unsafe</span> {
+                <span class="ident">volatile_set</span>(
+                    <span class="ident">extra_capacity_start</span>,
+                    <span class="number">0</span>,
+                    <span class="ident">extra_capacity_len</span> <span class="op">*</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>(),
+                )
+            };
+            <span class="ident">atomic_fence</span>();
+        }
+
+        <span class="self">self</span>.<span class="ident">clear</span>();
+    }
+}
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)))]</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroize</span> <span class="kw">for</span> <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">Z</span>]<span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="doccomment">/// Unlike `Vec`, `Box&lt;[Z]&gt;` cannot reallocate, so we can be sure that we are not leaving</span>
+    <span class="doccomment">/// values on the heap.</span>
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">iter_mut</span>().<span class="ident">zeroize</span>();
+    }
+}
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)))]</span>
+<span class="kw">impl</span> <span class="ident">Zeroize</span> <span class="kw">for</span> <span class="ident">String</span> {
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">as_mut_vec</span>() }.<span class="ident">zeroize</span>();
+    }
+}
+
+<span class="doccomment">/// Fallible trait for representing cases where zeroization may or may not be</span>
+<span class="doccomment">/// possible.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is primarily useful for scenarios like reference counted data, where</span>
+<span class="doccomment">/// zeroization is only possible when the last reference is dropped.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">TryZeroize</span> {
+    <span class="doccomment">/// Try to zero out this object from memory using Rust intrinsics which</span>
+    <span class="doccomment">/// ensure the zeroization operation is not &quot;optimized away&quot; by the</span>
+    <span class="doccomment">/// compiler.</span>
+    <span class="attribute">#[<span class="ident">must_use</span>]</span>
+    <span class="kw">fn</span> <span class="ident">try_zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">bool</span>;
+}
+
+<span class="doccomment">/// `Zeroizing` is a a wrapper for any `Z: Zeroize` type which implements a</span>
+<span class="doccomment">/// `Drop` handler which zeroizes dropped values.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Zeroizing</span><span class="op">&lt;</span><span class="ident">Z</span>: <span class="ident">Zeroize</span><span class="op">&gt;</span>(<span class="ident">Z</span>);
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroizing</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="doccomment">/// Move value inside a `Zeroizing` wrapper which ensures it will be</span>
+    <span class="doccomment">/// zeroized when it&#39;s dropped.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">value</span>: <span class="ident">Z</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident">value</span>.<span class="ident">into</span>()
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Zeroizing</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">value</span>: <span class="ident">Z</span>) -&gt; <span class="ident">Zeroizing</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> {
+        <span class="ident">Zeroizing</span>(<span class="ident">value</span>)
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">ops::Deref</span> <span class="kw">for</span> <span class="ident">Zeroizing</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">Z</span>;
+
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Z</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">ops::DerefMut</span> <span class="kw">for</span> <span class="ident">Zeroizing</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">Z</span> {
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="number">0</span>
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Zeroize</span> <span class="kw">for</span> <span class="ident">Zeroizing</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">zeroize</span>();
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">Zeroizing</span><span class="op">&lt;</span><span class="ident">Z</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">Z</span>: <span class="ident">Zeroize</span>,
+{
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">zeroize</span>()
+    }
+}
+
+<span class="doccomment">/// Use fences to prevent accesses from being reordered before this</span>
+<span class="doccomment">/// point, which should hopefully help ensure that all accessors</span>
+<span class="doccomment">/// see zeroes after this point.</span>
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">fn</span> <span class="ident">atomic_fence</span>() {
+    <span class="ident">atomic::compiler_fence</span>(<span class="ident">atomic::Ordering::SeqCst</span>);
+}
+
+<span class="doccomment">/// Perform a volatile write to the destination</span>
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">fn</span> <span class="ident">volatile_write</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Copy</span> <span class="op">+</span> <span class="ident">Sized</span><span class="op">&gt;</span>(<span class="ident">dst</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>, <span class="ident">src</span>: <span class="ident">T</span>) {
+    <span class="kw">unsafe</span> { <span class="ident">ptr::write_volatile</span>(<span class="ident">dst</span>, <span class="ident">src</span>) }
+}
+
+<span class="doccomment">/// Perform a volatile `memset` operation which fills a slice with a value</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Safety:</span>
+<span class="doccomment">/// The memory pointed to by `dst` must be a single allocated object that is valid for `count`</span>
+<span class="doccomment">/// contiguous elements of `T`.</span>
+<span class="doccomment">/// `count` must not be larger than an `isize`.</span>
+<span class="doccomment">/// `dst` being offset by `mem::size_of::&lt;T&gt; * count` bytes must not wrap around the address space.</span>
+<span class="doccomment">/// Also `dst` must be properly aligned.</span>
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">volatile_set</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Copy</span> <span class="op">+</span> <span class="ident">Sized</span><span class="op">&gt;</span>(<span class="ident">dst</span>: <span class="kw-2">*mut</span> <span class="ident">T</span>, <span class="ident">src</span>: <span class="ident">T</span>, <span class="ident">count</span>: <span class="ident">usize</span>) {
+    <span class="comment">// TODO(tarcieri): use `volatile_set_memory` when stabilized</span>
+    <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">count</span> {
+        <span class="comment">// Safety:</span>
+        <span class="comment">//</span>
+        <span class="comment">// This is safe because there is room for at least `count` objects of type `T` in the</span>
+        <span class="comment">// allocation pointed to by `dst`, because `count &lt;= isize::MAX` and because</span>
+        <span class="comment">// `dst.add(count)` must not wrap around the address space.</span>
+        <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">dst</span>.<span class="ident">add</span>(<span class="ident">i</span>);
+        <span class="comment">// Safety:</span>
+        <span class="comment">//</span>
+        <span class="comment">// This is safe, because the pointer is valid and because `dst` is well aligned for `T` and</span>
+        <span class="comment">// `ptr` is an offset of `dst` by a multiple of `mem::size_of::&lt;T&gt;()` bytes.</span>
+        <span class="ident">ptr::write_volatile</span>(<span class="ident">ptr</span>, <span class="ident">src</span>);
+    }
+}
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+<span class="kw">mod</span> <span class="ident">tests</span> {
+    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+    <span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">zeroize_byte_arrays</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="number">42u8</span>; <span class="number">64</span>];
+        <span class="ident">arr</span>.<span class="ident">zeroize</span>();
+        <span class="macro">assert_eq!</span>(<span class="ident">arr</span>.<span class="ident">as_ref</span>(), [<span class="number">0u8</span>; <span class="number">64</span>].<span class="ident">as_ref</span>());
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">zeroize_vec</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">42</span>; <span class="number">3</span>];
+        <span class="ident">vec</span>.<span class="ident">zeroize</span>();
+        <span class="macro">assert!</span>(<span class="ident">vec</span>.<span class="ident">is_empty</span>());
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">zeroize_vec_entire_capacity</span>() {
+        <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
+        <span class="kw">struct</span> <span class="ident">PanicOnNonZeroDrop</span>(<span class="ident">u64</span>);
+
+        <span class="kw">impl</span> <span class="ident">Zeroize</span> <span class="kw">for</span> <span class="ident">PanicOnNonZeroDrop</span> {
+            <span class="kw">fn</span> <span class="ident">zeroize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+                <span class="self">self</span>.<span class="number">0</span> <span class="op">=</span> <span class="number">0</span>;
+            }
+        }
+
+        <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">PanicOnNonZeroDrop</span> {
+            <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+                <span class="kw">if</span> <span class="self">self</span>.<span class="number">0</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+                    <span class="macro">panic!</span>(<span class="string">&quot;dropped non-zeroized data&quot;</span>);
+                }
+            }
+        }
+
+        <span class="comment">// Ensure that the entire capacity of the vec is zeroized and that no unitinialized data</span>
+        <span class="comment">// is ever interpreted as initialized</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">PanicOnNonZeroDrop</span>(<span class="number">42</span>); <span class="number">2</span>];
+
+        <span class="kw">unsafe</span> {
+            <span class="ident">vec</span>.<span class="ident">set_len</span>(<span class="number">1</span>);
+        }
+
+        <span class="ident">vec</span>.<span class="ident">zeroize</span>();
+
+        <span class="kw">unsafe</span> {
+            <span class="ident">vec</span>.<span class="ident">set_len</span>(<span class="number">2</span>);
+        }
+
+        <span class="ident">drop</span>(<span class="ident">vec</span>);
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">zeroize_string</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">string</span> <span class="op">=</span> <span class="ident">String::from</span>(<span class="string">&quot;Hello, world!&quot;</span>);
+        <span class="ident">string</span>.<span class="ident">zeroize</span>();
+        <span class="macro">assert!</span>(<span class="ident">string</span>.<span class="ident">is_empty</span>());
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">zeroize_string_entire_capacity</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">string</span> <span class="op">=</span> <span class="ident">String::from</span>(<span class="string">&quot;Hello, world!&quot;</span>);
+        <span class="ident">string</span>.<span class="ident">truncate</span>(<span class="number">5</span>);
+
+        <span class="ident">string</span>.<span class="ident">zeroize</span>();
+
+        <span class="comment">// convert the string to a vec to easily access the unused capacity</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">as_vec</span> <span class="op">=</span> <span class="ident">string</span>.<span class="ident">into_bytes</span>();
+        <span class="kw">unsafe</span> { <span class="ident">as_vec</span>.<span class="ident">set_len</span>(<span class="ident">as_vec</span>.<span class="ident">capacity</span>()) };
+
+        <span class="macro">assert!</span>(<span class="ident">as_vec</span>.<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span><span class="ident">byte</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">byte</span> <span class="op">==</span> <span class="number">0</span>));
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;alloc&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">zeroize_box</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">boxed_arr</span> <span class="op">=</span> <span class="ident">Box::new</span>([<span class="number">42u8</span>; <span class="number">3</span>]);
+        <span class="ident">boxed_arr</span>.<span class="ident">zeroize</span>();
+        <span class="macro">assert_eq!</span>(<span class="ident">boxed_arr</span>.<span class="ident">as_ref</span>(), <span class="kw-2">&amp;</span>[<span class="number">0u8</span>; <span class="number">3</span>]);
+    }
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="zeroize" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

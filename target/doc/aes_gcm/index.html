@@ -1,0 +1,97 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="AES-GCM: Authenticated Encryption and Associated Data (AEAD) cipher based on AES in Galois/Counter Mode."><meta name="keywords" content="rust, rustlang, rust-lang, aes_gcm"><title>aes_gcm - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../aes_gcm/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../aes_gcm/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate aes_gcm</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.9.4</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#structs">Structs</a></li><li><a href="#constants">Constants</a></li><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../aes_gcm/index.html">
+                        <img src="https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">aes_gcm</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/aes_gcm/lib.rs.html#1-343">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>AES-GCM: <a href="https://en.wikipedia.org/wiki/Authenticated_encryption">Authenticated Encryption and Associated Data (AEAD)</a> cipher
+based on AES in <a href="https://en.wikipedia.org/wiki/Galois/Counter_Mode">Galois/Counter Mode</a>.</p>
+<h3 id="performance-notes"><a href="#performance-notes">Performance Notes</a></h3>
+<p>By default this crate will use software implementations of both AES and
+the POLYVAL universal hash function.</p>
+<p>When targeting modern x86/x86_64 CPUs, use the following <code>RUSTFLAGS</code> to
+take advantage of high performance AES-NI and CLMUL CPU intrinsics:</p>
+<div class="example-wrap"><pre class="language-text"><code>RUSTFLAGS=&quot;-Ctarget-cpu=sandybridge -Ctarget-feature=+aes,+sse2,+sse4.1,+ssse3&quot;</code></pre></div><h3 id="security-notes"><a href="#security-notes">Security Notes</a></h3>
+<p>This crate has received one <a href="https://research.nccgroup.com/2020/02/26/public-report-rustcrypto-aes-gcm-and-chacha20poly1305-implementation-review/">security audit by NCC Group</a>, with no significant
+findings. We would like to thank <a href="https://www.mobilecoin.com/">MobileCoin</a> for funding the audit.</p>
+<p>All implementations contained in the crate are designed to execute in constant
+time, either by relying on hardware intrinsics (i.e. AES-NI and CLMUL on
+x86/x86_64), or using a portable implementation which is only constant time
+on processors which implement constant-time multiplication.</p>
+<p>It is not suitable for use on processors with a variable-time multiplication
+operation (e.g. short circuit on multiply-by-zero / multiply-by-one, such as
+certain 32-bit PowerPC CPUs and some non-ARM microcontrollers).</p>
+<h2 id="usage"><a href="#usage">Usage</a></h2>
+<p>Simple usage (allocating, no associated data):</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">aes_gcm</span>::{<span class="ident">Aes256Gcm</span>, <span class="ident">Key</span>, <span class="ident">Nonce</span>}; <span class="comment">// Or `Aes128Gcm`</span>
+<span class="kw">use</span> <span class="ident">aes_gcm::aead</span>::{<span class="ident">Aead</span>, <span class="ident">NewAead</span>};
+
+<span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">Key::from_slice</span>(<span class="string">b&quot;an example very very secret key.&quot;</span>);
+<span class="kw">let</span> <span class="ident">cipher</span> <span class="op">=</span> <span class="ident">Aes256Gcm::new</span>(<span class="ident">key</span>);
+
+<span class="kw">let</span> <span class="ident">nonce</span> <span class="op">=</span> <span class="ident">Nonce::from_slice</span>(<span class="string">b&quot;unique nonce&quot;</span>); <span class="comment">// 96-bits; unique per message</span>
+
+<span class="kw">let</span> <span class="ident">ciphertext</span> <span class="op">=</span> <span class="ident">cipher</span>.<span class="ident">encrypt</span>(<span class="ident">nonce</span>, <span class="string">b&quot;plaintext message&quot;</span>.<span class="ident">as_ref</span>())
+    .<span class="ident">expect</span>(<span class="string">&quot;encryption failure!&quot;</span>); <span class="comment">// NOTE: handle this error to avoid panics!</span>
+
+<span class="kw">let</span> <span class="ident">plaintext</span> <span class="op">=</span> <span class="ident">cipher</span>.<span class="ident">decrypt</span>(<span class="ident">nonce</span>, <span class="ident">ciphertext</span>.<span class="ident">as_ref</span>())
+    .<span class="ident">expect</span>(<span class="string">&quot;decryption failure!&quot;</span>); <span class="comment">// NOTE: handle this error to avoid panics!</span>
+
+<span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">plaintext</span>, <span class="string">b&quot;plaintext message&quot;</span>);</code></pre></div>
+<h3 id="in-place-usage-eliminates-alloc-requirement"><a href="#in-place-usage-eliminates-alloc-requirement">In-place Usage (eliminates <code>alloc</code> requirement)</a></h3>
+<p>This crate has an optional <code>alloc</code> feature which can be disabled in e.g.
+microcontroller environments that don’t have a heap.</p>
+<p>The <a href="trait.AeadInPlace.html#method.encrypt_in_place" title="AeadInPlace::encrypt_in_place"><code>AeadInPlace::encrypt_in_place</code></a> and <a href="trait.AeadInPlace.html#method.decrypt_in_place" title="AeadInPlace::decrypt_in_place"><code>AeadInPlace::decrypt_in_place</code></a>
+methods accept any type that impls the <a href="../aead/trait.Buffer.html" title="aead::Buffer"><code>aead::Buffer</code></a> trait which
+contains the plaintext for encryption or ciphertext for decryption.</p>
+<p>Note that if you enable the <code>heapless</code> feature of this crate,
+you will receive an impl of <a href="../aead/trait.Buffer.html" title="aead::Buffer"><code>aead::Buffer</code></a> for <code>heapless::Vec</code>
+(re-exported from the <a href="../aead/index.html" title="aead"><code>aead</code></a> crate as [<code>aead::heapless::Vec</code>]),
+which can then be passed as the <code>buffer</code> parameter to the in-place encrypt
+and decrypt methods:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">aes_gcm</span>::{<span class="ident">Aes256Gcm</span>, <span class="ident">Key</span>, <span class="ident">Nonce</span>}; <span class="comment">// Or `Aes128Gcm`</span>
+<span class="kw">use</span> <span class="ident">aes_gcm::aead</span>::{<span class="ident">AeadInPlace</span>, <span class="ident">NewAead</span>};
+<span class="kw">use</span> <span class="ident">aes_gcm::aead::heapless::Vec</span>;
+
+<span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">Key::from_slice</span>(<span class="string">b&quot;an example very very secret key.&quot;</span>);
+<span class="kw">let</span> <span class="ident">cipher</span> <span class="op">=</span> <span class="ident">Aes256Gcm::new</span>(<span class="ident">key</span>);
+
+<span class="kw">let</span> <span class="ident">nonce</span> <span class="op">=</span> <span class="ident">Nonce::from_slice</span>(<span class="string">b&quot;unique nonce&quot;</span>); <span class="comment">// 96-bits; unique per message</span>
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="number">128</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>(); <span class="comment">// Buffer needs 16-bytes overhead for GCM tag</span>
+<span class="ident">buffer</span>.<span class="ident">extend_from_slice</span>(<span class="string">b&quot;plaintext message&quot;</span>);
+
+<span class="comment">// Encrypt `buffer` in-place, replacing the plaintext contents with ciphertext</span>
+<span class="ident">cipher</span>.<span class="ident">encrypt_in_place</span>(<span class="ident">nonce</span>, <span class="string">b&quot;&quot;</span>, <span class="kw-2">&amp;mut</span> <span class="ident">buffer</span>).<span class="ident">expect</span>(<span class="string">&quot;encryption failure!&quot;</span>);
+
+<span class="comment">// `buffer` now contains the message ciphertext</span>
+<span class="macro">assert_ne!</span>(<span class="kw-2">&amp;</span><span class="ident">buffer</span>, <span class="string">b&quot;plaintext message&quot;</span>);
+
+<span class="comment">// Decrypt `buffer` in-place, replacing its ciphertext context with the original plaintext</span>
+<span class="ident">cipher</span>.<span class="ident">decrypt_in_place</span>(<span class="ident">nonce</span>, <span class="string">b&quot;&quot;</span>, <span class="kw-2">&amp;mut</span> <span class="ident">buffer</span>).<span class="ident">expect</span>(<span class="string">&quot;decryption failure!&quot;</span>);
+<span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">buffer</span>, <span class="string">b&quot;plaintext message&quot;</span>);</code></pre></div>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.aead"><code>pub use <a class="mod" href="../aead/index.html" title="mod aead">aead</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.aes"><code>pub use <a class="mod" href="../aes/index.html" title="mod aes">aes</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.AesGcm.html" title="aes_gcm::AesGcm struct">AesGcm</a></div><div class="item-right docblock-short"><p>AES-GCM: generic over an underlying AES implementation and nonce size.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Error.html" title="aes_gcm::Error struct">Error</a></div><div class="item-right docblock-short"><p>Error type.</p>
+</div></div></div><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.A_MAX.html" title="aes_gcm::A_MAX constant">A_MAX</a></div><div class="item-right docblock-short"><p>Maximum length of associated data</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.C_MAX.html" title="aes_gcm::C_MAX constant">C_MAX</a></div><div class="item-right docblock-short"><p>Maximum length of ciphertext</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.P_MAX.html" title="aes_gcm::P_MAX constant">P_MAX</a></div><div class="item-right docblock-short"><p>Maximum length of plaintext</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.AeadCore.html" title="aes_gcm::AeadCore trait">AeadCore</a></div><div class="item-right docblock-short"><p>Authenticated Encryption with Associated Data (AEAD) algorithm core trait.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.AeadInPlace.html" title="aes_gcm::AeadInPlace trait">AeadInPlace</a></div><div class="item-right docblock-short"><p>In-place stateless AEAD trait.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.NewAead.html" title="aes_gcm::NewAead trait">NewAead</a></div><div class="item-right docblock-short"><p>Instantiate either a stateless <a href="../aead/trait.Aead.html" title="Aead"><code>Aead</code></a> or stateful <a href="../aead/trait.AeadMut.html" title="AeadMut"><code>AeadMut</code></a> algorithm.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Aes128Gcm.html" title="aes_gcm::Aes128Gcm type">Aes128Gcm</a></div><div class="item-right docblock-short"><p>AES-GCM with a 128-bit key and 96-bit nonce</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Aes256Gcm.html" title="aes_gcm::Aes256Gcm type">Aes256Gcm</a></div><div class="item-right docblock-short"><p>AES-GCM with a 256-bit key and 96-bit nonce</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Key.html" title="aes_gcm::Key type">Key</a></div><div class="item-right docblock-short"><p>AES-GCM keys</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Nonce.html" title="aes_gcm::Nonce type">Nonce</a></div><div class="item-right docblock-short"><p>AES-GCM nonces</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Tag.html" title="aes_gcm::Tag type">Tag</a></div><div class="item-right docblock-short"><p>AES-GCM tags</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="aes_gcm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

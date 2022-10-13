@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This crate provides macros for runtime CPU feature detection. It’s intended as a stopgap until Rust RFC 2725 adding first-class target feature detection macros to `libcore` is implemented."><meta name="keywords" content="rust, rustlang, rust-lang, cpufeatures"><title>cpufeatures - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../cpufeatures/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../cpufeatures/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate cpufeatures</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.2.4</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#macros">Macros</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../cpufeatures/index.html">
+                        <img src="https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">cpufeatures</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/cpufeatures/lib.rs.html#1-140">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This crate provides macros for runtime CPU feature detection. It’s intended
+as a stopgap until Rust <a href="https://github.com/rust-lang/rfcs/pull/2725">RFC 2725</a> adding first-class target feature detection
+macros to <code>libcore</code> is implemented.</p>
+<p>Supported target architectures:</p>
+<ul>
+<li><code>aarch64</code>: Linux and macOS/M4 only (ARM64 does not support OS-independent feature detection)
+<ul>
+<li>Target features: <code>aes</code>, <code>sha2</code>, <code>sha3</code></li>
+</ul>
+</li>
+<li><code>x86</code>/<code>x86_64</code>: OS independent and <code>no_std</code>-friendly
+<ul>
+<li>Target features: <code>adx</code>, <code>aes</code>, <code>avx</code>, <code>avx2</code>, <code>bmi1</code>, <code>bmi2</code>, <code>fma</code>,
+<code>mmx</code>, <code>pclmulqdq</code>, <code>popcnt</code>, <code>rdrand</code>, <code>rdseed</code>, <code>sgx</code>, <code>sha</code>, <code>sse</code>,
+<code>sse2</code>, <code>sse3</code>, <code>sse4.1</code>, <code>sse4.2</code>, <code>ssse3</code></li>
+</ul>
+</li>
+</ul>
+<p>If you would like detection support for a target feature which is not on
+this list, please <a href="https://github.com/RustCrypto/utils/issues/new?title=cpufeatures:%20requesting%20support%20for%20CHANGEME%20target%20feature">open a GitHub issue</a>.</p>
+<h2 id="example"><a href="#example">Example</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// This macro creates `cpuid_aes_sha` module</span>
+<span class="macro">cpufeatures::new!</span>(<span class="ident">cpuid_aes_sha</span>, <span class="string">&quot;aes&quot;</span>, <span class="string">&quot;sha&quot;</span>);
+
+<span class="comment">// `token` is a Zero Sized Type (ZST) value, which guarantees</span>
+<span class="comment">// that underlying static storage got properly initialized,</span>
+<span class="comment">// which allows to omit initialization branch</span>
+<span class="kw">let</span> <span class="ident">token</span>: <span class="ident">cpuid_aes_sha::InitToken</span> <span class="op">=</span> <span class="ident">cpuid_aes_sha::init</span>();
+
+<span class="kw">if</span> <span class="ident">token</span>.<span class="ident">get</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;CPU supports both SHA and AES extensions&quot;</span>);
+} <span class="kw">else</span> {
+    <span class="macro">println!</span>(<span class="string">&quot;SHA and AES extensions are not supported&quot;</span>);
+}
+
+<span class="comment">// If stored value needed only once you can get stored value</span>
+<span class="comment">// omitting the token</span>
+<span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">cpuid_aes_sha::get</span>();
+<span class="macro">assert_eq!</span>(<span class="ident">val</span>, <span class="ident">token</span>.<span class="ident">get</span>());
+
+<span class="comment">// Additionally you can get both token and value</span>
+<span class="kw">let</span> (<span class="ident">token</span>, <span class="ident">val</span>) <span class="op">=</span> <span class="ident">cpuid_aes_sha::init_get</span>();
+<span class="macro">assert_eq!</span>(<span class="ident">val</span>, <span class="ident">token</span>.<span class="ident">get</span>());</code></pre></div>
+<p>Note that if all tested target features are enabled via compiler options
+(e.g. by using <code>RUSTFLAGS</code>), the <code>get</code> method will always return <code>true</code>
+and <code>init</code> will not use CPUID instruction. Such behavior allows
+compiler to completely eliminate fallback code.</p>
+<p>After first call macro caches result and returns it in subsequent
+calls, thus runtime overhead for them is minimal.</p>
+</div></details><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.new.html" title="cpufeatures::new macro">new</a></div><div class="item-right docblock-short"><p>Create module with CPU feature detection code.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="cpufeatures" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

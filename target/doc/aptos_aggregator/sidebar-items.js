@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["aggregator_extension",""],["delta_change_set","Parallel data aggregation uses a `Delta` op. Every delta is is a state key (for accessing the storage) and an operation: a partial function with a postcondition."],["transaction",""]]};

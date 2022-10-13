@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="github crates-io docs-rs"><meta name="keywords" content="rust, rustlang, rust-lang, indoc"><title>indoc - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../indoc/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../indoc/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate indoc</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 1.0.7</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#macros">Macros</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../indoc/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">indoc</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/indoc/lib.rs.html#1-404">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p><a href="https://github.com/dtolnay/indoc"><img src="https://img.shields.io/badge/github-8da0cb?style=for-the-badge&amp;labelColor=555555&amp;logo=github" alt="github" /></a> <a href="https://crates.io/crates/indoc"><img src="https://img.shields.io/badge/crates.io-fc8d62?style=for-the-badge&amp;labelColor=555555&amp;logo=rust" alt="crates-io" /></a> <a href="https://docs.rs/indoc"><img src="https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&amp;labelColor=555555&amp;logo=docs.rs" alt="docs-rs" /></a></p>
+<br>
+<p>This crate provides a procedural macro for indented string literals. The
+<code>indoc!()</code> macro takes a multiline string literal and un-indents it at
+compile time so the leftmost non-space character is in the first column.</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+indoc = &quot;1.0&quot;</code></pre></div><br>
+<h2 id="using-indoc"><a href="#using-indoc">Using indoc</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">indoc::indoc</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">testing</span> <span class="op">=</span> <span class="macro">indoc!</span> {<span class="string">&quot;
+        def hello():
+            print(&#39;Hello, world!&#39;)
+
+        hello()
+    &quot;</span>};
+    <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="string">&quot;def hello():\n    print(&#39;Hello, world!&#39;)\n\nhello()\n&quot;</span>;
+    <span class="macro">assert_eq!</span>(<span class="ident">testing</span>, <span class="ident">expected</span>);
+}</code></pre></div>
+<p>Indoc also works with raw string literals:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">indoc::indoc</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">testing</span> <span class="op">=</span> <span class="macro">indoc!</span> {<span class="string">r#&quot;
+        def hello():
+            print(&quot;Hello, world!&quot;)
+
+        hello()
+    &quot;#</span>};
+    <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="string">&quot;def hello():\n    print(\&quot;Hello, world!\&quot;)\n\nhello()\n&quot;</span>;
+    <span class="macro">assert_eq!</span>(<span class="ident">testing</span>, <span class="ident">expected</span>);
+}</code></pre></div>
+<p>And byte string literals:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">indoc::indoc</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">testing</span> <span class="op">=</span> <span class="macro">indoc!</span> {<span class="string">b&quot;
+        def hello():
+            print(&#39;Hello, world!&#39;)
+
+        hello()
+    &quot;</span>};
+    <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="string">b&quot;def hello():\n    print(&#39;Hello, world!&#39;)\n\nhello()\n&quot;</span>;
+    <span class="macro">assert_eq!</span>(<span class="ident">testing</span>[..], <span class="ident">expected</span>[..]);
+}</code></pre></div>
+<p><br><br></p>
+<h2 id="formatting-macros"><a href="#formatting-macros">Formatting macros</a></h2>
+<p>The indoc crate exports four additional macros to substitute conveniently
+for the standard library’s formatting macros:</p>
+<ul>
+<li><code>formatdoc!($fmt, ...)</code> — equivalent to <code>format!(indoc!($fmt), ...)</code></li>
+<li><code>printdoc!($fmt, ...)</code> — equivalent to <code>print!(indoc!($fmt), ...)</code></li>
+<li><code>eprintdoc!($fmt, ...)</code> — equivalent to <code>eprint!(indoc!($fmt), ...)</code></li>
+<li><code>writedoc!($dest, $fmt, ...)</code> — equivalent to <code>write!($dest, indoc!($fmt), ...)</code></li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">indoc::printdoc</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">printdoc!</span> {<span class="string">&quot;
+        GET {url}
+        Accept: {mime}
+        &quot;</span>,
+        <span class="ident">url</span> <span class="op">=</span> <span class="string">&quot;http://localhost:8080&quot;</span>,
+        <span class="ident">mime</span> <span class="op">=</span> <span class="string">&quot;application/json&quot;</span>,
+    }
+}</code></pre></div>
+<p><br><br></p>
+<h2 id="explanation"><a href="#explanation">Explanation</a></h2>
+<p>The following rules characterize the behavior of the <code>indoc!()</code> macro:</p>
+<ol>
+<li>Count the leading spaces of each line, ignoring the first line and any
+lines that are empty or contain spaces only.</li>
+<li>Take the minimum.</li>
+<li>If the first line is empty i.e. the string begins with a newline, remove
+the first line.</li>
+<li>Remove the computed number of spaces from the beginning of each line.</li>
+</ol>
+</div></details><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.eprintdoc.html" title="indoc::eprintdoc macro">eprintdoc</a></div><div class="item-right docblock-short"><p>Unindent and call <code>eprint!</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.formatdoc.html" title="indoc::formatdoc macro">formatdoc</a></div><div class="item-right docblock-short"><p>Unindent and call <code>format!</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.indoc.html" title="indoc::indoc macro">indoc</a></div><div class="item-right docblock-short"><p>Unindent and produce <code>&amp;'static str</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.printdoc.html" title="indoc::printdoc macro">printdoc</a></div><div class="item-right docblock-short"><p>Unindent and call <code>print!</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.writedoc.html" title="indoc::writedoc macro">writedoc</a></div><div class="item-right docblock-short"><p>Unindent and call <code>write!</code>.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="indoc" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

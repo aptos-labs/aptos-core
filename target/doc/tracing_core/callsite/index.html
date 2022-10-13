@@ -1,0 +1,91 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Callsites represent the source locations from which spans or events originate."><meta name="keywords" content="rust, rustlang, rust-lang, callsite"><title>tracing_core::callsite - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tracing_core/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tracing_core/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module callsite</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tracing_core/index.html">
+                        <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">tracing_core</a>::<wbr><a class="mod" href="#">callsite</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tracing_core/callsite.rs.html#1-620">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Callsites represent the source locations from which spans or events
+originate.</p>
+<h2 id="what-are-callsites"><a href="#what-are-callsites">What Are Callsites?</a></h2>
+<p>Every span or event in <code>tracing</code> is associated with a <a href="../trait.Callsite.html" title="Callsite"><code>Callsite</code></a>. A
+callsite is a small <code>static</code> value that is responsible for the following:</p>
+<ul>
+<li>Storing the span or event’s <a href="../struct.Metadata.html"><code>Metadata</code></a>,</li>
+<li>Uniquely <a href="struct.Identifier.html">identifying</a> the span or event definition,</li>
+<li>Caching the subscriber’s <a href="../subscriber/struct.Interest.html"><code>Interest</code></a><sup id="fnref1"><a href="#fn1">1</a></sup> in that span or event, to avoid
+re-evaluating filters,</li>
+<li>Storing a [<code>Registration</code>] that allows the callsite to be part of a global
+list of all callsites in the program.</li>
+</ul>
+<h2 id="registering-callsites"><a href="#registering-callsites">Registering Callsites</a></h2>
+<p>When a span or event is recorded for the first time, its callsite
+<a href="fn.register.html" title="register"><code>register</code></a>s itself with the global callsite registry. Registering a
+callsite calls the <a href="../trait.Subscriber.html#method.register_callsite"><code>Subscriber::register_callsite</code></a>
+method with that callsite’s <a href="../struct.Metadata.html"><code>Metadata</code></a> on every currently active
+subscriber. This serves two primary purposes: informing subscribers of the
+callsite’s existence, and performing static filtering.</p>
+<h3 id="callsite-existence"><a href="#callsite-existence">Callsite Existence</a></h3>
+<p>If a <a href="../trait.Subscriber.html"><code>Subscriber</code></a> implementation wishes to allocate storage for each
+unique span/event location in the program, or pre-compute some value
+that will be used to record that span or event in the future, it can
+do so in its <a href="../trait.Subscriber.html#method.register_callsite"><code>register_callsite</code></a> method.</p>
+<h3 id="performing-static-filtering"><a href="#performing-static-filtering">Performing Static Filtering</a></h3>
+<p>The <a href="../trait.Subscriber.html#method.register_callsite"><code>register_callsite</code></a> method returns an <a href="../subscriber/struct.Interest.html"><code>Interest</code></a> value,
+which indicates that the subscriber either <a href="../subscriber/struct.Interest.html#method.always">always</a> wishes to record
+that span or event, <a href="../subscriber/struct.Interest.html#method.sometimes">sometimes</a> wishes to record it based on a
+dynamic filter evaluation, or <a href="../subscriber/struct.Interest.html#method.never">never</a> wishes to record it.</p>
+<p>When registering a new callsite, the <a href="../subscriber/struct.Interest.html"><code>Interest</code></a>s returned by every
+currently active subscriber are combined, and the result is stored at
+each callsite. This way, when the span or event occurs in the
+future, the cached <a href="../subscriber/struct.Interest.html"><code>Interest</code></a> value can be checked efficiently
+to determine if the span or event should be recorded, without
+needing to perform expensive filtering (i.e. calling the
+<a href="../trait.Subscriber.html#tymethod.enabled"><code>Subscriber::enabled</code></a> method every time a span or event occurs).</p>
+<h4 id="rebuilding-cached-interest"><a href="#rebuilding-cached-interest">Rebuilding Cached Interest</a></h4>
+<p>When a new <a href="crate::dispatch::Dispatch"><code>Dispatch</code></a> is created (i.e. a new subscriber becomes
+active), any previously cached <a href="../subscriber/struct.Interest.html"><code>Interest</code></a> values are re-evaluated
+for all callsites in the program. This way, if the new subscriber
+will enable a callsite that was not previously enabled, the
+<a href="../subscriber/struct.Interest.html"><code>Interest</code></a> in that callsite is updated. Similarly, when a
+subscriber is dropped, the interest cache is also re-evaluated, so
+that any callsites enabled only by that subscriber are disabled.</p>
+<p>In addition, the <a href="fn.rebuild_interest_cache.html" title="rebuild_interest_cache"><code>rebuild_interest_cache</code></a> function in this module can be
+used to manually invalidate all cached interest and re-register those
+callsites. This function is useful in situations where a subscriber’s
+interest can change, but it does so relatively infrequently. The subscriber
+may wish for its interest to be cached most of the time, and return
+<a href="../subscriber/struct.Interest.html#method.always"><code>Interest::always</code></a> or <a href="../subscriber/struct.Interest.html#method.never"><code>Interest::never</code></a> in its
+<a href="../trait.Subscriber.html#method.register_callsite"><code>register_callsite</code></a> method, so that its <a href="../trait.Subscriber.html#tymethod.enabled"><code>Subscriber::enabled</code></a> method
+doesn’t need to be evaluated every time a span or event is recorded.
+However, when the configuration changes, the subscriber can call
+<a href="fn.rebuild_interest_cache.html" title="rebuild_interest_cache"><code>rebuild_interest_cache</code></a> to re-evaluate the entire interest cache with its
+new configuration. This is a relatively costly operation, but if the
+configuration changes infrequently, it may be more efficient than calling
+<a href="../trait.Subscriber.html#tymethod.enabled"><code>Subscriber::enabled</code></a> frequently.</p>
+<h2 id="implementing-callsites"><a href="#implementing-callsites">Implementing Callsites</a></h2>
+<p>In most cases, instrumenting code using <code>tracing</code> should <em>not</em> require
+implementing the <a href="../trait.Callsite.html" title="Callsite"><code>Callsite</code></a> trait directly. When using the <a href="https://docs.rs/tracing/latest/tracing/#macros"><code>tracing</code>
+crate’s macros</a> or the <a href="https://docs.rs/tracing/latest/tracing/attr.instrument.html"><code>#[instrument]</code> attribute</a>, a
+<code>Callsite</code> is automatically generated.</p>
+<p>However, code which provides alternative forms of <code>tracing</code> instrumentation
+may need to interact with the callsite system directly. If
+instrumentation-side code needs to produce a <code>Callsite</code> to emit spans or
+events, the <a href="struct.DefaultCallsite.html" title="DefaultCallsite"><code>DefaultCallsite</code></a> struct provided in this module is a
+ready-made <code>Callsite</code> implementation that is suitable for most uses. When
+possible, the use of <code>DefaultCallsite</code> should be preferred over implementing
+<a href="../trait.Callsite.html" title="Callsite"><code>Callsite</code></a> for user types, as <code>DefaultCallsite</code> may benefit from
+additional performance optimizations.</p>
+<div class="footnotes"><hr><ol><li id="fn1"><p>Returned by the <a href="crate::subscriber::Subscriber::register_callsite"><code>Subscriber::register_callsite</code></a>
+method.&nbsp;<a href="#fnref1">↩</a></p></li></ol></div></div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DefaultCallsite.html" title="tracing_core::callsite::DefaultCallsite struct">DefaultCallsite</a></div><div class="item-right docblock-short"><p>A default <a href="../trait.Callsite.html" title="Callsite"><code>Callsite</code></a> implementation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Identifier.html" title="tracing_core::callsite::Identifier struct">Identifier</a></div><div class="item-right docblock-short"><p>Uniquely identifies a <a href="../trait.Callsite.html"><code>Callsite</code></a></p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Callsite.html" title="tracing_core::callsite::Callsite trait">Callsite</a></div><div class="item-right docblock-short"><p>Trait implemented by callsites.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.rebuild_interest_cache.html" title="tracing_core::callsite::rebuild_interest_cache fn">rebuild_interest_cache</a></div><div class="item-right docblock-short"><p>Clear and reregister interest on every <a href="../trait.Callsite.html"><code>Callsite</code></a></p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.register.html" title="tracing_core::callsite::register fn">register</a></div><div class="item-right docblock-short"><p>Register a new <a href="../trait.Callsite.html"><code>Callsite</code></a> with the global registry.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tracing_core" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

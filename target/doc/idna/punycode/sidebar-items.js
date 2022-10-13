@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["decode","Convert Punycode to Unicode."],["decode_to_string","Convert Punycode to an Unicode `String`."],["encode","Convert Unicode to Punycode."],["encode_str","Convert an Unicode `str` to Punycode."]]};

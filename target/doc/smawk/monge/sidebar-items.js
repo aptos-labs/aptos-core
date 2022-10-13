@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["is_monge","Verify that a matrix is a Monge matrix."]]};

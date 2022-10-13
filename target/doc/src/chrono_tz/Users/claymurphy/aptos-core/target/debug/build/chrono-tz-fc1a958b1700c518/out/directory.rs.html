@@ -1,0 +1,1403 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/aptos-core/target/debug/build/chrono-tz-fc1a958b1700c518/out/directory.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>directory.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../../../../../../storage.js"></script><script defer src="../../../../../../../../../../source-script.js"></script><script defer src="../../../../../../../../../../source-files.js"></script><script defer src="../../../../../../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../../../../../../../../chrono_tz/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../../../../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../../../../../../../../chrono_tz/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../../../../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../../../../../../chrono_tz/index.html"><img class="rust-logo" src="../../../../../../../../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../../../../../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../../../../../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
+<span id="671">671</span>
+<span id="672">672</span>
+<span id="673">673</span>
+<span id="674">674</span>
+<span id="675">675</span>
+<span id="676">676</span>
+<span id="677">677</span>
+<span id="678">678</span>
+<span id="679">679</span>
+<span id="680">680</span>
+<span id="681">681</span>
+<span id="682">682</span>
+<span id="683">683</span>
+<span id="684">684</span>
+<span id="685">685</span>
+<span id="686">686</span>
+<span id="687">687</span>
+<span id="688">688</span>
+<span id="689">689</span>
+<span id="690">690</span>
+<span id="691">691</span>
+<span id="692">692</span>
+<span id="693">693</span>
+<span id="694">694</span>
+<span id="695">695</span>
+<span id="696">696</span>
+<span id="697">697</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CET</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::CET</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CST6CDT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::CST6CDT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cuba</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Cuba</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EET</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::EET</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EST</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::EST</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EST5EDT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::EST5EDT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Egypt</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Egypt</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Eire</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Eire</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GB</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::GB</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GBEire</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::GBEire</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::GMT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus0</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::GMTPlus0</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus0</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::GMTMinus0</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMT0</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::GMT0</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Greenwich</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Greenwich</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HST</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::HST</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Hongkong</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Hongkong</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Iceland</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Iceland</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Iran</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Iran</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Israel</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Israel</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jamaica</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Jamaica</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Japan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Japan</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kwajalein</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Kwajalein</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Libya</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Libya</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MET</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::MET</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MST</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::MST</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MST7MDT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::MST7MDT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NZ</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::NZ</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NZCHAT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::NZCHAT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Navajo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Navajo</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PRC</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::PRC</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PST8PDT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::PST8PDT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Poland</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Poland</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Portugal</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Portugal</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ROC</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::ROC</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ROK</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::ROK</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Singapore</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Singapore</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Turkey</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Turkey</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UCT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::UCT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UTC</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::UTC</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Universal</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Universal</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">WSU</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::WSU</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">WET</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::WET</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Zulu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Zulu</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Africa</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Abidjan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Abidjan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Accra</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Accra</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Addis_Ababa</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Addis_Ababa</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Algiers</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Algiers</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Asmara</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Asmara</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Asmera</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Asmera</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bamako</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Bamako</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bangui</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Bangui</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Banjul</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Banjul</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bissau</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Bissau</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Blantyre</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Blantyre</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Brazzaville</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Brazzaville</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bujumbura</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Bujumbura</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cairo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Cairo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Casablanca</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Casablanca</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ceuta</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Ceuta</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Conakry</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Conakry</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dakar</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Dakar</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dar_es_Salaam</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Dar_es_Salaam</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Djibouti</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Djibouti</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Douala</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Douala</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">El_Aaiun</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__El_Aaiun</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Freetown</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Freetown</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Gaborone</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Gaborone</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Harare</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Harare</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Johannesburg</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Johannesburg</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Juba</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Juba</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kampala</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Kampala</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Khartoum</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Khartoum</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kigali</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Kigali</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kinshasa</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Kinshasa</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lagos</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Lagos</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Libreville</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Libreville</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lome</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Lome</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Luanda</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Luanda</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lubumbashi</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Lubumbashi</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lusaka</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Lusaka</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Malabo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Malabo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Maputo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Maputo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Maseru</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Maseru</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mbabane</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Mbabane</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mogadishu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Mogadishu</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Monrovia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Monrovia</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nairobi</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Nairobi</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ndjamena</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Ndjamena</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Niamey</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Niamey</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nouakchott</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Nouakchott</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ouagadougou</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Ouagadougou</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PortoNovo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__PortoNovo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Sao_Tome</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Sao_Tome</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Timbuktu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Timbuktu</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tripoli</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Tripoli</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tunis</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Tunis</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Windhoek</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Africa__Windhoek</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">America</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Argentina</span> {
+        <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Buenos_Aires</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Buenos_Aires</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Catamarca</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Catamarca</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ComodRivadavia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__ComodRivadavia</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cordoba</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Cordoba</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jujuy</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Jujuy</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">La_Rioja</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__La_Rioja</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mendoza</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Mendoza</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rio_Gallegos</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Rio_Gallegos</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Salta</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Salta</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">San_Juan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__San_Juan</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">San_Luis</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__San_Luis</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tucuman</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Tucuman</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ushuaia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Argentina__Ushuaia</span>;
+    }
+
+    <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Indiana</span> {
+        <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Indianapolis</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indiana__Indianapolis</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Knox</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indiana__Knox</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Marengo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indiana__Marengo</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Petersburg</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indiana__Petersburg</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tell_City</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indiana__Tell_City</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vevay</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indiana__Vevay</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vincennes</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indiana__Vincennes</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Winamac</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indiana__Winamac</span>;
+    }
+
+    <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Kentucky</span> {
+        <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Louisville</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Kentucky__Louisville</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Monticello</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Kentucky__Monticello</span>;
+    }
+
+    <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">North_Dakota</span> {
+        <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Beulah</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__North_Dakota__Beulah</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Center</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__North_Dakota__Center</span>;
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">New_Salem</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__North_Dakota__New_Salem</span>;
+    }
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Adak</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Adak</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Anchorage</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Anchorage</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Anguilla</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Anguilla</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Antigua</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Antigua</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Araguaina</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Araguaina</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Aruba</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Aruba</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Asuncion</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Asuncion</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Atikokan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Atikokan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Atka</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Atka</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bahia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Bahia</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bahia_Banderas</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Bahia_Banderas</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Barbados</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Barbados</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Belem</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Belem</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Belize</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Belize</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BlancSablon</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__BlancSablon</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Boa_Vista</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Boa_Vista</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bogota</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Bogota</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Boise</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Boise</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Buenos_Aires</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Buenos_Aires</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cambridge_Bay</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Cambridge_Bay</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Campo_Grande</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Campo_Grande</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cancun</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Cancun</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Caracas</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Caracas</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Catamarca</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Catamarca</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cayenne</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Cayenne</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cayman</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Cayman</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chicago</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Chicago</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chihuahua</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Chihuahua</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Coral_Harbour</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Coral_Harbour</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cordoba</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Cordoba</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Costa_Rica</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Costa_Rica</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Creston</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Creston</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cuiaba</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Cuiaba</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Curacao</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Curacao</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Danmarkshavn</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Danmarkshavn</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dawson</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Dawson</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dawson_Creek</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Dawson_Creek</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Denver</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Denver</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Detroit</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Detroit</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dominica</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Dominica</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Edmonton</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Edmonton</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Eirunepe</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Eirunepe</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">El_Salvador</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__El_Salvador</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ensenada</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Ensenada</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Fort_Nelson</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Fort_Nelson</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Fort_Wayne</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Fort_Wayne</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Fortaleza</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Fortaleza</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Glace_Bay</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Glace_Bay</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Godthab</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Godthab</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Goose_Bay</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Goose_Bay</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Grand_Turk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Grand_Turk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Grenada</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Grenada</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Guadeloupe</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Guadeloupe</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Guatemala</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Guatemala</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Guayaquil</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Guayaquil</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Guyana</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Guyana</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Halifax</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Halifax</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Havana</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Havana</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Hermosillo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Hermosillo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Indianapolis</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Indianapolis</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Inuvik</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Inuvik</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Iqaluit</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Iqaluit</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jamaica</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Jamaica</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jujuy</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Jujuy</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Juneau</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Juneau</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Knox_IN</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Knox_IN</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kralendijk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Kralendijk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">La_Paz</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__La_Paz</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lima</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Lima</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Los_Angeles</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Los_Angeles</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Louisville</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Louisville</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lower_Princes</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Lower_Princes</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Maceio</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Maceio</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Managua</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Managua</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Manaus</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Manaus</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Marigot</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Marigot</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Martinique</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Martinique</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Matamoros</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Matamoros</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mazatlan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Mazatlan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mendoza</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Mendoza</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Menominee</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Menominee</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Merida</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Merida</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Metlakatla</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Metlakatla</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mexico_City</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Mexico_City</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Miquelon</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Miquelon</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Moncton</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Moncton</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Monterrey</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Monterrey</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Montevideo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Montevideo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Montreal</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Montreal</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Montserrat</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Montserrat</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nassau</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Nassau</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">New_York</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__New_York</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nipigon</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Nipigon</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nome</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Nome</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Noronha</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Noronha</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nuuk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Nuuk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ojinaga</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Ojinaga</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Panama</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Panama</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Pangnirtung</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Pangnirtung</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Paramaribo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Paramaribo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Phoenix</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Phoenix</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PortauPrince</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__PortauPrince</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Port_of_Spain</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Port_of_Spain</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Porto_Acre</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Porto_Acre</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Porto_Velho</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Porto_Velho</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Puerto_Rico</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Puerto_Rico</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Punta_Arenas</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Punta_Arenas</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rainy_River</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Rainy_River</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rankin_Inlet</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Rankin_Inlet</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Recife</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Recife</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Regina</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Regina</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Resolute</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Resolute</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rio_Branco</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Rio_Branco</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rosario</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Rosario</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Santa_Isabel</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Santa_Isabel</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Santarem</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Santarem</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Santiago</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Santiago</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Santo_Domingo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Santo_Domingo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Sao_Paulo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Sao_Paulo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Scoresbysund</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Scoresbysund</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Shiprock</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Shiprock</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Sitka</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Sitka</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">St_Barthelemy</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__St_Barthelemy</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">St_Johns</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__St_Johns</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">St_Kitts</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__St_Kitts</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">St_Lucia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__St_Lucia</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">St_Thomas</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__St_Thomas</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">St_Vincent</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__St_Vincent</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Swift_Current</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Swift_Current</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tegucigalpa</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Tegucigalpa</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Thule</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Thule</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Thunder_Bay</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Thunder_Bay</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tijuana</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Tijuana</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Toronto</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Toronto</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tortola</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Tortola</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vancouver</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Vancouver</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Virgin</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Virgin</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Whitehorse</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Whitehorse</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Winnipeg</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Winnipeg</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yakutat</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Yakutat</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yellowknife</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::America__Yellowknife</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Antarctica</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Casey</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Casey</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Davis</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Davis</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DumontDUrville</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__DumontDUrville</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Macquarie</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Macquarie</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mawson</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Mawson</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">McMurdo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__McMurdo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Palmer</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Palmer</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rothera</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Rothera</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">South_Pole</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__South_Pole</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Syowa</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Syowa</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Troll</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Troll</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vostok</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Antarctica__Vostok</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Arctic</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Longyearbyen</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Arctic__Longyearbyen</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Asia</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Aden</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Aden</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Almaty</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Almaty</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Amman</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Amman</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Anadyr</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Anadyr</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Aqtau</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Aqtau</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Aqtobe</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Aqtobe</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ashgabat</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Ashgabat</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ashkhabad</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Ashkhabad</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Atyrau</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Atyrau</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Baghdad</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Baghdad</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bahrain</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Bahrain</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Baku</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Baku</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bangkok</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Bangkok</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Barnaul</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Barnaul</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Beirut</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Beirut</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bishkek</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Bishkek</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Brunei</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Brunei</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Calcutta</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Calcutta</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chita</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Chita</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Choibalsan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Choibalsan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chongqing</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Chongqing</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chungking</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Chungking</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Colombo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Colombo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dacca</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Dacca</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Damascus</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Damascus</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dhaka</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Dhaka</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dili</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Dili</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dubai</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Dubai</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dushanbe</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Dushanbe</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Famagusta</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Famagusta</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Gaza</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Gaza</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Harbin</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Harbin</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Hebron</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Hebron</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ho_Chi_Minh</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Ho_Chi_Minh</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Hong_Kong</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Hong_Kong</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Hovd</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Hovd</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Irkutsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Irkutsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Istanbul</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Istanbul</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jakarta</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Jakarta</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jayapura</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Jayapura</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jerusalem</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Jerusalem</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kabul</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Kabul</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kamchatka</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Kamchatka</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Karachi</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Karachi</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kashgar</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Kashgar</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kathmandu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Kathmandu</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Katmandu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Katmandu</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Khandyga</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Khandyga</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kolkata</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Kolkata</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Krasnoyarsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Krasnoyarsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kuala_Lumpur</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Kuala_Lumpur</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kuching</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Kuching</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kuwait</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Kuwait</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Macao</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Macao</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Macau</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Macau</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Magadan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Magadan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Makassar</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Makassar</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Manila</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Manila</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Muscat</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Muscat</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nicosia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Nicosia</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Novokuznetsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Novokuznetsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Novosibirsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Novosibirsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Omsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Omsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Oral</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Oral</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Phnom_Penh</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Phnom_Penh</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Pontianak</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Pontianak</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Pyongyang</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Pyongyang</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Qatar</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Qatar</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Qostanay</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Qostanay</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Qyzylorda</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Qyzylorda</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rangoon</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Rangoon</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Riyadh</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Riyadh</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Saigon</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Saigon</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Sakhalin</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Sakhalin</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Samarkand</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Samarkand</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Seoul</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Seoul</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Shanghai</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Shanghai</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Singapore</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Singapore</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Srednekolymsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Srednekolymsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Taipei</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Taipei</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tashkent</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Tashkent</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tbilisi</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Tbilisi</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tehran</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Tehran</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tel_Aviv</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Tel_Aviv</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Thimbu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Thimbu</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Thimphu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Thimphu</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tokyo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Tokyo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tomsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Tomsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ujung_Pandang</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Ujung_Pandang</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ulaanbaatar</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Ulaanbaatar</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ulan_Bator</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Ulan_Bator</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Urumqi</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Urumqi</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UstNera</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__UstNera</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vientiane</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Vientiane</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vladivostok</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Vladivostok</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yakutsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Yakutsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yangon</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Yangon</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yekaterinburg</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Yekaterinburg</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yerevan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Asia__Yerevan</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Atlantic</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Azores</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Azores</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bermuda</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Bermuda</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Canary</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Canary</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cape_Verde</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Cape_Verde</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Faeroe</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Faeroe</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Faroe</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Faroe</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jan_Mayen</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Jan_Mayen</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Madeira</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Madeira</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Reykjavik</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Reykjavik</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">South_Georgia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__South_Georgia</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">St_Helena</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__St_Helena</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Stanley</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Atlantic__Stanley</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Australia</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ACT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__ACT</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Adelaide</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Adelaide</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Brisbane</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Brisbane</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Broken_Hill</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Broken_Hill</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Canberra</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Canberra</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Currie</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Currie</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Darwin</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Darwin</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Eucla</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Eucla</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Hobart</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Hobart</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LHI</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__LHI</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lindeman</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Lindeman</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lord_Howe</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Lord_Howe</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Melbourne</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Melbourne</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NSW</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__NSW</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">North</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__North</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Perth</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Perth</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Queensland</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Queensland</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">South</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__South</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Sydney</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Sydney</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tasmania</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Tasmania</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Victoria</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Victoria</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">West</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__West</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yancowinna</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Australia__Yancowinna</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Brazil</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Acre</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Brazil__Acre</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DeNoronha</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Brazil__DeNoronha</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">East</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Brazil__East</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">West</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Brazil__West</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Canada</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Atlantic</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Canada__Atlantic</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Central</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Canada__Central</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Eastern</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Canada__Eastern</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mountain</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Canada__Mountain</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Newfoundland</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Canada__Newfoundland</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Pacific</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Canada__Pacific</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Saskatchewan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Canada__Saskatchewan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yukon</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Canada__Yukon</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Chile</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Continental</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Chile__Continental</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EasterIsland</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Chile__EasterIsland</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Etc</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMT</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus0</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus0</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus1</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus1</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus10</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus10</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus11</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus11</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus12</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus12</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus2</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus2</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus3</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus3</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus4</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus4</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus5</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus5</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus6</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus6</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus7</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus7</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus8</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus8</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTPlus9</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTPlus9</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus0</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus0</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus1</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus1</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus10</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus10</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus11</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus11</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus12</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus12</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus13</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus13</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus14</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus14</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus2</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus2</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus3</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus3</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus4</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus4</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus5</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus5</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus6</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus6</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus7</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus7</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus8</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus8</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMTMinus9</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMTMinus9</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GMT0</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__GMT0</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Greenwich</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__Greenwich</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UCT</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__UCT</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UTC</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__UTC</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Universal</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__Universal</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Zulu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Etc__Zulu</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Europe</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Amsterdam</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Amsterdam</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Andorra</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Andorra</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Astrakhan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Astrakhan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Athens</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Athens</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Belfast</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Belfast</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Belgrade</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Belgrade</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Berlin</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Berlin</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bratislava</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Bratislava</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Brussels</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Brussels</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bucharest</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Bucharest</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Budapest</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Budapest</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Busingen</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Busingen</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chisinau</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Chisinau</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Copenhagen</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Copenhagen</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Dublin</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Dublin</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Gibraltar</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Gibraltar</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Guernsey</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Guernsey</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Helsinki</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Helsinki</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Isle_of_Man</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Isle_of_Man</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Istanbul</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Istanbul</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Jersey</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Jersey</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kaliningrad</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Kaliningrad</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kiev</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Kiev</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kirov</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Kirov</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Lisbon</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Lisbon</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ljubljana</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Ljubljana</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">London</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__London</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Luxembourg</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Luxembourg</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Madrid</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Madrid</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Malta</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Malta</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mariehamn</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Mariehamn</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Minsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Minsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Monaco</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Monaco</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Moscow</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Moscow</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nicosia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Nicosia</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Oslo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Oslo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Paris</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Paris</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Podgorica</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Podgorica</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Prague</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Prague</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Riga</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Riga</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rome</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Rome</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Samara</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Samara</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">San_Marino</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__San_Marino</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Sarajevo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Sarajevo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Saratov</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Saratov</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Simferopol</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Simferopol</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Skopje</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Skopje</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Sofia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Sofia</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Stockholm</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Stockholm</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tallinn</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Tallinn</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tirane</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Tirane</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tiraspol</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Tiraspol</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ulyanovsk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Ulyanovsk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Uzhgorod</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Uzhgorod</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vaduz</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Vaduz</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vatican</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Vatican</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vienna</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Vienna</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Vilnius</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Vilnius</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Volgograd</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Volgograd</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Warsaw</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Warsaw</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Zagreb</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Zagreb</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Zaporozhye</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Zaporozhye</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Zurich</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Europe__Zurich</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Indian</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Antananarivo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Antananarivo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chagos</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Chagos</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Christmas</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Christmas</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Cocos</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Cocos</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Comoro</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Comoro</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kerguelen</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Kerguelen</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mahe</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Mahe</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Maldives</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Maldives</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mauritius</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Mauritius</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mayotte</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Mayotte</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Reunion</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Indian__Reunion</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Mexico</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BajaNorte</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Mexico__BajaNorte</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BajaSur</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Mexico__BajaSur</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">General</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Mexico__General</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">Pacific</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Apia</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Apia</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Auckland</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Auckland</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bougainville</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Bougainville</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chatham</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Chatham</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Chuuk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Chuuk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Easter</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Easter</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Efate</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Efate</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Enderbury</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Enderbury</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Fakaofo</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Fakaofo</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Fiji</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Fiji</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Funafuti</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Funafuti</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Galapagos</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Galapagos</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Gambier</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Gambier</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Guadalcanal</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Guadalcanal</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Guam</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Guam</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Honolulu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Honolulu</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Johnston</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Johnston</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kanton</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Kanton</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kiritimati</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Kiritimati</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kosrae</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Kosrae</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Kwajalein</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Kwajalein</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Majuro</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Majuro</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Marquesas</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Marquesas</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Midway</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Midway</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Nauru</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Nauru</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Niue</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Niue</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Norfolk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Norfolk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Noumea</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Noumea</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Pago_Pago</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Pago_Pago</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Palau</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Palau</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Pitcairn</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Pitcairn</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Pohnpei</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Pohnpei</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Ponape</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Ponape</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Port_Moresby</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Port_Moresby</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Rarotonga</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Rarotonga</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Saipan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Saipan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Samoa</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Samoa</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tahiti</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Tahiti</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tarawa</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Tarawa</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tongatapu</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Tongatapu</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Truk</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Truk</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Wake</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Wake</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Wallis</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Wallis</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Yap</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::Pacific__Yap</span>;
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">US</span> {
+    <span class="kw">use</span> <span class="ident">timezones::Tz</span>;
+
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Alaska</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Alaska</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Aleutian</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Aleutian</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Arizona</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Arizona</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Central</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Central</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EastIndiana</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__EastIndiana</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Eastern</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Eastern</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Hawaii</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Hawaii</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IndianaStarke</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__IndianaStarke</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Michigan</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Michigan</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Mountain</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Mountain</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Pacific</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Pacific</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Samoa</span> : <span class="ident">Tz</span> <span class="op">=</span> <span class="ident">Tz::US__Samoa</span>;
+}
+
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../../../../../../" data-current-crate="chrono_tz" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

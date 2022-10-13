@@ -1,0 +1,894 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="An I/O object representing a Unix datagram socket."><meta name="keywords" content="rust, rustlang, rust-lang, UnixDatagram"><title>UnixDatagram in tokio::net - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc struct"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tokio/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">UnixDatagram</a></h2><div class="sidebar-elems"><section><div class="block"><h3 class="sidebar-title"><a href="#implementations">Methods</a></h3><ul><li><a href="#method.bind">bind</a></li><li><a href="#method.connect">connect</a></li><li><a href="#method.from_std">from_std</a></li><li><a href="#method.into_std">into_std</a></li><li><a href="#method.local_addr">local_addr</a></li><li><a href="#method.pair">pair</a></li><li><a href="#method.peer_addr">peer_addr</a></li><li><a href="#method.poll_recv">poll_recv</a></li><li><a href="#method.poll_recv_from">poll_recv_from</a></li><li><a href="#method.poll_recv_ready">poll_recv_ready</a></li><li><a href="#method.poll_send">poll_send</a></li><li><a href="#method.poll_send_ready">poll_send_ready</a></li><li><a href="#method.poll_send_to">poll_send_to</a></li><li><a href="#method.readable">readable</a></li><li><a href="#method.ready">ready</a></li><li><a href="#method.recv">recv</a></li><li><a href="#method.recv_from">recv_from</a></li><li><a href="#method.send">send</a></li><li><a href="#method.send_to">send_to</a></li><li><a href="#method.shutdown">shutdown</a></li><li><a href="#method.take_error">take_error</a></li><li><a href="#method.try_io">try_io</a></li><li><a href="#method.try_recv">try_recv</a></li><li><a href="#method.try_recv_buf">try_recv_buf</a></li><li><a href="#method.try_recv_buf_from">try_recv_buf_from</a></li><li><a href="#method.try_recv_from">try_recv_from</a></li><li><a href="#method.try_send">try_send</a></li><li><a href="#method.try_send_to">try_send_to</a></li><li><a href="#method.unbound">unbound</a></li><li><a href="#method.writable">writable</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#trait-implementations">Trait Implementations</a></h3><ul><li><a href="#impl-AsRawFd">AsRawFd</a></li><li><a href="#impl-Debug">Debug</a></li><li><a href="#impl-TryFrom%3CUnixDatagram%3E">TryFrom&lt;UnixDatagram&gt;</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#synthetic-implementations">Auto Trait Implementations</a></h3><ul><li><a href="#impl-RefUnwindSafe">RefUnwindSafe</a></li><li><a href="#impl-Send">Send</a></li><li><a href="#impl-Sync">Sync</a></li><li><a href="#impl-Unpin">Unpin</a></li><li><a href="#impl-UnwindSafe">UnwindSafe</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#blanket-implementations">Blanket Implementations</a></h3><ul><li><a href="#impl-Any">Any</a></li><li><a href="#impl-Borrow%3CT%3E">Borrow&lt;T&gt;</a></li><li><a href="#impl-BorrowMut%3CT%3E">BorrowMut&lt;T&gt;</a></li><li><a href="#impl-From%3CT%3E">From&lt;T&gt;</a></li><li><a href="#impl-Into%3CU%3E">Into&lt;U&gt;</a></li><li><a href="#impl-TryFrom%3CU%3E">TryFrom&lt;U&gt;</a></li><li><a href="#impl-TryInto%3CU%3E">TryInto&lt;U&gt;</a></li></ul></div></section><h2 class="location"><a href="index.html">In tokio::net</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tokio/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Struct <a href="../index.html">tokio</a>::<wbr><a href="index.html">net</a>::<wbr><a class="struct" href="#">UnixDatagram</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#93-95">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust struct"><code>pub struct UnixDatagram { /* private fields */ }</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>An I/O object representing a Unix datagram socket.</p>
+<p>A socket can be either named (associated with a filesystem path) or
+unnamed.</p>
+<p>This type does not provide a <code>split</code> method, because this functionality
+can be achieved by wrapping the socket in an <a href="https://doc.rust-lang.org/1.63.0/alloc/sync/struct.Arc.html"><code>Arc</code></a>. Note that you do
+not need a <code>Mutex</code> to share the <code>UnixDatagram</code> — an <code>Arc&lt;UnixDatagram&gt;</code>
+is enough. This is because all of the methods take <code>&amp;self</code> instead of
+<code>&amp;mut self</code>.</p>
+<p><strong>Note:</strong> named sockets are persisted even after the object is dropped
+and the program has exited, and cannot be reconnected. It is advised
+that you either check for and unlink the existing socket if it exists,
+or use a temporary file that is guaranteed to not already exist.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Using named sockets, associated with a filesystem path:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// We use a temporary directory so that the socket</span>
+<span class="comment">// files left by the bound sockets will get cleaned up.</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Bind each socket to a filesystem path</span>
+<span class="kw">let</span> <span class="ident">tx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;tx&quot;</span>);
+<span class="kw">let</span> <span class="ident">tx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">tx_path</span>)<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">rx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;rx&quot;</span>);
+<span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">rx_path</span>)<span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hello world&quot;</span>;
+<span class="ident">tx</span>.<span class="ident">send_to</span>(<span class="ident">bytes</span>, <span class="kw-2">&amp;</span><span class="ident">rx_path</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> (<span class="ident">size</span>, <span class="ident">addr</span>) <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_from</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">addr</span>.<span class="ident">as_pathname</span>().<span class="ident">unwrap</span>(), <span class="kw-2">&amp;</span><span class="ident">tx_path</span>);
+</code></pre></div>
+<p>Using unnamed sockets, created as a pair</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+
+<span class="comment">// Create the pair of sockets</span>
+<span class="kw">let</span> (<span class="ident">sock1</span>, <span class="ident">sock2</span>) <span class="op">=</span> <span class="ident">UnixDatagram::pair</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Since the sockets are paired, the paired send/recv</span>
+<span class="comment">// functions can be used</span>
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hello world&quot;</span>;
+<span class="ident">sock1</span>.<span class="ident">send</span>(<span class="ident">bytes</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buff</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">sock2</span>.<span class="ident">recv</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buff</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buff</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+</code></pre></div>
+</div></details><h2 id="implementations" class="small-section-header">Implementations<a href="#implementations" class="anchor"></a></h2><div id="implementations-list"><details class="rustdoc-toggle implementors-toggle" open><summary><section id="impl" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#98-1402">source</a></span><a href="#impl" class="anchor"></a><h3 class="code-header in-band">impl <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.ready" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#167-170">source</a></span><a href="#method.ready" class="anchor"></a><h4 class="code-header">pub async fn <a href="#method.ready" class="fnname">ready</a>(&amp;self, interest: <a class="struct" href="../io/struct.Interest.html" title="struct tokio::io::Interest">Interest</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="struct" href="../io/struct.Ready.html" title="struct tokio::io::Ready">Ready</a>&gt;</h4></section></summary><div class="docblock"><p>Waits for any of the requested ready states.</p>
+<p>This function is usually paired with <code>try_recv()</code> or <code>try_send()</code>. It
+can be used to concurrently recv / send to the same socket on a single
+task without splitting the socket.</p>
+<p>The function may complete without the socket being ready. This is a
+false-positive and attempting an operation will return with
+<code>io::ErrorKind::WouldBlock</code>.</p>
+<h5 id="cancel-safety"><a href="#cancel-safety">Cancel safety</a></h5>
+<p>This method is cancel safe. Once a readiness event occurs, the method
+will continue to return immediately until the readiness event is
+consumed by an attempt to read or write that fails with <code>WouldBlock</code> or
+<code>Poll::Pending</code>.</p>
+<h5 id="examples-1"><a href="#examples-1">Examples</a></h5>
+<p>Concurrently receive from and send to the socket on the same task
+without splitting.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::io::Interest</span>;
+<span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+    <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="ident">server_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="kw">let</span> <span class="ident">ready</span> <span class="op">=</span> <span class="ident">socket</span>.<span class="ident">ready</span>(<span class="ident">Interest::READABLE</span> <span class="op">|</span> <span class="ident">Interest::WRITABLE</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="kw">if</span> <span class="ident">ready</span>.<span class="ident">is_readable</span>() {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">1024</span>];
+            <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_recv</span>(<span class="kw-2">&amp;mut</span> <span class="ident">data</span>[..]) {
+                <span class="prelude-val">Ok</span>(<span class="ident">n</span>) =&gt; {
+                    <span class="macro">println!</span>(<span class="string">&quot;received {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">data</span>[..<span class="ident">n</span>]);
+                }
+                <span class="comment">// False-positive, continue</span>
+                <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {}
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+                }
+            }
+        }
+
+        <span class="kw">if</span> <span class="ident">ready</span>.<span class="ident">is_writable</span>() {
+            <span class="comment">// Write some data</span>
+            <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_send</span>(<span class="string">b&quot;hello world&quot;</span>) {
+                <span class="prelude-val">Ok</span>(<span class="ident">n</span>) =&gt; {
+                    <span class="macro">println!</span>(<span class="string">&quot;sent {} bytes&quot;</span>, <span class="ident">n</span>);
+                }
+                <span class="comment">// False-positive, continue</span>
+                <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {}
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+                }
+            }
+        }
+    }
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.writable" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#224-227">source</a></span><a href="#method.writable" class="anchor"></a><h4 class="code-header">pub async fn <a href="#method.writable" class="fnname">writable</a>(&amp;self) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>&gt;</h4></section></summary><div class="docblock"><p>Waits for the socket to become writable.</p>
+<p>This function is equivalent to <code>ready(Interest::WRITABLE)</code> and is
+usually paired with <code>try_send()</code> or <code>try_send_to()</code>.</p>
+<p>The function may complete without the socket being writable. This is a
+false-positive and attempting a <code>try_send()</code> will return with
+<code>io::ErrorKind::WouldBlock</code>.</p>
+<h5 id="cancel-safety-1"><a href="#cancel-safety-1">Cancel safety</a></h5>
+<p>This method is cancel safe. Once a readiness event occurs, the method
+will continue to return immediately until the readiness event is
+consumed by an attempt to write that fails with <code>WouldBlock</code> or
+<code>Poll::Pending</code>.</p>
+<h5 id="examples-2"><a href="#examples-2">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+    <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="ident">server_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// Wait for the socket to be writable</span>
+        <span class="ident">socket</span>.<span class="ident">writable</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="comment">// Try to send data, this may still fail with `WouldBlock`</span>
+        <span class="comment">// if the readiness event is a false positive.</span>
+        <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_send</span>(<span class="string">b&quot;hello world&quot;</span>) {
+            <span class="prelude-val">Ok</span>(<span class="ident">n</span>) =&gt; {
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {
+                <span class="kw">continue</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            }
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.poll_send_ready" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#258-260">source</a></span><a href="#method.poll_send_ready" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.poll_send_ready" class="fnname">poll_send_ready</a>(&amp;self, cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>&gt;&gt;</h4></section></summary><div class="docblock"><p>Polls for write/send readiness.</p>
+<p>If the socket is not currently ready for sending, this method will
+store a clone of the <code>Waker</code> from the provided <code>Context</code>. When the socket
+becomes ready for sending, <code>Waker::wake</code> will be called on the
+waker.</p>
+<p>Note that on multiple calls to <code>poll_send_ready</code> or <code>poll_send</code>, only
+the <code>Waker</code> from the <code>Context</code> passed to the most recent call is
+scheduled to receive a wakeup. (However, <code>poll_recv_ready</code> retains a
+second, independent waker.)</p>
+<p>This function is intended for cases where creating and pinning a future
+via <a href="struct.UnixDatagram.html#method.writable"><code>writable</code></a> is not feasible. Where possible, using <a href="struct.UnixDatagram.html#method.writable"><code>writable</code></a> is
+preferred, as this supports polling from multiple tasks at once.</p>
+<h5 id="return-value"><a href="#return-value">Return value</a></h5>
+<p>The function returns:</p>
+<ul>
+<li><code>Poll::Pending</code> if the socket is not ready for writing.</li>
+<li><code>Poll::Ready(Ok(()))</code> if the socket is ready for writing.</li>
+<li><code>Poll::Ready(Err(e))</code> if an error is encountered.</li>
+</ul>
+<h5 id="errors"><a href="#errors">Errors</a></h5>
+<p>This function may encounter any standard I/O error except <code>WouldBlock</code>.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.readable" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#320-323">source</a></span><a href="#method.readable" class="anchor"></a><h4 class="code-header">pub async fn <a href="#method.readable" class="fnname">readable</a>(&amp;self) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>&gt;</h4></section></summary><div class="docblock"><p>Waits for the socket to become readable.</p>
+<p>This function is equivalent to <code>ready(Interest::READABLE)</code> and is usually
+paired with <code>try_recv()</code>.</p>
+<p>The function may complete without the socket being readable. This is a
+false-positive and attempting a <code>try_recv()</code> will return with
+<code>io::ErrorKind::WouldBlock</code>.</p>
+<h5 id="cancel-safety-2"><a href="#cancel-safety-2">Cancel safety</a></h5>
+<p>This method is cancel safe. Once a readiness event occurs, the method
+will continue to return immediately until the readiness event is
+consumed by an attempt to read that fails with <code>WouldBlock</code> or
+<code>Poll::Pending</code>.</p>
+<h5 id="examples-3"><a href="#examples-3">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="comment">// Connect to a peer</span>
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+    <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="ident">server_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// Wait for the socket to be readable</span>
+        <span class="ident">socket</span>.<span class="ident">readable</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="comment">// The buffer is **not** included in the async task and will</span>
+        <span class="comment">// only exist on the stack.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">1024</span>];
+
+        <span class="comment">// Try to recv data, this may still fail with `WouldBlock`</span>
+        <span class="comment">// if the readiness event is a false positive.</span>
+        <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_recv</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>) {
+            <span class="prelude-val">Ok</span>(<span class="ident">n</span>) =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;GOT {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">n</span>]);
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {
+                <span class="kw">continue</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            }
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.poll_recv_ready" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#354-356">source</a></span><a href="#method.poll_recv_ready" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.poll_recv_ready" class="fnname">poll_recv_ready</a>(&amp;self, cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>&gt;&gt;</h4></section></summary><div class="docblock"><p>Polls for read/receive readiness.</p>
+<p>If the socket is not currently ready for receiving, this method will
+store a clone of the <code>Waker</code> from the provided <code>Context</code>. When the
+socket becomes ready for reading, <code>Waker::wake</code> will be called on the
+waker.</p>
+<p>Note that on multiple calls to <code>poll_recv_ready</code>, <code>poll_recv</code> or
+<code>poll_peek</code>, only the <code>Waker</code> from the <code>Context</code> passed to the most
+recent call is scheduled to receive a wakeup. (However,
+<code>poll_send_ready</code> retains a second, independent waker.)</p>
+<p>This function is intended for cases where creating and pinning a future
+via <a href="struct.UnixDatagram.html#method.readable"><code>readable</code></a> is not feasible. Where possible, using <a href="struct.UnixDatagram.html#method.readable"><code>readable</code></a> is
+preferred, as this supports polling from multiple tasks at once.</p>
+<h5 id="return-value-1"><a href="#return-value-1">Return value</a></h5>
+<p>The function returns:</p>
+<ul>
+<li><code>Poll::Pending</code> if the socket is not ready for reading.</li>
+<li><code>Poll::Ready(Ok(()))</code> if the socket is ready for reading.</li>
+<li><code>Poll::Ready(Err(e))</code> if an error is encountered.</li>
+</ul>
+<h5 id="errors-1"><a href="#errors-1">Errors</a></h5>
+<p>This function may encounter any standard I/O error except <code>WouldBlock</code>.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.bind" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#379-385">source</a></span><a href="#method.bind" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.bind" class="fnname">bind</a>&lt;P&gt;(path: P) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a>&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;P: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.AsRef.html" title="trait core::convert::AsRef">AsRef</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/std/path/struct.Path.html" title="struct std::path::Path">Path</a>&gt;,&nbsp;</span></h4></section></summary><div class="docblock"><p>Creates a new <code>UnixDatagram</code> bound to the specified path.</p>
+<h5 id="examples-4"><a href="#examples-4">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// We use a temporary directory so that the socket</span>
+<span class="comment">// files left by the bound sockets will get cleaned up.</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Bind the socket to a filesystem path</span>
+<span class="kw">let</span> <span class="ident">socket_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;socket&quot;</span>);
+<span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">socket_path</span>)<span class="question-mark">?</span>;
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.pair" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#416-422">source</a></span><a href="#method.pair" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.pair" class="fnname">pair</a>() -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;(<a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a>, <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a>)&gt;</h4></section></summary><div class="docblock"><p>Creates an unnamed pair of connected sockets.</p>
+<p>This function will create a pair of interconnected Unix sockets for
+communicating back and forth between one another.</p>
+<h5 id="examples-5"><a href="#examples-5">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+
+<span class="comment">// Create the pair of sockets</span>
+<span class="kw">let</span> (<span class="ident">sock1</span>, <span class="ident">sock2</span>) <span class="op">=</span> <span class="ident">UnixDatagram::pair</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Since the sockets are paired, the paired send/recv</span>
+<span class="comment">// functions can be used</span>
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hail eris&quot;</span>;
+<span class="ident">sock1</span>.<span class="ident">send</span>(<span class="ident">bytes</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buff</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">sock2</span>.<span class="ident">recv</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buff</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buff</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.from_std" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#462-466">source</a></span><a href="#method.from_std" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.from_std" class="fnname">from_std</a>(datagram: <a class="struct" href="https://doc.rust-lang.org/1.63.0/std/os/unix/net/datagram/struct.UnixDatagram.html" title="struct std::os::unix::net::datagram::UnixDatagram">UnixDatagram</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a>&gt;</h4></section></summary><div class="docblock"><p>Creates new <code>UnixDatagram</code> from a <code>std::os::unix::net::UnixDatagram</code>.</p>
+<p>This function is intended to be used to wrap a UnixDatagram from the
+standard library in the Tokio equivalent. The conversion assumes
+nothing about the underlying datagram; it is left up to the user to set
+it in non-blocking mode.</p>
+<h5 id="panics"><a href="#panics">Panics</a></h5>
+<p>This function panics if it is not called from within a runtime with
+IO enabled.</p>
+<p>The runtime is usually set implicitly when this function is called
+from a future driven by a Tokio runtime, otherwise runtime can be set
+explicitly with <a href="../runtime/struct.Runtime.html#method.enter"><code>Runtime::enter</code></a> function.</p>
+<h5 id="examples-6"><a href="#examples-6">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::os::unix::net::UnixDatagram</span> <span class="kw">as</span> <span class="ident">StdUDS</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// We use a temporary directory so that the socket</span>
+<span class="comment">// files left by the bound sockets will get cleaned up.</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Bind the socket to a filesystem path</span>
+<span class="kw">let</span> <span class="ident">socket_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;socket&quot;</span>);
+<span class="kw">let</span> <span class="ident">std_socket</span> <span class="op">=</span> <span class="ident">StdUDS::bind</span>(<span class="kw-2">&amp;</span><span class="ident">socket_path</span>)<span class="question-mark">?</span>;
+<span class="ident">std_socket</span>.<span class="ident">set_nonblocking</span>(<span class="bool-val">true</span>)<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">tokio_socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::from_std</span>(<span class="ident">std_socket</span>)<span class="question-mark">?</span>;
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.into_std" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#491-496">source</a></span><a href="#method.into_std" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.into_std" class="fnname">into_std</a>(self) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/std/os/unix/net/datagram/struct.UnixDatagram.html" title="struct std::os::unix::net::datagram::UnixDatagram">UnixDatagram</a>&gt;</h4></section></summary><div class="docblock"><p>Turns a <a href="struct.UnixDatagram.html"><code>tokio::net::UnixDatagram</code></a> into a <a href="https://doc.rust-lang.org/1.63.0/std/os/unix/net/datagram/struct.UnixDatagram.html"><code>std::os::unix::net::UnixDatagram</code></a>.</p>
+<p>The returned <a href="https://doc.rust-lang.org/1.63.0/std/os/unix/net/datagram/struct.UnixDatagram.html"><code>std::os::unix::net::UnixDatagram</code></a> will have nonblocking
+mode set as <code>true</code>.  Use <a href="https://doc.rust-lang.org/1.63.0/std/os/unix/net/datagram/struct.UnixDatagram.html#method.set_nonblocking"><code>set_nonblocking</code></a> to change the blocking mode
+if needed.</p>
+<h5 id="examples-7"><a href="#examples-7">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::error::Error</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">tokio_socket</span> <span class="op">=</span> <span class="ident">tokio::net::UnixDatagram::bind</span>(<span class="string">&quot;127.0.0.1:0&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">std_socket</span> <span class="op">=</span> <span class="ident">tokio_socket</span>.<span class="ident">into_std</span>()<span class="question-mark">?</span>;
+    <span class="ident">std_socket</span>.<span class="ident">set_nonblocking</span>(<span class="bool-val">false</span>)<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.unbound" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#534-537">source</a></span><a href="#method.unbound" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.unbound" class="fnname">unbound</a>() -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a>&gt;</h4></section></summary><div class="docblock"><p>Creates a new <code>UnixDatagram</code> which is not bound to any address.</p>
+<h5 id="examples-8"><a href="#examples-8">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// Create an unbound socket</span>
+<span class="kw">let</span> <span class="ident">tx</span> <span class="op">=</span> <span class="ident">UnixDatagram::unbound</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Create another, bound socket</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">rx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;rx&quot;</span>);
+<span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">rx_path</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Send to the bound socket</span>
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hello world&quot;</span>;
+<span class="ident">tx</span>.<span class="ident">send_to</span>(<span class="ident">bytes</span>, <span class="kw-2">&amp;</span><span class="ident">rx_path</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> (<span class="ident">size</span>, <span class="ident">addr</span>) <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_from</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.connect" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#576-578">source</a></span><a href="#method.connect" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.connect" class="fnname">connect</a>&lt;P:&nbsp;<a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.AsRef.html" title="trait core::convert::AsRef">AsRef</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/std/path/struct.Path.html" title="struct std::path::Path">Path</a>&gt;&gt;(&amp;self, path: P) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>&gt;</h4></section></summary><div class="docblock"><p>Connects the socket to the specified address.</p>
+<p>The <code>send</code> method may be used to send data to the specified address.
+<code>recv</code> and <code>recv_from</code> will only receive data from that address.</p>
+<h5 id="examples-9"><a href="#examples-9">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// Create an unbound socket</span>
+<span class="kw">let</span> <span class="ident">tx</span> <span class="op">=</span> <span class="ident">UnixDatagram::unbound</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Create another, bound socket</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">rx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;rx&quot;</span>);
+<span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">rx_path</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Connect to the bound socket</span>
+<span class="ident">tx</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="ident">rx_path</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Send to the bound socket</span>
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hello world&quot;</span>;
+<span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">bytes</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> (<span class="ident">size</span>, <span class="ident">addr</span>) <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_from</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.send" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#612-617">source</a></span><a href="#method.send" class="anchor"></a><h4 class="code-header">pub async fn <a href="#method.send" class="fnname">send</a>(&amp;self, buf: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>]) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt;</h4></section></summary><div class="docblock"><p>Sends data on the socket to the socket’s peer.</p>
+<h5 id="cancel-safety-3"><a href="#cancel-safety-3">Cancel safety</a></h5>
+<p>This method is cancel safe. If <code>send</code> is used as the event in a
+<a href="../macro.select.html"><code>tokio::select!</code></a> statement and some other branch
+completes first, then it is guaranteed that the message was not sent.</p>
+<h5 id="examples-10"><a href="#examples-10">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+
+<span class="comment">// Create the pair of sockets</span>
+<span class="kw">let</span> (<span class="ident">sock1</span>, <span class="ident">sock2</span>) <span class="op">=</span> <span class="ident">UnixDatagram::pair</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Since the sockets are paired, the paired send/recv</span>
+<span class="comment">// functions can be used</span>
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hello world&quot;</span>;
+<span class="ident">sock1</span>.<span class="ident">send</span>(<span class="ident">bytes</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buff</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">sock2</span>.<span class="ident">recv</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buff</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buff</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_send" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#657-661">source</a></span><a href="#method.try_send" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.try_send" class="fnname">try_send</a>(&amp;self, buf: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>]) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt;</h4></section></summary><div class="docblock"><p>Tries to send a datagram to the peer without waiting.</p>
+<h5 id="examples-11"><a href="#examples-11">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+    <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="ident">server_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// Wait for the socket to be writable</span>
+        <span class="ident">socket</span>.<span class="ident">writable</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="comment">// Try to send data, this may still fail with `WouldBlock`</span>
+        <span class="comment">// if the readiness event is a false positive.</span>
+        <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_send</span>(<span class="string">b&quot;hello world&quot;</span>) {
+            <span class="prelude-val">Ok</span>(<span class="ident">n</span>) =&gt; {
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {
+                <span class="kw">continue</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            }
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_send_to" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#700-707">source</a></span><a href="#method.try_send_to" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.try_send_to" class="fnname">try_send_to</a>&lt;P&gt;(&amp;self, buf: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>], target: P) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;P: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.AsRef.html" title="trait core::convert::AsRef">AsRef</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/std/path/struct.Path.html" title="struct std::path::Path">Path</a>&gt;,&nbsp;</span></h4></section></summary><div class="docblock"><p>Tries to send a datagram to the peer without waiting.</p>
+<h5 id="examples-12"><a href="#examples-12">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// Wait for the socket to be writable</span>
+        <span class="ident">socket</span>.<span class="ident">writable</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="comment">// Try to send data, this may still fail with `WouldBlock`</span>
+        <span class="comment">// if the readiness event is a false positive.</span>
+        <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_send_to</span>(<span class="string">b&quot;hello world&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">server_path</span>) {
+            <span class="prelude-val">Ok</span>(<span class="ident">n</span>) =&gt; {
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {
+                <span class="kw">continue</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            }
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.recv" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#742-747">source</a></span><a href="#method.recv" class="anchor"></a><h4 class="code-header">pub async fn <a href="#method.recv" class="fnname">recv</a>(&amp;self, buf: &amp;mut [<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>]) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt;</h4></section></summary><div class="docblock"><p>Receives data from the socket.</p>
+<h5 id="cancel-safety-4"><a href="#cancel-safety-4">Cancel safety</a></h5>
+<p>This method is cancel safe. If <code>recv</code> is used as the event in a
+<a href="../macro.select.html"><code>tokio::select!</code></a> statement and some other branch
+completes first, it is guaranteed that no messages were received on this
+socket.</p>
+<h5 id="examples-13"><a href="#examples-13">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+
+<span class="comment">// Create the pair of sockets</span>
+<span class="kw">let</span> (<span class="ident">sock1</span>, <span class="ident">sock2</span>) <span class="op">=</span> <span class="ident">UnixDatagram::pair</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Since the sockets are paired, the paired send/recv</span>
+<span class="comment">// functions can be used</span>
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hello world&quot;</span>;
+<span class="ident">sock1</span>.<span class="ident">send</span>(<span class="ident">bytes</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buff</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">sock2</span>.<span class="ident">recv</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buff</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buff</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_recv" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#793-797">source</a></span><a href="#method.try_recv" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.try_recv" class="fnname">try_recv</a>(&amp;self, buf: &amp;mut [<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>]) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt;</h4></section></summary><div class="docblock"><p>Tries to receive a datagram from the peer without waiting.</p>
+<h5 id="examples-14"><a href="#examples-14">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="comment">// Connect to a peer</span>
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+    <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="ident">server_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// Wait for the socket to be readable</span>
+        <span class="ident">socket</span>.<span class="ident">readable</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="comment">// The buffer is **not** included in the async task and will</span>
+        <span class="comment">// only exist on the stack.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">1024</span>];
+
+        <span class="comment">// Try to recv data, this may still fail with `WouldBlock`</span>
+        <span class="comment">// if the readiness event is a false positive.</span>
+        <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_recv</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>) {
+            <span class="prelude-val">Ok</span>(<span class="ident">n</span>) =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;GOT {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">n</span>]);
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {
+                <span class="kw">continue</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            }
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_recv_buf_from" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#841-859">source</a></span><a href="#method.try_recv_buf_from" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.try_recv_buf_from" class="fnname">try_recv_buf_from</a>&lt;B:&nbsp;<a class="trait" href="../../bytes/buf/buf_mut/trait.BufMut.html" title="trait bytes::buf::buf_mut::BufMut">BufMut</a>&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;buf: <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.reference.html">&amp;mut </a>B<br>) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;(<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>, <a class="struct" href="unix/struct.SocketAddr.html" title="struct tokio::net::unix::SocketAddr">SocketAddr</a>)&gt;</h4></section></summary><div class="docblock"><p>Tries to receive data from the socket without waiting.</p>
+<h5 id="examples-15"><a href="#examples-15">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="comment">// Connect to a peer</span>
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// Wait for the socket to be readable</span>
+        <span class="ident">socket</span>.<span class="ident">readable</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="number">1024</span>);
+
+        <span class="comment">// Try to recv data, this may still fail with `WouldBlock`</span>
+        <span class="comment">// if the readiness event is a false positive.</span>
+        <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_recv_buf_from</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>) {
+            <span class="prelude-val">Ok</span>((<span class="ident">n</span>, <span class="ident">_addr</span>)) =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;GOT {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">n</span>]);
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {
+                <span class="kw">continue</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            }
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_recv_buf" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#904-920">source</a></span><a href="#method.try_recv_buf" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.try_recv_buf" class="fnname">try_recv_buf</a>&lt;B:&nbsp;<a class="trait" href="../../bytes/buf/buf_mut/trait.BufMut.html" title="trait bytes::buf::buf_mut::BufMut">BufMut</a>&gt;(&amp;self, buf: <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.reference.html">&amp;mut </a>B) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt;</h4></section></summary><div class="docblock"><p>Tries to read data from the stream into the provided buffer, advancing the
+buffer’s internal cursor, returning how many bytes were read.</p>
+<h5 id="examples-16"><a href="#examples-16">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="comment">// Connect to a peer</span>
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+    <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="ident">server_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// Wait for the socket to be readable</span>
+        <span class="ident">socket</span>.<span class="ident">readable</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="number">1024</span>);
+
+        <span class="comment">// Try to recv data, this may still fail with `WouldBlock`</span>
+        <span class="comment">// if the readiness event is a false positive.</span>
+        <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_recv_buf</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>) {
+            <span class="prelude-val">Ok</span>(<span class="ident">n</span>) =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;GOT {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">n</span>]);
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {
+                <span class="kw">continue</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            }
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.send_to" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#962-970">source</a></span><a href="#method.send_to" class="anchor"></a><h4 class="code-header">pub async fn <a href="#method.send_to" class="fnname">send_to</a>&lt;P&gt;(&amp;self, buf: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>], target: P) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;P: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.AsRef.html" title="trait core::convert::AsRef">AsRef</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/std/path/struct.Path.html" title="struct std::path::Path">Path</a>&gt;,&nbsp;</span></h4></section></summary><div class="docblock"><p>Sends data on the socket to the specified address.</p>
+<h5 id="cancel-safety-5"><a href="#cancel-safety-5">Cancel safety</a></h5>
+<p>This method is cancel safe. If <code>send_to</code> is used as the event in a
+<a href="../macro.select.html"><code>tokio::select!</code></a> statement and some other branch
+completes first, then it is guaranteed that the message was not sent.</p>
+<h5 id="examples-17"><a href="#examples-17">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// We use a temporary directory so that the socket</span>
+<span class="comment">// files left by the bound sockets will get cleaned up.</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Bind each socket to a filesystem path</span>
+<span class="kw">let</span> <span class="ident">tx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;tx&quot;</span>);
+<span class="kw">let</span> <span class="ident">tx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">tx_path</span>)<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">rx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;rx&quot;</span>);
+<span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">rx_path</span>)<span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hello world&quot;</span>;
+<span class="ident">tx</span>.<span class="ident">send_to</span>(<span class="ident">bytes</span>, <span class="kw-2">&amp;</span><span class="ident">rx_path</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> (<span class="ident">size</span>, <span class="ident">addr</span>) <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_from</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">addr</span>.<span class="ident">as_pathname</span>().<span class="ident">unwrap</span>(), <span class="kw-2">&amp;</span><span class="ident">tx_path</span>);
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.recv_from" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1012-1020">source</a></span><a href="#method.recv_from" class="anchor"></a><h4 class="code-header">pub async fn <a href="#method.recv_from" class="fnname">recv_from</a>(&amp;self, buf: &amp;mut [<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>]) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;(<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>, <a class="struct" href="unix/struct.SocketAddr.html" title="struct tokio::net::unix::SocketAddr">SocketAddr</a>)&gt;</h4></section></summary><div class="docblock"><p>Receives data from the socket.</p>
+<h5 id="cancel-safety-6"><a href="#cancel-safety-6">Cancel safety</a></h5>
+<p>This method is cancel safe. If <code>recv_from</code> is used as the event in a
+<a href="../macro.select.html"><code>tokio::select!</code></a> statement and some other branch
+completes first, it is guaranteed that no messages were received on this
+socket.</p>
+<h5 id="examples-18"><a href="#examples-18">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// We use a temporary directory so that the socket</span>
+<span class="comment">// files left by the bound sockets will get cleaned up.</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Bind each socket to a filesystem path</span>
+<span class="kw">let</span> <span class="ident">tx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;tx&quot;</span>);
+<span class="kw">let</span> <span class="ident">tx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">tx_path</span>)<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">rx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;rx&quot;</span>);
+<span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">rx_path</span>)<span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="string">b&quot;hello world&quot;</span>;
+<span class="ident">tx</span>.<span class="ident">send_to</span>(<span class="ident">bytes</span>, <span class="kw-2">&amp;</span><span class="ident">rx_path</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="number">24</span>];
+<span class="kw">let</span> (<span class="ident">size</span>, <span class="ident">addr</span>) <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_from</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let</span> <span class="ident">dgram</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">size</span>];
+<span class="macro">assert_eq!</span>(<span class="ident">dgram</span>, <span class="ident">bytes</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">addr</span>.<span class="ident">as_pathname</span>().<span class="ident">unwrap</span>(), <span class="kw-2">&amp;</span><span class="ident">tx_path</span>);
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.poll_recv_from" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1039-1059">source</a></span><a href="#method.poll_recv_from" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.poll_recv_from" class="fnname">poll_recv_from</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;buf: &amp;mut <a class="struct" href="../io/struct.ReadBuf.html" title="struct tokio::io::ReadBuf">ReadBuf</a>&lt;'_&gt;<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="struct" href="unix/struct.SocketAddr.html" title="struct tokio::net::unix::SocketAddr">SocketAddr</a>&gt;&gt;</h4></section></summary><div class="docblock"><p>Attempts to receive a single datagram on the specified address.</p>
+<p>Note that on multiple calls to a <code>poll_*</code> method in the recv direction, only the
+<code>Waker</code> from the <code>Context</code> passed to the most recent call will be scheduled to
+receive a wakeup.</p>
+<h5 id="return-value-2"><a href="#return-value-2">Return value</a></h5>
+<p>The function returns:</p>
+<ul>
+<li><code>Poll::Pending</code> if the socket is not ready to read</li>
+<li><code>Poll::Ready(Ok(addr))</code> reads data from <code>addr</code> into <code>ReadBuf</code> if the socket is ready</li>
+<li><code>Poll::Ready(Err(e))</code> if an error is encountered.</li>
+</ul>
+<h5 id="errors-2"><a href="#errors-2">Errors</a></h5>
+<p>This function may encounter any standard I/O error except <code>WouldBlock</code>.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.poll_send_to" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1078-1090">source</a></span><a href="#method.poll_send_to" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.poll_send_to" class="fnname">poll_send_to</a>&lt;P&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;buf: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>], <br>&nbsp;&nbsp;&nbsp;&nbsp;target: P<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt;&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;P: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.AsRef.html" title="trait core::convert::AsRef">AsRef</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/std/path/struct.Path.html" title="struct std::path::Path">Path</a>&gt;,&nbsp;</span></h4></section></summary><div class="docblock"><p>Attempts to send data to the specified address.</p>
+<p>Note that on multiple calls to a <code>poll_*</code> method in the send direction, only the
+<code>Waker</code> from the <code>Context</code> passed to the most recent call will be scheduled to
+receive a wakeup.</p>
+<h5 id="return-value-3"><a href="#return-value-3">Return value</a></h5>
+<p>The function returns:</p>
+<ul>
+<li><code>Poll::Pending</code> if the socket is not ready to write</li>
+<li><code>Poll::Ready(Ok(n))</code> <code>n</code> is the number of bytes sent.</li>
+<li><code>Poll::Ready(Err(e))</code> if an error is encountered.</li>
+</ul>
+<h5 id="errors-3"><a href="#errors-3">Errors</a></h5>
+<p>This function may encounter any standard I/O error except <code>WouldBlock</code>.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.poll_send" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1115-1119">source</a></span><a href="#method.poll_send" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.poll_send" class="fnname">poll_send</a>(&amp;self, cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;, buf: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>]) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>&gt;&gt;</h4></section></summary><div class="docblock"><p>Attempts to send data on the socket to the remote address to which it
+was previously <code>connect</code>ed.</p>
+<p>The <a href="struct.UnixDatagram.html#method.connect"><code>connect</code></a> method will connect this socket to a remote address.
+This method will fail if the socket is not connected.</p>
+<p>Note that on multiple calls to a <code>poll_*</code> method in the send direction,
+only the <code>Waker</code> from the <code>Context</code> passed to the most recent call will
+be scheduled to receive a wakeup.</p>
+<h5 id="return-value-4"><a href="#return-value-4">Return value</a></h5>
+<p>The function returns:</p>
+<ul>
+<li><code>Poll::Pending</code> if the socket is not available to write</li>
+<li><code>Poll::Ready(Ok(n))</code> <code>n</code> is the number of bytes sent</li>
+<li><code>Poll::Ready(Err(e))</code> if an error is encountered.</li>
+</ul>
+<h5 id="errors-4"><a href="#errors-4">Errors</a></h5>
+<p>This function may encounter any standard I/O error except <code>WouldBlock</code>.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.poll_recv" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1144-1160">source</a></span><a href="#method.poll_recv" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.poll_recv" class="fnname">poll_recv</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;cx: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/task/wake/struct.Context.html" title="struct core::task::wake::Context">Context</a>&lt;'_&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;buf: &amp;mut <a class="struct" href="../io/struct.ReadBuf.html" title="struct tokio::io::ReadBuf">ReadBuf</a>&lt;'_&gt;<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/task/poll/enum.Poll.html" title="enum core::task::poll::Poll">Poll</a>&lt;<a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>&gt;&gt;</h4></section></summary><div class="docblock"><p>Attempts to receive a single datagram message on the socket from the remote
+address to which it is <code>connect</code>ed.</p>
+<p>The <a href="struct.UnixDatagram.html#method.connect"><code>connect</code></a> method will connect this socket to a remote address. This method
+resolves to an error if the socket is not connected.</p>
+<p>Note that on multiple calls to a <code>poll_*</code> method in the recv direction, only the
+<code>Waker</code> from the <code>Context</code> passed to the most recent call will be scheduled to
+receive a wakeup.</p>
+<h5 id="return-value-5"><a href="#return-value-5">Return value</a></h5>
+<p>The function returns:</p>
+<ul>
+<li><code>Poll::Pending</code> if the socket is not ready to read</li>
+<li><code>Poll::Ready(Ok(()))</code> reads data <code>ReadBuf</code> if the socket is ready</li>
+<li><code>Poll::Ready(Err(e))</code> if an error is encountered.</li>
+</ul>
+<h5 id="errors-5"><a href="#errors-5">Errors</a></h5>
+<p>This function may encounter any standard I/O error except <code>WouldBlock</code>.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_recv_from" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1205-1212">source</a></span><a href="#method.try_recv_from" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.try_recv_from" class="fnname">try_recv_from</a>(&amp;self, buf: &amp;mut [<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>]) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;(<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.usize.html">usize</a>, <a class="struct" href="unix/struct.SocketAddr.html" title="struct tokio::net::unix::SocketAddr">SocketAddr</a>)&gt;</h4></section></summary><div class="docblock"><p>Tries to receive data from the socket without waiting.</p>
+<h5 id="examples-19"><a href="#examples-19">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="attribute">#[<span class="ident">tokio::main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="comment">// Connect to a peer</span>
+    <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile::tempdir</span>().<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="ident">client_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;client.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">server_path</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;server.sock&quot;</span>);
+    <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">client_path</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// Wait for the socket to be readable</span>
+        <span class="ident">socket</span>.<span class="ident">readable</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="comment">// The buffer is **not** included in the async task and will</span>
+        <span class="comment">// only exist on the stack.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">1024</span>];
+
+        <span class="comment">// Try to recv data, this may still fail with `WouldBlock`</span>
+        <span class="comment">// if the readiness event is a false positive.</span>
+        <span class="kw">match</span> <span class="ident">socket</span>.<span class="ident">try_recv_from</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buf</span>) {
+            <span class="prelude-val">Ok</span>((<span class="ident">n</span>, <span class="ident">_addr</span>)) =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;GOT {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">n</span>]);
+                <span class="kw">break</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">io::ErrorKind::WouldBlock</span> =&gt; {
+                <span class="kw">continue</span>;
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            }
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_io" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1241-1249">source</a></span><a href="#method.try_io" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.try_io" class="fnname">try_io</a>&lt;R&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;interest: <a class="struct" href="../io/struct.Interest.html" title="struct tokio::io::Interest">Interest</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;f: impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/ops/function/trait.FnOnce.html" title="trait core::ops::function::FnOnce">FnOnce</a>() -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;R&gt;<br>) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;R&gt;</h4></section></summary><div class="docblock"><p>Tries to read or write from the socket using a user-provided IO operation.</p>
+<p>If the socket is ready, the provided closure is called. The closure
+should attempt to perform IO operation from the socket by manually
+calling the appropriate syscall. If the operation fails because the
+socket is not actually ready, then the closure should return a
+<code>WouldBlock</code> error and the readiness flag is cleared. The return value
+of the closure is then returned by <code>try_io</code>.</p>
+<p>If the socket is not ready, then the closure is not called
+and a <code>WouldBlock</code> error is returned.</p>
+<p>The closure should only return a <code>WouldBlock</code> error if it has performed
+an IO operation on the socket that failed due to the socket not being
+ready. Returning a <code>WouldBlock</code> error in any other situation will
+incorrectly clear the readiness flag, which can cause the socket to
+behave incorrectly.</p>
+<p>The closure should not perform the IO operation using any of the methods
+defined on the Tokio <code>UnixDatagram</code> type, as this will mess with the
+readiness flag and can cause the socket to behave incorrectly.</p>
+<p>Usually, <a href="struct.UnixDatagram.html#method.readable"><code>readable()</code></a>, <a href="struct.UnixDatagram.html#method.writable"><code>writable()</code></a> or <a href="struct.UnixDatagram.html#method.ready"><code>ready()</code></a> is used with this function.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.local_addr" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1291-1293">source</a></span><a href="#method.local_addr" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.local_addr" class="fnname">local_addr</a>(&amp;self) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="struct" href="unix/struct.SocketAddr.html" title="struct tokio::net::unix::SocketAddr">SocketAddr</a>&gt;</h4></section></summary><div class="docblock"><p>Returns the local address that this socket is bound to.</p>
+<h5 id="examples-20"><a href="#examples-20">Examples</a></h5>
+<p>For a socket bound to a local path</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// We use a temporary directory so that the socket</span>
+<span class="comment">// files left by the bound sockets will get cleaned up.</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Bind socket to a filesystem path</span>
+<span class="kw">let</span> <span class="ident">socket_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;socket&quot;</span>);
+<span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">socket_path</span>)<span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(<span class="ident">socket</span>.<span class="ident">local_addr</span>()<span class="question-mark">?</span>.<span class="ident">as_pathname</span>().<span class="ident">unwrap</span>(), <span class="kw-2">&amp;</span><span class="ident">socket_path</span>);
+</code></pre></div>
+<p>For an unbound socket</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+
+<span class="comment">// Create an unbound socket</span>
+<span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::unbound</span>()<span class="question-mark">?</span>;
+
+<span class="macro">assert!</span>(<span class="ident">socket</span>.<span class="ident">local_addr</span>()<span class="question-mark">?</span>.<span class="ident">is_unnamed</span>());
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.peer_addr" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1340-1342">source</a></span><a href="#method.peer_addr" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.peer_addr" class="fnname">peer_addr</a>(&amp;self) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="struct" href="unix/struct.SocketAddr.html" title="struct tokio::net::unix::SocketAddr">SocketAddr</a>&gt;</h4></section></summary><div class="docblock"><p>Returns the address of this socket’s peer.</p>
+<p>The <code>connect</code> method will connect the socket to a peer.</p>
+<h5 id="examples-21"><a href="#examples-21">Examples</a></h5>
+<p>For a peer with a local path</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">tempfile::tempdir</span>;
+
+<span class="comment">// Create an unbound socket</span>
+<span class="kw">let</span> <span class="ident">tx</span> <span class="op">=</span> <span class="ident">UnixDatagram::unbound</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Create another, bound socket</span>
+<span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tempdir</span>()<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">rx_path</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;rx&quot;</span>);
+<span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">UnixDatagram::bind</span>(<span class="kw-2">&amp;</span><span class="ident">rx_path</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Connect to the bound socket</span>
+<span class="ident">tx</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="ident">rx_path</span>)<span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(<span class="ident">tx</span>.<span class="ident">peer_addr</span>()<span class="question-mark">?</span>.<span class="ident">as_pathname</span>().<span class="ident">unwrap</span>(), <span class="kw-2">&amp;</span><span class="ident">rx_path</span>);
+</code></pre></div>
+<p>For an unbound peer</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+
+<span class="comment">// Create the pair of sockets</span>
+<span class="kw">let</span> (<span class="ident">sock1</span>, <span class="ident">sock2</span>) <span class="op">=</span> <span class="ident">UnixDatagram::pair</span>()<span class="question-mark">?</span>;
+
+<span class="macro">assert!</span>(<span class="ident">sock1</span>.<span class="ident">peer_addr</span>()<span class="question-mark">?</span>.<span class="ident">is_unnamed</span>());
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.take_error" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1363-1365">source</a></span><a href="#method.take_error" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.take_error" class="fnname">take_error</a>(&amp;self) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="enum" href="https://doc.rust-lang.org/1.63.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/std/io/error/struct.Error.html" title="struct std::io::error::Error">Error</a>&gt;&gt;</h4></section></summary><div class="docblock"><p>Returns the value of the <code>SO_ERROR</code> option.</p>
+<h5 id="examples-22"><a href="#examples-22">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+
+<span class="comment">// Create an unbound socket</span>
+<span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">UnixDatagram::unbound</span>()<span class="question-mark">?</span>;
+
+<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">err</span>)) <span class="op">=</span> <span class="ident">socket</span>.<span class="ident">take_error</span>() {
+    <span class="macro">println!</span>(<span class="string">&quot;Got error: {:?}&quot;</span>, <span class="ident">err</span>);
+}
+</code></pre></div>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.shutdown" class="method has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1399-1401">source</a></span><a href="#method.shutdown" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.shutdown" class="fnname">shutdown</a>(&amp;self, how: <a class="enum" href="https://doc.rust-lang.org/1.63.0/std/net/enum.Shutdown.html" title="enum std::net::Shutdown">Shutdown</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>&gt;</h4></section></summary><div class="docblock"><p>Shuts down the read, write, or both halves of this connection.</p>
+<p>This function will cause all pending and future I/O calls on the
+specified portions to immediately return with an appropriate value
+(see the documentation of <code>Shutdown</code>).</p>
+<h5 id="examples-23"><a href="#examples-23">Examples</a></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tokio::net::UnixDatagram</span>;
+<span class="kw">use</span> <span class="ident">std::net::Shutdown</span>;
+
+<span class="comment">// Create an unbound socket</span>
+<span class="kw">let</span> (<span class="ident">socket</span>, <span class="ident">other</span>) <span class="op">=</span> <span class="ident">UnixDatagram::pair</span>()<span class="question-mark">?</span>;
+
+<span class="ident">socket</span>.<span class="ident">shutdown</span>(<span class="ident">Shutdown::Both</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// NOTE: the following commented out code does NOT work as expected.</span>
+<span class="comment">// Due to an underlying issue, the recv call will block indefinitely.</span>
+<span class="comment">// See: https://github.com/tokio-rs/tokio/issues/1679</span>
+<span class="comment">//let mut buff = vec![0u8; 24];</span>
+<span class="comment">//let size = socket.recv(&amp;mut buff).await?;</span>
+<span class="comment">//assert_eq!(size, 0);</span>
+
+<span class="kw">let</span> <span class="ident">send_result</span> <span class="op">=</span> <span class="ident">socket</span>.<span class="ident">send</span>(<span class="string">b&quot;hello world&quot;</span>).<span class="kw">await</span>;
+<span class="macro">assert!</span>(<span class="ident">send_result</span>.<span class="ident">is_err</span>());
+</code></pre></div>
+</div></details></div></details></div><h2 id="trait-implementations" class="small-section-header">Trait Implementations<a href="#trait-implementations" class="anchor"></a></h2><div id="trait-implementations-list"><details class="rustdoc-toggle implementors-toggle" open><summary><section id="impl-AsRawFd" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1422-1426">source</a></span><a href="#impl-AsRawFd" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/std/os/fd/raw/trait.AsRawFd.html" title="trait std::os::fd::raw::AsRawFd">AsRawFd</a> for <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.as_raw_fd" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1423-1425">source</a></span><a href="#method.as_raw_fd" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/std/os/fd/raw/trait.AsRawFd.html#tymethod.as_raw_fd" class="fnname">as_raw_fd</a>(&amp;self) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/std/os/fd/raw/type.RawFd.html" title="type std::os::fd::raw::RawFd">RawFd</a></h4></section></summary><div class='docblock'><p>Extracts the raw file descriptor. <a href="https://doc.rust-lang.org/1.63.0/std/os/fd/raw/trait.AsRawFd.html#tymethod.as_raw_fd">Read more</a></p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle" open><summary><section id="impl-Debug" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1416-1420">source</a></span><a href="#impl-Debug" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a> for <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.fmt" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1417-1419">source</a></span><a href="#method.fmt" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Debug.html#tymethod.fmt" class="fnname">fmt</a>(&amp;self, f: &amp;mut <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/fmt/struct.Formatter.html" title="struct core::fmt::Formatter">Formatter</a>&lt;'_&gt;) -&gt; <a class="type" href="https://doc.rust-lang.org/1.63.0/core/fmt/type.Result.html" title="type core::fmt::Result">Result</a></h4></section></summary><div class='docblock'><p>Formats the value using the given formatter. <a href="https://doc.rust-lang.org/1.63.0/core/fmt/trait.Debug.html#tymethod.fmt">Read more</a></p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle" open><summary><section id="impl-TryFrom%3CUnixDatagram%3E" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1404-1414">source</a></span><a href="#impl-TryFrom%3CUnixDatagram%3E" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/std/os/unix/net/datagram/struct.UnixDatagram.html" title="struct std::os::unix::net::datagram::UnixDatagram">UnixDatagram</a>&gt; for <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_from" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../../src/tokio/net/unix/datagram/socket.rs.html#1411-1413">source</a></span><a href="#method.try_from" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html#tymethod.try_from" class="fnname">try_from</a>(stream: <a class="struct" href="https://doc.rust-lang.org/1.63.0/std/os/unix/net/datagram/struct.UnixDatagram.html" title="struct std::os::unix::net::datagram::UnixDatagram">UnixDatagram</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, Self::<a class="associatedtype" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a>&gt;</h4></section></summary><div class="docblock"><p>Consumes stream, returning the Tokio I/O object.</p>
+<p>This is equivalent to
+<a href="struct.UnixDatagram.html#method.from_std"><code>UnixDatagram::from_std(stream)</code></a>.</p>
+</div></details><details class="rustdoc-toggle" open><summary><section id="associatedtype.Error" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error" class="anchor"></a><h4 class="code-header">type <a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html#associatedtype.Error" class="associatedtype">Error</a> = <a class="struct" href="https://doc.rust-lang.org/1.63.0/std/io/error/struct.Error.html" title="struct std::io::error::Error">Error</a></h4></section></summary><div class='docblock'><p>The type returned in the event of a conversion error.</p>
+</div></details></div></details></div><h2 id="synthetic-implementations" class="small-section-header">Auto Trait Implementations<a href="#synthetic-implementations" class="anchor"></a></h2><div id="synthetic-implementations-list"><section id="impl-RefUnwindSafe" class="impl has-srclink"><a href="#impl-RefUnwindSafe" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/panic/unwind_safe/trait.RefUnwindSafe.html" title="trait core::panic::unwind_safe::RefUnwindSafe">RefUnwindSafe</a> for <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section><section id="impl-Send" class="impl has-srclink"><a href="#impl-Send" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> for <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section><section id="impl-Sync" class="impl has-srclink"><a href="#impl-Sync" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> for <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section><section id="impl-Unpin" class="impl has-srclink"><a href="#impl-Unpin" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a> for <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section><section id="impl-UnwindSafe" class="impl has-srclink"><a href="#impl-UnwindSafe" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/panic/unwind_safe/trait.UnwindSafe.html" title="trait core::panic::unwind_safe::UnwindSafe">UnwindSafe</a> for <a class="struct" href="struct.UnixDatagram.html" title="struct tokio::net::UnixDatagram">UnixDatagram</a></h3></section></div><h2 id="blanket-implementations" class="small-section-header">Blanket Implementations<a href="#blanket-implementations" class="anchor"></a></h2><div id="blanket-implementations-list"><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-Any" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/any.rs.html#203-207">source</a></span><a href="#impl-Any" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/any/trait.Any.html" title="trait core::any::Any">Any</a> for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: 'static + ?<a class="trait" href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.type_id" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/any.rs.html#204">source</a></span><a href="#method.type_id" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/any/trait.Any.html#tymethod.type_id" class="fnname">type_id</a>(&amp;self) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.63.0/core/any/struct.TypeId.html" title="struct core::any::TypeId">TypeId</a></h4></section></summary><div class='docblock'><p>Gets the <code>TypeId</code> of <code>self</code>. <a href="https://doc.rust-lang.org/1.63.0/core/any/trait.Any.html#tymethod.type_id">Read more</a></p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-Borrow%3CT%3E" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/borrow.rs.html#209-214">source</a></span><a href="#impl-Borrow%3CT%3E" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/borrow/trait.Borrow.html" title="trait core::borrow::Borrow">Borrow</a>&lt;T&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: ?<a class="trait" href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.borrow" class="method trait-impl has-srclink"><span class="rightside"><span class="since" title="const unstable">const: <a href="https://github.com/rust-lang/rust/issues/91522" title="Tracking issue for const_borrow">unstable</a></span> · <a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/borrow.rs.html#211">source</a></span><a href="#method.borrow" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/borrow/trait.Borrow.html#tymethod.borrow" class="fnname">borrow</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.reference.html">&amp;</a>T</h4></section></summary><div class='docblock'><p>Immutably borrows from an owned value. <a href="https://doc.rust-lang.org/1.63.0/core/borrow/trait.Borrow.html#tymethod.borrow">Read more</a></p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-BorrowMut%3CT%3E" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/borrow.rs.html#218-222">source</a></span><a href="#impl-BorrowMut%3CT%3E" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/borrow/trait.BorrowMut.html" title="trait core::borrow::BorrowMut">BorrowMut</a>&lt;T&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: ?<a class="trait" href="https://doc.rust-lang.org/1.63.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.borrow_mut" class="method trait-impl has-srclink"><span class="rightside"><span class="since" title="const unstable">const: <a href="https://github.com/rust-lang/rust/issues/91522" title="Tracking issue for const_borrow">unstable</a></span> · <a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/borrow.rs.html#219">source</a></span><a href="#method.borrow_mut" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/borrow/trait.BorrowMut.html#tymethod.borrow_mut" class="fnname">borrow_mut</a>(&amp;mut self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.reference.html">&amp;mut </a>T</h4></section></summary><div class='docblock'><p>Mutably borrows from an owned value. <a href="https://doc.rust-lang.org/1.63.0/core/borrow/trait.BorrowMut.html#tymethod.borrow_mut">Read more</a></p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-From%3CT%3E" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/convert/mod.rs.html#557-562">source</a></span><a href="#impl-From%3CT%3E" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;T&gt; for T</h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.from" class="method trait-impl has-srclink"><span class="rightside"><span class="since" title="const unstable">const: <a href="https://github.com/rust-lang/rust/issues/88674" title="Tracking issue for const_convert">unstable</a></span> · <a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/convert/mod.rs.html#559">source</a></span><a href="#method.from" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.From.html#tymethod.from" class="fnname">from</a>(t: T) -&gt; T</h4></section></summary><div class="docblock"><p>Returns the argument unchanged.</p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-Into%3CU%3E" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/convert/mod.rs.html#541-552">source</a></span><a href="#impl-Into%3CU%3E" class="anchor"></a><h3 class="code-header in-band">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;U&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;T&gt;,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.into" class="method trait-impl has-srclink"><span class="rightside"><span class="since" title="const unstable">const: <a href="https://github.com/rust-lang/rust/issues/88674" title="Tracking issue for const_convert">unstable</a></span> · <a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/convert/mod.rs.html#549">source</a></span><a href="#method.into" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.Into.html#tymethod.into" class="fnname">into</a>(self) -&gt; U</h4></section></summary><div class="docblock"><p>Calls <code>U::from(self)</code>.</p>
+<p>That is, this conversion is whatever the implementation of
+<code><a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.From.html" title="From">From</a>&lt;T&gt; for U</code> chooses to do.</p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-TryFrom%3CU%3E" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/convert/mod.rs.html#598-607">source</a></span><a href="#impl-TryFrom%3CU%3E" class="anchor"></a><h3 class="code-header in-band">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;U&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;T&gt;,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle" open><summary><section id="associatedtype.Error-2" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error-2" class="anchor"></a><h4 class="code-header">type <a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html#associatedtype.Error" class="associatedtype">Error</a> = <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/convert/enum.Infallible.html" title="enum core::convert::Infallible">Infallible</a></h4></section></summary><div class='docblock'><p>The type returned in the event of a conversion error.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_from-1" class="method trait-impl has-srclink"><span class="rightside"><span class="since" title="const unstable">const: <a href="https://github.com/rust-lang/rust/issues/88674" title="Tracking issue for const_convert">unstable</a></span> · <a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/convert/mod.rs.html#604">source</a></span><a href="#method.try_from-1" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html#tymethod.try_from" class="fnname">try_from</a>(value: U) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;T, &lt;T as <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;U&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a>&gt;</h4></section></summary><div class='docblock'><p>Performs the conversion.</p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-TryInto%3CU%3E" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/convert/mod.rs.html#583-592">source</a></span><a href="#impl-TryInto%3CU%3E" class="anchor"></a><h3 class="code-header in-band">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryInto.html" title="trait core::convert::TryInto">TryInto</a>&lt;U&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle" open><summary><section id="associatedtype.Error-1" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error-1" class="anchor"></a><h4 class="code-header">type <a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryInto.html#associatedtype.Error" class="associatedtype">Error</a> = &lt;U as <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a></h4></section></summary><div class='docblock'><p>The type returned in the event of a conversion error.</p>
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_into" class="method trait-impl has-srclink"><span class="rightside"><span class="since" title="const unstable">const: <a href="https://github.com/rust-lang/rust/issues/88674" title="Tracking issue for const_convert">unstable</a></span> · <a class="srclink" href="https://doc.rust-lang.org/1.63.0/src/core/convert/mod.rs.html#589">source</a></span><a href="#method.try_into" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryInto.html#tymethod.try_into" class="fnname">try_into</a>(self) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;U, &lt;U as <a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a>&gt;</h4></section></summary><div class='docblock'><p>Performs the conversion.</p>
+</div></details></div></details></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tokio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Module for actions setting flags."><meta name="keywords" content="rust, rustlang, rust-lang, flag"><title>signal_hook::flag - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../signal_hook/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../signal_hook/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module flag</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../signal_hook/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">signal_hook</a>::<wbr><a class="mod" href="#">flag</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/signal_hook/flag.rs.html#1-283">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Module for actions setting flags.</p>
+<p>This contains helper functions to set flags whenever a signal happens. The flags are atomic
+bools or numbers and the library manipulates them with the <code>SeqCst</code> ordering, in case someone
+cares about relative order to some <em>other</em> atomic variables. If you don’t care about the
+relative order, you are free to use <code>Ordering::Relaxed</code> when reading and resetting the flags.</p>
+<h2 id="when-to-use"><a href="#when-to-use">When to use</a></h2>
+<p>The flags in this module allow for polling if a signal arrived since the previous poll. The do
+not allow blocking until something arrives.</p>
+<p>Therefore, the natural way to use them is in applications that have some kind of iterative work
+with both some upper and lower time limit on one iteration. If one iteration could block for
+arbitrary time, the handling of the signal would be postponed for a long time. If the iteration
+didn’t block at all, the checking for the signal would turn into a busy-loop.</p>
+<p>If what you need is blocking until a signal comes, you might find better tools in the
+<a href="../low_level/pipe/index.html" title="crate::low_level::pipe"><code>pipe</code></a> and <a href="../iterator/index.html" title="crate::iterator"><code>iterator</code></a> modules.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Doing something until terminated. This also knows by which signal it was terminated. In case
+multiple termination signals arrive before it is handled, it recognizes the last one.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::io::Error</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+
+<span class="kw">use</span> <span class="ident">signal_hook::consts::signal</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">signal_hook::flag</span> <span class="kw">as</span> <span class="ident">signal_flag</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">term</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicUsize::new</span>(<span class="number">0</span>));
+    <span class="kw">const</span> <span class="ident">SIGTERM_U</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">SIGTERM</span> <span class="kw">as</span> <span class="ident">usize</span>;
+    <span class="kw">const</span> <span class="ident">SIGINT_U</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">SIGINT</span> <span class="kw">as</span> <span class="ident">usize</span>;
+    <span class="kw">const</span> <span class="ident">SIGQUIT_U</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">SIGQUIT</span> <span class="kw">as</span> <span class="ident">usize</span>;
+    <span class="ident">signal_flag::register_usize</span>(<span class="ident">SIGTERM</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">term</span>), <span class="ident">SIGTERM_U</span>)<span class="question-mark">?</span>;
+    <span class="ident">signal_flag::register_usize</span>(<span class="ident">SIGINT</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">term</span>), <span class="ident">SIGINT_U</span>)<span class="question-mark">?</span>;
+    <span class="ident">signal_flag::register_usize</span>(<span class="ident">SIGQUIT</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">term</span>), <span class="ident">SIGQUIT_U</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="kw">match</span> <span class="ident">term</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
+            <span class="number">0</span> =&gt; {
+                <span class="comment">// Do some useful stuff here</span>
+            }
+            <span class="ident">SIGTERM_U</span> =&gt; {
+                <span class="macro">eprintln!</span>(<span class="string">&quot;Terminating on the TERM signal&quot;</span>);
+                <span class="kw">break</span>;
+            }
+            <span class="ident">SIGINT_U</span> =&gt; {
+                <span class="macro">eprintln!</span>(<span class="string">&quot;Terminating on the INT signal&quot;</span>);
+                <span class="kw">break</span>;
+            }
+            <span class="ident">SIGQUIT_U</span> =&gt; {
+                <span class="macro">eprintln!</span>(<span class="string">&quot;Terminating on the QUIT signal&quot;</span>);
+                <span class="kw">break</span>;
+            }
+            <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
+        }
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p>Sending a signal to self and seeing it arrived (not of a practical usage on itself):</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::io::Error</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std::thread</span>;
+<span class="kw">use</span> <span class="ident">std::time::Duration</span>;
+
+<span class="kw">use</span> <span class="ident">signal_hook::consts::signal</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">signal_hook::low_level::raise</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">got</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>));
+    <span class="ident">signal_hook::flag::register</span>(<span class="ident">SIGUSR1</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">got</span>))<span class="question-mark">?</span>;
+    <span class="ident">raise</span>(<span class="ident">SIGUSR1</span>).<span class="ident">unwrap</span>();
+    <span class="comment">// A sleep here, because it could run the signal handler in another thread and we may not</span>
+    <span class="comment">// see the flag right away. This is still a hack and not guaranteed to work, it is just an</span>
+    <span class="comment">// example!</span>
+    <span class="ident">thread::sleep</span>(<span class="ident">Duration::from_secs</span>(<span class="number">1</span>));
+    <span class="macro">assert!</span>(<span class="ident">got</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>));
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p>Reloading a configuration on <code>SIGHUP</code> (which is a common behaviour of many UNIX daemons,
+together with reopening the log file).</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std::io::Error</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
+
+<span class="kw">use</span> <span class="ident">signal_hook::consts::signal</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">signal_hook::flag</span> <span class="kw">as</span> <span class="ident">signal_flag</span>;
+
+<span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="comment">// We start with true, to load the configuration in the very first iteration too.</span>
+    <span class="kw">let</span> <span class="ident">reload</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">true</span>));
+    <span class="kw">let</span> <span class="ident">term</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>));
+    <span class="ident">signal_flag::register</span>(<span class="ident">SIGHUP</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">reload</span>))<span class="question-mark">?</span>;
+    <span class="ident">signal_flag::register</span>(<span class="ident">SIGINT</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">term</span>))<span class="question-mark">?</span>;
+    <span class="ident">signal_flag::register</span>(<span class="ident">SIGTERM</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">term</span>))<span class="question-mark">?</span>;
+    <span class="ident">signal_flag::register</span>(<span class="ident">SIGQUIT</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">term</span>))<span class="question-mark">?</span>;
+    <span class="kw">while</span> <span class="op">!</span><span class="ident">term</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
+        <span class="comment">// Using swap here, not load, to reset it back to false once it is reloaded.</span>
+        <span class="kw">if</span> <span class="ident">reload</span>.<span class="ident">swap</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::Relaxed</span>) {
+            <span class="comment">// Reload the config here</span>
+        }
+        <span class="comment">// Serve one request</span>
+    }
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+</div></details><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.register.html" title="signal_hook::flag::register fn">register</a></div><div class="item-right docblock-short"><p>Registers an action to set the flag to <code>true</code> whenever the given signal arrives.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.register_conditional_default.html" title="signal_hook::flag::register_conditional_default fn">register_conditional_default</a></div><div class="item-right docblock-short"><p>Conditionally runs an emulation of the default action on the given signal.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.register_conditional_shutdown.html" title="signal_hook::flag::register_conditional_shutdown fn">register_conditional_shutdown</a></div><div class="item-right docblock-short"><p>Terminate the application on a signal if the given condition is true.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.register_usize.html" title="signal_hook::flag::register_usize fn">register_usize</a></div><div class="item-right docblock-short"><p>Registers an action to set the flag to the given value whenever the signal arrives.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="signal_hook" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

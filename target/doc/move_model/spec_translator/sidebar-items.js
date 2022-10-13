@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["SpecTranslator","A helper which reduces specification conditions to assume/assert statements."],["TranslatedSpec","Represents a translated spec."]]};

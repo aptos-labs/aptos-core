@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["TryInitError","Error returned by `try_init` if a global default subscriber could not be initialized."]],"trait":[["SubscriberInitExt","Extension trait adding utility methods for subscriber initialization."]]};

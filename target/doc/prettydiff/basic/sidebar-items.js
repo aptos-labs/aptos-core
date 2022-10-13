@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["DiffOp","Single change in original slice needed to get new slice"]],"fn":[["diff","Diffs any slices which implements PartialEq"],["diff_slice","Diff two arbitary slices with elements that support Display trait"]],"struct":[["SliceChangeset","Container for slice diff result.  Can be pretty-printed by Display trait."]]};

@@ -1,0 +1,185 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A fail point implementation for Rust."><meta name="keywords" content="rust, rustlang, rust-lang, fail"><title>fail - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../fail/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../fail/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate fail</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.5.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#macros">Macros</a></li><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../fail/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">fail</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/fail/lib.rs.html#3-1031">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A fail point implementation for Rust.</p>
+<p>Fail points are code instrumentations that allow errors and other behavior
+to be injected dynamically at runtime, primarily for testing purposes. Fail
+points are flexible and can be configured to exhibit a variety of behavior,
+including panics, early returns, and sleeping. They can be controlled both
+programmatically and via the environment, and can be triggered
+conditionally and probabilistically.</p>
+<p>This crate is inspired by FreeBSD’s
+<a href="https://freebsd.org/cgi/man.cgi?query=fail">failpoints</a>.</p>
+<h3 id="usage"><a href="#usage">Usage</a></h3>
+<p>First, add this to your <code>Cargo.toml</code>:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+fail = &quot;0.4&quot;</code></pre></div>
+<p>Now you can import the <code>fail_point!</code> macro from the <code>fail</code> crate and use it
+to inject dynamic failures.</p>
+<p>As an example, here’s a simple program that uses a fail point to simulate an
+I/O panic:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">fail</span>::{<span class="ident">fail_point</span>, <span class="ident">FailScenario</span>};
+
+<span class="kw">fn</span> <span class="ident">do_fallible_work</span>() {
+    <span class="macro">fail_point!</span>(<span class="string">&quot;read-dir&quot;</span>);
+    <span class="kw">let</span> <span class="ident">_dir</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std::fs::read_dir</span>(<span class="string">&quot;.&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">collect</span>();
+    <span class="comment">// ... do some work on the directory ...</span>
+}
+
+<span class="kw">let</span> <span class="ident">scenario</span> <span class="op">=</span> <span class="ident">FailScenario::setup</span>();
+<span class="ident">do_fallible_work</span>();
+<span class="ident">scenario</span>.<span class="ident">teardown</span>();
+<span class="macro">println!</span>(<span class="string">&quot;done&quot;</span>);</code></pre></div>
+<p>Here, the program calls <code>unwrap</code> on the result of <code>read_dir</code>, a function
+that returns a <code>Result</code>. In other words, this particular program expects
+this call to <code>read_dir</code> to always succeed. And in practice it almost always
+will, which makes the behavior of this program when <code>read_dir</code> fails
+difficult to test. By instrumenting the program with a fail point we can
+pretend that <code>read_dir</code> failed, causing the subsequent <code>unwrap</code> to panic,
+and allowing us to observe the program’s behavior under failure conditions.</p>
+<p>When the program is run normally it just prints “done”:</p>
+<div class="example-wrap"><pre class="language-sh"><code>$ cargo run --features fail/failpoints
+    Finished dev [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/debug/failpointtest`
+done</code></pre></div>
+<p>But now, by setting the <code>FAILPOINTS</code> variable we can see what happens if the
+<code>read_dir</code> fails:</p>
+<div class="example-wrap"><pre class="language-sh"><code>FAILPOINTS=read-dir=panic cargo run --features fail/failpoints
+    Finished dev [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/debug/failpointtest`
+thread &#39;main&#39; panicked at &#39;failpoint read-dir panic&#39;, /home/ubuntu/.cargo/registry/src/github.com-1ecc6299db9ec823/fail-0.2.0/src/lib.rs:286:25
+note: Run with `RUST_BACKTRACE=1` for a backtrace.</code></pre></div><h3 id="usage-in-tests"><a href="#usage-in-tests">Usage in tests</a></h3>
+<p>The previous example triggers a fail point by modifying the <code>FAILPOINT</code>
+environment variable. In practice, you’ll often want to trigger fail points
+programmatically, in unit tests.
+Fail points are global resources, and Rust tests run in parallel,
+so tests that exercise fail points generally need to hold a lock to
+avoid interfering with each other. This is accomplished by <code>FailScenario</code>.</p>
+<p>Here’s a basic pattern for writing unit tests tests with fail points:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">fail</span>::{<span class="ident">fail_point</span>, <span class="ident">FailScenario</span>};
+
+<span class="kw">fn</span> <span class="ident">do_fallible_work</span>() {
+    <span class="macro">fail_point!</span>(<span class="string">&quot;read-dir&quot;</span>);
+    <span class="kw">let</span> <span class="ident">_dir</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std::fs::read_dir</span>(<span class="string">&quot;.&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">collect</span>();
+    <span class="comment">// ... do some work on the directory ...</span>
+}
+
+<span class="attribute">#[<span class="ident">test</span>]</span>
+<span class="attribute">#[<span class="ident">should_panic</span>]</span>
+<span class="kw">fn</span> <span class="ident">test_fallible_work</span>() {
+    <span class="kw">let</span> <span class="ident">scenario</span> <span class="op">=</span> <span class="ident">FailScenario::setup</span>();
+    <span class="ident">fail::cfg</span>(<span class="string">&quot;read-dir&quot;</span>, <span class="string">&quot;panic&quot;</span>).<span class="ident">unwrap</span>();
+
+    <span class="ident">do_fallible_work</span>();
+
+    <span class="ident">scenario</span>.<span class="ident">teardown</span>();
+}</code></pre></div>
+<p>Even if a test does not itself turn on any fail points, code that it runs
+could trigger a fail point that was configured by another thread. Because of
+this it is a best practice to put all fail point unit tests into their own
+binary. Here’s an example of a snippet from <code>Cargo.toml</code> that creates a
+fail-point-specific test binary:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[[test]]
+name = &quot;failpoints&quot;
+path = &quot;tests/failpoints/mod.rs&quot;
+required-features = [&quot;fail/failpoints&quot;]</code></pre></div><h3 id="early-return"><a href="#early-return">Early return</a></h3>
+<p>The previous examples illustrate injecting panics via fail points, but
+panics aren’t the only — or even the most common — error pattern
+in Rust. The more common type of error is propagated by <code>Result</code> return
+values, and fail points can inject those as well with “early returns”. That
+is, when configuring a fail point as “return” (as opposed to “panic”), the
+fail point will immediately return from the function, optionally with a
+configurable value.</p>
+<p>The setup for early return requires a slightly diferent invocation of the
+<code>fail_point!</code> macro. To illustrate this, let’s modify the <code>do_fallible_work</code>
+function we used earlier to return a <code>Result</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">fail</span>::{<span class="ident">fail_point</span>, <span class="ident">FailScenario</span>};
+<span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="kw">fn</span> <span class="ident">do_fallible_work</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="macro">fail_point!</span>(<span class="string">&quot;read-dir&quot;</span>);
+    <span class="kw">let</span> <span class="ident">_dir</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std::fs::read_dir</span>(<span class="string">&quot;.&quot;</span>)<span class="question-mark">?</span>.<span class="ident">collect</span>();
+    <span class="comment">// ... do some work on the directory ...</span>
+    <span class="prelude-val">Ok</span>(())
+}
+
+<span class="kw">fn</span> <span class="ident">main</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">scenario</span> <span class="op">=</span> <span class="ident">FailScenario::setup</span>();
+    <span class="ident">do_fallible_work</span>()<span class="question-mark">?</span>;
+    <span class="ident">scenario</span>.<span class="ident">teardown</span>();
+    <span class="macro">println!</span>(<span class="string">&quot;done&quot;</span>);
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p>This example has more proper Rust error handling, with no unwraps
+anywhere. Instead it uses <code>?</code> to propagate errors via the <code>Result</code> type
+return values. This is more realistic Rust code.</p>
+<p>The “read-dir” fail point though is not yet configured to support early
+return, so if we attempt to configure it to “return”, we’ll see an error
+like</p>
+<div class="example-wrap"><pre class="language-sh"><code>$ FAILPOINTS=read-dir=return cargo run --features fail/failpoints
+    Finished dev [unoptimized + debuginfo] target(s) in 0.13s
+     Running `target/debug/failpointtest`
+thread &#39;main&#39; panicked at &#39;Return is not supported for the fail point &quot;read-dir&quot;&#39;, src/main.rs:7:5
+note: Run with `RUST_BACKTRACE=1` for a backtrace.</code></pre></div>
+<p>This error tells us that the “read-dir” fail point is not defined correctly
+to support early return, and gives us the line number of that fail point.
+What we’re missing in the fail point definition is code describring <em>how</em> to
+return an error value, and the way we do this is by passing <code>fail_point!</code> a
+closure that returns the same type as the enclosing function.</p>
+<p>Here’s a variation that does so:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn</span> <span class="ident">do_fallible_work</span>() -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="macro">fail::fail_point!</span>(<span class="string">&quot;read-dir&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+        <span class="prelude-val">Err</span>(<span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::PermissionDenied</span>, <span class="string">&quot;error&quot;</span>))
+    });
+    <span class="kw">let</span> <span class="ident">_dir</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std::fs::read_dir</span>(<span class="string">&quot;.&quot;</span>)<span class="question-mark">?</span>.<span class="ident">collect</span>();
+    <span class="comment">// ... do some work on the directory ...</span>
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div>
+<p>And now if the “read-dir” fail point is configured to “return” we get a
+different result:</p>
+<div class="example-wrap"><pre class="language-sh"><code>$ FAILPOINTS=read-dir=return cargo run --features fail/failpoints
+   Compiling failpointtest v0.1.0
+    Finished dev [unoptimized + debuginfo] target(s) in 2.38s
+     Running `target/debug/failpointtest`
+Error: Custom { kind: PermissionDenied, error: StringError(&quot;error&quot;) }</code></pre></div>
+<p>This time, <code>do_fallible_work</code> returned the error defined in our closure,
+which propagated all the way up and out of main.</p>
+<h3 id="advanced-usage"><a href="#advanced-usage">Advanced usage</a></h3>
+<p>That’s the basics of fail points: defining them with <code>fail_point!</code>,
+configuring them with <code>FAILPOINTS</code> and <code>fail::cfg</code>, and configuring them to
+panic and return early. But that’s not all they can do. To learn more see
+the documentation for <a href="fn.cfg.html"><code>cfg</code></a>,
+<a href="fn.cfg_callback.html"><code>cfg_callback</code></a> and
+<a href="macro.fail_point.html"><code>fail_point!</code></a>.</p>
+<h3 id="usage-considerations"><a href="#usage-considerations">Usage considerations</a></h3>
+<p>For most effective fail point usage, keep in mind the following:</p>
+<ul>
+<li>Fail points are disabled by default and can be enabled via the <code>failpoints</code>
+feature. When failpoints are disabled, no code is generated by the macro.</li>
+<li>Carefully consider complex, concurrent, non-deterministic combinations of
+fail points. Put test cases exercising fail points into their own test
+crate.</li>
+<li>Fail points might have the same name, in which case they take the
+same actions. Be careful about duplicating fail point names, either within
+a single crate, or across multiple crates.</li>
+</ul>
+</div></details><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.fail_point.html" title="fail::fail_point macro">fail_point</a></div><div class="item-right docblock-short"><p>Define a fail point (disabled, see <code>failpoints</code> feature).</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FailScenario.html" title="fail::FailScenario struct">FailScenario</a></div><div class="item-right docblock-short"><p>Test scenario with configured fail points.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.cfg.html" title="fail::cfg fn">cfg</a></div><div class="item-right docblock-short"><p>Configure the actions for a fail point at runtime.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.cfg_callback.html" title="fail::cfg_callback fn">cfg_callback</a></div><div class="item-right docblock-short"><p>Configure the actions for a fail point at runtime.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.has_failpoints.html" title="fail::has_failpoints fn">has_failpoints</a></div><div class="item-right docblock-short"><p>Returns whether code generation for failpoints is enabled.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.list.html" title="fail::list fn">list</a></div><div class="item-right docblock-short"><p>Get all registered fail points.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.remove.html" title="fail::remove fn">remove</a></div><div class="item-right docblock-short"><p>Remove a fail point.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="fail" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

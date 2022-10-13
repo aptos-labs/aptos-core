@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["EVENT_MODULE_IDENTIFIER",""]],"static":[["EVENT_MODULE",""]]};

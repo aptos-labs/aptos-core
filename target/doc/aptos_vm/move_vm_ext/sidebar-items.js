@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["SessionId",""]],"struct":[["MoveVmExt",""],["SessionExt",""],["SessionOutput",""]],"trait":[["MoveResolverExt",""]]};

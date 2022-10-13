@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Wrapper for a `Layer` to allow it to be dynamically reloaded."><meta name="keywords" content="rust, rustlang, rust-lang, reload"><title>tracing_subscriber::reload - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tracing_subscriber/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../tracing_subscriber/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module reload</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tracing_subscriber/index.html">
+                        <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">tracing_subscriber</a>::<wbr><a class="mod" href="#">reload</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/tracing_subscriber/reload.rs.html#1-360">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Wrapper for a <code>Layer</code> to allow it to be dynamically reloaded.</p>
+<p>This module provides a <a href="struct.Layer.html"><code>Layer</code> type</a> implementing the <a href="../layer/trait.Layer.html"><code>Layer</code> trait</a> or <a href="../layer/trait.Filter.html"><code>Filter</code> trait</a>
+which wraps another type implementing the corresponding trait. This
+allows the wrapped type to be replaced with another
+instance of that type at runtime.</p>
+<p>This can be used in cases where a subset of <code>Layer</code> or <code>Filter</code> functionality
+should be dynamically reconfigured, such as when filtering directives may
+change at runtime. Note that this layer introduces a (relatively small)
+amount of overhead, and should thus only be used as needed.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>Reloading a <a href="../layer/index.html#global-filtering">global filtering</a> layer:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tracing_subscriber</span>::{<span class="ident">filter</span>, <span class="ident">fmt</span>, <span class="ident">reload</span>, <span class="ident">prelude</span>::<span class="kw-2">*</span>};
+<span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="ident">filter::LevelFilter::WARN</span>;
+<span class="kw">let</span> (<span class="ident">filter</span>, <span class="ident">reload_handle</span>) <span class="op">=</span> <span class="ident">reload::Layer::new</span>(<span class="ident">filter</span>);
+<span class="ident">tracing_subscriber::registry</span>()
+  .<span class="ident">with</span>(<span class="ident">filter</span>)
+  .<span class="ident">with</span>(<span class="ident">fmt::Layer::default</span>())
+  .<span class="ident">init</span>();
+<span class="macro">info!</span>(<span class="string">&quot;This will be ignored&quot;</span>);
+<span class="ident">reload_handle</span>.<span class="ident">modify</span>(<span class="op">|</span><span class="ident">filter</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">filter</span> <span class="op">=</span> <span class="ident">filter::LevelFilter::INFO</span>);
+<span class="macro">info!</span>(<span class="string">&quot;This will be logged&quot;</span>);</code></pre></div>
+<p>Reloading a <a href="../filter/struct.Filtered.html"><code>Filtered</code></a> layer:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">tracing_subscriber</span>::{<span class="ident">filter</span>, <span class="ident">fmt</span>, <span class="ident">reload</span>, <span class="ident">prelude</span>::<span class="kw-2">*</span>};
+<span class="kw">let</span> <span class="ident">filtered_layer</span> <span class="op">=</span> <span class="ident">fmt::Layer::default</span>().<span class="ident">with_filter</span>(<span class="ident">filter::LevelFilter::WARN</span>);
+<span class="kw">let</span> (<span class="ident">filtered_layer</span>, <span class="ident">reload_handle</span>) <span class="op">=</span> <span class="ident">reload::Layer::new</span>(<span class="ident">filtered_layer</span>);
+<span class="ident">tracing_subscriber::registry</span>()
+  .<span class="ident">with</span>(<span class="ident">filtered_layer</span>)
+  .<span class="ident">init</span>();
+<span class="macro">info!</span>(<span class="string">&quot;This will be ignored&quot;</span>);
+<span class="ident">reload_handle</span>.<span class="ident">modify</span>(<span class="op">|</span><span class="ident">layer</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">layer</span>.<span class="ident">filter_mut</span>() <span class="op">=</span> <span class="ident">filter::LevelFilter::INFO</span>);
+<span class="macro">info!</span>(<span class="string">&quot;This will be logged&quot;</span>);</code></pre></div>
+<h3 id="note"><a href="#note">Note</a></h3>
+<p>The <a href="struct.Layer.html" title="Layer"><code>Layer</code></a> implementation is unable to implement downcasting functionality,
+so certain <a href="struct.Layer.html" title="Layer"><code>Layer</code></a> will fail to downcast if wrapped in a <code>reload::Layer</code>.</p>
+<p>If you only want to be able to dynamically change the
+<code>Filter</code> on a layer, prefer wrapping that <code>Filter</code> in the <code>reload::Layer</code>.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Error.html" title="tracing_subscriber::reload::Error struct">Error</a></div><div class="item-right docblock-short"><p>Indicates that an error occurred when reloading a layer.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Handle.html" title="tracing_subscriber::reload::Handle struct">Handle</a></div><div class="item-right docblock-short"><p>Allows reloading the state of an associated <a href="../layer/trait.Layer.html"><code>Layer</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Layer.html" title="tracing_subscriber::reload::Layer struct">Layer</a></div><div class="item-right docblock-short"><p>Wraps a <code>Layer</code> or <code>Filter</code>, allowing it to be reloaded dynamically at runtime.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tracing_subscriber" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

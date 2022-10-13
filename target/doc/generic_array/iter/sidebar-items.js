@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["GenericArrayIter","An iterator that moves out of a `GenericArray`"]]};

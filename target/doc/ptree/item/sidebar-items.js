@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["StringItem","A simple concrete implementation of `TreeItem` using `String`s"]],"trait":[["TreeItem","Main trait for exposing a tree structure to `ptree`"]]};

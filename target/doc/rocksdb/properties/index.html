@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Properties"><meta name="keywords" content="rust, rustlang, rust-lang, properties"><title>rocksdb::properties - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../rocksdb/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../rocksdb/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module properties</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#constants">Constants</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../rocksdb/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">rocksdb</a>::<wbr><a class="mod" href="#">properties</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/rocksdb/properties.rs.html#1-251">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Properties</p>
+<p>Full list of valid properties and descriptions pulled from
+<a href="https:///github.com/facebook/rocksdb/blob/08809f5e6cd9cc4bc3958dd4d59457ae78c76660/include/rocksdb/db.h#L428-L634">here</a>.</p>
+</div></details><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.ACTUAL_DELAYED_WRITE_RATE.html" title="rocksdb::properties::ACTUAL_DELAYED_WRITE_RATE constant">ACTUAL_DELAYED_WRITE_RATE</a></div><div class="item-right docblock-short"><p>“rocksdb.actual-delayed-write-rate” - returns the current actual delayed
+write rate. 0 means no delay.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.AGGREGATED_TABLE_PROPERTIES.html" title="rocksdb::properties::AGGREGATED_TABLE_PROPERTIES constant">AGGREGATED_TABLE_PROPERTIES</a></div><div class="item-right docblock-short"><p>“rocksdb.aggregated-table-properties” - returns a string representation
+of the aggregated table properties of the target column family.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.BACKGROUND_ERRORS.html" title="rocksdb::properties::BACKGROUND_ERRORS constant">BACKGROUND_ERRORS</a></div><div class="item-right docblock-short"><p>“rocksdb.background-errors” - returns accumulated number of background
+errors.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.BASE_LEVEL.html" title="rocksdb::properties::BASE_LEVEL constant">BASE_LEVEL</a></div><div class="item-right docblock-short"><p>“rocksdb.base-level” - returns number of level to which L0 data will be
+compacted.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.BLOCK_CACHE_CAPACITY.html" title="rocksdb::properties::BLOCK_CACHE_CAPACITY constant">BLOCK_CACHE_CAPACITY</a></div><div class="item-right docblock-short"><p>“rocksdb.block-cache-capacity” - returns block cache capacity.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.BLOCK_CACHE_PINNED_USAGE.html" title="rocksdb::properties::BLOCK_CACHE_PINNED_USAGE constant">BLOCK_CACHE_PINNED_USAGE</a></div><div class="item-right docblock-short"><p>“rocksdb.block-cache-pinned-usage” - returns the memory size for the
+entries being pinned.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.BLOCK_CACHE_USAGE.html" title="rocksdb::properties::BLOCK_CACHE_USAGE constant">BLOCK_CACHE_USAGE</a></div><div class="item-right docblock-short"><p>“rocksdb.block-cache-usage” - returns the memory size for the entries
+residing in block cache.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.CFSTATS.html" title="rocksdb::properties::CFSTATS constant">CFSTATS</a></div><div class="item-right docblock-short"><p>“rocksdb.cfstats” - Both of “rocksdb.cfstats-no-file-histogram” and
+“rocksdb.cf-file-histogram” together. See below for description
+of the two.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.CFSTATS_NO_FILE_HISTOGRAM.html" title="rocksdb::properties::CFSTATS_NO_FILE_HISTOGRAM constant">CFSTATS_NO_FILE_HISTOGRAM</a></div><div class="item-right docblock-short"><p>“rocksdb.cfstats-no-file-histogram” - returns a multi-line string with
+general columm family stats per-level over db’s lifetime (“L<n>”),
+aggregated over db’s lifetime (“Sum”), and aggregated over the
+interval since the last retrieval (“Int”).
+It could also be used to return the stats in the format of the map.
+In this case there will a pair of string to array of double for
+each level as well as for “Sum”. “Int” stats will not be affected
+when this form of stats are retrieved.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.CF_FILE_HISTOGRAM.html" title="rocksdb::properties::CF_FILE_HISTOGRAM constant">CF_FILE_HISTOGRAM</a></div><div class="item-right docblock-short"><p>“rocksdb.cf-file-histogram” - print out how many file reads to every
+level, as well as the histogram of latency of single requests.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.COMPACTION_PENDING.html" title="rocksdb::properties::COMPACTION_PENDING constant">COMPACTION_PENDING</a></div><div class="item-right docblock-short"><p>“rocksdb.compaction-pending” - returns 1 if at least one compaction is
+pending; otherwise, returns 0.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.CURRENT_SUPER_VERSION_NUMBER.html" title="rocksdb::properties::CURRENT_SUPER_VERSION_NUMBER constant">CURRENT_SUPER_VERSION_NUMBER</a></div><div class="item-right docblock-short"><p>“rocksdb.current-super-version-number” - returns number of current LSM
+version. It is a uint64_t integer number, incremented after there is
+any change to the LSM tree. The number is not preserved after restarting
+the DB. After DB restart, it will start from 0 again.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.CUR_SIZE_ACTIVE_MEM_TABLE.html" title="rocksdb::properties::CUR_SIZE_ACTIVE_MEM_TABLE constant">CUR_SIZE_ACTIVE_MEM_TABLE</a></div><div class="item-right docblock-short"><p>“rocksdb.cur-size-active-mem-table” - returns approximate size of active
+memtable (bytes).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.CUR_SIZE_ALL_MEM_TABLES.html" title="rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES constant">CUR_SIZE_ALL_MEM_TABLES</a></div><div class="item-right docblock-short"><p>“rocksdb.cur-size-all-mem-tables” - returns approximate size of active
+and unflushed immutable memtables (bytes).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.DBSTATS.html" title="rocksdb::properties::DBSTATS constant">DBSTATS</a></div><div class="item-right docblock-short"><p>“rocksdb.dbstats” - returns a multi-line string with general database
+stats, both cumulative (over the db’s lifetime) and interval (since
+the last retrieval of kDBStats).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.ESTIMATE_LIVE_DATA_SIZE.html" title="rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE constant">ESTIMATE_LIVE_DATA_SIZE</a></div><div class="item-right docblock-short"><p>“rocksdb.estimate-live-data-size” - returns an estimate of the amount of
+live data in bytes.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.ESTIMATE_NUM_KEYS.html" title="rocksdb::properties::ESTIMATE_NUM_KEYS constant">ESTIMATE_NUM_KEYS</a></div><div class="item-right docblock-short"><p>“rocksdb.estimate-num-keys” - returns estimated number of total keys in
+the active and unflushed immutable memtables and storage.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.ESTIMATE_OLDEST_KEY_TIME.html" title="rocksdb::properties::ESTIMATE_OLDEST_KEY_TIME constant">ESTIMATE_OLDEST_KEY_TIME</a></div><div class="item-right docblock-short"><p>“rocksdb.estimate-oldest-key-time” - returns an estimation of
+oldest key timestamp in the DB. Currently only available for
+FIFO compaction with
+compaction_options_fifo.allow_compaction = false.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.ESTIMATE_PENDING_COMPACTION_BYTES.html" title="rocksdb::properties::ESTIMATE_PENDING_COMPACTION_BYTES constant">ESTIMATE_PENDING_COMPACTION_BYTES</a></div><div class="item-right docblock-short"><p>“rocksdb.estimate-pending-compaction-bytes” - returns estimated total
+number of bytes compaction needs to rewrite to get all levels down
+to under target size. Not valid for other compactions than level-
+based.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.ESTIMATE_TABLE_READERS_MEM.html" title="rocksdb::properties::ESTIMATE_TABLE_READERS_MEM constant">ESTIMATE_TABLE_READERS_MEM</a></div><div class="item-right docblock-short"><p>“rocksdb.estimate-table-readers-mem” - returns estimated memory used for
+reading SST tables, excluding memory used in block cache (e.g.,
+filter and index blocks).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.IS_FILE_DELETIONS_ENABLED.html" title="rocksdb::properties::IS_FILE_DELETIONS_ENABLED constant">IS_FILE_DELETIONS_ENABLED</a></div><div class="item-right docblock-short"><p>“rocksdb.is-file-deletions-enabled” - returns 0 if deletion of obsolete
+files is enabled; otherwise, returns a non-zero number.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.IS_WRITE_STOPPED.html" title="rocksdb::properties::IS_WRITE_STOPPED constant">IS_WRITE_STOPPED</a></div><div class="item-right docblock-short"><p>“rocksdb.is-write-stopped” - Return 1 if write has been stopped.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.LEVELSTATS.html" title="rocksdb::properties::LEVELSTATS constant">LEVELSTATS</a></div><div class="item-right docblock-short"><p>“rocksdb.levelstats” - returns multi-line string containing the number
+of files per level and total size of each level (MB).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.LIVE_SST_FILES_SIZE.html" title="rocksdb::properties::LIVE_SST_FILES_SIZE constant">LIVE_SST_FILES_SIZE</a></div><div class="item-right docblock-short"><p>“rocksdb.live-sst-files-size” - returns total size (bytes) of all SST
+files belong to the latest LSM tree.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.MEM_TABLE_FLUSH_PENDING.html" title="rocksdb::properties::MEM_TABLE_FLUSH_PENDING constant">MEM_TABLE_FLUSH_PENDING</a></div><div class="item-right docblock-short"><p>“rocksdb.mem-table-flush-pending” - returns 1 if a memtable flush is
+pending; otherwise, returns 0.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.MIN_LOG_NUMBER_TO_KEEP.html" title="rocksdb::properties::MIN_LOG_NUMBER_TO_KEEP constant">MIN_LOG_NUMBER_TO_KEEP</a></div><div class="item-right docblock-short"><p>“rocksdb.min-log-number-to-keep” - return the minimum log number of the
+log files that should be kept.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.MIN_OBSOLETE_SST_NUMBER_TO_KEEP.html" title="rocksdb::properties::MIN_OBSOLETE_SST_NUMBER_TO_KEEP constant">MIN_OBSOLETE_SST_NUMBER_TO_KEEP</a></div><div class="item-right docblock-short"><p>“rocksdb.min-obsolete-sst-number-to-keep” - return the minimum file
+number for an obsolete SST to be kept. The max value of <code>uint64_t</code>
+will be returned if all obsolete files can be deleted.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_DELETES_ACTIVE_MEM_TABLE.html" title="rocksdb::properties::NUM_DELETES_ACTIVE_MEM_TABLE constant">NUM_DELETES_ACTIVE_MEM_TABLE</a></div><div class="item-right docblock-short"><p>“rocksdb.num-deletes-active-mem-table” - returns total number of delete
+entries in the active memtable.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_DELETES_IMM_MEM_TABLES.html" title="rocksdb::properties::NUM_DELETES_IMM_MEM_TABLES constant">NUM_DELETES_IMM_MEM_TABLES</a></div><div class="item-right docblock-short"><p>“rocksdb.num-deletes-imm-mem-tables” - returns total number of delete
+entries in the unflushed immutable memtables.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_ENTRIES_ACTIVE_MEM_TABLE.html" title="rocksdb::properties::NUM_ENTRIES_ACTIVE_MEM_TABLE constant">NUM_ENTRIES_ACTIVE_MEM_TABLE</a></div><div class="item-right docblock-short"><p>“rocksdb.num-entries-active-mem-table” - returns total number of entries
+in the active memtable.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_ENTRIES_IMM_MEM_TABLES.html" title="rocksdb::properties::NUM_ENTRIES_IMM_MEM_TABLES constant">NUM_ENTRIES_IMM_MEM_TABLES</a></div><div class="item-right docblock-short"><p>“rocksdb.num-entries-imm-mem-tables” - returns total number of entries
+in the unflushed immutable memtables.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_IMMUTABLE_MEM_TABLE.html" title="rocksdb::properties::NUM_IMMUTABLE_MEM_TABLE constant">NUM_IMMUTABLE_MEM_TABLE</a></div><div class="item-right docblock-short"><p>“rocksdb.num-immutable-mem-table” - returns number of immutable
+memtables that have not yet been flushed.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_IMMUTABLE_MEM_TABLE_FLUSHED.html" title="rocksdb::properties::NUM_IMMUTABLE_MEM_TABLE_FLUSHED constant">NUM_IMMUTABLE_MEM_TABLE_FLUSHED</a></div><div class="item-right docblock-short"><p>“rocksdb.num-immutable-mem-table-flushed” - returns number of immutable
+memtables that have already been flushed.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_LIVE_VERSIONS.html" title="rocksdb::properties::NUM_LIVE_VERSIONS constant">NUM_LIVE_VERSIONS</a></div><div class="item-right docblock-short"><p>“rocksdb.num-live-versions” - returns number of live versions. <code>Version</code>
+is an internal data structure. See version_set.h for details. More
+live versions often mean more SST files are held from being deleted,
+by iterators or unfinished compactions.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_RUNNING_COMPACTIONS.html" title="rocksdb::properties::NUM_RUNNING_COMPACTIONS constant">NUM_RUNNING_COMPACTIONS</a></div><div class="item-right docblock-short"><p>“rocksdb.num-running-compactions” - returns the number of currently
+running compactions.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_RUNNING_FLUSHES.html" title="rocksdb::properties::NUM_RUNNING_FLUSHES constant">NUM_RUNNING_FLUSHES</a></div><div class="item-right docblock-short"><p>“rocksdb.num-running-flushes” - returns the number of currently running
+flushes.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.NUM_SNAPSHOTS.html" title="rocksdb::properties::NUM_SNAPSHOTS constant">NUM_SNAPSHOTS</a></div><div class="item-right docblock-short"><p>“rocksdb.num-snapshots” - returns number of unreleased snapshots of the
+database.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.OLDEST_SNAPSHOT_TIME.html" title="rocksdb::properties::OLDEST_SNAPSHOT_TIME constant">OLDEST_SNAPSHOT_TIME</a></div><div class="item-right docblock-short"><p>“rocksdb.oldest-snapshot-time” - returns number representing unix
+timestamp of oldest unreleased snapshot.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.OPTIONS_STATISTICS.html" title="rocksdb::properties::OPTIONS_STATISTICS constant">OPTIONS_STATISTICS</a></div><div class="item-right docblock-short"><p>“rocksdb.options-statistics” - returns multi-line string
+of options.statistics</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.SIZE_ALL_MEM_TABLES.html" title="rocksdb::properties::SIZE_ALL_MEM_TABLES constant">SIZE_ALL_MEM_TABLES</a></div><div class="item-right docblock-short"><p>“rocksdb.size-all-mem-tables” - returns approximate size of active,
+unflushed immutable, and pinned immutable memtables (bytes).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.SSTABLES.html" title="rocksdb::properties::SSTABLES constant">SSTABLES</a></div><div class="item-right docblock-short"><p>“rocksdb.sstables” - returns a multi-line string summarizing current
+SST files.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.STATS.html" title="rocksdb::properties::STATS constant">STATS</a></div><div class="item-right docblock-short"><p>“rocksdb.stats” - returns a multi-line string containing the data
+described by kCFStats followed by the data described by kDBStats.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.TOTAL_SST_FILES_SIZE.html" title="rocksdb::properties::TOTAL_SST_FILES_SIZE constant">TOTAL_SST_FILES_SIZE</a></div><div class="item-right docblock-short"><p>“rocksdb.total-sst-files-size” - returns total size (bytes) of all SST
+files.
+WARNING: may slow down online queries if there are too many files.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.aggregated_table_properties_at_level.html" title="rocksdb::properties::aggregated_table_properties_at_level fn">aggregated_table_properties_at_level</a></div><div class="item-right docblock-short"><p>“rocksdb.aggregated-table-properties-at-level<N>”, same as the previous
+one but only returns the aggregated table properties of the
+specified level “N” at the target column family.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.compression_ratio_at_level.html" title="rocksdb::properties::compression_ratio_at_level fn">compression_ratio_at_level</a></div><div class="item-right docblock-short"><p>“rocksdb.compression-ratio-at-level<N>” - returns string containing the
+compression ratio of data at level <N>, where <N> is an ASCII
+representation of a level number (e.g., “0”). Here, compression
+ratio is defined as uncompressed data size / compressed file size.
+Returns “-1.0” if no open files at level <N>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.num_files_at_level.html" title="rocksdb::properties::num_files_at_level fn">num_files_at_level</a></div><div class="item-right docblock-short"><p>“rocksdb.num-files-at-level<N>” - returns string containing the number
+of files at level <N>, where <N> is an ASCII representation of a
+level number (e.g., “0”).</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="rocksdb" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

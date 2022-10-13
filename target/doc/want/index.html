@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A Futures channel-like utility to signal when a value is wanted."><meta name="keywords" content="rust, rustlang, rust-lang, want"><title>want - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../want/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../want/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate want</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.3.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../want/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">want</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/want/lib.rs.html#1-585">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A Futures channel-like utility to signal when a value is wanted.</p>
+<p>Futures are supposed to be lazy, and only starting work if <code>Future::poll</code>
+is called. The same is true of <code>Stream</code>s, but when using a channel as
+a <code>Stream</code>, it can be hard to know if the receiver is ready for the next
+value.</p>
+<p>Put another way, given a <code>(tx, rx)</code> from <code>futures::sync::mpsc::channel()</code>,
+how can the sender (<code>tx</code>) know when the receiver (<code>rx</code>) actually wants more
+work to be produced? Just because there is room in the channel buffer
+doesn’t mean the work would be used by the receiver.</p>
+<p>This is where something like <code>want</code> comes in. Added to a channel, you can
+make sure that the <code>tx</code> only creates the message and sends it when the <code>rx</code>
+has <code>poll()</code> for it, and the buffer was empty.</p>
+<h2 id="example"><a href="#example">Example</a></h2><div class="example-wrap"><pre class="language-nightly"><code>extern crate want;
+
+
+// Some message that is expensive to produce.
+struct Expensive;
+
+// Some futures-aware MPSC channel...
+let (mut tx, mut rx) = mpsc_channel();
+
+// And our `want` channel!
+let (mut gv, mut tk) = want::new();
+
+
+// Our receiving task...
+spawn(async move {
+    // Maybe something comes up that prevents us from ever
+    // using the expensive message.
+    //
+    // Without `want`, the &quot;send&quot; task may have started to
+    // produce the expensive message even though we wouldn&#39;t
+    // be able to use it.
+    if !we_still_want_message() {
+        return;
+    }
+
+    // But we can use it! So tell the `want` channel.
+    tk.want();
+
+    match rx.recv().await {
+        Some(_msg) =&gt; println!(&quot;got a message&quot;),
+        None =&gt; println!(&quot;DONE&quot;),
+    }
+});
+
+// Our sending task
+spawn(async move {
+    // It&#39;s expensive to create a new message, so we wait until the
+    // receiving end truly *wants* the message.
+    if let Err(_closed) = gv.want().await {
+        // Looks like they will never want it...
+        return;
+    }
+
+    // They want it, let&#39;s go!
+    tx.send(Expensive);
+});
+</code></pre></div></div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Closed.html" title="want::Closed struct">Closed</a></div><div class="item-right docblock-short"><p>The <code>Taker</code> has canceled its interest in a value.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Giver.html" title="want::Giver struct">Giver</a></div><div class="item-right docblock-short"><p>An entity that gives a value when wanted.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.SharedGiver.html" title="want::SharedGiver struct">SharedGiver</a></div><div class="item-right docblock-short"><p>A cloneable <code>Giver</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Taker.html" title="want::Taker struct">Taker</a></div><div class="item-right docblock-short"><p>An entity that wants a value.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.new.html" title="want::new fn">new</a></div><div class="item-right docblock-short"><p>Create a new <code>want</code> channel.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="want" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

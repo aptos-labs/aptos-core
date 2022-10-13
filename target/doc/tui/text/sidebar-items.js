@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Span","A string where all graphemes have the same style."],["Spans","A string composed of clusters of graphemes, each with their own style."],["StyledGrapheme","A grapheme associated to a style."],["Text","A string split over multiple lines where each line is composed of several clusters, each with their own style."]]};

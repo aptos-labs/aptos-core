@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["PKG_DESCRIPTION","UNIC component description."],["PKG_NAME","UNIC component name."],["PKG_VERSION","UNIC component version."]],"macro":[["chars","Convenience macro for the initialization of `CharRange`s."]],"struct":[["CharIter","An iterator over a range of unicode code points."],["CharRange","A range of unicode code points."]]};

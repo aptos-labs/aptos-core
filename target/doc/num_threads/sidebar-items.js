@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["is_single_threaded","Determine if the current process is single-threaded. Returns `None` if the number of threads cannot be determined."],["num_threads","Obtain the number of threads currently part of the active process. Returns `None` if the number of threads cannot be determined."]]};

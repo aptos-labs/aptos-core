@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["TypeView","Trait that provides an abstract view into a Move type."],["ValueView","Trait that provides an abstract view into a Move Value."],["ValueVisitor","Trait that defines a visitor that could be used to traverse a value recursively."]]};

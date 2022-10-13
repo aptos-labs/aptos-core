@@ -1,0 +1,66 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Formatters for logging `tracing` events."><meta name="keywords" content="rust, rustlang, rust-lang, format"><title>tracing_subscriber::fmt::format - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../tracing_subscriber/index.html"><div class="logo-container"><img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../tracing_subscriber/index.html"><div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module format</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../tracing_subscriber/index.html">
+                        <img src="https://raw.githubusercontent.com/tokio-rs/tracing/master/assets/logo-type.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../../index.html">tracing_subscriber</a>::<wbr><a href="../index.html">fmt</a>::<wbr><a class="mod" href="#">format</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../../src/tracing_subscriber/fmt/format/mod.rs.html#1-2161">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Formatters for logging <code>tracing</code> events.</p>
+<p>This module provides several formatter implementations, as well as utilities
+for implementing custom formatters.</p>
+<h2 id="formatters"><a href="#formatters">Formatters</a></h2>
+<p>This module provides a number of formatter implementations:</p>
+<ul>
+<li>
+<p><a href="struct.Full.html" title="Full"><code>Full</code></a>: The default formatter. This emits human-readable,
+single-line logs for each event that occurs, with the current span context
+displayed before the formatted representation of the event. See
+<a href="struct.Full.html#example-output">here</a> for sample output.</p>
+</li>
+<li>
+<p><a href="struct.Compact.html" title="Compact"><code>Compact</code></a>: A variant of the default formatter, optimized for
+short line lengths. Fields from the current span context are appended to
+the fields of the formatted event, and span names are not shown; the
+verbosity level is abbreviated to a single character. See
+<a href="struct.Compact.html#example-output">here</a> for sample output.</p>
+</li>
+<li>
+<p><a href="struct.Pretty.html" title="Pretty"><code>Pretty</code></a>: Emits excessively pretty, multi-line logs, optimized
+for human readability. This is primarily intended to be used in local
+development and debugging, or for command-line applications, where
+automated analysis and compact storage of logs is less of a priority than
+readability and visual appeal. See <a href="struct.Pretty.html#example-output">here</a>
+for sample output.</p>
+</li>
+<li>
+<p>[<code>Json</code>]: Outputs newline-delimited JSON logs. This is intended
+for production use with systems where structured logs are consumed as JSON
+by analysis and viewing tools. The JSON output is not optimized for human
+readability. See <a href="Json#example-output">here</a> for sample output.</p>
+</li>
+</ul>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Compact.html" title="tracing_subscriber::fmt::format::Compact struct">Compact</a></div><div class="item-right docblock-short"><p>Marker for <a href="struct.Format.html" title="Format"><code>Format</code></a> that indicates that the compact log format should be used.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DefaultFields.html" title="tracing_subscriber::fmt::format::DefaultFields struct">DefaultFields</a></div><div class="item-right docblock-short"><p>The default <a href="../trait.FormatFields.html" title="FormatFields"><code>FormatFields</code></a> implementation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DefaultVisitor.html" title="tracing_subscriber::fmt::format::DefaultVisitor struct">DefaultVisitor</a></div><div class="item-right docblock-short"><p>The <a href="../../field/trait.Visit.html">visitor</a> produced by <a href="struct.DefaultFields.html" title="DefaultFields"><code>DefaultFields</code></a>’s <a href="../../field/trait.MakeVisitor.html"><code>MakeVisitor</code></a> implementation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FieldFn.html" title="tracing_subscriber::fmt::format::FieldFn struct">FieldFn</a></div><div class="item-right docblock-short"><p>A <a href="../trait.FormatFields.html" title="FormatFields"><code>FormatFields</code></a> implementation that formats fields by calling a function
+or closure.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FieldFnVisitor.html" title="tracing_subscriber::fmt::format::FieldFnVisitor struct">FieldFnVisitor</a></div><div class="item-right docblock-short"><p>The <a href="../../field/trait.Visit.html">visitor</a> produced by <a href="struct.FieldFn.html" title="FieldFn"><code>FieldFn</code></a>’s <a href="../../field/trait.MakeVisitor.html"><code>MakeVisitor</code></a> implementation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FmtSpan.html" title="tracing_subscriber::fmt::format::FmtSpan struct">FmtSpan</a></div><div class="item-right docblock-short"><p>Configures what points in the span lifecycle are logged as events.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Format.html" title="tracing_subscriber::fmt::format::Format struct">Format</a></div><div class="item-right docblock-short"><p>A pre-configured event formatter.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Full.html" title="tracing_subscriber::fmt::format::Full struct">Full</a></div><div class="item-right docblock-short"><p>Marker for <a href="struct.Format.html" title="Format"><code>Format</code></a> that indicates that the default log format should be used.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Pretty.html" title="tracing_subscriber::fmt::format::Pretty struct">Pretty</a></div><div class="item-right docblock-short"><p>An excessively pretty, human-readable event formatter.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.PrettyFields.html" title="tracing_subscriber::fmt::format::PrettyFields struct">PrettyFields</a></div><div class="item-right docblock-short"><p>An excessively pretty, human-readable <a href="../../field/trait.MakeVisitor.html"><code>MakeVisitor</code></a> implementation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.PrettyVisitor.html" title="tracing_subscriber::fmt::format::PrettyVisitor struct">PrettyVisitor</a></div><div class="item-right docblock-short"><p>The <a href="../../field/trait.Visit.html">visitor</a> produced by <a href="struct.Pretty.html" title="Pretty"><code>Pretty</code></a>’s <a href="../../field/trait.MakeVisitor.html"><code>MakeVisitor</code></a> implementation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Writer.html" title="tracing_subscriber::fmt::format::Writer struct">Writer</a></div><div class="item-right docblock-short"><p>A writer to which formatted representations of spans and events are written.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FormatEvent.html" title="tracing_subscriber::fmt::format::FormatEvent trait">FormatEvent</a></div><div class="item-right docblock-short"><p>A type that can format a tracing <a href="tracing::Event"><code>Event</code></a> to a <a href="struct.Writer.html" title="Writer"><code>Writer</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.FormatFields.html" title="tracing_subscriber::fmt::format::FormatFields trait">FormatFields</a></div><div class="item-right docblock-short"><p>A type that can format a <a href="../../field/trait.RecordFields.html">set of fields</a> to a <a href="struct.Writer.html" title="Writer"><code>Writer</code></a>.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.debug_fn.html" title="tracing_subscriber::fmt::format::debug_fn fn">debug_fn</a></div><div class="item-right docblock-short"><p>Returns a <a href="../trait.FormatFields.html" title="FormatFields"><code>FormatFields</code></a> implementation that formats fields using the
+provided function or closure.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.format.html" title="tracing_subscriber::fmt::format::format fn">format</a></div><div class="item-right docblock-short"><p>Returns the default configuration for an [event formatter].</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="tracing_subscriber" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

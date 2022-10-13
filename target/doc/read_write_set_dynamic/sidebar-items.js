@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["ConcretizedFormals","A read/write set state with no unbound formals or type variables"],["ConcretizedSecondaryIndexes","A read/write set state with no secondary indexes and no unbound formals or type variables"],["NormalizedReadWriteSetAnalysis",""]]};

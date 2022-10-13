@@ -1,0 +1,1185 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/Users/claymurphy/.cargo/registry/src/github.com-1ecc6299db9ec823/http-0.2.8/src/status.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>status.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../http/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../http/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../http/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+</pre><pre class="rust"><code><span class="doccomment">//! HTTP status codes</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This module contains HTTP-status code related structs an errors. The main</span>
+<span class="doccomment">//! type in this module is `StatusCode` which is not intended to be used through</span>
+<span class="doccomment">//! this module but rather the `http::StatusCode` type.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! use http::StatusCode;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! assert_eq!(StatusCode::from_u16(200).unwrap(), StatusCode::OK);</span>
+<span class="doccomment">//! assert_eq!(StatusCode::NOT_FOUND, 404);</span>
+<span class="doccomment">//! assert!(StatusCode::OK.is_success());</span>
+<span class="doccomment">//! ```</span>
+
+<span class="kw">use</span> <span class="ident">std::convert::TryFrom</span>;
+<span class="kw">use</span> <span class="ident">std::num::NonZeroU16</span>;
+<span class="kw">use</span> <span class="ident">std::error::Error</span>;
+<span class="kw">use</span> <span class="ident">std::fmt</span>;
+<span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
+
+<span class="doccomment">/// An HTTP status code (`status-code` in RFC 7230 et al.).</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Constants are provided for known status codes, including those in the IANA</span>
+<span class="doccomment">/// [HTTP Status Code Registry](</span>
+<span class="doccomment">/// https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml).</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Status code values in the range 100-999 (inclusive) are supported by this</span>
+<span class="doccomment">/// type. Values in the range 100-599 are semantically classified by the most</span>
+<span class="doccomment">/// significant digit. See [`StatusCode::is_success`], etc. Values above 599</span>
+<span class="doccomment">/// are unclassified but allowed for legacy compatibility, though their use is</span>
+<span class="doccomment">/// discouraged. Applications may interpret such values as protocol errors.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Examples</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">/// use http::StatusCode;</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// assert_eq!(StatusCode::from_u16(200).unwrap(), StatusCode::OK);</span>
+<span class="doccomment">/// assert_eq!(StatusCode::NOT_FOUND.as_u16(), 404);</span>
+<span class="doccomment">/// assert!(StatusCode::OK.is_success());</span>
+<span class="doccomment">/// ```</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>, <span class="ident">Hash</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StatusCode</span>(<span class="ident">NonZeroU16</span>);
+
+<span class="doccomment">/// A possible error value when converting a `StatusCode` from a `u16` or `&amp;str`</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This error indicates that the supplied input was not a valid number, was less</span>
+<span class="doccomment">/// than 100, or was greater than 999.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">InvalidStatusCode</span> {
+    <span class="ident">_priv</span>: (),
+}
+
+<span class="kw">impl</span> <span class="ident">StatusCode</span> {
+    <span class="doccomment">/// Converts a u16 to a status code.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The function validates the correctness of the supplied u16. It must be</span>
+    <span class="doccomment">/// greater or equal to 100 and less than 1000.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Example</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use http::StatusCode;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// let ok = StatusCode::from_u16(200).unwrap();</span>
+    <span class="doccomment">/// assert_eq!(ok, StatusCode::OK);</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// let err = StatusCode::from_u16(99);</span>
+    <span class="doccomment">/// assert!(err.is_err());</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_u16</span>(<span class="ident">src</span>: <span class="ident">u16</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">StatusCode</span>, <span class="ident">InvalidStatusCode</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="ident">src</span> <span class="op">&lt;</span> <span class="number">100</span> <span class="op">|</span><span class="op">|</span> <span class="ident">src</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">1000</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">InvalidStatusCode::new</span>());
+        }
+
+        <span class="ident">NonZeroU16::new</span>(<span class="ident">src</span>)
+            .<span class="ident">map</span>(<span class="ident">StatusCode</span>)
+            .<span class="ident">ok_or_else</span>(<span class="ident">InvalidStatusCode::new</span>)
+    }
+
+    <span class="doccomment">/// Converts a &amp;[u8] to a status code</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_bytes</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">StatusCode</span>, <span class="ident">InvalidStatusCode</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="ident">src</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">3</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">InvalidStatusCode::new</span>());
+        }
+
+        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">src</span>[<span class="number">0</span>].<span class="ident">wrapping_sub</span>(<span class="string">b&#39;0&#39;</span>) <span class="kw">as</span> <span class="ident">u16</span>;
+        <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">src</span>[<span class="number">1</span>].<span class="ident">wrapping_sub</span>(<span class="string">b&#39;0&#39;</span>) <span class="kw">as</span> <span class="ident">u16</span>;
+        <span class="kw">let</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">src</span>[<span class="number">2</span>].<span class="ident">wrapping_sub</span>(<span class="string">b&#39;0&#39;</span>) <span class="kw">as</span> <span class="ident">u16</span>;
+
+        <span class="kw">if</span> <span class="ident">a</span> <span class="op">==</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">a</span> <span class="op">&gt;</span> <span class="number">9</span> <span class="op">|</span><span class="op">|</span> <span class="ident">b</span> <span class="op">&gt;</span> <span class="number">9</span> <span class="op">|</span><span class="op">|</span> <span class="ident">c</span> <span class="op">&gt;</span> <span class="number">9</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">InvalidStatusCode::new</span>());
+        }
+
+        <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> (<span class="ident">a</span> <span class="op">*</span> <span class="number">100</span>) <span class="op">+</span> (<span class="ident">b</span> <span class="op">*</span> <span class="number">10</span>) <span class="op">+</span> <span class="ident">c</span>;
+        <span class="ident">NonZeroU16::new</span>(<span class="ident">status</span>)
+            .<span class="ident">map</span>(<span class="ident">StatusCode</span>)
+            .<span class="ident">ok_or_else</span>(<span class="ident">InvalidStatusCode::new</span>)
+    }
+
+    <span class="doccomment">/// Returns the `u16` corresponding to this `StatusCode`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Note</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is the same as the `From&lt;StatusCode&gt;` implementation, but</span>
+    <span class="doccomment">/// included as an inherent method because that implementation doesn&#39;t</span>
+    <span class="doccomment">/// appear in rustdocs, as well as a way to force the type instead of</span>
+    <span class="doccomment">/// relying on inference.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Example</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// let status = http::StatusCode::OK;</span>
+    <span class="doccomment">/// assert_eq!(status.as_u16(), 200);</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_u16</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u16</span> {
+        (<span class="kw-2">*</span><span class="self">self</span>).<span class="ident">into</span>()
+    }
+
+    <span class="doccomment">/// Returns a &amp;str representation of the `StatusCode`</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The return value only includes a numerical representation of the</span>
+    <span class="doccomment">/// status code. The canonical reason is not included.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Example</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// let status = http::StatusCode::OK;</span>
+    <span class="doccomment">/// assert_eq!(status.as_str(), &quot;200&quot;);</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
+        <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> (<span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">-</span> <span class="number">100</span>) <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">offset</span> <span class="op">*</span> <span class="number">3</span>;
+
+        <span class="comment">// Invariant: self has checked range [100, 999] and CODE_DIGITS is</span>
+        <span class="comment">// ASCII-only, of length 900 * 3 = 2700 bytes</span>
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+        { <span class="kw-2">&amp;</span><span class="ident">CODE_DIGITS</span>[<span class="ident">offset</span>..<span class="ident">offset</span><span class="op">+</span><span class="number">3</span>] }
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">debug_assertions</span>))]</span>
+        <span class="kw">unsafe</span> { <span class="ident">CODE_DIGITS</span>.<span class="ident">get_unchecked</span>(<span class="ident">offset</span>..<span class="ident">offset</span><span class="op">+</span><span class="number">3</span>) }
+    }
+
+    <span class="doccomment">/// Get the standardised `reason-phrase` for this status code.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is mostly here for servers writing responses, but could potentially have application</span>
+    <span class="doccomment">/// at other times.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The reason phrase is defined as being exclusively for human readers. You should avoid</span>
+    <span class="doccomment">/// deriving any meaning from it at all costs.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Bear in mind also that in HTTP/2.0 and HTTP/3.0 the reason phrase is abolished from</span>
+    <span class="doccomment">/// transmission, and so this canonical reason phrase really is the only reason phrase you’ll</span>
+    <span class="doccomment">/// find.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Example</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// let status = http::StatusCode::OK;</span>
+    <span class="doccomment">/// assert_eq!(status.canonical_reason(), Some(&quot;OK&quot;));</span>
+    <span class="doccomment">/// ```</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">canonical_reason</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+        <span class="ident">canonical_reason</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>())
+    }
+
+    <span class="doccomment">/// Check if status is within 100-199.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_informational</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="number">200</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="number">100</span>
+    }
+
+    <span class="doccomment">/// Check if status is within 200-299.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_success</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="number">300</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="number">200</span>
+    }
+
+    <span class="doccomment">/// Check if status is within 300-399.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_redirection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="number">400</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="number">300</span>
+    }
+
+    <span class="doccomment">/// Check if status is within 400-499.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_client_error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="number">500</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="number">400</span>
+    }
+
+    <span class="doccomment">/// Check if status is within 500-599.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_server_error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="number">600</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="number">500</span>
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="ident">fmt::Debug::fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>, <span class="ident">f</span>)
+    }
+}
+
+<span class="doccomment">/// Formats the status code, *including* the canonical reason.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Example</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">/// # use http::StatusCode;</span>
+<span class="doccomment">/// assert_eq!(format!(&quot;{}&quot;, StatusCode::OK), &quot;200 OK&quot;);</span>
+<span class="doccomment">/// ```</span>
+<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="macro">write!</span>(
+            <span class="ident">f</span>,
+            <span class="string">&quot;{} {}&quot;</span>,
+            <span class="ident">u16::from</span>(<span class="kw-2">*</span><span class="self">self</span>),
+            <span class="self">self</span>.<span class="ident">canonical_reason</span>().<span class="ident">unwrap_or</span>(<span class="string">&quot;&lt;unknown status code&gt;&quot;</span>)
+        )
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">StatusCode</span> {
+        <span class="ident">StatusCode::OK</span>
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">PartialEq</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">u16</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">as_u16</span>() <span class="op">==</span> <span class="kw-2">*</span><span class="ident">other</span>
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">PartialEq</span><span class="op">&lt;</span><span class="ident">StatusCode</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">u16</span> {
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">StatusCode</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw-2">*</span><span class="self">self</span> <span class="op">==</span> <span class="ident">other</span>.<span class="ident">as_u16</span>()
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">StatusCode</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">u16</span> {
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">status</span>: <span class="ident">StatusCode</span>) -&gt; <span class="ident">u16</span> {
+        <span class="ident">status</span>.<span class="number">0</span>.<span class="ident">get</span>()
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">InvalidStatusCode</span>;
+
+    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">StatusCode</span>, <span class="ident">InvalidStatusCode</span><span class="op">&gt;</span> {
+        <span class="ident">StatusCode::from_bytes</span>(<span class="ident">s</span>.<span class="ident">as_ref</span>())
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">StatusCode</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">t</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">StatusCode</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident">t</span>.<span class="ident">clone</span>()
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">InvalidStatusCode</span>;
+
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">t</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
+        <span class="ident">StatusCode::from_bytes</span>(<span class="ident">t</span>)
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">InvalidStatusCode</span>;
+
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">t</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
+        <span class="ident">t</span>.<span class="ident">parse</span>()
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StatusCode</span> {
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">InvalidStatusCode</span>;
+
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">t</span>: <span class="ident">u16</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
+        <span class="ident">StatusCode::from_u16</span>(<span class="ident">t</span>)
+    }
+}
+
+<span class="macro">macro_rules!</span> <span class="ident">status_codes</span> {
+    (
+        $(
+            $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">docs</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span>
+            (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">num</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">konst</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">phrase</span>:<span class="ident">expr</span>);
+        )<span class="op">+</span>
+    ) =&gt; {
+        <span class="kw">impl</span> <span class="ident">StatusCode</span> {
+        $(
+            $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">docs</span>]</span>)<span class="op">*</span>
+            <span class="kw">pub</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">konst</span>: <span class="ident">StatusCode</span> <span class="op">=</span> <span class="ident">StatusCode</span>(<span class="kw">unsafe</span> { <span class="ident">NonZeroU16::new_unchecked</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">num</span>) });
+        )<span class="op">+</span>
+
+        }
+
+        <span class="kw">fn</span> <span class="ident">canonical_reason</span>(<span class="ident">num</span>: <span class="ident">u16</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+            <span class="kw">match</span> <span class="ident">num</span> {
+                $(
+                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">num</span> =&gt; <span class="prelude-val">Some</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">phrase</span>),
+                )<span class="op">+</span>
+                <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>
+            }
+        }
+    }
+}
+
+<span class="macro">status_codes!</span> {
+    <span class="doccomment">/// 100 Continue</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.2.1](https://tools.ietf.org/html/rfc7231#section-6.2.1)]</span>
+    (<span class="number">100</span>, <span class="ident">CONTINUE</span>, <span class="string">&quot;Continue&quot;</span>);
+    <span class="doccomment">/// 101 Switching Protocols</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.2.2](https://tools.ietf.org/html/rfc7231#section-6.2.2)]</span>
+    (<span class="number">101</span>, <span class="ident">SWITCHING_PROTOCOLS</span>, <span class="string">&quot;Switching Protocols&quot;</span>);
+    <span class="doccomment">/// 102 Processing</span>
+    <span class="doccomment">/// [[RFC2518](https://tools.ietf.org/html/rfc2518)]</span>
+    (<span class="number">102</span>, <span class="ident">PROCESSING</span>, <span class="string">&quot;Processing&quot;</span>);
+
+    <span class="doccomment">/// 200 OK</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.3.1](https://tools.ietf.org/html/rfc7231#section-6.3.1)]</span>
+    (<span class="number">200</span>, <span class="ident">OK</span>, <span class="string">&quot;OK&quot;</span>);
+    <span class="doccomment">/// 201 Created</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.3.2](https://tools.ietf.org/html/rfc7231#section-6.3.2)]</span>
+    (<span class="number">201</span>, <span class="ident">CREATED</span>, <span class="string">&quot;Created&quot;</span>);
+    <span class="doccomment">/// 202 Accepted</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.3.3](https://tools.ietf.org/html/rfc7231#section-6.3.3)]</span>
+    (<span class="number">202</span>, <span class="ident">ACCEPTED</span>, <span class="string">&quot;Accepted&quot;</span>);
+    <span class="doccomment">/// 203 Non-Authoritative Information</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.3.4](https://tools.ietf.org/html/rfc7231#section-6.3.4)]</span>
+    (<span class="number">203</span>, <span class="ident">NON_AUTHORITATIVE_INFORMATION</span>, <span class="string">&quot;Non Authoritative Information&quot;</span>);
+    <span class="doccomment">/// 204 No Content</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.3.5](https://tools.ietf.org/html/rfc7231#section-6.3.5)]</span>
+    (<span class="number">204</span>, <span class="ident">NO_CONTENT</span>, <span class="string">&quot;No Content&quot;</span>);
+    <span class="doccomment">/// 205 Reset Content</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.3.6](https://tools.ietf.org/html/rfc7231#section-6.3.6)]</span>
+    (<span class="number">205</span>, <span class="ident">RESET_CONTENT</span>, <span class="string">&quot;Reset Content&quot;</span>);
+    <span class="doccomment">/// 206 Partial Content</span>
+    <span class="doccomment">/// [[RFC7233, Section 4.1](https://tools.ietf.org/html/rfc7233#section-4.1)]</span>
+    (<span class="number">206</span>, <span class="ident">PARTIAL_CONTENT</span>, <span class="string">&quot;Partial Content&quot;</span>);
+    <span class="doccomment">/// 207 Multi-Status</span>
+    <span class="doccomment">/// [[RFC4918](https://tools.ietf.org/html/rfc4918)]</span>
+    (<span class="number">207</span>, <span class="ident">MULTI_STATUS</span>, <span class="string">&quot;Multi-Status&quot;</span>);
+    <span class="doccomment">/// 208 Already Reported</span>
+    <span class="doccomment">/// [[RFC5842](https://tools.ietf.org/html/rfc5842)]</span>
+    (<span class="number">208</span>, <span class="ident">ALREADY_REPORTED</span>, <span class="string">&quot;Already Reported&quot;</span>);
+
+    <span class="doccomment">/// 226 IM Used</span>
+    <span class="doccomment">/// [[RFC3229](https://tools.ietf.org/html/rfc3229)]</span>
+    (<span class="number">226</span>, <span class="ident">IM_USED</span>, <span class="string">&quot;IM Used&quot;</span>);
+
+    <span class="doccomment">/// 300 Multiple Choices</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.4.1](https://tools.ietf.org/html/rfc7231#section-6.4.1)]</span>
+    (<span class="number">300</span>, <span class="ident">MULTIPLE_CHOICES</span>, <span class="string">&quot;Multiple Choices&quot;</span>);
+    <span class="doccomment">/// 301 Moved Permanently</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.4.2](https://tools.ietf.org/html/rfc7231#section-6.4.2)]</span>
+    (<span class="number">301</span>, <span class="ident">MOVED_PERMANENTLY</span>, <span class="string">&quot;Moved Permanently&quot;</span>);
+    <span class="doccomment">/// 302 Found</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.4.3](https://tools.ietf.org/html/rfc7231#section-6.4.3)]</span>
+    (<span class="number">302</span>, <span class="ident">FOUND</span>, <span class="string">&quot;Found&quot;</span>);
+    <span class="doccomment">/// 303 See Other</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.4.4](https://tools.ietf.org/html/rfc7231#section-6.4.4)]</span>
+    (<span class="number">303</span>, <span class="ident">SEE_OTHER</span>, <span class="string">&quot;See Other&quot;</span>);
+    <span class="doccomment">/// 304 Not Modified</span>
+    <span class="doccomment">/// [[RFC7232, Section 4.1](https://tools.ietf.org/html/rfc7232#section-4.1)]</span>
+    (<span class="number">304</span>, <span class="ident">NOT_MODIFIED</span>, <span class="string">&quot;Not Modified&quot;</span>);
+    <span class="doccomment">/// 305 Use Proxy</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.4.5](https://tools.ietf.org/html/rfc7231#section-6.4.5)]</span>
+    (<span class="number">305</span>, <span class="ident">USE_PROXY</span>, <span class="string">&quot;Use Proxy&quot;</span>);
+    <span class="doccomment">/// 307 Temporary Redirect</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.4.7](https://tools.ietf.org/html/rfc7231#section-6.4.7)]</span>
+    (<span class="number">307</span>, <span class="ident">TEMPORARY_REDIRECT</span>, <span class="string">&quot;Temporary Redirect&quot;</span>);
+    <span class="doccomment">/// 308 Permanent Redirect</span>
+    <span class="doccomment">/// [[RFC7238](https://tools.ietf.org/html/rfc7238)]</span>
+    (<span class="number">308</span>, <span class="ident">PERMANENT_REDIRECT</span>, <span class="string">&quot;Permanent Redirect&quot;</span>);
+
+    <span class="doccomment">/// 400 Bad Request</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.1](https://tools.ietf.org/html/rfc7231#section-6.5.1)]</span>
+    (<span class="number">400</span>, <span class="ident">BAD_REQUEST</span>, <span class="string">&quot;Bad Request&quot;</span>);
+    <span class="doccomment">/// 401 Unauthorized</span>
+    <span class="doccomment">/// [[RFC7235, Section 3.1](https://tools.ietf.org/html/rfc7235#section-3.1)]</span>
+    (<span class="number">401</span>, <span class="ident">UNAUTHORIZED</span>, <span class="string">&quot;Unauthorized&quot;</span>);
+    <span class="doccomment">/// 402 Payment Required</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.2](https://tools.ietf.org/html/rfc7231#section-6.5.2)]</span>
+    (<span class="number">402</span>, <span class="ident">PAYMENT_REQUIRED</span>, <span class="string">&quot;Payment Required&quot;</span>);
+    <span class="doccomment">/// 403 Forbidden</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.3](https://tools.ietf.org/html/rfc7231#section-6.5.3)]</span>
+    (<span class="number">403</span>, <span class="ident">FORBIDDEN</span>, <span class="string">&quot;Forbidden&quot;</span>);
+    <span class="doccomment">/// 404 Not Found</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.4](https://tools.ietf.org/html/rfc7231#section-6.5.4)]</span>
+    (<span class="number">404</span>, <span class="ident">NOT_FOUND</span>, <span class="string">&quot;Not Found&quot;</span>);
+    <span class="doccomment">/// 405 Method Not Allowed</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.5](https://tools.ietf.org/html/rfc7231#section-6.5.5)]</span>
+    (<span class="number">405</span>, <span class="ident">METHOD_NOT_ALLOWED</span>, <span class="string">&quot;Method Not Allowed&quot;</span>);
+    <span class="doccomment">/// 406 Not Acceptable</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.6](https://tools.ietf.org/html/rfc7231#section-6.5.6)]</span>
+    (<span class="number">406</span>, <span class="ident">NOT_ACCEPTABLE</span>, <span class="string">&quot;Not Acceptable&quot;</span>);
+    <span class="doccomment">/// 407 Proxy Authentication Required</span>
+    <span class="doccomment">/// [[RFC7235, Section 3.2](https://tools.ietf.org/html/rfc7235#section-3.2)]</span>
+    (<span class="number">407</span>, <span class="ident">PROXY_AUTHENTICATION_REQUIRED</span>, <span class="string">&quot;Proxy Authentication Required&quot;</span>);
+    <span class="doccomment">/// 408 Request Timeout</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.7](https://tools.ietf.org/html/rfc7231#section-6.5.7)]</span>
+    (<span class="number">408</span>, <span class="ident">REQUEST_TIMEOUT</span>, <span class="string">&quot;Request Timeout&quot;</span>);
+    <span class="doccomment">/// 409 Conflict</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.8](https://tools.ietf.org/html/rfc7231#section-6.5.8)]</span>
+    (<span class="number">409</span>, <span class="ident">CONFLICT</span>, <span class="string">&quot;Conflict&quot;</span>);
+    <span class="doccomment">/// 410 Gone</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.9](https://tools.ietf.org/html/rfc7231#section-6.5.9)]</span>
+    (<span class="number">410</span>, <span class="ident">GONE</span>, <span class="string">&quot;Gone&quot;</span>);
+    <span class="doccomment">/// 411 Length Required</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.10](https://tools.ietf.org/html/rfc7231#section-6.5.10)]</span>
+    (<span class="number">411</span>, <span class="ident">LENGTH_REQUIRED</span>, <span class="string">&quot;Length Required&quot;</span>);
+    <span class="doccomment">/// 412 Precondition Failed</span>
+    <span class="doccomment">/// [[RFC7232, Section 4.2](https://tools.ietf.org/html/rfc7232#section-4.2)]</span>
+    (<span class="number">412</span>, <span class="ident">PRECONDITION_FAILED</span>, <span class="string">&quot;Precondition Failed&quot;</span>);
+    <span class="doccomment">/// 413 Payload Too Large</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.11](https://tools.ietf.org/html/rfc7231#section-6.5.11)]</span>
+    (<span class="number">413</span>, <span class="ident">PAYLOAD_TOO_LARGE</span>, <span class="string">&quot;Payload Too Large&quot;</span>);
+    <span class="doccomment">/// 414 URI Too Long</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.12](https://tools.ietf.org/html/rfc7231#section-6.5.12)]</span>
+    (<span class="number">414</span>, <span class="ident">URI_TOO_LONG</span>, <span class="string">&quot;URI Too Long&quot;</span>);
+    <span class="doccomment">/// 415 Unsupported Media Type</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.13](https://tools.ietf.org/html/rfc7231#section-6.5.13)]</span>
+    (<span class="number">415</span>, <span class="ident">UNSUPPORTED_MEDIA_TYPE</span>, <span class="string">&quot;Unsupported Media Type&quot;</span>);
+    <span class="doccomment">/// 416 Range Not Satisfiable</span>
+    <span class="doccomment">/// [[RFC7233, Section 4.4](https://tools.ietf.org/html/rfc7233#section-4.4)]</span>
+    (<span class="number">416</span>, <span class="ident">RANGE_NOT_SATISFIABLE</span>, <span class="string">&quot;Range Not Satisfiable&quot;</span>);
+    <span class="doccomment">/// 417 Expectation Failed</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.14](https://tools.ietf.org/html/rfc7231#section-6.5.14)]</span>
+    (<span class="number">417</span>, <span class="ident">EXPECTATION_FAILED</span>, <span class="string">&quot;Expectation Failed&quot;</span>);
+    <span class="doccomment">/// 418 I&#39;m a teapot</span>
+    <span class="doccomment">/// [curiously not registered by IANA but [RFC2324](https://tools.ietf.org/html/rfc2324)]</span>
+    (<span class="number">418</span>, <span class="ident">IM_A_TEAPOT</span>, <span class="string">&quot;I&#39;m a teapot&quot;</span>);
+
+    <span class="doccomment">/// 421 Misdirected Request</span>
+    <span class="doccomment">/// [RFC7540, Section 9.1.2](http://tools.ietf.org/html/rfc7540#section-9.1.2)</span>
+    (<span class="number">421</span>, <span class="ident">MISDIRECTED_REQUEST</span>, <span class="string">&quot;Misdirected Request&quot;</span>);
+    <span class="doccomment">/// 422 Unprocessable Entity</span>
+    <span class="doccomment">/// [[RFC4918](https://tools.ietf.org/html/rfc4918)]</span>
+    (<span class="number">422</span>, <span class="ident">UNPROCESSABLE_ENTITY</span>, <span class="string">&quot;Unprocessable Entity&quot;</span>);
+    <span class="doccomment">/// 423 Locked</span>
+    <span class="doccomment">/// [[RFC4918](https://tools.ietf.org/html/rfc4918)]</span>
+    (<span class="number">423</span>, <span class="ident">LOCKED</span>, <span class="string">&quot;Locked&quot;</span>);
+    <span class="doccomment">/// 424 Failed Dependency</span>
+    <span class="doccomment">/// [[RFC4918](https://tools.ietf.org/html/rfc4918)]</span>
+    (<span class="number">424</span>, <span class="ident">FAILED_DEPENDENCY</span>, <span class="string">&quot;Failed Dependency&quot;</span>);
+
+    <span class="doccomment">/// 426 Upgrade Required</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.5.15](https://tools.ietf.org/html/rfc7231#section-6.5.15)]</span>
+    (<span class="number">426</span>, <span class="ident">UPGRADE_REQUIRED</span>, <span class="string">&quot;Upgrade Required&quot;</span>);
+
+    <span class="doccomment">/// 428 Precondition Required</span>
+    <span class="doccomment">/// [[RFC6585](https://tools.ietf.org/html/rfc6585)]</span>
+    (<span class="number">428</span>, <span class="ident">PRECONDITION_REQUIRED</span>, <span class="string">&quot;Precondition Required&quot;</span>);
+    <span class="doccomment">/// 429 Too Many Requests</span>
+    <span class="doccomment">/// [[RFC6585](https://tools.ietf.org/html/rfc6585)]</span>
+    (<span class="number">429</span>, <span class="ident">TOO_MANY_REQUESTS</span>, <span class="string">&quot;Too Many Requests&quot;</span>);
+
+    <span class="doccomment">/// 431 Request Header Fields Too Large</span>
+    <span class="doccomment">/// [[RFC6585](https://tools.ietf.org/html/rfc6585)]</span>
+    (<span class="number">431</span>, <span class="ident">REQUEST_HEADER_FIELDS_TOO_LARGE</span>, <span class="string">&quot;Request Header Fields Too Large&quot;</span>);
+
+    <span class="doccomment">/// 451 Unavailable For Legal Reasons</span>
+    <span class="doccomment">/// [[RFC7725](http://tools.ietf.org/html/rfc7725)]</span>
+    (<span class="number">451</span>, <span class="ident">UNAVAILABLE_FOR_LEGAL_REASONS</span>, <span class="string">&quot;Unavailable For Legal Reasons&quot;</span>);
+
+    <span class="doccomment">/// 500 Internal Server Error</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.6.1](https://tools.ietf.org/html/rfc7231#section-6.6.1)]</span>
+    (<span class="number">500</span>, <span class="ident">INTERNAL_SERVER_ERROR</span>, <span class="string">&quot;Internal Server Error&quot;</span>);
+    <span class="doccomment">/// 501 Not Implemented</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.6.2](https://tools.ietf.org/html/rfc7231#section-6.6.2)]</span>
+    (<span class="number">501</span>, <span class="ident">NOT_IMPLEMENTED</span>, <span class="string">&quot;Not Implemented&quot;</span>);
+    <span class="doccomment">/// 502 Bad Gateway</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.6.3](https://tools.ietf.org/html/rfc7231#section-6.6.3)]</span>
+    (<span class="number">502</span>, <span class="ident">BAD_GATEWAY</span>, <span class="string">&quot;Bad Gateway&quot;</span>);
+    <span class="doccomment">/// 503 Service Unavailable</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.6.4](https://tools.ietf.org/html/rfc7231#section-6.6.4)]</span>
+    (<span class="number">503</span>, <span class="ident">SERVICE_UNAVAILABLE</span>, <span class="string">&quot;Service Unavailable&quot;</span>);
+    <span class="doccomment">/// 504 Gateway Timeout</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.6.5](https://tools.ietf.org/html/rfc7231#section-6.6.5)]</span>
+    (<span class="number">504</span>, <span class="ident">GATEWAY_TIMEOUT</span>, <span class="string">&quot;Gateway Timeout&quot;</span>);
+    <span class="doccomment">/// 505 HTTP Version Not Supported</span>
+    <span class="doccomment">/// [[RFC7231, Section 6.6.6](https://tools.ietf.org/html/rfc7231#section-6.6.6)]</span>
+    (<span class="number">505</span>, <span class="ident">HTTP_VERSION_NOT_SUPPORTED</span>, <span class="string">&quot;HTTP Version Not Supported&quot;</span>);
+    <span class="doccomment">/// 506 Variant Also Negotiates</span>
+    <span class="doccomment">/// [[RFC2295](https://tools.ietf.org/html/rfc2295)]</span>
+    (<span class="number">506</span>, <span class="ident">VARIANT_ALSO_NEGOTIATES</span>, <span class="string">&quot;Variant Also Negotiates&quot;</span>);
+    <span class="doccomment">/// 507 Insufficient Storage</span>
+    <span class="doccomment">/// [[RFC4918](https://tools.ietf.org/html/rfc4918)]</span>
+    (<span class="number">507</span>, <span class="ident">INSUFFICIENT_STORAGE</span>, <span class="string">&quot;Insufficient Storage&quot;</span>);
+    <span class="doccomment">/// 508 Loop Detected</span>
+    <span class="doccomment">/// [[RFC5842](https://tools.ietf.org/html/rfc5842)]</span>
+    (<span class="number">508</span>, <span class="ident">LOOP_DETECTED</span>, <span class="string">&quot;Loop Detected&quot;</span>);
+
+    <span class="doccomment">/// 510 Not Extended</span>
+    <span class="doccomment">/// [[RFC2774](https://tools.ietf.org/html/rfc2774)]</span>
+    (<span class="number">510</span>, <span class="ident">NOT_EXTENDED</span>, <span class="string">&quot;Not Extended&quot;</span>);
+    <span class="doccomment">/// 511 Network Authentication Required</span>
+    <span class="doccomment">/// [[RFC6585](https://tools.ietf.org/html/rfc6585)]</span>
+    (<span class="number">511</span>, <span class="ident">NETWORK_AUTHENTICATION_REQUIRED</span>, <span class="string">&quot;Network Authentication Required&quot;</span>);
+}
+
+<span class="kw">impl</span> <span class="ident">InvalidStatusCode</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">InvalidStatusCode</span> {
+        <span class="ident">InvalidStatusCode</span> {
+            <span class="ident">_priv</span>: (),
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">InvalidStatusCode</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;InvalidStatusCode&quot;</span>)
+            <span class="comment">// skip _priv noise</span>
+            .<span class="ident">finish</span>()
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">InvalidStatusCode</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;invalid status code&quot;</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Error</span> <span class="kw">for</span> <span class="ident">InvalidStatusCode</span> {}
+
+<span class="comment">// A string of packed 3-ASCII-digit status code values for the supported range</span>
+<span class="comment">// of [100, 999] (900 codes, 2700 bytes).</span>
+<span class="kw">const</span> <span class="ident">CODE_DIGITS</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;\
+100101102103104105106107108109110111112113114115116117118119\
+120121122123124125126127128129130131132133134135136137138139\
+140141142143144145146147148149150151152153154155156157158159\
+160161162163164165166167168169170171172173174175176177178179\
+180181182183184185186187188189190191192193194195196197198199\
+200201202203204205206207208209210211212213214215216217218219\
+220221222223224225226227228229230231232233234235236237238239\
+240241242243244245246247248249250251252253254255256257258259\
+260261262263264265266267268269270271272273274275276277278279\
+280281282283284285286287288289290291292293294295296297298299\
+300301302303304305306307308309310311312313314315316317318319\
+320321322323324325326327328329330331332333334335336337338339\
+340341342343344345346347348349350351352353354355356357358359\
+360361362363364365366367368369370371372373374375376377378379\
+380381382383384385386387388389390391392393394395396397398399\
+400401402403404405406407408409410411412413414415416417418419\
+420421422423424425426427428429430431432433434435436437438439\
+440441442443444445446447448449450451452453454455456457458459\
+460461462463464465466467468469470471472473474475476477478479\
+480481482483484485486487488489490491492493494495496497498499\
+500501502503504505506507508509510511512513514515516517518519\
+520521522523524525526527528529530531532533534535536537538539\
+540541542543544545546547548549550551552553554555556557558559\
+560561562563564565566567568569570571572573574575576577578579\
+580581582583584585586587588589590591592593594595596597598599\
+600601602603604605606607608609610611612613614615616617618619\
+620621622623624625626627628629630631632633634635636637638639\
+640641642643644645646647648649650651652653654655656657658659\
+660661662663664665666667668669670671672673674675676677678679\
+680681682683684685686687688689690691692693694695696697698699\
+700701702703704705706707708709710711712713714715716717718719\
+720721722723724725726727728729730731732733734735736737738739\
+740741742743744745746747748749750751752753754755756757758759\
+760761762763764765766767768769770771772773774775776777778779\
+780781782783784785786787788789790791792793794795796797798799\
+800801802803804805806807808809810811812813814815816817818819\
+820821822823824825826827828829830831832833834835836837838839\
+840841842843844845846847848849850851852853854855856857858859\
+860861862863864865866867868869870871872873874875876877878879\
+880881882883884885886887888889890891892893894895896897898899\
+900901902903904905906907908909910911912913914915916917918919\
+920921922923924925926927928929930931932933934935936937938939\
+940941942943944945946947948949950951952953954955956957958959\
+960961962963964965966967968969970971972973974975976977978979\
+980981982983984985986987988989990991992993994995996997998999&quot;</span>;
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="http" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

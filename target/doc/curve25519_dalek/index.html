@@ -1,0 +1,183 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="curve25519-dalek   "><meta name="keywords" content="rust, rustlang, rust-lang, curve25519_dalek"><title>curve25519_dalek - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../curve25519_dalek/index.html"><div class="logo-container"><img src="https://doc.dalek.rs/assets/dalek-logo-clear.png" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../curve25519_dalek/index.html"><div class="logo-container">
+                    <img src="https://doc.dalek.rs/assets/dalek-logo-clear.png" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate curve25519_dalek</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 3.2.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../curve25519_dalek/index.html">
+                        <img src="https://doc.dalek.rs/assets/dalek-logo-clear.png" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">curve25519_dalek</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/curve25519_dalek/lib.rs.html#12-320">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="curve25519-dalek---"><a href="#curve25519-dalek---">curve25519-dalek <img src="https://img.shields.io/crates/v/curve25519-dalek.svg" alt="" /> <img src="https://img.shields.io/badge/dynamic/json.svg?label=docs&amp;uri=https%3A%2F%2Fcrates.io%2Fapi%2Fv1%2Fcrates%2Fcurve25519-dalek%2Fversions&amp;query=%24.versions%5B0%5D.num&amp;colorB=4F74A6" alt="" /> <img src="https://travis-ci.org/dalek-cryptography/curve25519-dalek.svg?branch=master" alt="" /></a></h2>
+<p><img
+ width="33%"
+ align="right"
+ src="https://doc.dalek.rs/assets/dalek-logo-clear.png"/></p>
+<p><strong>A pure-Rust implementation of group operations on Ristretto and Curve25519.</strong></p>
+<p><code>curve25519-dalek</code> is a library providing group operations on the Edwards and
+Montgomery forms of Curve25519, and on the prime-order Ristretto group.</p>
+<p><code>curve25519-dalek</code> is not intended to provide implementations of any particular
+crypto protocol.  Rather, implementations of those protocols (such as
+<a href="https://github.com/dalek-cryptography/x25519-dalek"><code>x25519-dalek</code></a> and <a href="https://github.com/dalek-cryptography/ed25519-dalek"><code>ed25519-dalek</code></a>) should use
+<code>curve25519-dalek</code> as a library.</p>
+<p><code>curve25519-dalek</code> is intended to provide a clean and safe <em>mid-level</em> API for use
+implementing a wide range of ECC-based crypto protocols, such as key agreement,
+signatures, anonymous credentials, rangeproofs, and zero-knowledge proof
+systems.</p>
+<p>In particular, <code>curve25519-dalek</code> implements Ristretto, which constructs a
+prime-order group from a non-prime-order Edwards curve.  This provides the
+speed and safety benefits of Edwards curve arithmetic, without the pitfalls of
+cofactor-related abstraction mismatches.</p>
+<h2 id="documentation"><a href="#documentation">Documentation</a></h2>
+<p>The semver-stable, public-facing <code>curve25519-dalek</code> API is documented
+<a href="https://doc.dalek.rs/curve25519_dalek/">here</a>.  In addition, the unstable internal implementation
+details are documented <a href="https://doc-internal.dalek.rs/curve25519_dalek/">here</a>.</p>
+<p>The <code>curve25519-dalek</code> documentation requires a custom HTML header to include
+KaTeX for math support. Unfortunately <code>cargo doc</code> does not currently support
+this, but docs can be built using</p>
+<div class="example-wrap"><pre class="language-sh"><code>make doc
+make doc-internal</code></pre></div><h2 id="use"><a href="#use">Use</a></h2>
+<p>To import <code>curve25519-dalek</code>, add the following to the dependencies section of
+your project’s <code>Cargo.toml</code>:</p>
+<div class="example-wrap"><pre class="language-toml"><code>curve25519-dalek = &quot;3&quot;</code></pre></div>
+<p>The sole breaking change in the <code>3.x</code> series was an update to the <code>digest</code>
+version, and in terms of non-breaking changes it includes:</p>
+<ul>
+<li>support for using <code>alloc</code> instead of <code>std</code> on stable Rust,</li>
+<li>the Elligator2 encoding for Edwards points,</li>
+<li>a fix to use <code>packed_simd2</code>,</li>
+<li>various documentation fixes and improvements,</li>
+<li>support for configurably-sized, precomputed lookup tables for basepoint scalar
+multiplication,</li>
+<li>two new formally-verified field arithmetic backends which use the Fiat Crypto
+Rust code, which is generated from proofs of functional correctness checked by
+the Coq theorem proving system, and</li>
+<li>support for explicitly calling the <code>zeroize</code> traits for all point types.</li>
+</ul>
+<p>The <code>2.x</code> series has API almost entirely unchanged from the <code>1.x</code> series,
+except that:</p>
+<ul>
+<li>an error in the data modeling for the (optional) <code>serde</code> feature was
+corrected, so that when the <code>2.x</code>-series <code>serde</code> implementation is used
+with <code>serde-bincode</code>, the derived serialization matches the usual X/Ed25519
+formats;</li>
+<li>the <code>rand</code> version was updated.</li>
+</ul>
+<p>See <code>CHANGELOG.md</code> for more details.</p>
+<h2 id="backends-and-features"><a href="#backends-and-features">Backends and Features</a></h2>
+<p>The <code>nightly</code> feature enables features available only when using a Rust nightly
+compiler.  In particular, it is required for rendering documentation and for
+the SIMD backends.</p>
+<p>Curve arithmetic is implemented using one of the following backends:</p>
+<ul>
+<li>a <code>u32</code> backend using serial formulas and <code>u64</code> products;</li>
+<li>a <code>u64</code> backend using serial formulas and <code>u128</code> products;</li>
+<li>an <code>avx2</code> backend using <a href="https://doc-internal.dalek.rs/curve25519_dalek/backend/vector/avx2/index.html">parallel formulas</a> and <code>avx2</code> instructions (sets speed records);</li>
+<li>an <code>ifma</code> backend using <a href="https://doc-internal.dalek.rs/curve25519_dalek/backend/vector/avx2/index.html">parallel formulas</a> and <code>ifma</code> instructions (sets speed records);</li>
+</ul>
+<p>By default the <code>u64</code> backend is selected.  To select a specific backend, use:</p>
+<div class="example-wrap"><pre class="language-sh"><code>cargo build --no-default-features --features &quot;std u32_backend&quot;
+cargo build --no-default-features --features &quot;std u64_backend&quot;
+cargo build --no-default-features --features &quot;std simd_backend&quot;
+cargo build --no-default-features --features &quot;std simd_backend&quot;</code></pre></div>
+<p>Crates using <code>curve25519-dalek</code> can either select a backend on behalf of their
+users, or expose feature flags that control the <code>curve25519-dalek</code> backend.</p>
+<p>The <code>std</code> feature is enabled by default, but it can be disabled for no-<code>std</code>
+builds using <code>--no-default-features</code>.  Note that this requires explicitly
+selecting an arithmetic backend using one of the <code>_backend</code> features.
+If no backend is selected, compilation will fail.</p>
+<h2 id="safety"><a href="#safety">Safety</a></h2>
+<p>The <code>curve25519-dalek</code> types are designed to make illegal states
+unrepresentable.  For example, any instance of an <code>EdwardsPoint</code> is
+guaranteed to hold a point on the Edwards curve, and any instance of a
+<code>RistrettoPoint</code> is guaranteed to hold a valid point in the Ristretto
+group.</p>
+<p>All operations are implemented using constant-time logic (no
+secret-dependent branches, no secret-dependent memory accesses),
+unless specifically marked as being variable-time code.
+We believe that our constant-time logic is lowered to constant-time
+assembly, at least on <code>x86_64</code> targets.</p>
+<p>As an additional guard against possible future compiler optimizations,
+the <code>subtle</code> crate places an optimization barrier before every
+conditional move or assignment.  More details can be found in <a href="https://doc.dalek.rs/subtle/">the
+documentation for the <code>subtle</code> crate</a>.</p>
+<p>Some functionality (e.g., multiscalar multiplication or batch
+inversion) requires heap allocation for temporary buffers.  All
+heap-allocated buffers of potentially secret data are explicitly
+zeroed before release.</p>
+<p>However, we do not attempt to zero stack data, for two reasons.
+First, it’s not possible to do so correctly: we don’t have control
+over stack allocations, so there’s no way to know how much data to
+wipe.  Second, because <code>curve25519-dalek</code> provides a mid-level API,
+the correct place to start zeroing stack data is likely not at the
+entrypoints of <code>curve25519-dalek</code> functions, but at the entrypoints of
+functions in other crates.</p>
+<p>The implementation is memory-safe, and contains no significant
+<code>unsafe</code> code.  The SIMD backend uses <code>unsafe</code> internally to call SIMD
+intrinsics.  These are marked <code>unsafe</code> only because invoking them on an
+inappropriate CPU would cause <code>SIGILL</code>, but the entire backend is only
+compiled with appropriate <code>target_feature</code>s, so this cannot occur.</p>
+<h2 id="performance"><a href="#performance">Performance</a></h2>
+<p>Benchmarks are run using <a href="https://github.com/japaric/criterion.rs"><code>criterion.rs</code></a>:</p>
+<div class="example-wrap"><pre class="language-sh"><code>cargo bench --no-default-features --features &quot;std u32_backend&quot;
+cargo bench --no-default-features --features &quot;std u64_backend&quot;
+export RUSTFLAGS=&quot;-C target_cpu=native&quot;
+cargo bench --no-default-features --features &quot;std simd_backend&quot;</code></pre></div>
+<p>Performance is a secondary goal behind correctness, safety, and
+clarity, but we aim to be competitive with other implementations.</p>
+<h2 id="ffi"><a href="#ffi">FFI</a></h2>
+<p>Unfortunately, we have no plans to add FFI to <code>curve25519-dalek</code> directly.  The
+reason is that we use Rust features to provide an API that maintains safety
+invariants, which are not possible to maintain across an FFI boundary.  For
+instance, as described in the <em>Safety</em> section above, invalid points are
+impossible to construct, and this would not be the case if we exposed point
+operations over FFI.</p>
+<p>However, <code>curve25519-dalek</code> is designed as a <em>mid-level</em> API, aimed at
+implementing other, higher-level primitives.  Instead of providing FFI at the
+mid-level, our suggestion is to implement the higher-level primitive (a
+signature, PAKE, ZKP, etc) in Rust, using <code>curve25519-dalek</code> as a dependency,
+and have that crate provide a minimal, byte-buffer-oriented FFI specific to
+that primitive.</p>
+<h2 id="contributing"><a href="#contributing">Contributing</a></h2>
+<p>Please see <a href="https://github.com/dalek-cryptography/curve25519-dalek/blob/master/CONTRIBUTING.md">CONTRIBUTING.md</a>.</p>
+<p>Patches and pull requests should be make against the <code>develop</code>
+branch, <strong>not</strong> <code>main</code>.</p>
+<h2 id="about"><a href="#about">About</a></h2>
+<p><strong>SPOILER ALERT:</strong> <em>The Twelfth Doctor’s first encounter with the Daleks is in
+his second full episode, “Into the Dalek”. A beleaguered ship of the “Combined
+Galactic Resistance” has discovered a broken Dalek that has turned “good”,
+desiring to kill all other Daleks. The Doctor, Clara and a team of soldiers
+are miniaturized and enter the Dalek, which the Doctor names Rusty. They
+repair the damage, but accidentally restore it to its original nature, causing
+it to go on the rampage and alert the Dalek fleet to the whereabouts of the
+rebel ship. However, the Doctor manages to return Rusty to its previous state
+by linking his mind with the Dalek’s: Rusty shares the Doctor’s view of the
+universe’s beauty, but also his deep hatred of the Daleks. Rusty destroys the
+other Daleks and departs the ship, determined to track down and bring an end
+to the Dalek race.</em></p>
+<p><code>curve25519-dalek</code> is authored by Isis Agora Lovecruft and Henry de Valence.</p>
+<p>Portions of this library were originally a port of <a href="https://!github.com/agl/ed25519">Adam Langley’s
+Golang ed25519 library</a>, which was in
+turn a port of the reference <code>ref10</code> implementation.  Most of this code,
+including the 32-bit field arithmetic, has since been rewritten.</p>
+<p>The fast <code>u32</code> and <code>u64</code> scalar arithmetic was implemented by Andrew Moon, and
+the addition chain for scalar inversion was provided by Brian Smith.  The
+optimised batch inversion was contributed by Sean Bowe and Daira Hopwood.</p>
+<p>The <code>no_std</code> and <code>zeroize</code> support was contributed by Tony Arcieri.</p>
+<p>The formally verified backends, <code>fiat_u32_backend</code> and <code>fiat_u64_backend</code>, which
+integrate with the Rust generated by the
+<a href="https://github.com/mit-plv/fiat-crypto">Fiat Crypto project</a> were contributed
+by François Garillot.</p>
+<p>Thanks also to Ashley Hauck, Lucas Salibian, Manish Goregaokar, Jack Grigg,
+Pratyush Mishra, Michael Rosenberg, and countless others for their
+contributions.</p>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left"><code>pub extern crate <a class="mod" href="../digest/index.html" title="mod digest">digest</a>;</code></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="constants/index.html" title="curve25519_dalek::constants mod">constants</a></div><div class="item-right docblock-short"><p>Various constants, such as the Ristretto and Ed25519 basepoints.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="edwards/index.html" title="curve25519_dalek::edwards mod">edwards</a></div><div class="item-right docblock-short"><p>Group operations for Curve25519, in Edwards form.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="montgomery/index.html" title="curve25519_dalek::montgomery mod">montgomery</a></div><div class="item-right docblock-short"><p>Scalar multiplication on the Montgomery form of Curve25519.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="ristretto/index.html" title="curve25519_dalek::ristretto mod">ristretto</a></div><div class="item-right docblock-short"><p>An implementation of <a href="https://ristretto.group/">Ristretto</a>, which provides a
+prime-order group.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="scalar/index.html" title="curve25519_dalek::scalar mod">scalar</a></div><div class="item-right docblock-short"><p>Arithmetic on scalars (integers mod the group order).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="traits/index.html" title="curve25519_dalek::traits mod">traits</a></div><div class="item-right docblock-short"><p>Module for common traits.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="curve25519_dalek" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

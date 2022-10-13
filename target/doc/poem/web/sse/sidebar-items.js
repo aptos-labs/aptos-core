@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Event","An “event”, either an incoming message or some meta-action that needs to be applied to the stream."]],"struct":[["SSE","An SSE response."]]};

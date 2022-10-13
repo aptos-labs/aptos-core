@@ -1,0 +1,71 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Connectors used by the `Client`."><meta name="keywords" content="rust, rustlang, rust-lang, connect"><title>hyper::client::connect - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../hyper/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../hyper/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module connect</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../hyper/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../../index.html">hyper</a>::<wbr><a href="../index.html">client</a>::<wbr><a class="mod" href="#">connect</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../../src/hyper/client/connect/mod.rs.html#1-412">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Connectors used by the <code>Client</code>.</p>
+<p>This module contains:</p>
+<ul>
+<li>A default <a href="struct.HttpConnector.html"><code>HttpConnector</code></a> that does DNS resolution and establishes
+connections over TCP.</li>
+<li>Types to build custom connectors.</li>
+</ul>
+<h2 id="connectors"><a href="#connectors">Connectors</a></h2>
+<p>A “connector” is a <a href="../../service/trait.Service.html"><code>Service</code></a> that takes a <a href="../../struct.Uri.html"><code>Uri</code></a> destination, and
+its <code>Response</code> is some type implementing <a href="../../../tokio/io/async_read/trait.AsyncRead.html"><code>AsyncRead</code></a>, <a href="../../../tokio/io/async_write/trait.AsyncWrite.html"><code>AsyncWrite</code></a>,
+and <a href="trait.Connection.html"><code>Connection</code></a>.</p>
+<h3 id="custom-connectors"><a href="#custom-connectors">Custom Connectors</a></h3>
+<p>A simple connector that ignores the <code>Uri</code> destination and always returns
+a TCP connection to the same address could be written like this:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore"><code><span class="kw">let</span> <span class="ident">connector</span> <span class="op">=</span> <span class="ident">tower::service_fn</span>(<span class="op">|</span><span class="ident">_dst</span><span class="op">|</span> <span class="kw">async</span> {
+    <span class="ident">tokio::net::TcpStream::connect</span>(<span class="string">&quot;127.0.0.1:1337&quot;</span>)
+})</code></pre></div>
+<p>Or, fully written out:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">future::Future</span>, <span class="ident">net::SocketAddr</span>, <span class="ident">pin::Pin</span>, <span class="ident">task</span>::{<span class="self">self</span>, <span class="ident">Poll</span>}};
+<span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">service::Service</span>, <span class="ident">Uri</span>};
+<span class="kw">use</span> <span class="ident">tokio::net::TcpStream</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">LocalConnector</span>;
+
+<span class="kw">impl</span> <span class="ident">Service</span><span class="op">&lt;</span><span class="ident">Uri</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">LocalConnector</span> {
+    <span class="kw">type</span> <span class="ident">Response</span> <span class="op">=</span> <span class="ident">TcpStream</span>;
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">std::io::Error</span>;
+    <span class="comment">// We can&#39;t &quot;name&quot; an `async` generated future.</span>
+    <span class="kw">type</span> <span class="ident">Future</span> <span class="op">=</span> <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span>
+        <span class="kw">dyn</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Response</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span>
+    <span class="op">&gt;</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll_ready</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;mut</span> <span class="ident">task::Context</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">Poll</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="comment">// This connector is always ready, but others might not be.</span>
+        <span class="ident">Poll::Ready</span>(<span class="prelude-val">Ok</span>(()))
+    }
+
+    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">Uri</span>) -&gt; <span class="ident"><span class="self">Self</span>::Future</span> {
+        <span class="ident">Box::pin</span>(<span class="ident">TcpStream::connect</span>(<span class="ident">SocketAddr::from</span>(([<span class="number">127</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>], <span class="number">1337</span>))))
+    }
+}</code></pre></div>
+<p>It’s worth noting that for <code>TcpStream</code>s, the <a href="struct.HttpConnector.html"><code>HttpConnector</code></a> is a
+better starting place to extend from.</p>
+<p>Using either of the above connector examples, it can be used with the
+<code>Client</code> like this:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// let connector = ...</span>
+
+<span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">hyper::Client::builder</span>()
+    .<span class="ident">build</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">hyper::Body</span><span class="op">&gt;</span>(<span class="ident">connector</span>);</code></pre></div>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="dns/index.html" title="hyper::client::connect::dns mod">dns</a></div><div class="item-right docblock-short"><p>DNS Resolution used by the <code>HttpConnector</code>.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Connected.html" title="hyper::client::connect::Connected struct">Connected</a></div><div class="item-right docblock-short"><p>Extra information about the connected transport.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.HttpConnector.html" title="hyper::client::connect::HttpConnector struct">HttpConnector</a></div><div class="item-right docblock-short"><p>A connector for the <code>http</code> scheme.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.HttpInfo.html" title="hyper::client::connect::HttpInfo struct">HttpInfo</a></div><div class="item-right docblock-short"><p>Extra information about the transport when an HttpConnector is used.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Connect.html" title="hyper::client::connect::Connect trait">Connect</a></div><div class="item-right docblock-short"><p>Connect to a destination, returning an IO transport.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Connection.html" title="hyper::client::connect::Connection trait">Connection</a></div><div class="item-right docblock-short"><p>Describes a type returned by a connector.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="hyper" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="hyper"><meta name="keywords" content="rust, rustlang, rust-lang, hyper"><title>hyper - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../hyper/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../hyper/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate hyper</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.14.20</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../hyper/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">hyper</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/hyper/lib.rs.html#1-109">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="hyper"><a href="#hyper">hyper</a></h2>
+<p>hyper is a <strong>fast</strong> and <strong>correct</strong> HTTP implementation written in and for Rust.</p>
+<h3 id="features"><a href="#features">Features</a></h3>
+<ul>
+<li>HTTP/1 and HTTP/2</li>
+<li>Asynchronous design</li>
+<li>Leading in performance</li>
+<li>Tested and <strong>correct</strong></li>
+<li>Extensive production use</li>
+<li><a href="client/index.html">Client</a> and <a href="server/index.html">Server</a> APIs</li>
+</ul>
+<p>If just starting out, <strong>check out the <a href="https://hyper.rs/guides">Guides</a>
+first.</strong></p>
+<h3 id="low-level"><a href="#low-level">“Low-level”</a></h3>
+<p>hyper is a lower-level HTTP library, meant to be a building block
+for libraries and applications.</p>
+<p>If looking for just a convenient HTTP client, consider the
+<a href="https://crates.io/crates/reqwest">reqwest</a> crate.</p>
+<h2 id="optional-features"><a href="#optional-features">Optional Features</a></h2>
+<p>hyper uses a set of <a href="https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section">feature flags</a> to reduce the amount of compiled code.
+It is possible to just enable certain features over others. By default,
+hyper does not enable any features but allows one to enable a subset for
+their use case. Below is a list of the available feature flags. You may
+also notice above each function, struct and trait there is listed one or
+more feature flags that are required for that item to be used.</p>
+<p>If you are new to hyper it is possible to enable the <code>full</code> feature flag
+which will enable all public APIs. Beware though that this will pull in
+many extra dependencies that you may not need.</p>
+<p>The following optional features are available:</p>
+<ul>
+<li><code>http1</code>: Enables HTTP/1 support.</li>
+<li><code>http2</code>: Enables HTTP/2 support.</li>
+<li><code>client</code>: Enables the HTTP <code>client</code>.</li>
+<li><code>server</code>: Enables the HTTP <code>server</code>.</li>
+<li><code>runtime</code>: Enables convenient integration with <code>tokio</code>, providing
+connectors and acceptors for TCP, and a default executor.</li>
+<li><code>tcp</code>: Enables convenient implementations over TCP (using tokio).</li>
+<li><code>stream</code>: Provides <code>futures::Stream</code> capabilities.</li>
+</ul>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.HeaderMap"><code>pub use crate::http::<a class="struct" href="header/struct.HeaderMap.html" title="struct hyper::header::HeaderMap">HeaderMap</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Client"><code>pub use crate::client::<a class="struct" href="client/struct.Client.html" title="struct hyper::client::Client">Client</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Server"><code>pub use crate::server::<a class="struct" href="server/struct.Server.html" title="struct hyper::server::Server">Server</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="body/index.html" title="hyper::body mod">body</a></div><div class="item-right docblock-short"><p>Streaming bodies for Requests and Responses</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="client/index.html" title="hyper::client mod">client</a></div><div class="item-right docblock-short"><p>HTTP Client</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="ext/index.html" title="hyper::ext mod">ext</a></div><div class="item-right docblock-short"><p>HTTP extensions.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="header/index.html" title="hyper::header mod">header</a></div><div class="item-right docblock-short"><p>HTTP header types</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="rt/index.html" title="hyper::rt mod">rt</a></div><div class="item-right docblock-short"><p>Runtime components</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="server/index.html" title="hyper::server mod">server</a></div><div class="item-right docblock-short"><p>HTTP Server</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="service/index.html" title="hyper::service mod">service</a></div><div class="item-right docblock-short"><p>Asynchronous Services</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="upgrade/index.html" title="hyper::upgrade mod">upgrade</a></div><div class="item-right docblock-short"><p>HTTP Upgrades</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Body.html" title="hyper::Body struct">Body</a></div><div class="item-right docblock-short"><p>A stream of <code>Bytes</code>, used when receiving bodies.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Error.html" title="hyper::Error struct">Error</a></div><div class="item-right docblock-short"><p>Represents errors that can occur handling HTTP streams.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Method.html" title="hyper::Method struct">Method</a></div><div class="item-right docblock-short"><p>The Request Method (VERB)</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Request.html" title="hyper::Request struct">Request</a></div><div class="item-right docblock-short"><p>Represents an HTTP request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Response.html" title="hyper::Response struct">Response</a></div><div class="item-right docblock-short"><p>Represents an HTTP response</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.StatusCode.html" title="hyper::StatusCode struct">StatusCode</a></div><div class="item-right docblock-short"><p>An HTTP status code (<code>status-code</code> in RFC 7230 et al.).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Uri.html" title="hyper::Uri struct">Uri</a></div><div class="item-right docblock-short"><p>The URI component of a request.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Version.html" title="hyper::Version struct">Version</a></div><div class="item-right docblock-short"><p>Represents a version of the HTTP spec.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Result.html" title="hyper::Result type">Result</a></div><div class="item-right docblock-short"><p>Result type often returned from methods that can have hyper <code>Error</code>s.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="hyper" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

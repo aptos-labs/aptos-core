@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Any","Rust representation of the Move Any type"]]};

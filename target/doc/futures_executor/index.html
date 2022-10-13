@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Built-in executors and related tools."><meta name="keywords" content="rust, rustlang, rust-lang, futures_executor"><title>futures_executor - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../futures_executor/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../futures_executor/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate futures_executor</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.3.24</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../futures_executor/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">futures_executor</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/futures_executor/lib.rs.html#1-76">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Built-in executors and related tools.</p>
+<p>All asynchronous computation occurs within an executor, which is
+capable of spawning futures as tasks. This module provides several
+built-in executors, as well as tools for building your own.</p>
+<p>All items are only available when the <code>std</code> feature of this
+library is activated, and it is activated by default.</p>
+<h2 id="using-a-thread-pool-mn-task-scheduling"><a href="#using-a-thread-pool-mn-task-scheduling">Using a thread pool (M:N task scheduling)</a></h2>
+<p>Most of the time tasks should be executed on a <a href="ThreadPool">thread pool</a>.
+A small set of worker threads can handle a very large set of spawned tasks
+(which are much lighter weight than threads). Tasks spawned onto the pool
+with the <a href="ThreadPool::spawn_ok"><code>spawn_ok</code></a> function will run ambiently on
+the created threads.</p>
+<h2 id="spawning-additional-tasks"><a href="#spawning-additional-tasks">Spawning additional tasks</a></h2>
+<p>Tasks can be spawned onto a spawner by calling its <a href="https://docs.rs/futures/0.3/futures/task/trait.Spawn.html#tymethod.spawn_obj"><code>spawn_obj</code></a> method
+directly. In the case of <code>!Send</code> futures, <a href="https://docs.rs/futures/0.3/futures/task/trait.LocalSpawn.html#tymethod.spawn_local_obj"><code>spawn_local_obj</code></a> can be used
+instead.</p>
+<h2 id="single-threaded-execution"><a href="#single-threaded-execution">Single-threaded execution</a></h2>
+<p>In addition to thread pools, it’s possible to run a task (and the tasks
+it spawns) entirely within a single thread via the <a href="struct.LocalPool.html" title="LocalPool"><code>LocalPool</code></a> executor.
+Aside from cutting down on synchronization costs, this executor also makes
+it possible to spawn non-<code>Send</code> tasks, via <a href="https://docs.rs/futures/0.3/futures/task/trait.LocalSpawn.html#tymethod.spawn_local_obj"><code>spawn_local_obj</code></a>. The
+<a href="struct.LocalPool.html" title="LocalPool"><code>LocalPool</code></a> is best suited for running I/O-bound tasks that do relatively
+little work between I/O operations.</p>
+<p>There is also a convenience function <a href="fn.block_on.html" title="block_on"><code>block_on</code></a> for simply running a
+future to completion on the current thread.</p>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BlockingStream.html" title="futures_executor::BlockingStream struct">BlockingStream</a></div><div class="item-right docblock-short"><p>An iterator which blocks on values from a stream until they become available.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Enter.html" title="futures_executor::Enter struct">Enter</a></div><div class="item-right docblock-short"><p>Represents an executor context.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EnterError.html" title="futures_executor::EnterError struct">EnterError</a></div><div class="item-right docblock-short"><p>An error returned by <code>enter</code> if an execution scope has already been
+entered.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.LocalPool.html" title="futures_executor::LocalPool struct">LocalPool</a></div><div class="item-right docblock-short"><p>A single-threaded task pool for polling futures to completion.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.LocalSpawner.html" title="futures_executor::LocalSpawner struct">LocalSpawner</a></div><div class="item-right docblock-short"><p>A handle to a <a href="struct.LocalPool.html"><code>LocalPool</code></a> that implements
+<a href="../futures_task/spawn/trait.Spawn.html"><code>Spawn</code></a>.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.block_on.html" title="futures_executor::block_on fn">block_on</a></div><div class="item-right docblock-short"><p>Run a future to completion on the current thread.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.block_on_stream.html" title="futures_executor::block_on_stream fn">block_on_stream</a></div><div class="item-right docblock-short"><p>Turn a stream into a blocking iterator.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.enter.html" title="futures_executor::enter fn">enter</a></div><div class="item-right docblock-short"><p>Marks the current thread as being within the dynamic extent of an
+executor.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="futures_executor" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

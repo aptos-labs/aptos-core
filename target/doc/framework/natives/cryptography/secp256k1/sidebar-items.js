@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""]],"mod":[["abort_codes","Abort code when deserialization fails (0x01 == INVALID_ARGUMENT) NOTE: This must match the code in the Move implementation"]],"struct":[["GasParameters",""]]};

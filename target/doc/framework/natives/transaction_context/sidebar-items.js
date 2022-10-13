@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""],["make_native_get_script_hash",""]],"struct":[["GasParameters",""],["GetScriptHashGasParameters",""],["NativeTransactionContext","The native transaction context extension. This needs to be attached to the NativeContextExtensions value which is passed into session functions, so its accessible from natives of this extension."]]};

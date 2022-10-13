@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Docgen","Generate javadoc style documentation for Move packages"]]};

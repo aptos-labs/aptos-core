@@ -1,0 +1,150 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This crates provides an API for logging."><meta name="keywords" content="rust, rustlang, rust-lang, aptos_logger"><title>aptos_logger - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../aptos_logger/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../aptos_logger/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate aptos_logger</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.1.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#macros">Macros</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li><li><a href="#derives">Derive Macros</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../aptos_logger/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">aptos_logger</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/aptos_logger/lib.rs.html#4-172">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This crates provides an API for logging.</p>
+<h2 id="instrumenting-with-logs"><a href="#instrumenting-with-logs">Instrumenting with Logs</a></h2><h3 id="basic-instrumenting-with-logs"><a href="#basic-instrumenting-with-logs">Basic instrumenting with Logs</a></h3>
+<p>A set of logging macros (<code>info!</code>, <code>error!</code>, <code>warn!</code>, <code>debug!</code>, and <code>trace!</code>) is provided for
+emitting logs at different levels. All of these macros support the addition of providing
+structured data along with a formatted text message.  For guidelines on which level to use,
+see the <a href="https://aptos.dev/docs/core/coding-guidelines#logging">coding guidelines</a>.</p>
+<p>The below examples do no type checking for structured log fields, and instead just serialize
+whatever is given.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">aptos_logger::info</span>;
+
+<span class="kw">let</span> <span class="ident">world</span> <span class="op">=</span> <span class="string">&quot;world!&quot;</span>;
+
+<span class="comment">// Formatted message, similar to `printf!`</span>
+<span class="macro">info!</span>(<span class="string">&quot;hello {}&quot;</span>, <span class="ident">world</span>);
+<span class="comment">// =&gt; &#39;{&quot;level&quot;:&quot;info&quot;, &quot;message&quot;: &quot;hello world!&quot;}&#39;</span>
+
+<span class="comment">// Structured data can be logged using the format &#39;key = value&#39;</span>
+<span class="comment">// where value implements Serialize.  This can be used for indexing and search later.</span>
+<span class="kw">let</span> <span class="ident">value1</span> <span class="op">=</span> <span class="number">5</span>;
+<span class="macro">info!</span>(<span class="ident">key1</span> <span class="op">=</span> <span class="ident">value1</span>);
+<span class="comment">// =&gt; &#39;{&quot;level&quot;:&quot;info&quot;, &quot;data&quot;: {&quot;key1&quot;: 5}}&#39;</span>
+
+<span class="comment">// You can even set multiple key/value pairs and a format message together</span>
+<span class="kw">let</span> <span class="ident">value2</span> <span class="op">=</span> <span class="bool-val">false</span>;
+<span class="macro">info!</span>(<span class="ident">key1</span> <span class="op">=</span> <span class="ident">value1</span>, <span class="ident">key2</span> <span class="op">=</span> <span class="ident">value2</span>, <span class="string">&quot;hello {}&quot;</span>, <span class="ident">world</span>);
+<span class="comment">// =&gt; &#39;{&quot;level&quot;:&quot;info&quot;, &quot;data&quot;: {&quot;key1&quot;: 5, &quot;key2&quot;: false}, &quot;message&quot;: &quot;hello world!&quot;}&#39;</span>
+
+<span class="comment">// Structured data can also use `Display` or `Debug` outputs instead.</span>
+<span class="comment">// Using the sigil `?` for debug and `%` for display.</span>
+<span class="kw">let</span> <span class="ident">value1</span> <span class="op">=</span> <span class="number">5</span>;
+<span class="macro">info!</span>(<span class="ident">debug_key</span> <span class="op">=</span> <span class="question-mark">?</span><span class="ident">value1</span>, <span class="ident">display_key</span> <span class="op">=</span> <span class="op">%</span><span class="ident">value1</span>);
+<span class="comment">// =&gt; &#39;{&quot;level&quot;:&quot;info&quot;, &quot;data&quot;: {&quot;display_key&quot;: 5, &quot;debug_key&quot;: 5}}&#39;</span></code></pre></div>
+<h4 id="note"><a href="#note">Note</a></h4>
+<p>Arguments used in a formatted message are <strong>not</strong> captured and included as structured data.
+Everything after the format string literal e.g. <code>&quot;hello {}&quot;</code> are only used in the format string.</p>
+<h3 id="preferred-instrumenting-with-logs-typed-schemas"><a href="#preferred-instrumenting-with-logs-typed-schemas">Preferred instrumenting with Logs (Typed Schemas)</a></h3>
+<p>The <code>Schema</code> trait can be used to implement typed logging schemas. This can either be
+implemented by hand or derived using the <code>Schema</code> derive proc-macro, implementing the <code>Schema</code>
+trait for the struct as well as providing setters for all fields.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">aptos_logger</span>::{<span class="ident">info</span>, <span class="ident">Schema</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Schema</span>)]</span>
+<span class="kw">struct</span> <span class="ident">LogSchema</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="comment">// Log using this type&#39;s Serialize impl</span>
+    <span class="ident">a</span>: <span class="ident">usize</span>,
+    <span class="comment">// Log using this type&#39;s Debug impl</span>
+    <span class="attribute">#[<span class="ident">schema</span>(<span class="ident">debug</span>)]</span>
+    <span class="ident">b</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="comment">// Log using this type&#39;s Display impl</span>
+    <span class="attribute">#[<span class="ident">schema</span>(<span class="ident">display</span>)]</span>
+    <span class="ident">c</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> <span class="ident">LogSchema</span> { <span class="ident">a</span>: <span class="number">5</span>, <span class="ident">b</span>: <span class="prelude-val">None</span>, <span class="ident">c</span>: <span class="prelude-val">None</span> };
+
+<span class="comment">// Automatic setters are named based on the field names, and handle `Option`</span>
+<span class="comment">// None fields will be ignored</span>
+<span class="macro">info!</span>(<span class="ident">log</span>.<span class="ident">c</span>(<span class="string">&quot;radiant&quot;</span>));
+<span class="comment">// =&gt; &#39;{&quot;level&quot;:&quot;info&quot;, &quot;data&quot;: { &quot;a&quot;: 5, &quot;c&quot;: &quot;radiant&quot;}}&#39;</span>
+
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Schema</span>)]</span>
+<span class="kw">struct</span> <span class="ident">OtherSchema</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+  <span class="ident">val</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span>
+}
+
+<span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> <span class="ident">LogSchema</span> { <span class="ident">a</span>: <span class="number">5</span>, <span class="ident">b</span>: <span class="prelude-val">None</span>, <span class="ident">c</span>: <span class="prelude-val">None</span> };
+<span class="kw">let</span> <span class="ident">other</span> <span class="op">=</span> <span class="ident">OtherSchema</span> { <span class="ident">val</span>: <span class="prelude-val">None</span> };
+
+<span class="comment">// Schemas can be combined</span>
+<span class="macro">info!</span>(
+  <span class="ident">other</span>.<span class="ident">val</span>(<span class="string">&quot;awesome&quot;</span>), <span class="comment">// First schema</span>
+  <span class="ident">log</span> <span class="comment">// Second schema has fields added to it all</span>
+);
+<span class="comment">// =&gt; &#39;{&quot;level&quot;:&quot;info&quot;, &quot;data&quot;: { &quot;a&quot;: 5, &quot;val&quot;:&quot;awesome&quot;}}&#39;</span>
+
+<span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> <span class="ident">LogSchema</span> { <span class="ident">a</span>: <span class="number">5</span>, <span class="ident">b</span>: <span class="prelude-val">None</span>, <span class="ident">c</span>: <span class="prelude-val">None</span> };
+<span class="kw">let</span> <span class="ident">other</span> <span class="op">=</span> <span class="ident">OtherSchema</span> { <span class="ident">val</span>: <span class="prelude-val">None</span> };
+
+<span class="comment">// Schemas can be combined with one off fields and messages like above</span>
+<span class="macro">info!</span>(
+   <span class="ident">other</span>.<span class="ident">val</span>(<span class="string">&quot;awesome&quot;</span>), <span class="comment">// First schema</span>
+   <span class="ident">log</span>, <span class="comment">// Second schema has fields added to it all</span>
+   <span class="ident">new_field</span> <span class="op">=</span> <span class="string">&quot;new&quot;</span>, <span class="comment">// Basic structured fields</span>
+   <span class="string">&quot;Message: {}&quot;</span>, <span class="comment">// Format messages</span>
+   <span class="string">&quot;Some message&quot;</span> <span class="comment">// Format message fields (not added to indexed fields)</span>
+);
+<span class="comment">// =&gt; {&quot;level&quot;:&quot;info&quot;, &quot;message&quot;: &quot;Message: Some message&quot;,</span>
+<span class="comment">//     &quot;data&quot;: { &quot;a&quot;: 5, &quot;val&quot;:&quot;awesome&quot;, &quot;new_field&quot;: &quot;new&quot;}}&#39;</span></code></pre></div>
+<h3 id="sampling-logs"><a href="#sampling-logs">Sampling logs</a></h3>
+<p>Sometimes logging a large amount of data is expensive.  In order to log information only part
+of the time, we’ve added a <code>sample!</code> macro that’s configurable on how often we want to execute some code.</p>
+<p><code>SampleRate</code> determines how often the sampled statement will occur.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">aptos_logger</span>::{<span class="ident">info</span>, <span class="ident">sample</span>, <span class="ident">sample</span>::{<span class="ident">SampleRate</span>, <span class="ident">Sampling</span>}};
+<span class="kw">use</span> <span class="ident">std::time::Duration</span>;
+
+<span class="comment">// Sampled based on frequency of events, log only every 2 logs</span>
+<span class="macro">sample!</span>(<span class="ident">SampleRate::Frequency</span>(<span class="number">2</span>), <span class="macro">info!</span>(<span class="string">&quot;Long log&quot;</span>));
+
+<span class="comment">// Sampled based on time passed, log at most once a minute</span>
+<span class="macro">sample!</span>(<span class="ident">SampleRate::Duration</span>(<span class="ident">Duration::from_secs</span>(<span class="number">60</span>)), <span class="macro">info!</span>(<span class="string">&quot;Long log&quot;</span>));</code></pre></div>
+<h2 id="configuration"><a href="#configuration">Configuration</a></h2>
+<p>In order for logs to be captured and emitted a Logger needs to be instantiated. This can be
+done by using the <code>Logger</code> type:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">aptos_logger</span>::{<span class="ident">Level</span>, <span class="ident">Logger</span>};
+
+<span class="ident">Logger::builder</span>().<span class="ident">level</span>(<span class="ident">Level::Info</span>).<span class="ident">build</span>();</code></pre></div>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.Logger"><code>pub use crate::aptos_logger::<a class="struct" href="aptos_logger/struct.AptosData.html" title="struct aptos_logger::aptos_logger::AptosData">AptosData</a> as Logger;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.AptosDataBuilder"><code>pub use crate::aptos_logger::<a class="struct" href="aptos_logger/struct.AptosDataBuilder.html" title="struct aptos_logger::aptos_logger::AptosDataBuilder">AptosDataBuilder</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.LoggerFilterUpdater"><code>pub use crate::aptos_logger::<a class="struct" href="aptos_logger/struct.LoggerFilterUpdater.html" title="struct aptos_logger::aptos_logger::LoggerFilterUpdater">LoggerFilterUpdater</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Writer"><code>pub use crate::aptos_logger::<a class="trait" href="aptos_logger/trait.Writer.html" title="trait aptos_logger::aptos_logger::Writer">Writer</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.CHANNEL_SIZE"><code>pub use crate::aptos_logger::<a class="constant" href="aptos_logger/constant.CHANNEL_SIZE.html" title="constant aptos_logger::aptos_logger::CHANNEL_SIZE">CHANNEL_SIZE</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="aptos_logger/index.html" title="aptos_logger::aptos_logger mod">aptos_logger</a></div><div class="item-right docblock-short"><p>Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
+(e.g. Logstash)</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="prelude/index.html" title="aptos_logger::prelude mod">prelude</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="sample/index.html" title="aptos_logger::sample mod">sample</a></div><div class="item-right docblock-short"><p>Periodic sampling for logs, metrics, and other use cases through a simple macro</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="telemetry_log_writer/index.html" title="aptos_logger::telemetry_log_writer mod">telemetry_log_writer</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="tracing_adapter/index.html" title="aptos_logger::tracing_adapter mod">tracing_adapter</a></div><div class="item-right docblock-short"></div></div></div><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.debug.html" title="aptos_logger::debug macro">debug</a></div><div class="item-right docblock-short"><p>Log at the <code>debug</code> level</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.enabled.html" title="aptos_logger::enabled macro">enabled</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.error.html" title="aptos_logger::error macro">error</a></div><div class="item-right docblock-short"><p>Log at the <code>error</code> level</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.info.html" title="aptos_logger::info macro">info</a></div><div class="item-right docblock-short"><p>Log at the <code>info</code> level</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.log.html" title="aptos_logger::log macro">log</a></div><div class="item-right docblock-short"><p>Log at the given level, it’s recommended to use a specific level macro instead</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.sample.html" title="aptos_logger::sample macro">sample</a></div><div class="item-right docblock-short"><p>Samples a given function at a <code>SampleRate</code>, useful for periodically emitting logs or metrics on
+high throughput pieces of code.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.spawn_named.html" title="aptos_logger::spawn_named macro">spawn_named</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.trace.html" title="aptos_logger::trace macro">trace</a></div><div class="item-right docblock-short"><p>Log at the <code>trace</code> level</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.warn.html" title="aptos_logger::warn macro">warn</a></div><div class="item-right docblock-short"><p>Log at the <code>warn</code> level</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Event.html" title="aptos_logger::Event struct">Event</a></div><div class="item-right docblock-short"><p>An individual structured logging event from a log line.  Includes the</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Filter.html" title="aptos_logger::Filter struct">Filter</a></div><div class="item-right docblock-short"><p>A logging filter to determine which logs to keep or remove based on <code>Directive</code>s</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Key.html" title="aptos_logger::Key struct">Key</a></div><div class="item-right docblock-short"><p>The key part of a logging key value pair e.g. <code>info!(key = value)</code></p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.KeyValue.html" title="aptos_logger::KeyValue struct">KeyValue</a></div><div class="item-right docblock-short"><p>The logging key value pair e.g. <code>info!(key = value)</code></p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Metadata.html" title="aptos_logger::Metadata struct">Metadata</a></div><div class="item-right docblock-short"><p>Associated metadata with every log to identify what kind of log and where it came from</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Level.html" title="aptos_logger::Level enum">Level</a></div><div class="item-right docblock-short"><p>Logging levels, used for stratifying logs, and disabling less important ones for performance reasons</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.LevelFilter.html" title="aptos_logger::LevelFilter enum">LevelFilter</a></div><div class="item-right docblock-short"><p>A definition of the most verbose <code>Level</code> allowed, or completely off.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.SecurityEvent.html" title="aptos_logger::SecurityEvent enum">SecurityEvent</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Value.html" title="aptos_logger::Value enum">Value</a></div><div class="item-right docblock-short"><p>The value part of a logging key value pair e.g. <code>info!(key = value)</code></p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Schema.html" title="aptos_logger::Schema trait">Schema</a></div><div class="item-right docblock-short"><p>A schema of key-value pairs.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Visitor.html" title="aptos_logger::Visitor trait">Visitor</a></div><div class="item-right docblock-short"><p>A visitor for the key-value pairs in a <a href="trait.Schema.html"><code>Schema</code></a>.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.flush.html" title="aptos_logger::flush fn">flush</a></div><div class="item-right docblock-short"><p>Flush the global <code>Logger</code>. Note this is expensive, only use off the critical path.</p>
+</div></div></div><h2 id="derives" class="small-section-header"><a href="#derives">Derive Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="derive" href="derive.Schema.html" title="aptos_logger::Schema derive">Schema</a></div><div class="item-right docblock-short"></div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="aptos_logger" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

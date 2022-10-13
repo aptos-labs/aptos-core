@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Ed25519Signature","An Ed25519 signature"]]};

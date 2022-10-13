@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Pretty-print tree-like structures"><meta name="keywords" content="rust, rustlang, rust-lang, ptree"><title>ptree - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../ptree/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../ptree/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate ptree</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.4.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../ptree/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">ptree</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/ptree/lib.rs.html#1-259">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Pretty-print tree-like structures</p>
+<h3 id="basic-usage"><a href="#basic-usage">Basic usage</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// Build a tree using a TreeBuilder</span>
+<span class="kw">let</span> <span class="ident">tree</span> <span class="op">=</span> <span class="ident">TreeBuilder::new</span>(<span class="string">&quot;tree&quot;</span>.<span class="ident">to_string</span>())
+    .<span class="ident">begin_child</span>(<span class="string">&quot;branch&quot;</span>.<span class="ident">to_string</span>())
+        .<span class="ident">add_empty_child</span>(<span class="string">&quot;leaf&quot;</span>.<span class="ident">to_string</span>())
+    .<span class="ident">end_child</span>()
+    .<span class="ident">add_empty_child</span>(<span class="string">&quot;empty branch&quot;</span>.<span class="ident">to_string</span>())
+    .<span class="ident">build</span>();
+
+<span class="comment">// Print out the tree using default formatting</span>
+<span class="ident">print_tree</span>(<span class="kw-2">&amp;</span><span class="ident">tree</span>)<span class="question-mark">?</span>;
+</code></pre></div>
+<h3 id="output-configuration"><a href="#output-configuration">Output configuration</a></h3>
+<p>Ptree allows user configuration of the output format.
+Thus any program using the library can be configured globaly,
+providing a consistent user experience.</p>
+<p>Output formatting is controlled by a user configuration file or
+by environment variables.</p>
+<div class="example-wrap"><pre class="language-toml"><code>
+indent = 4
+
+[branch]
+foreground = red
+dimmed = true
+
+[leaf]
+bold = true</code></pre></div>
+<p>The configuration file resides in the platform-specific user configuration directory,
+as returned by <a href="https://docs.rs/directories/1.0.1/directories/struct.BaseDirs.html#method.config_dir"><code>config_dir</code></a>.
+It can be in TOML, YAML, INI or JSON format, provided the file stem is <code>ptree</code>.
+A custom configuration file can be specified by setting the <code>PTREE_CONFIG</code> environment
+variable to the full path of the file.</p>
+<p>Individual configuration parameters can also be overriden using environment variables.</p>
+<div class="example-wrap"><pre class="language-bash"><code>PTREE_INDENT=3 PTREE_BRANCH_BACKGROUND=yellow &lt;command&gt;</code></pre></div>
+<p>See <a href="print_config/struct.PrintConfig.html"><code>PrintConfig</code></a> for the list of all configuration options.</p>
+<h3 id="advanced-usage"><a href="#advanced-usage">Advanced usage</a></h3><h4 id="implementing-the-treeitem-trait"><a href="#implementing-the-treeitem-trait">Implementing the <code>TreeItem</code> trait</a></h4>
+<p>Rather than construct a new tree, one can implement the
+<a href="item/trait.TreeItem.html"><code>TreeItem</code></a> trait for a custom data structure.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">MyCustomTree</span> {}
+
+<span class="kw">impl</span> <span class="ident">TreeItem</span> <span class="kw">for</span> <span class="ident">MyCustomTree</span> {
+    <span class="kw">type</span> <span class="ident">Child</span> <span class="op">=</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">write_self</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io::Write</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">W</span>, <span class="ident">style</span>: <span class="kw-2">&amp;</span><span class="ident">Style</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="ident">style</span>.<span class="ident">paint</span>(<span class="string">&quot;My custom tree&quot;</span>))
+    }
+    <span class="kw">fn</span> <span class="ident">children</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Cow</span><span class="op">&lt;</span>[<span class="ident"><span class="self">Self</span>::Child</span>]<span class="op">&gt;</span> {
+        <span class="ident">Cow::from</span>(<span class="macro">vec!</span>[])
+    }
+}
+
+<span class="comment">// Build my custom tree structure</span>
+<span class="kw">let</span> <span class="ident">tree</span> <span class="op">=</span> <span class="ident">MyCustomTree</span> {};
+
+<span class="comment">// Print out the tree using default formatting</span>
+<span class="ident">print_tree</span>(<span class="kw-2">&amp;</span><span class="ident">tree</span>)<span class="question-mark">?</span>;
+</code></pre></div>
+<h4 id="custom-output-formatting"><a href="#custom-output-formatting">Custom output formatting</a></h4>
+<p>The <a href="output/fn.print_tree.html"><code>print_tree</code></a> function loads the user configuration to control
+output formatting.
+If you want to override this, you can create your own PrintConfig
+and use the <a href="output/fn.print_tree_with.html"><code>print_tree_with</code></a> function.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// Build a tree using a TreeBuilder</span>
+<span class="kw">let</span> <span class="ident">tree</span> <span class="op">=</span> <span class="ident">TreeBuilder::new</span>(<span class="string">&quot;tree&quot;</span>.<span class="ident">to_string</span>())
+    .<span class="ident">add_empty_child</span>(<span class="string">&quot;empty branch&quot;</span>.<span class="ident">to_string</span>())
+    .<span class="ident">build</span>();
+
+<span class="comment">// Set up the print configuration</span>
+<span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">PrintConfig::from_env</span>();
+    <span class="ident">config</span>.<span class="ident">branch</span> <span class="op">=</span> <span class="ident">Style</span> {
+        <span class="ident">foreground</span>: <span class="prelude-val">Some</span>(<span class="ident">Color::Red</span>),
+        <span class="ident">background</span>: <span class="prelude-val">Some</span>(<span class="ident">Color::Yellow</span>),
+        <span class="ident">dimmed</span>: <span class="bool-val">true</span>,
+        ..<span class="ident">Style::default</span>()
+    };
+    <span class="ident">config</span>.<span class="ident">leaf</span> <span class="op">=</span> <span class="ident">Style</span> {
+        <span class="ident">bold</span>: <span class="bool-val">true</span>,
+        ..<span class="ident">Style::default</span>()
+    };
+    <span class="ident">config</span>.<span class="ident">characters</span> <span class="op">=</span> <span class="ident">UTF_CHARS_BOLD</span>.<span class="ident">into</span>();
+    <span class="ident">config</span>.<span class="ident">indent</span> <span class="op">=</span> <span class="number">4</span>;
+    <span class="ident">config</span>
+};
+
+<span class="comment">// Print out the tree using custom formatting</span>
+<span class="ident">print_tree_with</span>(<span class="kw-2">&amp;</span><span class="ident">tree</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>)<span class="question-mark">?</span>;
+</code></pre></div>
+<h4 id="write-to-a-file"><a href="#write-to-a-file">Write to a file</a></h4>
+<p>To write a tree to a file rather than to standard output,
+use <a href="output/fn.write_tree.html"><code>write_tree</code></a> or <a href="output/fn.write_tree_with.html"><code>write_tree_with</code></a>.</p>
+<p>Unless <a href="print_config/struct.PrintConfig.html#structfield.styled"><code>PrintConfig::styled</code></a> is set to <a href="print_config/struct.PrintConfig.html#structfield.styled"><code>Always</code></a>, these two functions
+will not use ANSI coloring and styling for the output text.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// Build a tree using a TreeBuilder</span>
+<span class="kw">let</span> <span class="ident">tree</span> <span class="op">=</span> <span class="ident">TreeBuilder::new</span>(<span class="string">&quot;tree&quot;</span>.<span class="ident">to_string</span>())
+    .<span class="ident">add_empty_child</span>(<span class="string">&quot;empty branch&quot;</span>.<span class="ident">to_string</span>())
+    .<span class="ident">build</span>();
+
+<span class="comment">// Open a file for writing</span>
+<span class="kw">let</span> <span class="ident">file_name</span> <span class="op">=</span> <span class="string">&quot;tree.txt&quot;</span>;
+<span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">File::create</span>(<span class="kw-2">&amp;</span><span class="ident">file_name</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Write out the tree to the file</span>
+<span class="ident">write_tree</span>(<span class="kw-2">&amp;</span><span class="ident">tree</span>, <span class="ident">file</span>)<span class="question-mark">?</span>;
+</code></pre></div>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.TreeBuilder"><code>pub use builder::<a class="struct" href="builder/struct.TreeBuilder.html" title="struct ptree::builder::TreeBuilder">TreeBuilder</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.TreeItem"><code>pub use item::<a class="trait" href="item/trait.TreeItem.html" title="trait ptree::item::TreeItem">TreeItem</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.print_tree"><code>pub use output::<a class="fn" href="output/fn.print_tree.html" title="fn ptree::output::print_tree">print_tree</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.print_tree_with"><code>pub use output::<a class="fn" href="output/fn.print_tree_with.html" title="fn ptree::output::print_tree_with">print_tree_with</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.write_tree"><code>pub use output::<a class="fn" href="output/fn.write_tree.html" title="fn ptree::output::write_tree">write_tree</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.write_tree_with"><code>pub use output::<a class="fn" href="output/fn.write_tree_with.html" title="fn ptree::output::write_tree_with">write_tree_with</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.IndentChars"><code>pub use print_config::<a class="struct" href="print_config/struct.IndentChars.html" title="struct ptree::print_config::IndentChars">IndentChars</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.PrintConfig"><code>pub use print_config::<a class="struct" href="print_config/struct.PrintConfig.html" title="struct ptree::print_config::PrintConfig">PrintConfig</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Color"><code>pub use style::<a class="enum" href="style/enum.Color.html" title="enum ptree::style::Color">Color</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Style"><code>pub use style::<a class="struct" href="style/struct.Style.html" title="struct ptree::style::Style">Style</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="builder/index.html" title="ptree::builder mod">builder</a></div><div class="item-right docblock-short"><p>Contains the <code>TreeBuilder</code> structure, useful for manually constructing trees</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="graph/index.html" title="ptree::graph mod">graph</a></div><div class="item-right docblock-short"><p>Implementation of <code>TreeItem</code> for <a href="https://docs.rs/petgraph/0.4.13/petgraph/graph/struct.Graph.html"><code>petgraph::Graph</code></a></p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="item/index.html" title="ptree::item mod">item</a></div><div class="item-right docblock-short"><p>Contains the <code>TreeItem</code> trait</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="output/index.html" title="ptree::output mod">output</a></div><div class="item-right docblock-short"><p>Functions for printing trees to standard output or to custom writers</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="print_config/index.html" title="ptree::print_config mod">print_config</a></div><div class="item-right docblock-short"><p>Structures to control the output formatting</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="style/index.html" title="ptree::style mod">style</a></div><div class="item-right docblock-short"><p>Structures to control terminal colors and styles</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="value/index.html" title="ptree::value mod">value</a></div><div class="item-right docblock-short"><p>Implementation of <code>TreeItem</code> for <a href="../serde_value/enum.Value.html" title="serde_value::Value"><code>serde_value::Value</code></a>, allowing easy printing of
+deserialized structures from a variety of formats.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="ptree" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

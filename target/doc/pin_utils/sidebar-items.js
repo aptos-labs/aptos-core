@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":[["pin_mut","Pins a value on the stack."],["unsafe_pinned","A pinned projection of a struct field."],["unsafe_unpinned","An unpinned projection of a struct field."]]};

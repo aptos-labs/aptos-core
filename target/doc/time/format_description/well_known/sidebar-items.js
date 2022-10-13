@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["iso8601","The format described in ISO 8601."]],"struct":[["Iso8601","The format described in ISO 8601."],["Rfc2822","The format described in RFC 2822."],["Rfc3339","The format described in RFC 3339."]]};

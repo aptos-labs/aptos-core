@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["SyncProofFetcher","An implementation of proof fetcher, which synchronously fetches proofs from the underlying persistent storage."]]};

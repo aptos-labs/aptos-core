@@ -1,0 +1,238 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Public key signatures: signing and verification."><meta name="keywords" content="rust, rustlang, rust-lang, signature"><title>ring::signature - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ring/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../ring/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module signature</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#constants">Constants</a></li><li><a href="#statics">Statics</a></li><li><a href="#traits">Traits</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ring/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">ring</a>::<wbr><a class="mod" href="#">signature</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/ring/signature.rs.html#15-406">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Public key signatures: signing and verification.</p>
+<p>Use the <code>verify</code> function to verify signatures, passing a reference to the
+algorithm that identifies the algorithm. See the documentation for <code>verify</code>
+for examples.</p>
+<p>For signature verification, this API treats each combination of parameters
+as a separate algorithm. For example, instead of having a single “RSA”
+algorithm with a verification function that takes a bunch of parameters,
+there are <code>RSA_PKCS1_2048_8192_SHA256</code>, <code>RSA_PKCS1_2048_8192_SHA384</code>, etc.,
+which encode sets of parameter choices into objects. This is designed to
+reduce the risks of algorithm agility and to provide consistency with ECDSA
+and EdDSA.</p>
+<p>Currently this module does not support digesting the message to be signed
+separately from the public key operation, as it is currently being
+optimized for Ed25519 and for the implementation of protocols that do not
+requiring signing large messages. An interface for efficiently supporting
+larger messages may be added later.</p>
+<h2 id="algorithm-details"><a href="#algorithm-details">Algorithm Details</a></h2><h3 id="ecdsa__asn1-details-asn1-encoded-ecdsa-signatures"><a href="#ecdsa__asn1-details-asn1-encoded-ecdsa-signatures"><code>ECDSA_*_ASN1</code> Details: ASN.1-encoded ECDSA Signatures</a></h3>
+<p>The signature is a ASN.1 DER-encoded <code>Ecdsa-Sig-Value</code> as described in
+<a href="https://tools.ietf.org/html/rfc3279#section-2.2.3">RFC 3279 Section 2.2.3</a>. This is the form of ECDSA signature used in
+X.509-related structures and in TLS’s <code>ServerKeyExchange</code> messages.</p>
+<p>The public key is encoding in uncompressed form using the
+Octet-String-to-Elliptic-Curve-Point algorithm in
+<a href="http://www.secg.org/sec1-v2.pdf">SEC 1: Elliptic Curve Cryptography, Version 2.0</a>.</p>
+<p>During verification, the public key is validated using the ECC Partial
+Public-Key Validation Routine from Section 5.6.2.3.3 of
+<a href="http://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Ar2.pdf">NIST Special Publication 800-56A, revision 2</a> and Appendix A.3 of the
+NSA’s <a href="https://github.com/briansmith/ring/blob/main/doc/ecdsa.pdf">Suite B implementer’s guide to FIPS 186-3</a>. Note that, as explained
+in the NSA guide, ECC Partial Public-Key Validation is equivalent to ECC
+Full Public-Key Validation for prime-order curves like this one.</p>
+<h3 id="ecdsa__fixed-details-fixed-length-pkcs11-style-ecdsa-signatures"><a href="#ecdsa__fixed-details-fixed-length-pkcs11-style-ecdsa-signatures"><code>ECDSA_*_FIXED</code> Details: Fixed-length (PKCS#11-style) ECDSA Signatures</a></h3>
+<p>The signature is <em>r</em>||<em>s</em>, where || denotes concatenation, and where both
+<em>r</em> and <em>s</em> are both big-endian-encoded values that are left-padded to the
+maximum length. A P-256 signature will be 64 bytes long (two 32-byte
+components) and a P-384 signature will be 96 bytes long (two 48-byte
+components). This is the form of ECDSA signature used PKCS#11 and DNSSEC.</p>
+<p>The public key is encoding in uncompressed form using the
+Octet-String-to-Elliptic-Curve-Point algorithm in
+<a href="http://www.secg.org/sec1-v2.pdf">SEC 1: Elliptic Curve Cryptography, Version 2.0</a>.</p>
+<p>During verification, the public key is validated using the ECC Partial
+Public-Key Validation Routine from Section 5.6.2.3.3 of
+<a href="http://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Ar2.pdf">NIST Special Publication 800-56A, revision 2</a> and Appendix A.3 of the
+NSA’s <a href="https://github.com/briansmith/ring/blob/main/doc/ecdsa.pdf">Suite B implementer’s guide to FIPS 186-3</a>. Note that, as explained
+in the NSA guide, ECC Partial Public-Key Validation is equivalent to ECC
+Full Public-Key Validation for prime-order curves like this one.</p>
+<h3 id="rsa_pkcs1_-details-rsa-pkcs1-15-signatures"><a href="#rsa_pkcs1_-details-rsa-pkcs1-15-signatures"><code>RSA_PKCS1_*</code> Details: RSA PKCS#1 1.5 Signatures</a></h3>
+<p>The signature is an RSASSA-PKCS1-v1_5 signature as described in
+<a href="https://tools.ietf.org/html/rfc3447#section-7.2">RFC 3447 Section 8.2</a>.</p>
+<p>The public key is encoded as an ASN.1 <code>RSAPublicKey</code> as described in
+<a href="https://tools.ietf.org/html/rfc3447#appendix-A.1.1">RFC 3447 Appendix-A.1.1</a>. The public key modulus length, rounded <em>up</em> to
+the nearest (larger) multiple of 8 bits, must be in the range given in the
+name of the algorithm. The public exponent must be an odd integer of 2-33
+bits, inclusive.</p>
+<h3 id="rsa_pss_-details-rsa-pss-signatures"><a href="#rsa_pss_-details-rsa-pss-signatures"><code>RSA_PSS_*</code> Details: RSA PSS Signatures</a></h3>
+<p>The signature is an RSASSA-PSS signature as described in
+<a href="https://tools.ietf.org/html/rfc3447#section-8.1">RFC 3447 Section 8.1</a>.</p>
+<p>The public key is encoded as an ASN.1 <code>RSAPublicKey</code> as described in
+<a href="https://tools.ietf.org/html/rfc3447#appendix-A.1.1">RFC 3447 Appendix-A.1.1</a>. The public key modulus length, rounded <em>up</em> to
+the nearest (larger) multiple of 8 bits, must be in the range given in the
+name of the algorithm. The public exponent must be an odd integer of 2-33
+bits, inclusive.</p>
+<p>During verification, signatures will only be accepted if the MGF1 digest
+algorithm is the same as the message digest algorithm and if the salt
+length is the same length as the message digest. This matches the
+requirements in TLS 1.3 and other recent specifications.</p>
+<p>During signing, the message digest algorithm will be used as the MGF1
+digest algorithm. The salt will be the same length as the message digest.
+This matches the requirements in TLS 1.3 and other recent specifications.
+Additionally, the entire salt is randomly generated separately for each
+signature using the secure random number generator passed to <code>sign()</code>.</p>
+<h2 id="examples"><a href="#examples">Examples</a></h2><h3 id="signing-and-verifying-with-ed25519"><a href="#signing-and-verifying-with-ed25519">Signing and verifying with Ed25519</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">ring</span>::{
+    <span class="ident">rand</span>,
+    <span class="ident">signature</span>::{<span class="self">self</span>, <span class="ident">KeyPair</span>},
+};
+
+<span class="comment">// Generate a key pair in PKCS#8 (v2) format.</span>
+<span class="kw">let</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">rand::SystemRandom::new</span>();
+<span class="kw">let</span> <span class="ident">pkcs8_bytes</span> <span class="op">=</span> <span class="ident">signature::Ed25519KeyPair::generate_pkcs8</span>(<span class="kw-2">&amp;</span><span class="ident">rng</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Normally the application would store the PKCS#8 file persistently. Later</span>
+<span class="comment">// it would read the PKCS#8 file from persistent storage to use it.</span>
+
+<span class="kw">let</span> <span class="ident">key_pair</span> <span class="op">=</span> <span class="ident">signature::Ed25519KeyPair::from_pkcs8</span>(<span class="ident">pkcs8_bytes</span>.<span class="ident">as_ref</span>())<span class="question-mark">?</span>;
+
+<span class="comment">// Sign the message &quot;hello, world&quot;.</span>
+<span class="kw">const</span> <span class="ident">MESSAGE</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;hello, world&quot;</span>;
+<span class="kw">let</span> <span class="ident">sig</span> <span class="op">=</span> <span class="ident">key_pair</span>.<span class="ident">sign</span>(<span class="ident">MESSAGE</span>);
+
+<span class="comment">// Normally an application would extract the bytes of the signature and</span>
+<span class="comment">// send them in a protocol message to the peer(s). Here we just get the</span>
+<span class="comment">// public key key directly from the key pair.</span>
+<span class="kw">let</span> <span class="ident">peer_public_key_bytes</span> <span class="op">=</span> <span class="ident">key_pair</span>.<span class="ident">public_key</span>().<span class="ident">as_ref</span>();
+
+<span class="comment">// Verify the signature of the message using the public key. Normally the</span>
+<span class="comment">// verifier of the message would parse the inputs to this code out of the</span>
+<span class="comment">// protocol message(s) sent by the signer.</span>
+<span class="kw">let</span> <span class="ident">peer_public_key</span> <span class="op">=</span>
+    <span class="ident">signature::UnparsedPublicKey::new</span>(<span class="kw-2">&amp;</span><span class="ident">signature::ED25519</span>, <span class="ident">peer_public_key_bytes</span>);
+<span class="ident">peer_public_key</span>.<span class="ident">verify</span>(<span class="ident">MESSAGE</span>, <span class="ident">sig</span>.<span class="ident">as_ref</span>())<span class="question-mark">?</span>;
+</code></pre></div>
+<h3 id="signing-and-verifying-with-rsa-pkcs1-15-padding"><a href="#signing-and-verifying-with-rsa-pkcs1-15-padding">Signing and verifying with RSA (PKCS#1 1.5 padding)</a></h3>
+<p>By default OpenSSL writes RSA public keys in SubjectPublicKeyInfo format,
+not RSAPublicKey format, and Base64-encodes them (“PEM” format).</p>
+<p>To convert the PEM SubjectPublicKeyInfo format (“BEGIN PUBLIC KEY”) to the
+binary RSAPublicKey format needed by <code>verify()</code>, use:</p>
+<div class="example-wrap"><pre class="language-sh"><code>openssl rsa -pubin \
+            -in public_key.pem \
+            -inform PEM \
+            -RSAPublicKey_out \
+            -outform DER \
+            -out public_key.der</code></pre></div>
+<p>To extract the RSAPublicKey-formatted public key from an ASN.1 (binary)
+DER-encoded RSAPrivateKey format private key file, use:</p>
+<div class="example-wrap"><pre class="language-sh"><code>openssl rsa -in private_key.der \
+            -inform DER \
+            -RSAPublicKey_out \
+            -outform DER \
+            -out public_key.der</code></pre></div>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">ring</span>::{<span class="ident">rand</span>, <span class="ident">signature</span>};
+
+<span class="kw">fn</span> <span class="ident">sign_and_verify_rsa</span>(<span class="ident">private_key_path</span>: <span class="kw-2">&amp;</span><span class="ident">std::path::Path</span>,
+                       <span class="ident">public_key_path</span>: <span class="kw-2">&amp;</span><span class="ident">std::path::Path</span>)
+                       -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">MyError</span><span class="op">&gt;</span> {
+<span class="comment">// Create an `RsaKeyPair` from the DER-encoded bytes. This example uses</span>
+<span class="comment">// a 2048-bit key, but larger keys are also supported.</span>
+<span class="kw">let</span> <span class="ident">private_key_der</span> <span class="op">=</span> <span class="ident">read_file</span>(<span class="ident">private_key_path</span>)<span class="question-mark">?</span>;
+<span class="kw">let</span> <span class="ident">key_pair</span> <span class="op">=</span> <span class="ident">signature::RsaKeyPair::from_der</span>(<span class="kw-2">&amp;</span><span class="ident">private_key_der</span>)
+    .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">MyError::BadPrivateKey</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Sign the message &quot;hello, world&quot;, using PKCS#1 v1.5 padding and the</span>
+<span class="comment">// SHA256 digest algorithm.</span>
+<span class="kw">const</span> <span class="ident">MESSAGE</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;hello, world&quot;</span>;
+<span class="kw">let</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">rand::SystemRandom::new</span>();
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">signature</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0</span>; <span class="ident">key_pair</span>.<span class="ident">public_modulus_len</span>()];
+<span class="ident">key_pair</span>.<span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="ident">signature::RSA_PKCS1_SHA256</span>, <span class="kw-2">&amp;</span><span class="ident">rng</span>, <span class="ident">MESSAGE</span>, <span class="kw-2">&amp;mut</span> <span class="ident">signature</span>)
+    .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">MyError::OOM</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Verify the signature.</span>
+<span class="kw">let</span> <span class="ident">public_key</span> <span class="op">=</span>
+    <span class="ident">signature::UnparsedPublicKey::new</span>(<span class="kw-2">&amp;</span><span class="ident">signature::RSA_PKCS1_2048_8192_SHA256</span>,
+                                      <span class="ident">read_file</span>(<span class="ident">public_key_path</span>)<span class="question-mark">?</span>);
+<span class="ident">public_key</span>.<span class="ident">verify</span>(<span class="ident">MESSAGE</span>, <span class="kw-2">&amp;</span><span class="ident">signature</span>)
+    .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">MyError::BadSignature</span>)
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">enum</span> <span class="ident">MyError</span> {
+   <span class="ident">IO</span>(<span class="ident">std::io::Error</span>),
+   <span class="ident">BadPrivateKey</span>,
+   <span class="ident">OOM</span>,
+   <span class="ident">BadSignature</span>,
+}
+
+<span class="kw">fn</span> <span class="ident">read_file</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">std::path::Path</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">MyError</span><span class="op">&gt;</span> {
+    <span class="kw">use</span> <span class="ident">std::io::Read</span>;
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">std::fs::File::open</span>(<span class="ident">path</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">MyError::IO</span>(<span class="ident">e</span>))<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">contents</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+    <span class="ident">file</span>.<span class="ident">read_to_end</span>(<span class="kw-2">&amp;mut</span> <span class="ident">contents</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">MyError::IO</span>(<span class="ident">e</span>))<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(<span class="ident">contents</span>)
+}</code></pre></div>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EcdsaKeyPair.html" title="ring::signature::EcdsaKeyPair struct">EcdsaKeyPair</a></div><div class="item-right docblock-short"><p>An ECDSA key pair, used for signing.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EcdsaSigningAlgorithm.html" title="ring::signature::EcdsaSigningAlgorithm struct">EcdsaSigningAlgorithm</a></div><div class="item-right docblock-short"><p>An ECDSA signing algorithm.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EcdsaVerificationAlgorithm.html" title="ring::signature::EcdsaVerificationAlgorithm struct">EcdsaVerificationAlgorithm</a></div><div class="item-right docblock-short"><p>An ECDSA verification algorithm.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Ed25519KeyPair.html" title="ring::signature::Ed25519KeyPair struct">Ed25519KeyPair</a></div><div class="item-right docblock-short"><p>An Ed25519 key pair, for signing.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EdDSAParameters.html" title="ring::signature::EdDSAParameters struct">EdDSAParameters</a></div><div class="item-right docblock-short"><p>Parameters for EdDSA signing and verification.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RsaKeyPair.html" title="ring::signature::RsaKeyPair struct">RsaKeyPair</a></div><div class="item-right docblock-short"><p>An RSA key pair, used for signing.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RsaParameters.html" title="ring::signature::RsaParameters struct">RsaParameters</a></div><div class="item-right docblock-short"><p>Parameters for RSA verification.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RsaPublicKeyComponents.html" title="ring::signature::RsaPublicKeyComponents struct">RsaPublicKeyComponents</a></div><div class="item-right docblock-short"><p>Low-level API for the verification of RSA signatures.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RsaSubjectPublicKey.html" title="ring::signature::RsaSubjectPublicKey struct">RsaSubjectPublicKey</a></div><div class="item-right docblock-short"><p>A serialized RSA public key.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Signature.html" title="ring::signature::Signature struct">Signature</a></div><div class="item-right docblock-short"><p>A public key signature returned from a signing operation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.UnparsedPublicKey.html" title="ring::signature::UnparsedPublicKey struct">UnparsedPublicKey</a></div><div class="item-right docblock-short"><p>An unparsed, possibly malformed, public key for signature verification.</p>
+</div></div></div><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.ED25519_PUBLIC_KEY_LEN.html" title="ring::signature::ED25519_PUBLIC_KEY_LEN constant">ED25519_PUBLIC_KEY_LEN</a></div><div class="item-right docblock-short"><p>The length of an Ed25519 public key.</p>
+</div></div></div><h2 id="statics" class="small-section-header"><a href="#statics">Statics</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P256_SHA256_ASN1.html" title="ring::signature::ECDSA_P256_SHA256_ASN1 static">ECDSA_P256_SHA256_ASN1</a></div><div class="item-right docblock-short"><p>Verification of ASN.1 DER-encoded ECDSA signatures using the P-256 curve
+and SHA-256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P256_SHA256_ASN1_SIGNING.html" title="ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING static">ECDSA_P256_SHA256_ASN1_SIGNING</a></div><div class="item-right docblock-short"><p>Signing of ASN.1 DER-encoded ECDSA signatures using the P-256 curve and
+SHA-256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P256_SHA256_FIXED.html" title="ring::signature::ECDSA_P256_SHA256_FIXED static">ECDSA_P256_SHA256_FIXED</a></div><div class="item-right docblock-short"><p>Verification of fixed-length (PKCS#11 style) ECDSA signatures using the
+P-256 curve and SHA-256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P256_SHA256_FIXED_SIGNING.html" title="ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING static">ECDSA_P256_SHA256_FIXED_SIGNING</a></div><div class="item-right docblock-short"><p>Signing of fixed-length (PKCS#11 style) ECDSA signatures using the
+P-256 curve and SHA-256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P256_SHA384_ASN1.html" title="ring::signature::ECDSA_P256_SHA384_ASN1 static">ECDSA_P256_SHA384_ASN1</a></div><div class="item-right docblock-short"><p><em>Not recommended</em>. Verification of ASN.1 DER-encoded ECDSA signatures using
+the P-256 curve and SHA-384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P384_SHA256_ASN1.html" title="ring::signature::ECDSA_P384_SHA256_ASN1 static">ECDSA_P384_SHA256_ASN1</a></div><div class="item-right docblock-short"><p><em>Not recommended</em>. Verification of ASN.1 DER-encoded ECDSA signatures using
+the P-384 curve and SHA-256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P384_SHA384_ASN1.html" title="ring::signature::ECDSA_P384_SHA384_ASN1 static">ECDSA_P384_SHA384_ASN1</a></div><div class="item-right docblock-short"><p>Verification of ASN.1 DER-encoded ECDSA signatures using the P-384 curve
+and SHA-384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P384_SHA384_ASN1_SIGNING.html" title="ring::signature::ECDSA_P384_SHA384_ASN1_SIGNING static">ECDSA_P384_SHA384_ASN1_SIGNING</a></div><div class="item-right docblock-short"><p>Signing of ASN.1 DER-encoded ECDSA signatures using the P-384 curve and
+SHA-384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P384_SHA384_FIXED.html" title="ring::signature::ECDSA_P384_SHA384_FIXED static">ECDSA_P384_SHA384_FIXED</a></div><div class="item-right docblock-short"><p>Verification of fixed-length (PKCS#11 style) ECDSA signatures using the
+P-384 curve and SHA-384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ECDSA_P384_SHA384_FIXED_SIGNING.html" title="ring::signature::ECDSA_P384_SHA384_FIXED_SIGNING static">ECDSA_P384_SHA384_FIXED_SIGNING</a></div><div class="item-right docblock-short"><p>Signing of fixed-length (PKCS#11 style) ECDSA signatures using the
+P-384 curve and SHA-384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.ED25519.html" title="ring::signature::ED25519 static">ED25519</a></div><div class="item-right docblock-short"><p>Verification of <a href="https://ed25519.cr.yp.to/">Ed25519</a> signatures.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_1024_8192_SHA1_FOR_LEGACY_USE_ONLY.html" title="ring::signature::RSA_PKCS1_1024_8192_SHA1_FOR_LEGACY_USE_ONLY static">RSA_PKCS1_1024_8192_SHA1_FOR_LEGACY_USE_ONLY</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 1024-8192 bits,
+PKCS#1.5 padding, and SHA-1.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_1024_8192_SHA256_FOR_LEGACY_USE_ONLY.html" title="ring::signature::RSA_PKCS1_1024_8192_SHA256_FOR_LEGACY_USE_ONLY static">RSA_PKCS1_1024_8192_SHA256_FOR_LEGACY_USE_ONLY</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 1024-8192 bits,
+PKCS#1.5 padding, and SHA-256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_1024_8192_SHA512_FOR_LEGACY_USE_ONLY.html" title="ring::signature::RSA_PKCS1_1024_8192_SHA512_FOR_LEGACY_USE_ONLY static">RSA_PKCS1_1024_8192_SHA512_FOR_LEGACY_USE_ONLY</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 1024-8192 bits,
+PKCS#1.5 padding, and SHA-512.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY.html" title="ring::signature::RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY static">RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 2048-8192 bits,
+PKCS#1.5 padding, and SHA-1.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_2048_8192_SHA256.html" title="ring::signature::RSA_PKCS1_2048_8192_SHA256 static">RSA_PKCS1_2048_8192_SHA256</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 2048-8192 bits,
+PKCS#1.5 padding, and SHA-256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_2048_8192_SHA384.html" title="ring::signature::RSA_PKCS1_2048_8192_SHA384 static">RSA_PKCS1_2048_8192_SHA384</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 2048-8192 bits,
+PKCS#1.5 padding, and SHA-384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_2048_8192_SHA512.html" title="ring::signature::RSA_PKCS1_2048_8192_SHA512 static">RSA_PKCS1_2048_8192_SHA512</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 2048-8192 bits,
+PKCS#1.5 padding, and SHA-512.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_3072_8192_SHA384.html" title="ring::signature::RSA_PKCS1_3072_8192_SHA384 static">RSA_PKCS1_3072_8192_SHA384</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 3072-8192 bits,
+PKCS#1.5 padding, and SHA-384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_SHA256.html" title="ring::signature::RSA_PKCS1_SHA256 static">RSA_PKCS1_SHA256</a></div><div class="item-right docblock-short"><p>PKCS#1 1.5 padding using SHA-256 for RSA signatures.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_SHA384.html" title="ring::signature::RSA_PKCS1_SHA384 static">RSA_PKCS1_SHA384</a></div><div class="item-right docblock-short"><p>PKCS#1 1.5 padding using SHA-384 for RSA signatures.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PKCS1_SHA512.html" title="ring::signature::RSA_PKCS1_SHA512 static">RSA_PKCS1_SHA512</a></div><div class="item-right docblock-short"><p>PKCS#1 1.5 padding using SHA-512 for RSA signatures.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PSS_2048_8192_SHA256.html" title="ring::signature::RSA_PSS_2048_8192_SHA256 static">RSA_PSS_2048_8192_SHA256</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 2048-8192 bits,
+PSS padding, and SHA-256.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PSS_2048_8192_SHA384.html" title="ring::signature::RSA_PSS_2048_8192_SHA384 static">RSA_PSS_2048_8192_SHA384</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 2048-8192 bits,
+PSS padding, and SHA-384.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PSS_2048_8192_SHA512.html" title="ring::signature::RSA_PSS_2048_8192_SHA512 static">RSA_PSS_2048_8192_SHA512</a></div><div class="item-right docblock-short"><p>Verification of signatures using RSA keys of 2048-8192 bits,
+PSS padding, and SHA-512.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PSS_SHA256.html" title="ring::signature::RSA_PSS_SHA256 static">RSA_PSS_SHA256</a></div><div class="item-right docblock-short"><p>RSA PSS padding using SHA-256 for RSA signatures.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PSS_SHA384.html" title="ring::signature::RSA_PSS_SHA384 static">RSA_PSS_SHA384</a></div><div class="item-right docblock-short"><p>RSA PSS padding using SHA-384 for RSA signatures.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="static" href="static.RSA_PSS_SHA512.html" title="ring::signature::RSA_PSS_SHA512 static">RSA_PSS_SHA512</a></div><div class="item-right docblock-short"><p>RSA PSS padding using SHA-512 for RSA signatures.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.KeyPair.html" title="ring::signature::KeyPair trait">KeyPair</a></div><div class="item-right docblock-short"><p>Key pairs for signing messages (private key and public key).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.RsaEncoding.html" title="ring::signature::RsaEncoding trait">RsaEncoding</a></div><div class="item-right docblock-short"><p>An RSA signature encoding as described in <a href="https://tools.ietf.org/html/rfc3447#section-8">RFC 3447 Section 8</a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.VerificationAlgorithm.html" title="ring::signature::VerificationAlgorithm trait">VerificationAlgorithm</a></div><div class="item-right docblock-short"><p>A signature verification algorithm.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ring" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

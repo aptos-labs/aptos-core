@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A very easy to use library for interning strings or other data in rust.  Interned data is very efficient to either hash or compare for equality (just a pointer comparison). Data is also automatically de-duplicated."><meta name="keywords" content="rust, rustlang, rust-lang, internment"><title>internment - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../internment/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../internment/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate internment</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.5.6</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#constants">Constants</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../internment/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">internment</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/internment/lib.rs.html#8-1140">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A very easy to use library for
+<a href="https://en.wikipedia.org/wiki/String_interning">interning</a>
+strings or other data in rust.  Interned data is very efficient to
+either hash or compare for equality (just a pointer comparison).
+Data is also automatically de-duplicated.</p>
+<p>You have three options with the internment crate:</p>
+<ol>
+<li>
+<p><code>Intern</code>, which will never free your data.  This means that an
+<code>Intern</code> is <code>Copy</code>, so you can make as many copies of the pointer
+as you may care to at no cost.</p>
+</li>
+<li>
+<p><code>LocalIntern</code>, which will only free your data when the calling
+thread exits.  This means that a <code>LocalIntern</code> is <code>Copy</code>, so you can
+make as many copies of the pointer as you may care to at no cost.
+However, you cannot share a <code>LocalIntern</code> with another thread.  On the
+plus side, it is faster to create a <code>LocalIntern</code> than an <code>Intern</code>.</p>
+</li>
+<li>
+<p><code>ArcIntern</code>, which reference-counts your data and frees it when
+there are no more references.  <code>ArcIntern</code> will keep memory use
+down, but uses an atomic increment/decrement whenever a clone of
+your pointer is made, or a pointer is dropped.</p>
+</li>
+</ol>
+<p>In each case, accessing your data is a single pointer dereference, and
+the size of any internment data structure (<code>Intern</code>, <code>LocalIntern</code>, or
+<code>ArcIntern</code>) is a single pointer.  In each case, you have a guarantee
+that a single data value (as defined by <code>Eq</code> and <code>Hash</code>) will
+correspond to a single pointer value.  This means that we can use
+pointer comparison (and a pointer hash) in place of value comparisons,
+which is very fast.</p>
+<h2 id="example"><a href="#example">Example</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">internment::Intern</span>;
+<span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">Intern::new</span>(<span class="string">&quot;hello&quot;</span>);
+<span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">Intern::new</span>(<span class="string">&quot;world&quot;</span>);
+<span class="macro">assert_ne!</span>(<span class="ident">x</span>, <span class="ident">y</span>);</code></pre></div>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ArcIntern.html" title="internment::ArcIntern struct">ArcIntern</a></div><div class="item-right docblock-short"><p>A pointer to a reference-counted interned object.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Intern.html" title="internment::Intern struct">Intern</a></div><div class="item-right docblock-short"><p>A pointer to an interned object that has been leaked and may be used in any
+thread without locking.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.LocalIntern.html" title="internment::LocalIntern struct">LocalIntern</a></div><div class="item-right docblock-short"><p>A pointer to a thread-local interned object.</p>
+</div></div></div><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.LOCAL_STUFF.html" title="internment::LOCAL_STUFF constant">LOCAL_STUFF</a></div><div class="item-right docblock-short"></div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="internment" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

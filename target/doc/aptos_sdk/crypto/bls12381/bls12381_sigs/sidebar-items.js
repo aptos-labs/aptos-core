@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Signature","Either (1) a BLS signature share from an individual signer, (2) a BLS multisignature or (3) a BLS aggregate signature"]]};

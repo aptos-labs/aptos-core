@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["aptos_gas"] = [{"text":"impl <a class=\"trait\" href=\"move_core_types/gas_algebra/trait.ToUnitFractionalWithParams.html\" title=\"trait move_core_types::gas_algebra::ToUnitFractionalWithParams\">ToUnitFractionalWithParams</a>&lt;<a class=\"enum\" href=\"aptos_gas/enum.GasUnit.html\" title=\"enum aptos_gas::GasUnit\">GasUnit</a>&gt; for <a class=\"enum\" href=\"aptos_gas/enum.InternalGasUnit.html\" title=\"enum aptos_gas::InternalGasUnit\">InternalGasUnit</a>","synthetic":false,"types":["move_core_types::gas_algebra::InternalGasUnit"]}];
+implementors["aptos_sdk"] = [];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

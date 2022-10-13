@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["deflate","Try to compress from input to output with the given [`CompressorOxide`]."]]};

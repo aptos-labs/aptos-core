@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["APTOS_ACCOUNT_MODULE_IDENTIFIER","The Identifier for the Account module."],["CORE_ACCOUNT_MODULE_IDENTIFIER","The Identifier for the Account module."]],"static":[["APTOS_ACCOUNT_MODULE","The ModuleId for the Account module."],["CORE_ACCOUNT_MODULE","The ModuleId for the Account module."]]};

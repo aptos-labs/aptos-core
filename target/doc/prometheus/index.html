@@ -1,0 +1,198 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="The Rust client library for Prometheus."><meta name="keywords" content="rust, rustlang, rust-lang, prometheus"><title>prometheus - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../prometheus/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../prometheus/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate prometheus</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.13.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#macros">Macros</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#constants">Constants</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../prometheus/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">prometheus</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/prometheus/lib.rs.html#3-228">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>The Rust client library for <a href="https://prometheus.io/">Prometheus</a>.</p>
+<p>Use of this library involves a few core concepts:</p>
+<ul>
+<li>
+<p><a href="core/trait.Metric.html"><code>Metric</code>s</a> like <a href="type.Counter.html"><code>Counter</code>s</a> that
+represent information about your system.</p>
+</li>
+<li>
+<p>A <a href="struct.Registry.html"><code>Registry</code></a> that <a href="core/trait.Metric.html"><code>Metric</code>s</a>
+are registered with.</p>
+</li>
+<li>
+<p>An endpoint that calls <a href="fn.gather.html"><code>gather</code></a> which returns
+<a href="proto/struct.MetricFamily.html"><code>MetricFamily</code>s</a> through an
+<a href="trait.Encoder.html"><code>Encoder</code></a>.</p>
+</li>
+</ul>
+<h2 id="basic-example"><a href="#basic-example">Basic Example</a></h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">prometheus</span>::{<span class="ident">Opts</span>, <span class="ident">Registry</span>, <span class="ident">Counter</span>, <span class="ident">TextEncoder</span>, <span class="ident">Encoder</span>};
+
+<span class="comment">// Create a Counter.</span>
+<span class="kw">let</span> <span class="ident">counter_opts</span> <span class="op">=</span> <span class="ident">Opts::new</span>(<span class="string">&quot;test_counter&quot;</span>, <span class="string">&quot;test counter help&quot;</span>);
+<span class="kw">let</span> <span class="ident">counter</span> <span class="op">=</span> <span class="ident">Counter::with_opts</span>(<span class="ident">counter_opts</span>).<span class="ident">unwrap</span>();
+
+<span class="comment">// Create a Registry and register Counter.</span>
+<span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">Registry::new</span>();
+<span class="ident">r</span>.<span class="ident">register</span>(<span class="ident">Box::new</span>(<span class="ident">counter</span>.<span class="ident">clone</span>())).<span class="ident">unwrap</span>();
+
+<span class="comment">// Inc.</span>
+<span class="ident">counter</span>.<span class="ident">inc</span>();
+
+<span class="comment">// Gather the metrics.</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+<span class="kw">let</span> <span class="ident">encoder</span> <span class="op">=</span> <span class="ident">TextEncoder::new</span>();
+<span class="kw">let</span> <span class="ident">metric_families</span> <span class="op">=</span> <span class="ident">r</span>.<span class="ident">gather</span>();
+<span class="ident">encoder</span>.<span class="ident">encode</span>(<span class="kw-2">&amp;</span><span class="ident">metric_families</span>, <span class="kw-2">&amp;mut</span> <span class="ident">buffer</span>).<span class="ident">unwrap</span>();
+
+<span class="comment">// Output to the standard output.</span>
+<span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">String::from_utf8</span>(<span class="ident">buffer</span>).<span class="ident">unwrap</span>());</code></pre></div>
+<p>You can find more examples within
+<a href="https://github.com/tikv/rust-prometheus/tree/master/examples"><code>/examples</code></a>.</p>
+<h2 id="static-metrics"><a href="#static-metrics">Static Metrics</a></h2>
+<p>This crate supports staticly built metrics. You can use it with
+<a href="https://docs.rs/lazy_static/"><code>lazy_static</code></a> to quickly build up and collect
+some metrics.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">prometheus</span>::{<span class="self">self</span>, <span class="ident">IntCounter</span>, <span class="ident">TextEncoder</span>, <span class="ident">Encoder</span>};
+
+<span class="kw">use</span> <span class="ident">lazy_static::lazy_static</span>;
+<span class="kw">use</span> <span class="ident">prometheus::register_int_counter</span>;
+
+<span class="macro">lazy_static!</span> {
+    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">HIGH_FIVE_COUNTER</span>: <span class="ident">IntCounter</span> <span class="op">=</span>
+        <span class="macro">register_int_counter!</span>(<span class="string">&quot;highfives&quot;</span>, <span class="string">&quot;Number of high fives received&quot;</span>).<span class="ident">unwrap</span>();
+}
+
+<span class="ident">HIGH_FIVE_COUNTER</span>.<span class="ident">inc</span>();
+<span class="macro">assert_eq!</span>(<span class="ident">HIGH_FIVE_COUNTER</span>.<span class="ident">get</span>(), <span class="number">1</span>);</code></pre></div>
+<p>By default, this registers with a default registry. To make a report, you can call
+<a href="fn.gather.html"><code>gather</code></a>. This will return a family of metrics you can then feed through an
+<a href="trait.Encoder.html"><code>Encoder</code></a> and report to Promethus.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">prometheus</span>::{<span class="self">self</span>, <span class="ident">TextEncoder</span>, <span class="ident">Encoder</span>};
+
+<span class="kw">use</span> <span class="ident">lazy_static::lazy_static</span>;
+<span class="kw">use</span> <span class="ident">prometheus::register_int_counter</span>;
+
+<span class="comment">// Register &amp; measure some metrics.</span>
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+<span class="kw">let</span> <span class="ident">encoder</span> <span class="op">=</span> <span class="ident">TextEncoder::new</span>();
+
+<span class="comment">// Gather the metrics.</span>
+<span class="kw">let</span> <span class="ident">metric_families</span> <span class="op">=</span> <span class="ident">prometheus::gather</span>();
+<span class="comment">// Encode them to send.</span>
+<span class="ident">encoder</span>.<span class="ident">encode</span>(<span class="kw-2">&amp;</span><span class="ident">metric_families</span>, <span class="kw-2">&amp;mut</span> <span class="ident">buffer</span>).<span class="ident">unwrap</span>();
+
+<span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">String::from_utf8</span>(<span class="ident">buffer</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>();
+<span class="kw">const</span> <span class="ident">EXPECTED_OUTPUT</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;# HELP highfives Number of high fives received\n# TYPE highfives counter\nhighfives 1\n&quot;</span>;
+<span class="macro">assert!</span>(<span class="ident">output</span>.<span class="ident">starts_with</span>(<span class="ident">EXPECTED_OUTPUT</span>));</code></pre></div>
+<p>See <a href="https://docs.rs/prometheus-static-metric">prometheus_static_metric</a> for
+additional functionality.</p>
+<h2 id="features"><a href="#features">Features</a></h2>
+<p>This library supports four features:</p>
+<ul>
+<li><code>gen</code>: To generate protobuf client with the latest protobuf version instead of
+using the pre-generated client.</li>
+<li><code>nightly</code>: Enable nightly only features.</li>
+<li><code>process</code>: For collecting process info.</li>
+<li><code>push</code>: Enable push support.</li>
+</ul>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="core/index.html" title="prometheus::core mod">core</a></div><div class="item-right docblock-short"><p>Core traits and types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="local/index.html" title="prometheus::local mod">local</a></div><div class="item-right docblock-short"><p>Unsync local metrics, provides better performance.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="proto/index.html" title="prometheus::proto mod">proto</a></div><div class="item-right docblock-short"><p>Non-generated version of required structures provided by the protobuf.
+This version is used when the <code>protobuf</code> feature is turned off.</p>
+</div></div></div><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.histogram_opts.html" title="prometheus::histogram_opts macro">histogram_opts</a></div><div class="item-right docblock-short"><p>Create a <a href="struct.HistogramOpts.html" title="crate::HistogramOpts"><code>HistogramOpts</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.labels.html" title="prometheus::labels macro">labels</a></div><div class="item-right docblock-short"><p>Create labels with specified name-value pairs.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.opts.html" title="prometheus::opts macro">opts</a></div><div class="item-right docblock-short"><p>Create an <a href="core/struct.Opts.html" title="crate::Opts"><code>Opts</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_counter.html" title="prometheus::register_counter macro">register_counter</a></div><div class="item-right docblock-short"><p>Create a <a href="type.Counter.html" title="crate::Counter"><code>Counter</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_counter_vec.html" title="prometheus::register_counter_vec macro">register_counter_vec</a></div><div class="item-right docblock-short"><p>Create a <a href="type.CounterVec.html" title="crate::CounterVec"><code>CounterVec</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_counter_vec_with_registry.html" title="prometheus::register_counter_vec_with_registry macro">register_counter_vec_with_registry</a></div><div class="item-right docblock-short"><p>Create a <a href="type.CounterVec.html" title="crate::CounterVec"><code>CounterVec</code></a> and registers to a custom registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_counter_with_registry.html" title="prometheus::register_counter_with_registry macro">register_counter_with_registry</a></div><div class="item-right docblock-short"><p>Create a <a href="type.Counter.html" title="crate::Counter"><code>Counter</code></a> and registers to a custom registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_gauge.html" title="prometheus::register_gauge macro">register_gauge</a></div><div class="item-right docblock-short"><p>Create a <a href="type.Gauge.html" title="crate::Gauge"><code>Gauge</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_gauge_vec.html" title="prometheus::register_gauge_vec macro">register_gauge_vec</a></div><div class="item-right docblock-short"><p>Create a <a href="type.GaugeVec.html" title="crate::GaugeVec"><code>GaugeVec</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_gauge_vec_with_registry.html" title="prometheus::register_gauge_vec_with_registry macro">register_gauge_vec_with_registry</a></div><div class="item-right docblock-short"><p>Create a <a href="type.GaugeVec.html" title="crate::GaugeVec"><code>GaugeVec</code></a> and registers to a custom registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_gauge_with_registry.html" title="prometheus::register_gauge_with_registry macro">register_gauge_with_registry</a></div><div class="item-right docblock-short"><p>Create a <a href="type.Gauge.html" title="crate::Gauge"><code>Gauge</code></a> and registers to a custom registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_histogram.html" title="prometheus::register_histogram macro">register_histogram</a></div><div class="item-right docblock-short"><p>Create a <a href="struct.Histogram.html" title="crate::Histogram"><code>Histogram</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_histogram_vec.html" title="prometheus::register_histogram_vec macro">register_histogram_vec</a></div><div class="item-right docblock-short"><p>Create a <a href="type.HistogramVec.html" title="crate::HistogramVec"><code>HistogramVec</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_histogram_vec_with_registry.html" title="prometheus::register_histogram_vec_with_registry macro">register_histogram_vec_with_registry</a></div><div class="item-right docblock-short"><p>Create a <a href="type.HistogramVec.html" title="crate::HistogramVec"><code>HistogramVec</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_histogram_with_registry.html" title="prometheus::register_histogram_with_registry macro">register_histogram_with_registry</a></div><div class="item-right docblock-short"><p>Create a <a href="struct.Histogram.html" title="crate::Histogram"><code>Histogram</code></a> and registers to a custom registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_int_counter.html" title="prometheus::register_int_counter macro">register_int_counter</a></div><div class="item-right docblock-short"><p>Create an <a href="type.IntCounter.html" title="crate::IntCounter"><code>IntCounter</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_int_counter_vec.html" title="prometheus::register_int_counter_vec macro">register_int_counter_vec</a></div><div class="item-right docblock-short"><p>Create an <a href="type.IntCounterVec.html" title="crate::IntCounterVec"><code>IntCounterVec</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_int_counter_vec_with_registry.html" title="prometheus::register_int_counter_vec_with_registry macro">register_int_counter_vec_with_registry</a></div><div class="item-right docblock-short"><p>Create an <a href="type.IntCounterVec.html" title="crate::IntCounterVec"><code>IntCounterVec</code></a> and registers to a custom registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_int_counter_with_registry.html" title="prometheus::register_int_counter_with_registry macro">register_int_counter_with_registry</a></div><div class="item-right docblock-short"><p>Create an <a href="type.IntCounter.html" title="crate::IntCounter"><code>IntCounter</code></a> and registers to a custom registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_int_gauge.html" title="prometheus::register_int_gauge macro">register_int_gauge</a></div><div class="item-right docblock-short"><p>Create an <a href="type.IntGauge.html" title="crate::IntGauge"><code>IntGauge</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_int_gauge_vec.html" title="prometheus::register_int_gauge_vec macro">register_int_gauge_vec</a></div><div class="item-right docblock-short"><p>Create an <a href="type.IntGaugeVec.html" title="crate::IntGaugeVec"><code>IntGaugeVec</code></a> and registers to default registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_int_gauge_vec_with_registry.html" title="prometheus::register_int_gauge_vec_with_registry macro">register_int_gauge_vec_with_registry</a></div><div class="item-right docblock-short"><p>Create an <a href="type.IntGaugeVec.html" title="crate::IntGaugeVec"><code>IntGaugeVec</code></a> and registers to a custom registry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.register_int_gauge_with_registry.html" title="prometheus::register_int_gauge_with_registry macro">register_int_gauge_with_registry</a></div><div class="item-right docblock-short"><p>Create an <a href="type.IntGauge.html" title="crate::IntGauge"><code>IntGauge</code></a> and registers to a custom registry.</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Histogram.html" title="prometheus::Histogram struct">Histogram</a></div><div class="item-right docblock-short"><p>A <a href="core/trait.Metric.html" title="Metric"><code>Metric</code></a> counts individual observations from an event or sample stream
+in configurable buckets. Similar to a <a href="proto/struct.Summary.html"><code>Summary</code></a>,
+it also provides a sum of observations and an observation count.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.HistogramOpts.html" title="prometheus::HistogramOpts struct">HistogramOpts</a></div><div class="item-right docblock-short"><p>A struct that bundles the options for creating a <a href="struct.Histogram.html" title="Histogram"><code>Histogram</code></a> metric. It is
+mandatory to set Name and Help to a non-empty string. All other fields are
+optional and can safely be left at their zero value.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.HistogramTimer.html" title="prometheus::HistogramTimer struct">HistogramTimer</a></div><div class="item-right docblock-short"><p>Timer to measure and record the duration of an event.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Opts.html" title="prometheus::Opts struct">Opts</a></div><div class="item-right docblock-short"><p>A struct that bundles the options for creating most <a href="core/trait.Metric.html" title="Metric"><code>Metric</code></a> types.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Registry.html" title="prometheus::Registry struct">Registry</a></div><div class="item-right docblock-short"><p>A struct for registering Prometheus collectors, collecting their metrics, and gathering
+them into <code>MetricFamilies</code> for exposition.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.TextEncoder.html" title="prometheus::TextEncoder struct">TextEncoder</a></div><div class="item-right docblock-short"><p>An implementation of an <a href="trait.Encoder.html" title="Encoder"><code>Encoder</code></a> that converts a <a href="proto/struct.MetricFamily.html" title="MetricFamily"><code>MetricFamily</code></a> proto message
+into text format.</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Error.html" title="prometheus::Error enum">Error</a></div><div class="item-right docblock-short"><p>The error types for prometheus.</p>
+</div></div></div><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.DEFAULT_BUCKETS.html" title="prometheus::DEFAULT_BUCKETS constant">DEFAULT_BUCKETS</a></div><div class="item-right docblock-short"><p>The default <a href="struct.Histogram.html" title="Histogram"><code>Histogram</code></a> buckets. The default buckets are
+tailored to broadly measure the response time (in seconds) of a
+network service. Most likely, however, you will be required to define
+buckets customized to your use case.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.TEXT_FORMAT.html" title="prometheus::TEXT_FORMAT constant">TEXT_FORMAT</a></div><div class="item-right docblock-short"><p>The text format of metric family.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Encoder.html" title="prometheus::Encoder trait">Encoder</a></div><div class="item-right docblock-short"><p>An interface for encoding metric families into an underlying wire protocol.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.default_registry.html" title="prometheus::default_registry fn">default_registry</a></div><div class="item-right docblock-short"><p>Default registry (global static).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.exponential_buckets.html" title="prometheus::exponential_buckets fn">exponential_buckets</a></div><div class="item-right docblock-short"><p>Create <code>count</code> buckets, where the lowest bucket has an
+upper bound of <code>start</code> and each following bucket’s upper bound is <code>factor</code>
+times the previous bucket’s upper bound. The final +Inf bucket is not counted
+and not included in the returned slice. The returned slice is meant to be
+used for the Buckets field of <a href="struct.HistogramOpts.html" title="HistogramOpts"><code>HistogramOpts</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.gather.html" title="prometheus::gather fn">gather</a></div><div class="item-right docblock-short"><p>Return all <code>MetricFamily</code> of <code>DEFAULT_REGISTRY</code>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.linear_buckets.html" title="prometheus::linear_buckets fn">linear_buckets</a></div><div class="item-right docblock-short"><p>Create <code>count</code> buckets, each <code>width</code> wide, where the lowest
+bucket has an upper bound of <code>start</code>. The final +Inf bucket is not counted
+and not included in the returned slice. The returned slice is meant to be
+used for the Buckets field of <a href="struct.HistogramOpts.html" title="HistogramOpts"><code>HistogramOpts</code></a>.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.register.html" title="prometheus::register fn">register</a></div><div class="item-right docblock-short"><p>Registers a new <a href="core/trait.Collector.html" title="Collector"><code>Collector</code></a> to be included in metrics collection. It
+returns an error if the descriptors provided by the <a href="core/trait.Collector.html" title="Collector"><code>Collector</code></a> are invalid or
+if they - in combination with descriptors of already registered Collectors -
+do not fulfill the consistency and uniqueness criteria described in the
+<a href="core/struct.Desc.html"><code>Desc</code></a> documentation.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.unregister.html" title="prometheus::unregister fn">unregister</a></div><div class="item-right docblock-short"><p>Unregisters the <a href="core/trait.Collector.html" title="Collector"><code>Collector</code></a> that equals the <a href="core/trait.Collector.html" title="Collector"><code>Collector</code></a> passed in as
+an argument. (Two Collectors are considered equal if their Describe method
+yields the same set of descriptors.) The function returns an error if a
+<a href="core/trait.Collector.html" title="Collector"><code>Collector</code></a> was not registered.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Counter.html" title="prometheus::Counter type">Counter</a></div><div class="item-right docblock-short"><p>A <a href="core/trait.Metric.html" title="Metric"><code>Metric</code></a> represents a single numerical value that only ever goes up.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.CounterVec.html" title="prometheus::CounterVec type">CounterVec</a></div><div class="item-right docblock-short"><p>A <a href="core/trait.Collector.html" title="Collector"><code>Collector</code></a> that bundles a set of <a href="type.Counter.html" title="Counter"><code>Counter</code></a>s that all share
+the same <a href="core/struct.Desc.html" title="Desc"><code>Desc</code></a>, but have different values for their variable labels. This is
+used if you want to count the same thing partitioned by various dimensions
+(e.g. number of HTTP requests, partitioned by response code and method).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Gauge.html" title="prometheus::Gauge type">Gauge</a></div><div class="item-right docblock-short"><p>A <a href="core/trait.Metric.html" title="Metric"><code>Metric</code></a> represents a single numerical value that can arbitrarily go up
+and down.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.GaugeVec.html" title="prometheus::GaugeVec type">GaugeVec</a></div><div class="item-right docblock-short"><p>A <a href="core/trait.Collector.html" title="Collector"><code>Collector</code></a> that bundles a set of <a href="type.Gauge.html" title="Gauge"><code>Gauge</code></a>s that all share
+the same <a href="core/struct.Desc.html" title="Desc"><code>Desc</code></a>, but have different values for their variable labels. This is
+used if you want to count the same thing partitioned by various dimensions
+(e.g. number of operations queued, partitioned by user and operation type).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.HistogramVec.html" title="prometheus::HistogramVec type">HistogramVec</a></div><div class="item-right docblock-short"><p>A <a href="core/trait.Collector.html" title="Collector"><code>Collector</code></a> that bundles a set of Histograms that all share the
+same <a href="core/struct.Desc.html" title="Desc"><code>Desc</code></a>, but have different values for their variable labels. This is used
+if you want to count the same thing partitioned by various dimensions
+(e.g. HTTP request latencies, partitioned by status code and method).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.IntCounter.html" title="prometheus::IntCounter type">IntCounter</a></div><div class="item-right docblock-short"><p>The integer version of <a href="type.Counter.html" title="Counter"><code>Counter</code></a>. Provides better performance if metric values
+are all positive integers (natural numbers).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.IntCounterVec.html" title="prometheus::IntCounterVec type">IntCounterVec</a></div><div class="item-right docblock-short"><p>The integer version of <a href="type.CounterVec.html" title="CounterVec"><code>CounterVec</code></a>. Provides better performance if metric
+are all positive integers (natural numbers).</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.IntGauge.html" title="prometheus::IntGauge type">IntGauge</a></div><div class="item-right docblock-short"><p>The integer version of <a href="type.Gauge.html" title="Gauge"><code>Gauge</code></a>. Provides better performance if metric values are
+all integers.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.IntGaugeVec.html" title="prometheus::IntGaugeVec type">IntGaugeVec</a></div><div class="item-right docblock-short"><p>The integer version of <a href="type.GaugeVec.html" title="GaugeVec"><code>GaugeVec</code></a>. Provides better performance if metric values
+are all integers.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Result.html" title="prometheus::Result type">Result</a></div><div class="item-right docblock-short"><p>A specialized Result type for prometheus.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="prometheus" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

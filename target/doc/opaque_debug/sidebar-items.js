@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":[["implement","Macro for defining opaque `Debug` implementation."]]};

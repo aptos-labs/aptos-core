@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["PackageContext","The PackageContext controls the package that the CLI is executing with respect to, and handles the creation of the `OnDiskStateView` with the package’s dependencies."]]};

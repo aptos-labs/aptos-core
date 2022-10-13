@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["Conv","Directed Type Conversion"],["TryConv","Directed Fallible Type Conversion"]]};

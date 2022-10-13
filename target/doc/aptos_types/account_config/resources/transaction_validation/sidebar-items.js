@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"static":[["APTOS_TRANSACTION_VALIDATION",""]],"struct":[["TransactionValidation","A Rust representation of chain-specific account information"]]};

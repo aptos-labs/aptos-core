@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["ScanDirection",""]],"struct":[["SchemaIterator","DB Iterator parameterized on [`Schema`] that seeks with [`Schema::Key`] and yields [`Schema::Key`] and [`Schema::Value`]"]]};

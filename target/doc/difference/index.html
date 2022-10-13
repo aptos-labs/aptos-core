@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Functions to find the difference between two texts (strings). Usage"><meta name="keywords" content="rust, rustlang, rust-lang, difference"><title>difference - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../difference/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../difference/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate difference</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 2.0.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#macros">Macros</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../difference/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">difference</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/difference/lib.rs.html#1-334">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h3 id="functions-to-find-the-difference-between-two-texts-stringsusage"><a href="#functions-to-find-the-difference-between-two-texts-stringsusage">Functions to find the difference between two texts (strings).
+Usage</a></h3>
+<p>Add the following to your <code>Cargo.toml</code>:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+difference = &quot;2.0&quot;</code></pre></div>
+<p>Now you can use the crate in your code</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore"><code><span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">difference</span>;</code></pre></div>
+<h3 id="examples"><a href="#examples">Examples</a></h3>
+<p>See <a href="Examples.md">Examples.md</a> for more examples.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">difference</span>::{<span class="ident">Difference</span>, <span class="ident">Changeset</span>};
+
+<span class="kw">let</span> <span class="ident">changeset</span> <span class="op">=</span> <span class="ident">Changeset::new</span>(<span class="string">&quot;test&quot;</span>, <span class="string">&quot;tent&quot;</span>, <span class="string">&quot;&quot;</span>);
+
+<span class="macro">assert_eq!</span>(<span class="ident">changeset</span>.<span class="ident">diffs</span>, <span class="macro">vec!</span>[
+  <span class="ident">Difference::Same</span>(<span class="string">&quot;te&quot;</span>.<span class="ident">to_string</span>()),
+  <span class="ident">Difference::Rem</span>(<span class="string">&quot;s&quot;</span>.<span class="ident">to_string</span>()),
+  <span class="ident">Difference::Add</span>(<span class="string">&quot;n&quot;</span>.<span class="ident">to_string</span>()),
+  <span class="ident">Difference::Same</span>(<span class="string">&quot;t&quot;</span>.<span class="ident">to_string</span>())
+]);</code></pre></div>
+</div></details><h2 id="macros" class="small-section-header"><a href="#macros">Macros</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="macro" href="macro.assert_diff.html" title="difference::assert_diff macro">assert_diff</a></div><div class="item-right docblock-short"><p>Assert the difference between two strings. Works like diff, but takes
+a fourth parameter that is the expected edit distance (e.g. 0 if you want to
+test for equality).</p>
+</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Changeset.html" title="difference::Changeset struct">Changeset</a></div><div class="item-right docblock-short"><p>The information about a full changeset</p>
+</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Difference.html" title="difference::Difference enum">Difference</a></div><div class="item-right docblock-short"><p>Defines the contents of a changeset
+Changesets will be delivered in order of appearance in the original string
+Sequences of the same kind will be grouped into one Difference</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.diff.html" title="difference::diff fn">diff</a><span class="stab deprecated" title="">Deprecated</span></div><div class="item-right docblock-short"><p><strong>This function is deprecated, please use <code>Changeset::new</code> instead</strong></p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.print_diff.html" title="difference::print_diff fn">print_diff</a><span class="stab deprecated" title="">Deprecated</span></div><div class="item-right docblock-short"><p><strong>This function is deprecated, <code>Changeset</code> now implements the <code>Display</code> trait instead</strong></p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="difference" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

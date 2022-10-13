@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="The default strategy."><meta name="keywords" content="rust, rustlang, rust-lang, DefaultStrategy"><title>DefaultStrategy in arc_swap::strategy - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc type"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../arc_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">DefaultStrategy</a></h2><div class="sidebar-elems"><h2 class="location"><a href="index.html">In arc_swap::strategy</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../arc_swap/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Type Definition <a href="../index.html">arc_swap</a>::<wbr><a href="index.html">strategy</a>::<wbr><a class="type" href="#">DefaultStrategy</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/arc_swap/strategy/mod.rs.html#93">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust typedef"><code>pub type DefaultStrategy = HybridStrategy&lt;DefaultConfig&gt;;</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>The default strategy.</p>
+<p>It is used by the type aliases <a href="../type.ArcSwap.html" title="crate::ArcSwap"><code>ArcSwap</code></a> and
+<a href="../type.ArcSwapOption.html" title="crate::ArcSwapOption"><code>ArcSwapOption</code></a>. Only the other strategies need to be used explicitly.</p>
+<h2 id="performance-characteristics"><a href="#performance-characteristics">Performance characteristics</a></h2>
+<ul>
+<li>It is optimized for read-heavy situations, with possibly many concurrent read accesses from
+multiple threads. Readers don’t contend each other at all.</li>
+<li>Readers are wait-free (with the exception of at most once in <code>usize::MAX / 4</code> accesses, which
+is only lock-free).</li>
+<li>Writers are lock-free.</li>
+<li>Reclamation is exact ‒ the resource is released as soon as possible (works like RAII, not
+like a traditional garbage collector; can contain non-<code>'static</code> data).</li>
+</ul>
+<p>Each thread has a limited number of fast slots (currently 8, but the exact number is not
+guaranteed). If it holds at most that many <a href="../struct.Guard.html"><code>Guard</code></a>s at once, acquiring them is fast. Once
+these slots are used up (by holding to these many <a href="../struct.Guard.html"><code>Guard</code></a>s), acquiring more of them will be
+slightly slower, but still wait-free.</p>
+<p>If you expect to hold a lot of “handles” to the data around, or hold onto it for a long time,
+you may want to prefer the <a href="../struct.ArcSwapAny.html#method.load_full" title="crate::ArcSwapAny::load_full"><code>load_full</code></a> method.</p>
+<p>The speed of the fast slots is in the ballpark of locking an <em>uncontented</em> mutex. The advantage
+over the mutex is the stability of speed in the face of contention from other threads ‒ while
+the performance of mutex goes rapidly down, the slowdown of running out of held slots or heavy
+concurrent writer thread in the area of single-digit multiples.</p>
+<p>The ballpark benchmark figures (my older computer) are around these, but you’re welcome to run
+the benchmarks in the git repository or write your own.</p>
+<ul>
+<li>Load (both uncontented and contented by other loads): ~30ns</li>
+<li><code>load_full</code>: ~50ns uncontented, goes up a bit with other <code>load_full</code> in other threads on the
+same <code>Arc</code> value (~80-100ns).</li>
+<li>Loads after running out of the slots ‒ about 10-20ns slower than <code>load_full</code>.</li>
+<li>Stores: Dependent on number of threads, but generally low microseconds.</li>
+<li>Loads with heavy concurrent writer (to the same <code>ArcSwap</code>): ~250ns.</li>
+</ul>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="arc_swap" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

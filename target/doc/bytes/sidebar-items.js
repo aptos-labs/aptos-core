@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["buf","Utilities for working with buffers."]],"struct":[["Bytes","A cheaply cloneable and sliceable chunk of contiguous memory."],["BytesMut","A unique reference to a contiguous slice of memory."]],"trait":[["Buf","Read bytes from a buffer."],["BufMut","A trait for values that provide sequential write access to bytes."]]};

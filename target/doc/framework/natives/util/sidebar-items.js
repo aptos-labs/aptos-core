@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""],["make_native_from_bytes",""],["make_native_from_func","Used to pass gas parameters into native functions."]],"struct":[["FromBytesGasParameters",""],["GasParameters",""]]};

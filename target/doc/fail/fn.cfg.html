@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Configure the actions for a fail point at runtime."><meta name="keywords" content="rust, rustlang, rust-lang, cfg"><title>cfg in fail - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../fail/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../fail/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><div class="sidebar-elems"><h2 class="location"><a href="index.html">In fail</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../fail/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Function <a href="index.html">fail</a>::<wbr><a class="fn" href="#">cfg</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/fail/lib.rs.html#676-679">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust fn"><code>pub fn cfg&lt;S:&nbsp;<a class="trait" href="https://doc.rust-lang.org/1.63.0/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.63.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;&gt;(name: S, actions: &amp;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.str.html">str</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.63.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.unit.html">()</a>, <a class="struct" href="https://doc.rust-lang.org/1.63.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Configure the actions for a fail point at runtime.</p>
+<p>Each fail point can be configured with a series of actions, specified by the
+<code>actions</code> argument. The format of <code>actions</code> is <code>action[-&gt;action...]</code>. When
+multiple actions are specified, an action will be checked only when its
+former action is not triggered.</p>
+<p>The format of a single action is <code>[p%][cnt*]task[(arg)]</code>. <code>p%</code> is the
+expected probability that the action is triggered, and <code>cnt*</code> is the max
+times the action can be triggered. The supported values of <code>task</code> are:</p>
+<ul>
+<li><code>off</code>, the fail point will do nothing.</li>
+<li><code>return(arg)</code>, return early when the fail point is triggered. <code>arg</code> is passed to <code>$e</code> (
+defined via the <code>fail_point!</code> macro) as a string.</li>
+<li><code>sleep(milliseconds)</code>, sleep for the specified time.</li>
+<li><code>panic(msg)</code>, panic with the message.</li>
+<li><code>print(msg)</code>, log the message, using the <code>log</code> crate, at the <code>info</code> level.</li>
+<li><code>pause</code>, sleep until other action is set to the fail point.</li>
+<li><code>yield</code>, yield the CPU.</li>
+<li><code>delay(milliseconds)</code>, busy waiting for the specified time.</li>
+</ul>
+<p>For example, <code>20%3*print(still alive!)-&gt;panic</code> means the fail point has 20% chance to print a
+message “still alive!” and 80% chance to panic. And the message will be printed at most 3
+times.</p>
+<p>The <code>FAILPOINTS</code> environment variable accepts this same syntax for its fail
+point actions.</p>
+<p>A call to <code>cfg</code> with a particular fail point name overwrites any existing actions for
+that fail point, including those set via the <code>FAILPOINTS</code> environment variable.</p>
+</div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="fail" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

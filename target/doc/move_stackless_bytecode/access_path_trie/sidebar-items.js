@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["AccessPathTrie","Set of (root node, child) associations"],["AccessPathTrieDisplay",""],["TrieNode","A node in the access Trie: `data` associated with the parent node + `children` mapping offsets to child nodes"]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Errmap","Generate error map for the package and its dependencies at `path` for use by the Move explanation tool."]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["view","Print a module or resource stored in `file`"]]};

@@ -1,0 +1,5 @@
+(function() {var implementors = {};
+implementors["aptos_sdk"] = [];
+implementors["move_core_types"] = [];
+implementors["move_vm_test_utils"] = [{"text":"impl <a class=\"trait\" href=\"move_core_types/gas_algebra/trait.ToUnit.html\" title=\"trait move_core_types::gas_algebra::ToUnit\">ToUnit</a>&lt;<a class=\"enum\" href=\"move_core_types/gas_algebra/enum.InternalGasUnit.html\" title=\"enum move_core_types::gas_algebra::InternalGasUnit\">InternalGasUnit</a>&gt; for <a class=\"enum\" href=\"move_vm_test_utils/gas_schedule/enum.GasUnit.html\" title=\"enum move_vm_test_utils::gas_schedule::GasUnit\">GasUnit</a>","synthetic":false,"types":["move_vm_test_utils::gas_schedule::GasUnit"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

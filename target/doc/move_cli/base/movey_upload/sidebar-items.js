@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["MoveyUpload","Upload the package metadata to Movey.net."],["MoveyUploadRequest",""]]};

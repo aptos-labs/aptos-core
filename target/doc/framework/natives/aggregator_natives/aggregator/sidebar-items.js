@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["make_all",""],["make_native_add",""],["make_native_destroy",""],["make_native_read",""],["make_native_sub",""]],"struct":[["AddGasParameters",""],["DestroyGasParameters",""],["GasParameters",""],["ReadGasParameters",""],["SubGasParameters",""]]};

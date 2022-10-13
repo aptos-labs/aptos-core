@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Error","An error that can occur during construction of a trie."]],"struct":[["TrieSetOwned","An owned trie set."],["TrieSetSlice","A borrowed trie set."]],"type":[["Result","A type alias that maps to `std::result::Result<T, ucd_trie::Error>`."],["TrieSet","A type alias for `TrieSetSlice<'static>`."]]};

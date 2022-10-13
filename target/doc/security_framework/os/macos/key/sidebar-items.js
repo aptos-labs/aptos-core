@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["SecKeyExt","An extension trait adding OSX specific functionality to `SecKey`."]]};

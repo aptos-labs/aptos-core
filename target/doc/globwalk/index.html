@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Recursively find files in a directory using globs."><meta name="keywords" content="rust, rustlang, rust-lang, globwalk"><title>globwalk - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../globwalk/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../globwalk/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate globwalk</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.8.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../globwalk/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">globwalk</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/globwalk/lib.rs.html#20-839">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Recursively find files in a directory using globs.</p>
+<p>Features include</p>
+<ul>
+<li><a href="https://git-scm.com/docs/gitignore#_pattern_format"><code>gitignore</code>’s extended glob syntax</a></li>
+<li>Control over symlink behavior</li>
+<li>Control depth walked</li>
+<li>Control order results are returned</li>
+</ul>
+<h2 id="examples"><a href="#examples">Examples</a></h2><h3 id="finding-image-files-in-the-current-directory"><a href="#finding-image-files-in-the-current-directory">Finding image files in the current directory.</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">globwalk</span>;
+
+<span class="kw">use</span> <span class="ident">std::fs</span>;
+
+<span class="kw">for</span> <span class="ident">img</span> <span class="kw">in</span> <span class="ident">globwalk::glob</span>(<span class="string">&quot;*.{png,jpg,gif}&quot;</span>)<span class="question-mark">?</span> {
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">img</span>) <span class="op">=</span> <span class="ident">img</span> {
+        <span class="ident">fs::remove_file</span>(<span class="ident">img</span>.<span class="ident">path</span>())<span class="question-mark">?</span>;
+    }
+}</code></pre></div>
+<h3 id="advanced-globbing"><a href="#advanced-globbing">Advanced Globbing</a></h3>
+<p>By using one of the constructors of <code>globwalk::GlobWalker</code>, it is possible to alter the
+base-directory or add multiple patterns.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">globwalk</span>;
+
+<span class="kw">use</span> <span class="ident">std::fs</span>;
+
+<span class="kw">let</span> <span class="ident">walker</span> <span class="op">=</span> <span class="ident">globwalk::GlobWalkerBuilder::from_patterns</span>(
+        <span class="ident">BASE_DIR</span>,
+        <span class="kw-2">&amp;</span>[<span class="string">&quot;*.{png,jpg,gif}&quot;</span>, <span class="string">&quot;!Pictures/*&quot;</span>],
+    )
+    .<span class="ident">max_depth</span>(<span class="number">4</span>)
+    .<span class="ident">follow_links</span>(<span class="bool-val">true</span>)
+    .<span class="ident">build</span>()<span class="question-mark">?</span>
+    .<span class="ident">into_iter</span>()
+    .<span class="ident">filter_map</span>(<span class="ident">Result::ok</span>);
+
+<span class="kw">for</span> <span class="ident">img</span> <span class="kw">in</span> <span class="ident">walker</span> {
+    <span class="ident">fs::remove_file</span>(<span class="ident">img</span>.<span class="ident">path</span>())<span class="question-mark">?</span>;
+}</code></pre></div>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FileType.html" title="globwalk::FileType struct">FileType</a></div><div class="item-right docblock-short"><p>Possible file type filters.
+Constants can be OR’d to filter for several types at a time.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.GlobError.html" title="globwalk::GlobError struct">GlobError</a></div><div class="item-right docblock-short"><p>Error from parsing globs.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.GlobWalker.html" title="globwalk::GlobWalker struct">GlobWalker</a></div><div class="item-right docblock-short"><p>An iterator which emits glob-matched patterns.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.GlobWalkerBuilder.html" title="globwalk::GlobWalkerBuilder struct">GlobWalkerBuilder</a></div><div class="item-right docblock-short"><p>An iterator for recursively yielding glob matches.</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.glob.html" title="globwalk::glob fn">glob</a></div><div class="item-right docblock-short"><p>Construct a new <code>GlobWalker</code> with a glob pattern.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.glob_builder.html" title="globwalk::glob_builder fn">glob_builder</a></div><div class="item-right docblock-short"><p>Construct a new <code>GlobWalkerBuilder</code> with a glob pattern.</p>
+</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.DirEntry.html" title="globwalk::DirEntry type">DirEntry</a></div><div class="item-right docblock-short"><p>A directory entry.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="type" href="type.WalkError.html" title="globwalk::WalkError type">WalkError</a></div><div class="item-right docblock-short"><p>Error from iterating on files.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="globwalk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.63.0 (4b91a6ea7 2022-08-08)" ></div>
+</body></html>

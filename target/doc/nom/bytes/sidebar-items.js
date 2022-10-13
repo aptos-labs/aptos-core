@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["complete","parsers recognizing bytes streams, complete input version"],["streaming","parsers recognizing bytes streams, streaming version"]]};

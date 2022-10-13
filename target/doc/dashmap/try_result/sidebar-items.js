@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["TryResult","Represents the result of a non-blocking read from a DashMap."]]};

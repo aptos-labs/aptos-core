@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["TYPE_DEPTH_MAX",""]],"enum":[["Type",""]],"struct":[["CachedStructIndex",""],["StructType",""]]};

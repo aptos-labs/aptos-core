@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["JsonField","A JSON type for multipart field."],["Upload","A uploaded file for multipart."]]};
