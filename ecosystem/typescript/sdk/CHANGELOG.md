@@ -8,6 +8,11 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 N/A
 
+## 1.3.16 (2022-10-12)
+
+- Add `estimatePrioritizedGasUnitPrice` to the simulation interface. If set to true, the estimated gas unit price is higher than the original estimate. Therefore, transactions have a higher chance to be executed during congestion period.
+- `esitmateGasPrice` now returns `deprioritized_gas_estimate` and `prioritized_gas_estimate` along with `gas_estimate`. `deprioritized_gas_estimate` is a conservative price estimate. Users might end up paying less gas eventually, but the transaction execution is deprioritized by the block chain. On the other hand, `prioritized_gas_estimate` is a higher price esitmate. Transactions need to be executed sooner could use `prioritized_gas_estimate`.
+
 ## 1.3.15 (2022-09-30)
 
 - **[Breaking Changes]** Following the deprecation notice in the release notes of 1.3.13, the following breaking changes have landed in this release. Please see the notes from last release for information on the new endpoints you must migrate to:
