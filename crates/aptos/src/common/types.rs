@@ -39,7 +39,7 @@ use std::{
     fs::OpenOptions,
     path::{Path, PathBuf},
     str::FromStr,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
 
@@ -1347,6 +1347,20 @@ pub struct TransactionOptions {
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) sender_account: Option<AccountAddress>,
 
+    /// Transaction expiration seconds
+    ///
+    /// The number of seconds from the current time to have the transaction expire.
+    /// This can be useful to increase if you sign the transaction and save it to use it later.
+    #[clap(long, default_value_t = 30)]
+    pub(crate) transaction_expiration_secs: u64,
+
+    /// Sequence number
+    ///
+    /// The sequence number for the transaction.  By default, this is automatically detected from the onchain state.
+    /// This can be useful to increase if you sign the transaction and save it to use it later.
+    #[clap(long)]
+    pub(crate) sequence_number: Option<u64>,
+
     #[clap(flatten)]
     pub(crate) private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
@@ -1392,8 +1406,12 @@ impl TransactionOptions {
     }
 
     pub async fn sequence_number(&self, sender_address: AccountAddress) -> CliTypedResult<u64> {
-        let client = self.rest_client()?;
-        get_sequence_number(&client, sender_address).await
+        if let Some(sequence_number) = self.sequence_number {
+            Ok(sequence_number)
+        } else {
+            let client = self.rest_client()?;
+            get_sequence_number(&client, sender_address).await
+        }
     }
 
     /// Submit a transaction
@@ -1435,6 +1453,11 @@ impl TransactionOptions {
                 .payload(payload.clone())
                 .sender(sender_address)
                 .sequence_number(sequence_number)
+                .expiration_timestamp_secs(
+                    (SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+                        + Duration::from_secs(self.transaction_expiration_secs))
+                    .as_secs(),
+                )
                 .build();
 
             let signed_transaction = SignedTransaction::new(
