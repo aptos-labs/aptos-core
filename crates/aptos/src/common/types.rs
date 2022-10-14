@@ -22,8 +22,9 @@ use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{aptos_api_types::HashValue, error::RestError, Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_types::transaction::{
-    authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -1361,6 +1362,13 @@ pub struct TransactionOptions {
     #[clap(long)]
     pub(crate) sequence_number: Option<u64>,
 
+    /// Chain Id
+    ///
+    /// The chain id for the network.  By default, this is automatically detected from the onchain state.
+    /// This can be useful to increase if you sign the transaction and save it to use it later without a network connection.
+    #[clap(long)]
+    pub(crate) chain_id: Option<ChainId>,
+
     #[clap(flatten)]
     pub(crate) private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
@@ -1438,6 +1446,12 @@ impl TransactionOptions {
             gas_unit_price
         };
 
+        let chain_id = if let Some(chain_id) = self.chain_id {
+            chain_id
+        } else {
+            chain_id(&client).await?
+        };
+
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
             if ask_to_confirm_price {
@@ -1446,17 +1460,19 @@ impl TransactionOptions {
             }
             max_gas
         } else {
-            let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-                .with_gas_unit_price(gas_unit_price);
+            let transaction_factory =
+                TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
 
             let unsigned_transaction = transaction_factory
                 .payload(payload.clone())
                 .sender(sender_address)
                 .sequence_number(sequence_number)
                 .expiration_timestamp_secs(
-                    (SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                        + Duration::from_secs(self.transaction_expiration_secs))
-                    .as_secs(),
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs()
+                        + self.transaction_expiration_secs,
                 )
                 .build();
 
@@ -1497,7 +1513,7 @@ impl TransactionOptions {
         };
 
         // Sign and submit transaction
-        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+        let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
