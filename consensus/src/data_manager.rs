@@ -102,6 +102,8 @@ impl DataManager for QuorumStoreDataManager {
             .update_certified_round(logical_time)
             .await;
 
+        let payload_is_empty = payloads.is_empty();
+
         let digests: Vec<HashValue> = payloads
             .into_iter()
             .map(|payload| match payload {
@@ -123,9 +125,12 @@ impl DataManager for QuorumStoreDataManager {
             .as_ref()
             .clone()
             .try_send(WrapperCommand::CleanRequest(logical_time, digests));
-        let expired_set = self.expiration_status.lock().expire(logical_time.round());
-        for expired in expired_set {
-            self.digest_status.remove(&expired);
+            
+        if !payload_is_empty {
+            let expired_set = self.expiration_status.lock().expire(logical_time.round());
+            for expired in expired_set {
+                self.digest_status.remove(&expired);
+            }
         }
     }
 

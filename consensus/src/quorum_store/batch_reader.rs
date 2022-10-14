@@ -294,6 +294,8 @@ impl BatchReader {
 
     // TODO: make sure state-sync also sends the message, or execution cleans.
     pub async fn update_certified_round(&self, certified_time: LogicalTime) {
+        assert!(self.epoch() == certified_time.epoch(), "QS: wrong epoch");
+
         debug!("QS: batch reader updating time {:?}", certified_time);
         let prev_round = self
             .last_committed_round
