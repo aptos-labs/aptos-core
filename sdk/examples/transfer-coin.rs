@@ -25,7 +25,7 @@ static FAUCET_URL: Lazy<Url> = Lazy::new(|| {
         std::env::var("APTOS_FAUCET_URL")
             .as_ref()
             .map(|s| s.as_str())
-            .unwrap_or("https://faucet.devnet.aptoslabs.com"),
+            .unwrap_or("http://localhost:9000"),
     )
     .unwrap()
 });
@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
     // Create the accounts on chain, but only fund Alice.
     // :!:>section_3
     faucet_client
-        .fund(alice.address(), 600_000)
+        .fund(alice.address(), 100_000_000)
         .await
         .context("Failed to fund Alice's account")?;
     faucet_client
