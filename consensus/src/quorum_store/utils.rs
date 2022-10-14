@@ -246,6 +246,7 @@ impl ProofQueue {
         for (digest, _) in self.digest_queue.drain(0..num_expired) {
             assert_some!(self.digest_proof.remove(&digest));
         }
+        debug!("QS: num_expired {}", num_expired);
 
         let mut ret = Vec::new();
         let mut cur_bytes = 0;
