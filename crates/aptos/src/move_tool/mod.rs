@@ -10,7 +10,7 @@ mod transactional_tests_runner;
 
 pub use stored_package::*;
 
-use crate::common::types::MoveManifestAccountWrapper;
+use crate::common::types::{EncodingOptions, MoveManifestAccountWrapper};
 use crate::common::types::{ProfileOptions, RestOptions};
 use crate::common::utils::{
     create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
@@ -34,7 +34,9 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
+use aptos_types::transaction::{
+    EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionPayload,
+};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
 use framework::natives::code::UpgradePolicy;
@@ -78,6 +80,7 @@ pub enum MoveTool {
     VerifyPackage(VerifyPackage),
     Run(RunFunction),
     RunScript(RunScript),
+    RunSignedTransaction(SubmitSignedTransaction),
     Test(TestPackage),
     Prove(ProvePackage),
     TransactionalTest(TransactionalTestOpts),
@@ -95,6 +98,7 @@ impl MoveTool {
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
+            MoveTool::RunSignedTransaction(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
             MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
@@ -908,6 +912,50 @@ impl CliCommand<TransactionSummary> for RunScript {
             )))
             .await?;
         Ok(TransactionSummary::from(&txn))
+    }
+}
+
+/// Submit a presigned transaction generated from a different CLI
+///
+/// The purpose of this transaction separation is to allow users to
+/// sign transactions one place, and then transfer it over to a connected
+/// machine for the purposes of submitting the transaction.
+#[derive(Parser)]
+pub struct SubmitSignedTransaction {
+    /// Signed transaction path
+    ///
+    /// Path to a signed transaction to submit to the blockchain
+    #[clap(long)]
+    pub(crate) signed_transaction_path: PathBuf,
+
+    #[clap(flatten)]
+    pub(crate) encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for SubmitSignedTransaction {
+    fn command_name(&self) -> &'static str {
+        "RunSignedTransaction"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let signed_transaction: SignedTransaction = self
+            .encoding_options
+            .encoding
+            .decode_file("SignedTransaction", self.signed_transaction_path.as_path())?;
+
+        let rest_client = self.rest_options.client(&self.profile_options)?;
+        let response = rest_client
+            .submit_and_wait(&signed_transaction)
+            .await?
+            .into_inner();
+        Ok(TransactionSummary::from(&response))
     }
 }
 

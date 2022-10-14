@@ -24,8 +24,10 @@ async fn test_account_flow() {
         .transfer_coins(0, 1, transfer_amount, None)
         .await
         .unwrap();
-    let expected_sender_amount =
-        DEFAULT_FUNDED_COINS - (response.gas_used * response.gas_unit_price) - transfer_amount;
+    let expected_sender_amount = DEFAULT_FUNDED_COINS
+        - (response.transaction_summary.gas_used.unwrap()
+            * response.transaction_summary.gas_unit_price.unwrap())
+        - transfer_amount;
     let expected_receiver_amount = DEFAULT_FUNDED_COINS + transfer_amount;
 
     // transfer_coins already waits for transaction to be committed
@@ -61,8 +63,9 @@ async fn test_account_flow() {
         )
         .await
         .unwrap();
-    assert_eq!(2, summary.gas_unit_price);
-    let gas_used = summary.gas_used * summary.gas_unit_price;
+    assert_eq!(2, summary.transaction_summary.gas_unit_price.unwrap());
+    let gas_used = summary.transaction_summary.gas_used.unwrap()
+        * summary.transaction_summary.gas_unit_price.unwrap();
 
     cli.assert_account_balance_now(2, DEFAULT_FUNDED_COINS - gas_used - 5)
         .await;

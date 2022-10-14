@@ -3,7 +3,7 @@
 
 use crate::common::types::{
     CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, ProfileOptions, PromptOptions,
-    RestOptions, TransactionOptions, TransactionSummary,
+    RestOptions, TransactionOptions, TransactionOutput, TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
 #[cfg(feature = "no-upload-proposal")]
@@ -301,41 +301,15 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
             self.txn_options.prompt_options,
         )?;
 
-        let txn = self
-            .txn_options
+        self.txn_options
             .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
                 self.pool_address_args.pool_address,
                 script_hash.to_vec(),
                 self.metadata_url.to_string().as_bytes().to_vec(),
                 metadata_hash.to_hex().as_bytes().to_vec(),
             ))
-            .await?;
-        let txn_summary = TransactionSummary::from(&txn);
-        if let Transaction::UserTransaction(inner) = txn {
-            // Find event with proposal id
-            let proposal_id = if let Some(event) = inner.events.into_iter().find(|event| {
-                event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
-            }) {
-                let data: CreateProposalEvent =
-                    serde_json::from_value(event.data).map_err(|_| {
-                        CliError::UnexpectedError(
-                            "Failed to parse Proposal event to get ProposalId".to_string(),
-                        )
-                    })?;
-                Some(data.proposal_id.0)
-            } else {
-                warn!("No proposal event found to find proposal id");
-                None
-            };
-
-            return Ok(ProposalSubmissionSummary {
-                proposal_id,
-                transaction: txn_summary,
-            });
-        }
-        Err(CliError::UnexpectedError(
-            "Unable to find parse proposal transaction output".to_string(),
-        ))
+            .await
+            .and_then(ProposalSubmissionSummary::try_from)
     }
 }
 
@@ -411,6 +385,36 @@ struct ProposalSubmissionSummary {
     proposal_id: Option<u64>,
     #[serde(flatten)]
     transaction: TransactionSummary,
+}
+
+impl TryFrom<TransactionOutput> for ProposalSubmissionSummary {
+    type Error = CliError;
+
+    fn try_from(txn: TransactionOutput) -> CliTypedResult<Self> {
+        let mut summary = ProposalSubmissionSummary {
+            proposal_id: None,
+            transaction: TransactionSummary::from(&txn),
+        };
+
+        if let TransactionOutput::Txn(Transaction::UserTransaction(txn)) = txn {
+            // Find event with proposal id
+            summary.proposal_id = if let Some(event) = txn.events.into_iter().find(|event| {
+                event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
+            }) {
+                let data: CreateProposalEvent =
+                    serde_json::from_value(event.data).map_err(|_| {
+                        CliError::UnexpectedError(
+                            "Failed to parse Proposal event to get ProposalId".to_string(),
+                        )
+                    })?;
+                Some(data.proposal_id.0)
+            } else {
+                warn!("No proposal event found to find proposal id");
+                None
+            };
+        };
+        Ok(summary)
+    }
 }
 
 /// Submit a vote on a proposal

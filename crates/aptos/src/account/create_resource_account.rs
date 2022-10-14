@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions, TransactionSummary};
+use crate::common::types::{
+    CliCommand, CliTypedResult, TransactionOptions, TransactionOutput, TransactionSummary,
+};
 use aptos_rest_client::{
     aptos_api_types::{WriteResource, WriteSetChange},
     Transaction,
@@ -42,8 +44,8 @@ pub struct CreateResourceAccountSummary {
     pub transaction_summary: TransactionSummary,
 }
 
-impl From<Transaction> for CreateResourceAccountSummary {
-    fn from(transaction: Transaction) -> Self {
+impl From<TransactionOutput> for CreateResourceAccountSummary {
+    fn from(transaction: TransactionOutput) -> Self {
         let transaction_summary = TransactionSummary::from(&transaction);
 
         let mut summary = CreateResourceAccountSummary {
@@ -51,7 +53,7 @@ impl From<Transaction> for CreateResourceAccountSummary {
             resource_account: None,
         };
 
-        if let Transaction::UserTransaction(txn) = transaction {
+        if let TransactionOutput::Txn(Transaction::UserTransaction(txn)) = transaction {
             summary.resource_account = txn.info.changes.iter().find_map(|change| match change {
                 WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
                     if data.typ.name.as_str() == "Account"

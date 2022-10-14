@@ -174,7 +174,7 @@ async fn test_block_transactions() {
     let validator = swarm.validators().next().unwrap();
     let rest_client = validator.rest_client();
     let height = rest_client
-        .get_block_by_version_bcs(response.version, false)
+        .get_block_by_version_bcs(response.transaction_summary.version.unwrap(), false)
         .await
         .unwrap()
         .into_inner()
@@ -334,7 +334,9 @@ async fn test_account_balance() {
         .transfer_coins(0, 1, TRANSFER_AMOUNT, None)
         .await
         .unwrap();
-    account_1_balance -= TRANSFER_AMOUNT + response.gas_used * response.gas_unit_price;
+    account_1_balance -= TRANSFER_AMOUNT
+        + response.transaction_summary.gas_used.unwrap()
+            * response.transaction_summary.gas_unit_price.unwrap();
     account_2_balance += TRANSFER_AMOUNT;
     account_has_balance(
         &rosetta_client,
