@@ -148,3 +148,28 @@ variable "enable_kube_state_metrics" {
   description = "Enable kube-state-metrics within monitoring helm chart"
   default     = false
 }
+
+variable "gke_enable_private_nodes" {
+  description = "Enable private nodes for GKE cluster"
+  default     = true
+}
+
+variable "gke_enable_autoscaling" {
+  description = "Enable autoscaling for the GKE cluster"
+  default     = false
+}
+
+variable "gke_autoscaling_max_cpu" {
+  description = "Maximum CPU utilization for GKE autoscaling"
+  default     = 10
+}
+
+variable "gke_autoscaling_max_memory" {
+  description = "Maximum memory utilization for GKE autoscaling"
+  default     = 100
+}
+
+variable "gke_autoscaling_max_node_count" {
+  description = "Maximum number of nodes for GKE autoscaling"
+  default     = 10
+}
