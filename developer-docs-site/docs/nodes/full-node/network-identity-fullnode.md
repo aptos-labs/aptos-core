@@ -19,7 +19,6 @@ This guide will show you how to:
 
 - Create a static network identity for your fullnode.
 - Start a node with a static network identity.
-- Allow other fullnodes to connect to your fullnode.
 
 ## Before you proceed
 
@@ -205,57 +204,3 @@ full_node_networks:
     key: "C83110913CBE4583F820FABEB7514293624E46862FAE1FD339B923F0CACC647D"
     peer_id: "B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813"
 ```
-
-## Allowing other fullnodes to connect
-
-:::tip Ports and port settings
-
-See [Ports and port settings](/nodes/validator-node/operator/node-requirements#networking-requirements) for an explanation of port settings and how they are used.
-:::
-
-Once you start your fullnode with a static identity you can allow others to connect to devnet through your node.
-
-:::tip
-
-In the below steps, the port numbers used are for illustration only. You can use your choice of port numbers.
-
-:::
-
-- Make sure you open port `6180` (or `6182`, for example, depending on which port your node is listening to) and that you open your firewall.
-- If you are using Docker, simply add `- "6180:6180"` or `- "6182:6182"` under ports in your ``docker-compose.yaml`` file.
-- Share your fullnode static network identity with others. They can then use it in the `seeds` key of their `fullnode.yaml` file to connect to your fullnode.
-- Make sure the port number you put in the `addresses` matches the one you have in the fullnode configuration file `fullnode.yaml` (for example, `6180` or `6182`).
-
-Share your fullnode static network identity in the following format in the Discord channel `advertise-full-nodes`:
-
-  ```yaml
-  <Peer_ID>:
-    addresses:
-    # with DNS
-    - "/dns4/<DNS_Name>/tcp/<Port_Number>/noise-ik/<Public_Key>/handshake/0"
-    role: Upstream
-  <Peer_ID>:
-    addresses:
-    # with IP
-    - "/ip4/<IP_Address>/tcp/<Port_Number>/noise-ik/<Public_Key>/handshake/0"
-    role: Upstream
-  ```
-
- For example:
-
-  ```yaml
-  B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813:
-    addresses:
-    - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
-    role: "Upstream"
-  B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813:
-    addresses:
-    - "/ip4/100.20.221.187/tcp/6182/noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
-    role: "Upstream"
-  ```
-
-:::tip
-
-Peer ID is synonymous with `AccountAddress`. See [NetworkAddress](https://github.com/aptos-labs/aptos-core/blob/main/documentation/specifications/network/network-address.md) to see how `addresses` key value is constructed.
-
-:::

@@ -175,6 +175,7 @@ const sidebars = {
         "nodes/full-node/fullnode-source-code-or-docker",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
+        "nodes/full-node/fullnode-network-connections",
         "nodes/full-node/run-a-fullnode-on-gcp",
         "nodes/full-node/bootstrap-fullnode",
       ],
@@ -302,6 +303,7 @@ const sidebars = {
       value: "Tools",
       className: "sidebar-title",
     },
+    "guides/use-aptos-explorer",
     {
       type: "category",
       label: "SDKs",

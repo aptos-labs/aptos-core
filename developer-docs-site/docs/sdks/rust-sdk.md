@@ -7,7 +7,7 @@ slug: "rust-sdk"
 
 ### Installing Rust SDK
 
-Aptos provides an official Rust SDK. To use the Rust SDK, add the following dependency on the git repo directly, like this:
+Aptos provides an official Rust SDK in the [Aptos-core GitHub](https://github.com/aptos-labs/aptos-core/tree/main/sdk) repository. To use the Rust SDK, add the following dependency on the git repo directly, like this:
 
 ```toml
 aptos-sdk = { git = "https://github.com/aptos-labs/aptos-core", branch = "devnet" }

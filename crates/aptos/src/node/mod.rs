@@ -399,6 +399,7 @@ impl CliCommand<StakePoolPerformance> for GetPerformance {
     }
 }
 
+/// Retrieves the stake pools associated with an account
 pub async fn get_stake_pools(
     client: &Client,
     owner_address: AccountAddress,
@@ -463,6 +464,7 @@ pub async fn get_stake_pools(
     Ok(stake_pool_results)
 }
 
+/// Retrieve 0x1::staking_contract related pools
 pub async fn get_staking_contract_pools(
     client: &Client,
     staker_address: AccountAddress,
