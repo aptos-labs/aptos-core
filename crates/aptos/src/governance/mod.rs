@@ -733,6 +733,10 @@ pub struct GenerateUpgradeProposal {
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
     pub(crate) included_artifacts: IncludedArtifacts,
 
+    /// Generate the script for mainnet governance proposal by default or generate the upgrade script for testnet.
+    #[clap(long)]
+    pub(crate) testnet: bool,
+
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 }
@@ -749,12 +753,17 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             account,
             included_artifacts,
             output,
+            testnet,
         } = self;
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts.build_options(move_options.named_addresses());
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
-        release.generate_script_proposal(account, output)?;
+        if testnet {
+            release.generate_script_proposal_testnet(account, output)?;
+        } else {
+            release.generate_script_proposal(account, output)?;
+        }
         Ok(())
     }
 }
