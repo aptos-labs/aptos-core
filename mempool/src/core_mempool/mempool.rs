@@ -90,9 +90,9 @@ impl Mempool {
     }
 
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
-        if let Some((&insertion_time, is_end_to_end)) = self
+        if let Some((&insertion_time, is_end_to_end, bucket)) = self
             .transactions
-            .get_insertion_time(&account, sequence_number)
+            .get_insertion_time_and_bucket(&account, sequence_number)
         {
             if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
                 let scope = if is_end_to_end {
@@ -100,7 +100,7 @@ impl Mempool {
                 } else {
                     LOCAL_LABEL
                 };
-                counters::core_mempool_txn_commit_latency(stage, scope, time_delta);
+                counters::core_mempool_txn_commit_latency(stage, scope, bucket, time_delta);
             }
         }
     }
