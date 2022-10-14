@@ -47,8 +47,5 @@ export interface Token {
   /** server will return string for u64 */
   amount: U64;
   /** the property map of the token */
-  token_properties: PropertyMap;
+  token_properties: any;
 }
-
-export type PropertyMap = {[key: string]: [type: string, value: string]};
-
