@@ -22,10 +22,10 @@ different deployments and requirements, including:
 
 ## Allowing fullnodes to connect to your node
 
-:::tip Create a static network identity first
+:::tip
 
-Before being able to allow other fullnodes to connect to your fullnode,
-be sure to create a fullnode identity first. See [Network Identity For Fullnode](/nodes/full-node/network-identity-fullnode).
+Before allowing other fullnodes to connect to your fullnode,
+be sure to create a fullnode identity. See [Network Identity For Fullnode](/nodes/full-node/network-identity-fullnode).
 
 :::
 
@@ -89,7 +89,7 @@ waypoint for your fullnode to ensure your node connects to the correct Aptos
 blockchain deployment. See [Aptos Blockchain Deployments](/nodes/aptos-deployments)
 for more information.
 
-## Add upstream seed peers
+## Connecting your fullnode to seed peers
 
 All Aptos fullnodes are configured to accept a maximum number of network
 connections. As a result, if the network is experiencing high network
