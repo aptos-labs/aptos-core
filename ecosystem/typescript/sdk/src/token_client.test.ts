@@ -6,6 +6,7 @@ import { AptosClient } from "./aptos_client";
 import { TokenClient } from "./token_client";
 
 import { getFaucetClient, longTestTimeout, NODE_URL } from "./utils/test_helper.test";
+import { bcsSerializeBool } from "./bcs";
 
 test(
   "full tutorial nft token flow",
@@ -31,7 +32,7 @@ test(
     );
 
     await client.waitForTransaction(
-      await tokenClient.createToken(
+      await tokenClient.createTokenWithMutabilityConfig(
         alice,
         collectionName,
         tokenName,
@@ -42,9 +43,10 @@ test(
         alice.address(),
         1,
         0,
-        ["key"],
-        ["2"],
-        ["int"],
+        ["TOKEN_BURNABLE_BY_OWNER"],
+        [bcsSerializeBool(true)],
+        ["bool"],
+        [false, false, false, false, true],
       ),
       { checkSuccess: true },
     );
@@ -93,6 +95,39 @@ test(
 
     const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
+
+    // default token property is configured to be mutable and then alice can make bob burn token after token creation
+    // test mutate Bob's token properties and allow owner to burn this token
+    let a = await tokenClient.mutateTokenProperties(
+      alice,
+      bob.address(),
+      alice.address(),
+      collectionName,
+      tokenName,
+      0,
+      1,
+      ["test"],
+      [bcsSerializeBool(true)],
+      ["bool"],
+    );
+    await client.waitForTransactionWithResult(a);
+
+    const newTokenId = {
+      token_data_id: {
+        creator: alice.address().hex(),
+        collection: collectionName,
+        name: tokenName,
+      },
+      property_version: "1",
+    };
+    const mutated_token = await tokenClient.getTokenForAccount(bob.address().hex(), newTokenId);
+    expect(mutated_token.token_properties.map.data.length).toBe(2);
+
+    // burn the token by owner
+    let b = await tokenClient.burnByOwner(bob, alice.address(), collectionName, tokenName, 1, 1);
+    await client.waitForTransactionWithResult(b);
+    const newbalance = await tokenClient.getTokenForAccount(bob.address().hex(), newTokenId);
+    expect(newbalance.amount).toBe("0");
   },
   longTestTimeout,
 );
