@@ -35,6 +35,8 @@ use proptest_derive::Arbitrary;
 use crate::TreeReader;
 use aptos_types::proof::definition::NodeInProof;
 use serde::{Deserialize, Serialize};
+use std::thread::sleep;
+use std::time::Duration;
 use std::{
     collections::hash_map::HashMap,
     io::{prelude::*, Cursor, Read, SeekFrom, Write},
@@ -803,6 +805,7 @@ where
 
     /// Computes the hash of nodes.
     pub fn hash(&self) -> HashValue {
+        sleep(Duration::from_millis(1));
         match self {
             Node::Internal(internal_node) => internal_node.hash(),
             Node::Leaf(leaf_node) => leaf_node.hash(),
