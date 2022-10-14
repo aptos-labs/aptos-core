@@ -13,9 +13,11 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 We strongly recommend that you read the consensus section of the [Life of a Transaction](/guides/basics-life-of-txn#consensus) before proceeding further. 
 :::
 
-In a distributed system like blockchain, executing a transaction is different from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before the results are persisted in storage and the state of the ledger is updated. 
+In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before the results are persisted in storage and the state of the ledger is updated. 
 
-A validator can participate in the consensus process. However, the validator can acquire the voting power only when they stake, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is made proportionate to the amount of validator's stake. In exchange, the validator is rewarded in proportion to the amount of validator's stake. Hence, the performance of the network, i.e., consensus, is aligned with the validator's interest, i.e., rewards.   
+A validator can participate in the consensus process. However, the validator can acquire the voting power only when they stake, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is made proportionate to the amount of validator's stake. In exchange, the validator is rewarded in proportion to the amount of validator's stake. Hence, the performance of the network, i.e., consensus, is aligned with the validator's interest, i.e., rewards.  
+
+Note that currently no slashing is implemented. 
 
 The rest of this document presents how staking works on the Aptos blockchain.
 
@@ -38,7 +40,7 @@ Below is a summary flow diagram of how staking on the Aptos blockchain works. Th
 The Aptos staking module defines a capability that represents ownership. 
 
 :::tip Ownership
-See [https://github.com/aptos-labs/aptos-core/blob/0daade4f734d1ba29a896b00d7ddde2249e87970/aptos-move/framework/aptos-framework/sources/configs/stake.move#L85](https://github.com/aptos-labs/aptos-core/blob/0daade4f734d1ba29a896b00d7ddde2249e87970/aptos-move/framework/aptos-framework/sources/configs/stake.move#L85).
+See the `OwnerCapability` defined in  [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move).
 :::
 
 The `OwnerCapability` resource can be used to control the stake pool. Three personas are supported: 
@@ -46,7 +48,7 @@ The `OwnerCapability` resource can be used to control the stake pool. Three pers
 - Operator
 - Voter
 
-Using this owner-operator-voter model, a custodian can assume the owner persona and stake on the Aptos blockchain and participate in the Aptos governance. This model allows delegations and staking services to be built as the owner can provide funds to the validator and the voter personas.
+Using this owner-operator-voter model, a custodian can assume the owner persona and stake on the Aptos blockchain and participate in the Aptos governance. This model allows delegations and staking services to be built as it separates the account that is control of the funds from the other accounts (operator, voter), hence allows secure delegations of responsibilities. 
 
 This section describes how this works, using Bob and Alice in the example. 
 
@@ -169,8 +171,10 @@ Participating as a validator node on the Aptos network works like this:
 
 1. Operator runs a validator node and configures the on-chain validator network addresses and rotates the consensus key. 
 2. Owner deposits her Aptos coins funds as stake, or have funds assigned by a staking service. The stake must be at least the minimum amount required.
-3. Operator validates and gains rewards. 
-4. The staked pool is automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
+3. **The validator node cannot sync until the stake pool becomes active.**
+4. Operator validates and gains rewards. 
+5. The staked pool is automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
+6.  Operator must wait until the new epoch starts before their validator becomes active.
 
 :::tip Joining the validator set
 For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](/nodes/validator-node/operator/staking-pool-operations#joining-validator-set).
@@ -210,7 +214,7 @@ The lockup duration is decided by the Aptos governance, i.e., by the covenants t
 An epoch in the Aptos blockchain is defined as a duration of time, in seconds, during which a number of blocks are voted on by the validators, the validator set is updated, and the rewards are distributed to the validators. 
 
 :::tip Epoch on Mainnet
-The Aptos mainnet epoch is set as 3600 seconds (one hour).
+The Aptos mainnet epoch is set as 7200 seconds (two hours).
 :::
 
 ### Triggers at the epoch start
