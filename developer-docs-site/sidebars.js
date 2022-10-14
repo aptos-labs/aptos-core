@@ -311,15 +311,15 @@ const sidebars = {
       collapsed: true,
       link: { type: "doc", id: "sdks/index" },
       items: [
-        "sdks/python-sdk",
         {
           type: "category",
-          label: "Typescript SDK",
+          label: "TypeScript SDK",
           link: { type: "doc", id: "sdks/ts-sdk/index" },
           collapsible: true,
           collapsed: true,
           items: ["sdks/ts-sdk/typescript-sdk", "sdks/ts-sdk/typescript-sdk-overview"],
         },
+        "sdks/python-sdk",
         "sdks/rust-sdk",
       ],
     },
