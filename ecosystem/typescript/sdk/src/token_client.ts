@@ -9,8 +9,8 @@ import { HexString, MaybeHexString } from "./hex_string";
 import { TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./transaction_builder";
 import { MAX_U64_BIG_INT } from "./bcs/consts";
 import { TOKEN_ABIS } from "./abis";
-import { AnyNumber, bcsToBytes } from "./bcs";
-import {PropertyMap, TokenId} from "./token_types";
+import { AnyNumber, bcsToBytes, Bytes } from "./bcs";
+import { getPropertyValueRaw } from "./utils/property_map_serializer";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -109,6 +109,67 @@ export class TokenClient {
         royalty_points_denominator,
         royalty_points_numerator,
         [false, false, false, false, false],
+        property_keys,
+        getPropertyValueRaw(property_values, property_types),
+        property_types,
+      ],
+    );
+
+    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
+  }
+
+  /**
+   * Creates a new NFT within the specified account
+   *
+   * @param account AptosAccount where token will be created
+   * @param collectionName Name of collection, that token belongs to
+   * @param name Token name
+   * @param description Token description
+   * @param supply Token supply
+   * @param uri URL to additional info about token
+   * @param max The maxium of tokens can be minted from this token
+   * @param royalty_payee_address the address to receive the royalty, the address can be a shared account address.
+   * @param royalty_points_denominator the denominator for calculating royalty
+   * @param royalty_points_numerator the numerator for calculating royalty
+   * @param property_keys the property keys for storing on-chain properties
+   * @param property_values the property values to be stored on-chain
+   * @param property_types the type of property values
+   * @param mutability_config configs which field is mutable
+   * @returns The hash of the transaction submitted to the API
+   */
+  // :!:>createToken
+  async createTokenWithMutabilityConfig(
+    account: AptosAccount,
+    collectionName: string,
+    name: string,
+    description: string,
+    supply: number,
+    uri: string,
+    max: AnyNumber = MAX_U64_BIG_INT,
+    royalty_payee_address: MaybeHexString = account.address(),
+    royalty_points_denominator: number = 0,
+    royalty_points_numerator: number = 0,
+    property_keys: Array<string> = [],
+    property_values: Array<Bytes> = [],
+    property_types: Array<string> = [],
+    mutability_config: Array<boolean> = [false, false, false, false, false],
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    // <:!:createToken
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token::create_token_script",
+      [],
+      [
+        collectionName,
+        name,
+        description,
+        supply,
+        max,
+        uri,
+        royalty_payee_address,
+        royalty_points_denominator,
+        royalty_points_numerator,
+        mutability_config,
         property_keys,
         property_values,
         property_types,
@@ -276,53 +337,100 @@ export class TokenClient {
    * User opt-in or out direct transfer through a boolean flag
    *
    * @param sender AptosAccount where the token will be transferred
-   * @param opt_in boolean value indicates user want to opt-in or out of direct transfer
+   * @param optIn boolean value indicates user want to opt-in or out of direct transfer
    * @returns The hash of the transaction submitted to the API
    */
-  async opt_in_token_transfer(
-      sender: AptosAccount,
-      opt_in: boolean,
-  ): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload(
-        "0x3::token::opt_in_direct_transfer",
-        [],
-        [opt_in],
-    );
+  async optInTokenTransfer(sender: AptosAccount, optIn: boolean): Promise<string> {
+    const payload = this.transactionBuilder.buildTransactionPayload("0x3::token::opt_in_direct_transfer", [], [optIn]);
 
     return this.aptosClient.generateSignSubmitTransaction(sender, payload);
   }
 
   /**
-   * User opt-in or out direct transfer through a boolean flag
+   * BurnToken by Creator
+   *
+   * @param creator creator of the token
+   * @param ownerAddress address of the token owner
+   * @param collectionName Name of collection where token is stored
+   * @param name Token name
+   * @param amount Amount of tokens which will be transfered
+   * @param property_version the version of token PropertyMap
+   * @returns The hash of the transaction submitted to the API
+   */
+  async burnByCreator(
+    creator: AptosAccount,
+    ownerAddress: MaybeHexString,
+    collection: String,
+    name: String,
+    PropertyVersion: number,
+    amount: number,
+  ): Promise<string> {
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token::burn_by_creator",
+      [],
+      [ownerAddress, collection, name, PropertyVersion, amount],
+    );
+
+    return this.aptosClient.generateSignSubmitTransaction(creator, payload);
+  }
+
+  /**
+   * BurnToken by Owner
+   *
+   * @param owner creator of the token
+   * @param creatorAddress address of the token creator
+   * @param collectionName Name of collection where token is stored
+   * @param name Token name
+   * @param amount Amount of tokens which will be transfered
+   * @param property_version the version of token PropertyMap
+   * @returns The hash of the transaction submitted to the API
+   */
+  async burnByOwner(
+    owner: AptosAccount,
+    creatorAddress: MaybeHexString,
+    collection: String,
+    name: String,
+    PropertyVersion: number,
+    amount: number,
+  ): Promise<string> {
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token::burn",
+      [],
+      [creatorAddress, collection, name, PropertyVersion, amount],
+    );
+
+    return this.aptosClient.generateSignSubmitTransaction(owner, payload);
+  }
+
+  /**
+   * creator mutates the properties of the tokens
    *
    * @param account AptosAccount who modifies the token properties
-   * @param token_owner the address of account owning the token
+   * @param tokenOwner the address of account owning the token
    * @param creator the creator of the token
    * @param collection_name the name of the token collection
-   * @param token_name the name of created token
-   * @param token_property_version the property_version of the token to be modified
+   * @param tokenName the name of created token
+   * @param propertyVersion the property_version of the token to be modified
    * @param amount the number of tokens to be modified
    *
    * @returns The hash of the transaction submitted to the API
    */
-  async mutate_token_properties(
-      account: AptosAccount,
-      token_owner: TxnBuilderTypes.AccountAddress,
-      creator:  TxnBuilderTypes.AccountAddress,
-      collection_name: string,
-      token_name: string,
-      token_property_version: number,
-      amount: number,
-      keys: Array<string>,
-      values: Array<string>,
-      types: Array<string>,
+  async mutateTokenProperties(
+    account: AptosAccount,
+    tokenOwner: HexString,
+    creator: HexString,
+    collection_name: string,
+    tokenName: string,
+    propertyVersion: number,
+    amount: number,
+    keys: Array<string>,
+    values: Array<Bytes>,
+    types: Array<string>,
   ): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload(
-        "0x3::token::mutate_token_properties",
-        [],
-        [
-            token_owner, creator, collection_name, token_name, token_property_version, amount, keys, values, types
-        ],
+      "0x3::token::mutate_token_properties",
+      [],
+      [tokenOwner, creator, collection_name, tokenName, propertyVersion, amount, keys, values, types],
     );
 
     return this.aptosClient.generateSignSubmitTransaction(account, payload);
@@ -417,7 +525,6 @@ export class TokenClient {
     return this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
   } // <:!:getTokenData
 
-
   /**
    * Queries token balance for the token creator
    */
@@ -480,7 +587,7 @@ export class TokenClient {
         return {
           id: tokenId,
           amount: "0",
-          token_properties: {}
+          token_properties: {},
         };
       }
       return error;
