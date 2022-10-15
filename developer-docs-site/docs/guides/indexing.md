@@ -46,14 +46,23 @@ A detailed documentation for each option is presented below.
 
 ## Use the Aptos-provided indexing service
 
-Aptos offers a rate-limited GraphQL API for public use. See below a few examples.
+Aptos provides a rate-limited GraphQL API for public use. See below a few examples showing how to use it.
 
-**Aptos indexer GraphQL server**: 
-[https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql)
+### Aptos indexer GraphQL servers
+
+- **Mainnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql
+- **Testnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql
+
+### Running example queries
+
+- Click on [Mainnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql) or [Testnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql).
+- On the server page, paste the **Query** code from an example into the main query section, and the **Query variables** code from the same example into the QUERY VARIABLES section (below the main query section).
 
 ### Example token queries
 
-Getting all tokens currently in account
+Getting all tokens currently in account. 
+
+**Query**
 
 ```graphql
 query CurrentTokens($owner_address: String, $offset: Int) {
@@ -69,15 +78,21 @@ query CurrentTokens($owner_address: String, $offset: Int) {
     amount
   }
 }
+```
 
-# Query Variables
+**Query variables**
+```json
 {
-  "owner_address: "0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff",
+  "owner_address": "0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff",
   "offset": 0
 }
 ```
 
-Getting all token activities for a particular token (note to get the token_id_hash you have to first make a query to get the token, e.g. from the first query).
+---
+
+Getting all token activities for a particular token. **Note** that to get the `token_id_hash` you have to first make a query to get the token from the above query.
+
+**Query**
 
 ```graphql
 query TokenActivities($token_id_hash: String, $offset: Int) {
@@ -96,15 +111,23 @@ query TokenActivities($token_id_hash: String, $offset: Int) {
     transfer_type
   }
 }
+```
 
-# Query Variables
+**Query variables**
+
+```json
 {
   "token_id_hash": "f344b838264bf9aa57d5d4c1e0c8e6bbdc93f000abe3e7f050c2a0f4dc23d030",
   "offset": 0
 }
 ```
 
-Getting current token offered to account
+---
+
+Getting current token offered to account.
+
+**Query**
+
 ```graphql
 query CurrentOffers($to_address: String, $offset: Int) {
   current_token_pending_claims(
@@ -122,8 +145,11 @@ query CurrentOffers($to_address: String, $offset: Int) {
     amount
   }
 }
+```
 
-# Query Variables
+** Query variables**
+
+```json
 {
   "to_address": "0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb",
   "offset": 0
@@ -132,7 +158,9 @@ query CurrentOffers($to_address: String, $offset: Int) {
 
 ### Example coin queries
 
-Getting coin activities (including gas fees)
+Getting coin activities (including gas fees).
+
+**Query**
 
 ```graphql
 query CoinActivity($owner_address: String, $offset: Int) {
@@ -150,15 +178,22 @@ query CoinActivity($owner_address: String, $offset: Int) {
     transaction_version
   }
 }
+```
 
-# Query Variables
+**Query variables**
+
+```json
 {
   "owner_address": "0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb",
   "offset": 0
 }
 ```
 
-Currently owned coins (0x1::coin::CoinStore)
+---
+
+Currently owned coins (`0x1::coin::CoinStore`).
+
+**Query**
 
 ```graphql
 query CurrentBalances($owner_address: String, $offset: Int)Ï {
@@ -175,8 +210,11 @@ query CurrentBalances($owner_address: String, $offset: Int)Ï {
     last_transaction_timestamp
   }
 }
+```
 
-# Query Variables
+**Query variables**
+
+```json
 {
   "owner_address": "0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb",
   "offset": 0
@@ -185,7 +223,9 @@ query CurrentBalances($owner_address: String, $offset: Int)Ï {
 
 ### Example explorer queries
 
-Getting all user transaction versions (to filter on user transaction for block explorer)
+Getting all user transaction versions (to filter on user transaction for block explorer).
+
+**Query**
 
 ```graphql
 query UserTransactions($limit: Int) {
@@ -193,41 +233,55 @@ query UserTransactions($limit: Int) {
     version
   }
 }
+```
 
-# Query Variables
+**Query variables**
+
+```json
 {
   "limit": 10
 }
-
 ```
+
 ## Run an indexer-enabled fullnode
 
 See [Indexer Fullnode](/nodes/indexer-fullnode).
 
 ## Define your own data model
 
-Currently Aptos only supports core modules such as 0x1::coin, 0x3::token, and 0x3::token_transfers. For other contracts, you’d likely need to implement custom parsing logic. 
+Use this method if you want to develop your custom indexer for the Aptos ledger data. 
 
-High level, creating a custom indexer involves 4 steps: 
+:::tip When to use custom indexer
+Currently Aptos-provided indexing service (see above) supports the following core Move modules:
+- `0x1::coin`.
+- `0x3::token`.
+- `0x3::token_transfers`. 
 
-1. Define new table schemas in diesel
-2. Create new data models based on the new tables
-3. Create a new processor (or optionally add to an existing processor)
-4. Integrate the new processor (optional if reusing existing processor)
+If you need an indexed database for any other Move modules and contracts, then you should develop your custom indexer.
+:::
 
-Let’s look through these in details. Specifically we will use coin balances as an example, which is part of `coin_processor`. 
+Creating a custom indexer involves the following steps. Refer to the indexing block diagram at the start of this document. 
 
-### 1. Define new table schemas in diesel
+1. Define new table schemas, using an ORM like [Diesel](https://diesel.rs/). In this document Diesel is used to describe the custom indexing steps ("Business logic" and the data queries in the diagram).
+2. Create new data models based on the new tables ("Business logic" in the diagram).
+3. Create a new transaction processor, or optionally add to an existing processor. In the diagram this step corresponds to processing the ledger database according to the new business logic and writing to the indexed database.
+4. Integrate the new processor. Optional if you are reusing an existing processor.
 
-We use postgres and [diesel](https://diesel.rs/) as the ORM. To make sure that we make backward compatible changes without having to reset the database every upgrade, we use [diesel migrations](https://docs.diesel.rs/diesel_migrations/index.html) to manage the schema. This is why it’s very important to start with generating a new diesel migration before doing anything else. 
+In the below detailed description, an example of indexing and querying for the coin balances is used. You can see this in the [`coin_processor`](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/coin_processor.rs). 
 
-1. Create a new diesel migration. This will generate a new folder under [migrations](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer/migrations) with `up.sql` and `down.sql`
+### 1. Define new table schemas
+
+In this example we use [PostgreSQL](https://www.postgresql.org/) and [Diesel](https://diesel.rs/) as the ORM. To make sure that we make backward-compatible changes without having to reset the database at every upgrade, we use [Diesel migrations](https://docs.diesel.rs/diesel_migrations/index.html) to manage the schema. This is why it is very important to start with generating a new Diesel migration before doing anything else. 
+
+Make sure you clone the Aptos-core repo by running `git clone https://github.com/aptos-labs/aptos-core.git` and then `cd` into `aptos-core/tree/main/crates/indexer` directory. Then proceed as below. 
+
+a. The first step is to create a new Diesel migration. This will generate a new folder under [migrations](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer/migrations) with `up.sql` and `down.sql`
 
 ```bash
 DATABASE_URL=postgres://postgres@localhost:5432/postgres diesel migration generate add_coin_tables
 ```
 
-b. Create the necessary table schemas. This is just postgres sql code. `up.sql` should have the new changes and `down.sql` should revert those changes.
+b. Create the necessary table schemas. This is just PostgreSQL code. In the code shown below, the `up.sql` will have the new changes and `down.sql` will revert those changes.
 
 ```sql
 -- up.sql
@@ -256,9 +310,9 @@ DROP TABLE IF EXISTS coin_balances;
 DROP TABLE IF EXISTS current_coin_balances;
 ```
 
-[full up.sql and down.sql](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer/migrations/2022-10-04-073529_add_coin_tables)
+See the [full source for `up.sql` and `down.sql`](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer/migrations/2022-10-04-073529_add_coin_tables).
 
-c. Run the migration. We suggest running it multiple times with `redo` to ensure that both `up.sql` and `down.sql` are implemented correctly. This will also modify the `[schema.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/schema.rs)` file. 
+c. Run the migration. We suggest running it multiple times with `redo` to ensure that both `up.sql` and `down.sql` are implemented correctly. This will also modify the [`schema.rs`](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/schema.rs) file. 
 
 ```bash
 DATABASE_URL=postgres://postgres@localhost:5432/postgres diesel migration run
@@ -266,7 +320,9 @@ DATABASE_URL=postgres://postgres@localhost:5432/postgres diesel migration redo
 ```
 
 ### 2. Create new data schemas
-We now have to make rust data models that corresponds to the diesel schemas. In the case of coin balances, we will define `CoinBalance` and `CurrentCoinBalance`. 
+
+We now have to prepare the Rust data models that correspond to the Diesel schemas. In the case of coin balances, we will define `CoinBalance` and `CurrentCoinBalance` as below: 
+
 ```rust
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, owner_address, coin_type))]
@@ -292,11 +348,12 @@ pub struct CurrentCoinBalance {
     pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
 ```
-We will also need to specify parsing logic, where the input is a portion of the transaction. In the case of coin balances, we can find all the details in `WriteSetChanges`, specifically where the write set change type is `write_resources`.
 
-**Where can we find the relevant data for parsing?**
-This requires a combination of understanding the move module and the structure of the transaction. In the example of coin balance, the contract lives in [coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move), specifically coin struct (search for `struct Coin`) that has a `value` field. We then can look at an [example transaction](https://fullnode.testnet.aptoslabs.com/v1/transactions/by_version/259518) where we find this exact structure in `write_resources`:
-```
+We will also need to specify the parsing logic, where the input is a portion of the transaction. In the case of coin balances, we can find all the details in `WriteSetChanges`, specifically where the write set change type is `write_resources`.
+
+**Where to find the relevant data for parsing**: This requires a combination of understanding the Move module and the structure of the transaction. In the example of coin balance, the contract lives in [coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move), specifically the coin struct (search for `struct Coin`) that has a `value` field. We then calook at an [example transaction](https://fullnode.testnet.aptoslabs.com/v1/transactions/by_version/259518) where we find this exact structure in `write_resources`:
+
+```json
 "changes": [
   {
     ...
@@ -309,29 +366,31 @@ This requires a combination of understanding the move module and the structure o
       ...
 ```
 
-Find the full code in [coin_balances.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/models/coin_models/coin_balances.rs).
+See the full code in [coin_balances.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/models/coin_models/coin_balances.rs).
 
 ### 3. Create a new processor
-Now that we have the data model and the parsing function, we need to call that function and save the resulting model in our postgres database. The way we do this is by creating (or modifying) a `processor`. We've abstracted a lot already from that class, so the only function that need to be implemented is `process_transactions` (there are a few more functions that need to be copied, those should be obvious from the example). 
 
-`process_transactions` takes in a vector of transactions with a start and end version that are used for tracking purposes. The general flow should be: 
-   * Loop through transactions in the vector
-   * Aggregate relevant models (sometimes deduping is required, e.g. in the case of `CurrentCoinBalance`)
-   * Insert models into database in a single diesel transaction (this is important to ensure that we don't have partial writes)
-   * Return status (error or success)
+Now that we have the data model and the parsing function, we need to call that parsing function and save the resulting model in our Postgres database. We do this by creating (or modifying) a `processor`. We have abstracted a lot already from that class, so the only function that should be implemented is `process_transactions` (there are a few more functions that should be copied, those should be obvious from the example). 
 
-Checkout [coin_process.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/coin_processor.rs) for a relatively straightforward example. You can search for `coin_balances` in the page for the specific code snippet related to coin balances. 
+The `process_transactions` function takes in a vector of transactions with a start and end version that are used for tracking purposes. The general flow should be: 
+  - Loop through transactions in the vector.
+  - Aggregate relevant models. Sometimes deduping is required, e.g. in the case of `CurrentCoinBalance`.
+  - Insert the models into the database in a single Diesel transaction. This is important, to ensure that we do not have partial writes.
+  - Return status (error or success).
 
-**How do we decide whether to create a new processor**
-This is completely up to you. The benefit of creating a new processor is that you're starting from scratch so you'll have full control over exactly what gets written to the db. The downside is that you'll have to maintain a new fullnode (since there's a 1:1 mapping between fullnode and processor). 
+:::tip Coin transaction processor
+See [coin_process.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/coin_processor.rs) for a relatively straightforward example. You can search for `coin_balances` in the page for the specific code snippet related to coin balances. 
+:::
+
+**How to decide whether to create a new processor:** This is completely up to you. The benefit of creating a new processor is that you are starting from scratch so you will have full control over exactly what gets written to the indexed database. The downside is that you will have to maintain a new fullnode, ssince there is a 1-to-1 mapping between a fullnode and the processor. 
 
 ### 4. Integrate the new processor
 
-This is the easiest step and involves just a few boiler plate additions. 
+This is the easiest step and involves just a few additions. 
 
-1. To start, make sure to add the new processor in [mod.rs](http://mod.rs) and [runtime.rs](http://runtime.rs)
+1. To start with, make sure to add the new processor in the Rust code files: [`mod.rs`]((https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/mod.rs)) and [`runtime.rs`](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/runtime.rs). See below: 
 
-[mod.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/mod.rs)
+[**mod.rs**](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/mod.rs)
 
 ```rust
 pub enum Processor {
@@ -342,15 +401,15 @@ pub enum Processor {
   COIN_PROCESSOR_NAME => Self::CoinProcessor,
 ```
 
-[runtime.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/runtime.rs)
+[**runtime.rs**](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/runtime.rs)
 
 ```rust
 Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
 ```
 
-b. Create a fullnode.yaml with the correct config and test
+2. Create a `fullnode.yaml` with the correct configuration and test the custom indexer by starting a fullnode with this `fullnode.yaml`. 
 
-I created a new fullnode_coin.yaml
+**fullnode.yaml**
 
 ```yaml
 storage:
@@ -369,6 +428,10 @@ indexer:
   processor_tasks: 10
 ```
 
-Testing with command below (there are lots of logs so it’s helpful to filter to only indexer logs)
+Test by starting an Aptos fullnode by running the below command. You will see many logs in the terminal output, so use the `grep` filter to see only indexer log output, as shown below:
 
-`cargo run -p aptos-node --features "indexer" --release -- -f ./fullnode_coin.yaml | grep -E "_processor"`
+```bash
+cargo run -p aptos-node --features "indexer" --release -- -f ./fullnode_coin.yaml | grep -E "_processor"
+```
+
+See the full instructions on how to start an indexer-enabled fullnode in [Indexer Fullnode](/nodes/indexer-fullnode).

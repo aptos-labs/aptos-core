@@ -73,11 +73,11 @@ const sidebars = {
         "guides/interacting-with-the-blockchain",
         "guides/state-sync",
         "guides/data-pruning",
+        "guides/indexing",
         "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
-        "guides/indexing",
         "guides/local-testnet-dev-flow",
         "guides/running-a-local-multi-node-network",
         "guides/handle-aptos-errors",
@@ -99,20 +99,6 @@ const sidebars = {
     "nodes/aptos-deployments",
     "nodes/leaderboard-metrics",
     "nodes/node-files",
-    /** Delete during clean up
-    {
-      type: "category",
-      label: "AIT-3",
-      link: { type: "doc", id: "nodes/ait/index" },
-      collapsible: true,
-      collapsed: true,
-      items: [
-        "nodes/ait/whats-new-in-ait3",
-        "nodes/ait/steps-in-ait3",
-        
-      ],
-    },  */
-
     {
       type: "category",
       label: "Validators",
@@ -199,107 +185,6 @@ const sidebars = {
       items: ["nodes/node-health-checker/node-health-checker-faq"],
     },
     "reference/telemetry",
-
-    /** Delete this section while cleaning up 
-    {
-      type: "category",
-      label: "Nodes",
-      link: { type: "doc", id: "nodes/index" },
-      collapsible: true,
-      collapsed: true,
-      items: [
-        "nodes/aptos-deployments",
-        {
-          type: "category",
-          label: "AIT-3",
-          link: { type: "doc", id: "nodes/ait/index" },
-          collapsible: true,
-          collapsed: true,
-          items: [
-            "nodes/ait/whats-new-in-ait3",
-            "nodes/ait/steps-in-ait3",
-            "nodes/ait/ait3-leaderboard-metrics",
-          ],
-        },
-        {
-          type: "category",
-          label: "Validators",
-          link: { type: "doc", id: "nodes/validator-node/index" },
-          collapsible: true,
-          collapsed: true,
-          items: [
-            {
-              type: "category",
-              label: "Owner",
-              collapsible: true,
-              collapsed: true,
-              link: { type: "doc", id: "nodes/validator-node/owner/index" },
-              items: [
-              ],
-            },
-            {
-              type: "category",
-              label: "Operator",
-              collapsible: true,
-              collapsed: true,
-              link: { type: "doc", id: "nodes/validator-node/operator/index" },
-              items: ["nodes/validator-node/operator/using-aws", 
-              "nodes/validator-node/operator/using-azure", 
-              "nodes/validator-node/operator/using-gcp", 
-              "nodes/validator-node/operator/using-docker", 
-              "nodes/validator-node/operator/using-source-code", 
-              "nodes/validator-node/operator/node-requirements",
-              "nodes/validator-node/operator/node-liveness-criteria",
-              "nodes/validator-node/operator/connect-to-testnet",
-              "nodes/validator-node/operator/additional-doc",
-              ],
-            },
-            {
-              type: "category",
-              label: "Voter",
-              collapsible: true,
-              collapsed: true,
-              link: { type: "doc", id: "nodes/validator-node/voter/index" },
-              items: ["nodes/validator-node/voter/index", 
-              ],
-            },
-          ],
-        },
-        
-        {
-          type: "category",
-          label: "Public Fullnode",
-          link: { type: "doc", id: "nodes/full-node/index" },
-          collapsible: true,
-          collapsed: true,
-          items: [
-            "nodes/full-node/fullnode-source-code-or-docker",
-            "nodes/full-node/update-fullnode-with-new-releases",
-            "nodes/full-node/network-identity-fullnode",
-            "nodes/full-node/troubleshooting-fullnode",
-            "nodes/full-node/run-a-fullnode-on-gcp",
-            "nodes/full-node/bootstrap-fullnode",
-          ],
-        },
-        {
-          type: "category",
-          label: "Local Testnet",
-          link: { type: "doc", id: "nodes/local-testnet/index" },
-          collapsible: true,
-          collapsed: true,
-          items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "nodes/local-testnet/run-a-local-testnet"],
-        },
-        {
-          type: "category",
-          label: "Node Health Checker",
-          link: { type: "doc", id: "nodes/node-health-checker/index" },
-          collapsible: true,
-          collapsed: true,
-          items: ["nodes/node-health-checker/node-health-checker-faq"],
-        },
-      ],
-    },
-    */
     {
       type: "html",
       value: "Tools",
