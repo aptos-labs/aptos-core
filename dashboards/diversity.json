@@ -118,7 +118,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(count by (failure_domain_beta_kubernetes_io_region\n) (count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}))) / ignoring(failure_domain_beta_kubernetes_io_region) group_left count(count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}))",
+          "expr": "(count by (failure_domain_beta_kubernetes_io_region\n) (count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}))) / ignoring(failure_domain_beta_kubernetes_io_region) group_left count(count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}))",
           "format": "time_series",
           "legendFormat": "{{failure_domain_beta_kubernetes_io_region}}",
           "refId": "A"
@@ -202,22 +202,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
           "legendFormat": "AWS",
           "refId": "A"
         },
         {
-          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
           "legendFormat": "Azure",
           "refId": "B"
         },
         {
-          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
           "legendFormat": "GCP",
           "refId": "C"
         },
         {
-          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
           "legendFormat": "Scaleway",
           "refId": "D"
         }
@@ -300,7 +300,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (beta_kubernetes_io_instance_type\n) (count by (kubernetes_pod_name, beta_kubernetes_io_instance_type\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}))",
+          "expr": "count by (beta_kubernetes_io_instance_type\n) (count by (kubernetes_pod_name, beta_kubernetes_io_instance_type\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}))",
           "format": "time_series",
           "legendFormat": "{{beta_kubernetes_io_instance_type}}",
           "refId": "A"
@@ -384,7 +384,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\"})",
+          "expr": "count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"})",
           "format": "time_series",
           "legendFormat": "{{kubernetes_pod_name}}-{{failure_domain_beta_kubernetes_io_region}}",
           "refId": "A"
@@ -468,22 +468,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})",
           "legendFormat": "{{kubernetes_pod_name}}-AWS",
           "refId": "A"
         },
         {
-          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})",
           "legendFormat": "{{kubernetes_pod_name}}-Azure",
           "refId": "B"
         },
         {
-          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})",
           "legendFormat": "{{kubernetes_pod_name}}-GCP",
           "refId": "C"
         },
         {
-          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})",
           "legendFormat": "{{kubernetes_pod_name}}-Scaleway",
           "refId": "D"
         }
@@ -560,7 +560,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(kubernetes_build_info{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}) by (kubernetes_pod_name, git_version)",
+          "expr": "sum(kubernetes_build_info{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}) by (kubernetes_pod_name, git_version)",
           "legendFormat": "{{kubernetes_pod_name}}-{{git_version}}",
           "refId": "A"
         }
@@ -587,7 +587,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "text": null, "value": null },
+        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
         "datasource": null,
         "hide": 0,
         "includeAll": false,
@@ -603,40 +603,109 @@
         "type": "datasource"
       },
       {
+        "name": "metrics_source",
+        "type": "query",
+        "datasource": null,
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
         "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
+        "allValue": ".*",
         "multi": false,
         "multiFormat": "",
-        "name": "namespace",
-        "options": [],
-        "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
-        "refresh": 1,
+        "query": {
+          "query": "label_values(node_process_start_time{}, metrics_source)",
+          "refId": "StandardVariableQuery"
+        },
         "regex": "",
-        "sort": 1,
-        "type": "query"
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
       },
       {
+        "name": "chain_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
         "allFormat": "",
         "allValue": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
-        "refresh": 1,
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
+          "refId": "StandardVariableQuery"
+        },
         "regex": "",
-        "sort": 1,
-        "type": "query"
+        "current": { "text": ["mainnet"], "value": "mainnet" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": null,
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "kubernetes_pod_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": true,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
       }
     ]
   },

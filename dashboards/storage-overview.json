@@ -109,7 +109,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
           "hide": false,
           "interval": "",
           "legendFormat": "latest (synced) (max)",
@@ -119,7 +119,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_ledger_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_ledger_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
           "hide": false,
           "interval": "",
           "legendFormat": "committed (max)",
@@ -129,7 +129,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sort_desc(quantile by (pruner_name) (0.8, aptos_pruner_min_readable_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", pruner_name !=\"state_store\"}))",
+          "expr": "sort_desc(quantile by (pruner_name) (0.8, aptos_pruner_min_readable_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", pruner_name !=\"state_store\"}))",
           "hide": false,
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}} {{pruner_name}} pruned-till (p80)",
@@ -140,7 +140,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
           "hide": false,
           "legendFormat": "epoch (max)",
           "range": true,
@@ -198,7 +198,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sort_desc(irate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) < 10000)",
+          "expr": "sort_desc(irate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) < 10000)",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
           "range": true,
@@ -257,7 +257,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sort_desc(irate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name, kubernetes_pod_name) irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", api_name=\"save_transactions\", role=~\"$role\", result=\"Ok\"}[1m]) < 10000)",
+          "expr": "sort_desc(irate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name, kubernetes_pod_name) irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", api_name=\"save_transactions\", role=~\"$role\", result=\"Ok\"}[1m]) < 10000)",
           "hide": false,
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}} ",
@@ -331,7 +331,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "quantile(0.8, aptos_jellyfish_leaf_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "quantile(0.8, aptos_jellyfish_leaf_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": true,
               "legendFormat": "{{kubernetes_pod_name}} {{role}}",
               "range": true,
@@ -340,7 +340,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "quantile(0.8, aptos_storage_state_items{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "quantile(0.8, aptos_storage_state_items{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": false,
               "legendFormat": "__auto",
               "range": true,
@@ -408,7 +408,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "max(aptos_storage_total_state_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "max(aptos_storage_total_state_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": false,
               "legendFormat": "__auto",
               "range": true,
@@ -417,7 +417,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "quantile(0.8, aptos_storage_total_state_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} / aptos_storage_state_items)",
+              "expr": "quantile(0.8, aptos_storage_total_state_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} / aptos_storage_state_items)",
               "hide": false,
               "legendFormat": "per item",
               "range": true,
@@ -481,7 +481,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "increase(quantile(0.8, aptos_storage_state_items{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})[1h])",
+              "expr": "increase(quantile(0.8, aptos_storage_state_items{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})[1h])",
               "hide": false,
               "legendFormat": "items created in 1 hour",
               "range": true,
@@ -552,7 +552,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "increase(quantile(0.8, aptos_storage_total_state_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})[1h])",
+              "expr": "increase(quantile(0.8, aptos_storage_total_state_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})[1h])",
               "hide": false,
               "legendFormat": "state bytes created in the past hour",
               "range": true,
@@ -626,7 +626,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[5m])))",
+              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[5m])))",
               "hide": false,
               "legendFormat": "TOTAL",
               "range": true,
@@ -635,7 +635,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[5m])))",
+              "expr": "sort_desc(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[5m])))",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -715,7 +715,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"transaction|event_accumulator|transaction_info|transaction_accumulator|event|transaction_by_hash|event_by_version|event_by_key|transaction_by_account|version_data|ledger_info|epoch_by_version|db_metadata|default\"}[5m])))",
+              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"transaction|event_accumulator|transaction_info|transaction_accumulator|event|transaction_by_hash|event_by_version|event_by_key|transaction_by_account|version_data|ledger_info|epoch_by_version|db_metadata|default\"}[5m])))",
               "hide": false,
               "legendFormat": "TOTAL",
               "range": true,
@@ -731,7 +731,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"transaction|event_accumulator|transaction_info|transaction_accumulator|event|transaction_by_hash|event_by_version|event_by_key|transaction_by_account|version_data|ledger_info|epoch_by_version|db_metadata|default\"}[5m])))",
+              "expr": "sort_desc(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"transaction|event_accumulator|transaction_info|transaction_accumulator|event|transaction_by_hash|event_by_version|event_by_key|transaction_by_account|version_data|ledger_info|epoch_by_version|db_metadata|default\"}[5m])))",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -743,7 +743,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}) - ignoring(pruner_name) quantile by (pruner_name) (0.8, aptos_pruner_min_readable_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", pruner_name=\"ledger_pruner\"})",
+              "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}) - ignoring(pruner_name) quantile by (pruner_name) (0.8, aptos_pruner_min_readable_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", pruner_name=\"ledger_pruner\"})",
               "hide": true,
               "legendFormat": "num_items",
               "range": true,
@@ -819,7 +819,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"jellyfish_merkle_node|stale_node_index|stale_node_index_cross_epoch\"}[5m])))",
+              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"jellyfish_merkle_node|stale_node_index|stale_node_index_cross_epoch\"}[5m])))",
               "hide": false,
               "legendFormat": "TOTAL",
               "range": true,
@@ -835,7 +835,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"jellyfish_merkle_node|stale_node_index|stale_node_index_cross_epoch\"}[5m])))",
+              "expr": "sort_desc(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"jellyfish_merkle_node|stale_node_index|stale_node_index_cross_epoch\"}[5m])))",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -847,7 +847,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "quantile(0.8, aptos_storage_state_items{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "quantile(0.8, aptos_storage_state_items{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": true,
               "legendFormat": "num_items",
               "range": true,
@@ -924,7 +924,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"state_value|write_set|stale_state_value_index\"}[5m])))",
+              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"state_value|write_set|stale_state_value_index\"}[5m])))",
               "hide": false,
               "legendFormat": "TOTAL",
               "range": true,
@@ -940,7 +940,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"state_value|write_set|stale_state_value_index\"}[5m])))",
+              "expr": "sort_desc(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"state_value|write_set|stale_state_value_index\"}[5m])))",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -952,7 +952,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "quantile(0.8, aptos_storage_total_state_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "quantile(0.8, aptos_storage_total_state_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": true,
               "legendFormat": "num_items",
               "range": true,
@@ -968,7 +968,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "quantile(0.8, aptos_storage_state_items{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "quantile(0.8, aptos_storage_state_items{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": true,
               "legendFormat": "__auto",
               "range": true,
@@ -1026,7 +1026,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", persistentvolumeclaim!~\".*prometheus.*\", role=~\"$role\"} - kubelet_volume_stats_used_bytes",
+              "expr": "kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", persistentvolumeclaim!~\".*prometheus.*\", role=~\"$role\"} - kubelet_volume_stats_used_bytes",
               "hide": true,
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} {{persistentvolumeclaim}}",
@@ -1036,7 +1036,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(node_disk_available_space{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",  persistentvolumeclaim!~\".*prometheus.*\", type!=\"rootfs\", name!=\"overlay\", role=~\"$role\"})",
+              "expr": "sort_desc(node_disk_available_space{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",  persistentvolumeclaim!~\".*prometheus.*\", type!=\"rootfs\", name!=\"overlay\", role=~\"$role\"})",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}} {{type}} {{name}}",
               "range": true,
@@ -1112,7 +1112,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])\r\n",
+              "expr": "rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])\r\n",
               "legendFormat": "{{kubernetes_pod_name}}",
               "range": true,
               "refId": "A"
@@ -1167,7 +1167,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_executor_commit_blocks_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+              "expr": "rate(aptos_executor_commit_blocks_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}",
               "range": true,
@@ -1223,7 +1223,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(rate(aptos_executor_apply_chunk_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
+              "expr": "sort_desc(rate(aptos_executor_apply_chunk_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
               "legendFormat": "{{kubernetes_pod_name}} apply",
               "range": true,
               "refId": "A"
@@ -1231,7 +1231,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(rate(aptos_executor_execute_chunk_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
+              "expr": "sort_desc(rate(aptos_executor_execute_chunk_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}} execute",
               "range": true,
@@ -1287,7 +1287,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_executor_commit_chunk_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+              "expr": "rate(aptos_executor_commit_chunk_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}",
               "range": true,
@@ -1353,7 +1353,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(node_linux_disk_io_in_progress{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+              "expr": "rate(node_linux_disk_io_in_progress{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
               "legendFormat": "{{kubernetes_pod_name}} {{name}}",
               "range": true,
               "refId": "A"
@@ -1409,7 +1409,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(irate(node_linux_system_cpu_usage{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"iowait_ms\"}[1m]) / 1000)",
+              "expr": "sort_desc(irate(node_linux_system_cpu_usage{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"iowait_ms\"}[1m]) / 1000)",
               "legendFormat": "{{kubernetes_pod_name}}",
               "range": true,
               "refId": "A"
@@ -1484,7 +1484,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(rate(node_linux_disk_num_reads{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]))",
+              "expr": "sort_desc(rate(node_linux_disk_num_reads{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]))",
               "legendFormat": "{{kubernetes_pod_name}} {{name}} read",
               "range": true,
               "refId": "A"
@@ -1492,7 +1492,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(rate(node_linux_disk_num_writes{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]))",
+              "expr": "sort_desc(rate(node_linux_disk_num_writes{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]))",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}} {{name}} write",
               "range": true,
@@ -1548,7 +1548,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "irate(node_linux_disk_total_io_time_ms{namespace=~\"$namespace\", chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) / 1000",
+              "expr": "irate(node_linux_disk_total_io_time_ms{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) / 1000",
               "legendFormat": "{{kubernetes_pod_name}} {{name}}",
               "range": true,
               "refId": "A"
@@ -1605,7 +1605,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (kubernetes_pod_name) (irate(aptos_schemadb_get_latency_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])) / sum by (kubernetes_pod_name) (irate(aptos_schemadb_get_latency_seconds_count[1m]))",
+              "expr": "sum by (kubernetes_pod_name) (irate(aptos_schemadb_get_latency_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])) / sum by (kubernetes_pod_name) (irate(aptos_schemadb_get_latency_seconds_count[1m]))",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}",
               "range": true,
@@ -1681,7 +1681,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": true,
               "interval": "",
               "legendFormat": "latest (synced) (max)",
@@ -1691,7 +1691,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "max(aptos_storage_ledger_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "max(aptos_storage_ledger_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": true,
               "interval": "",
               "legendFormat": "committed (max)",
@@ -1701,7 +1701,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(quantile by (pruner_name) (0.8, aptos_pruner_min_readable_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", pruner_name !=\"state_store\"}))",
+              "expr": "sort_desc(quantile by (pruner_name) (0.8, aptos_pruner_min_readable_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", pruner_name !=\"state_store\"}))",
               "hide": true,
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} {{pruner_name}} pruned-till (p80)",
@@ -1712,7 +1712,7 @@
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": true,
               "legendFormat": "epoch (max)",
               "range": true,
@@ -1721,7 +1721,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "sort_desc(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}} ver",
               "range": true,
@@ -1730,7 +1730,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "sort_desc(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}} epoch",
               "range": true,
@@ -1739,7 +1739,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_storage_ledger_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "expr": "aptos_storage_ledger_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
               "hide": false,
               "legendFormat": "ver",
               "range": true,
@@ -1808,7 +1808,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
+              "expr": "sum by (kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
               "hide": false,
               "legendFormat": "__auto",
               "range": true,
@@ -1861,7 +1861,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Ok\"}[1m])) / sum by (kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
+              "expr": "sum by (kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Ok\"}[1m])) / sum by (kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
               "hide": false,
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}",
@@ -1912,7 +1912,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Err\"}[1m]))",
+              "expr": "sum by (kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", result=\"Err\"}[1m]))",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}",
               "range": true,
@@ -1934,7 +1934,7 @@
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "Devinfra Remote Prometheus", "value": "Devinfra Remote Prometheus" },
+        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -1948,67 +1948,109 @@
         "type": "datasource"
       },
       {
-        "current": { "selected": false, "text": "chaos-mesh", "value": "chaos-mesh" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(namespace)",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "name": "namespace",
-        "options": [],
-        "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
+        "name": "metrics_source",
         "type": "query",
-        "useTags": false
-      },
-      {
-        "current": { "selected": false, "text": "forge-big-0", "value": "forge-big-0" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(chain_name)",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "name": "chain_name",
-        "options": [],
-        "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
+        "datasource": null,
         "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
-      },
-      {
-        "allValue": ".*",
-        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(kubernetes_pod_name)",
-        "hide": 0,
+        "options": [],
         "includeAll": true,
-        "multi": true,
-        "name": "kubernetes_pod_name",
-        "options": [],
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
         "query": {
-          "query": "label_values(kubernetes_pod_name)",
-          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
+          "query": "label_values(node_process_start_time{}, metrics_source)",
+          "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "chain_name",
         "type": "query",
-        "useTags": false
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["mainnet"], "value": "mainnet" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": null,
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "kubernetes_pod_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": true,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
       },
       {
         "current": { "selected": true, "text": ["validator"], "value": ["validator"] },

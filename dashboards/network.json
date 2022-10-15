@@ -109,7 +109,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -174,7 +174,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -237,7 +237,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -299,7 +299,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_network_key_mismatch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_network_key_mismatch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -376,7 +376,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
@@ -439,7 +439,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
@@ -502,7 +502,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
@@ -565,7 +565,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
@@ -629,7 +629,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_app_inbound_traffic_sum{namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\"}[1m])",
+          "expr": "rate(aptos_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
           "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}",
           "range": true,
           "refId": "A"
@@ -694,7 +694,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_app_outbound_traffic_sum{namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\"}[1m])",
+          "expr": "rate(aptos_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
           "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}",
           "range": true,
           "refId": "A"
@@ -759,7 +759,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_app_inbound_traffic_count{namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\"}[1m])",
+          "expr": "rate(aptos_network_app_inbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
           "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}",
           "range": true,
           "refId": "A"
@@ -824,7 +824,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_app_outbound_traffic_count{namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\"}[1m])",
+          "expr": "rate(aptos_network_app_outbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
           "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}",
           "range": true,
           "refId": "A"
@@ -902,7 +902,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
@@ -965,7 +965,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "B"
         }
@@ -1028,7 +1028,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
@@ -1091,7 +1091,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
@@ -1154,7 +1154,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_pending_wire_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
+          "expr": "rate(aptos_network_pending_wire_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "B"
         }
@@ -1217,7 +1217,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
+          "expr": "rate(aptos_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "B"
         }
@@ -1294,7 +1294,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"(declined|canceled)\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"(declined|canceled)\"}[$AggInterval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}",
@@ -1373,7 +1373,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\" }[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\" }[$AggInterval]))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -1437,7 +1437,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\" }[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\" }[$AggInterval]))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -1491,7 +1491,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "C"
         }
@@ -1554,7 +1554,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "C"
         }
@@ -1617,7 +1617,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "C"
         }
@@ -1680,7 +1680,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "C"
         }
@@ -1743,7 +1743,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "C"
         }
@@ -1806,7 +1806,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "C"
         }
@@ -1883,7 +1883,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
+          "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -1948,7 +1948,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"received\"}[$AggInterval]))",
+          "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2013,7 +2013,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2078,7 +2078,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2143,7 +2143,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\",state=\"sent\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\",state=\"sent\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2208,7 +2208,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2273,7 +2273,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -2336,7 +2336,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -2399,7 +2399,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -2462,7 +2462,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -2525,7 +2525,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -2588,7 +2588,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -2665,7 +2665,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2730,7 +2730,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -2795,7 +2795,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -2858,7 +2858,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -2931,7 +2931,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by(kubernetes_pod_name) (haproxy_process_pool_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
+          "expr": "sum by(kubernetes_pod_name) (haproxy_process_pool_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -2988,7 +2988,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by(kubernetes_pod_name) (haproxy_backend_current_sessions{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
+          "expr": "sum by(kubernetes_pod_name) (haproxy_backend_current_sessions{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -3045,7 +3045,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by(kubernetes_pod_name) (haproxy_process_idle_time_percent{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
+          "expr": "sum by(kubernetes_pod_name) (haproxy_process_idle_time_percent{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\".*\",kubernetes_pod_name=~\".*\", role=\"haproxy\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -3102,7 +3102,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by(kubernetes_pod_name) (rate(haproxy_frontend_connections_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\", kubernetes_pod_name=~\".*\", role=\"haproxy\"}[$__rate_interval]))",
+          "expr": "sum by(kubernetes_pod_name) (rate(haproxy_frontend_connections_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\".*\", kubernetes_pod_name=~\".*\", role=\"haproxy\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -3159,7 +3159,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by(kubernetes_pod_name, __name__) (rate({__name__=~\"haproxy_.*denied.*\", chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\".*\", kubernetes_pod_name=~\".*\", role=\"haproxy\"}[$__rate_interval]))",
+          "expr": "sum by(kubernetes_pod_name, __name__) (rate({__name__=~\"haproxy_.*denied.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\".*\", kubernetes_pod_name=~\".*\", role=\"haproxy\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -3178,7 +3178,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "selected": false, "text": "VictoriaMetrics Global", "value": "VictoriaMetrics Global" },
+        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -3195,44 +3195,109 @@
         "type": "datasource"
       },
       {
+        "name": "metrics_source",
+        "type": "query",
+        "datasource": null,
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
         "allFormat": "",
-        "allValue": "",
-        "current": { "selected": false, "text": "telemetry-service", "value": "telemetry-service" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
+        "allValue": ".*",
         "multi": false,
         "multiFormat": "",
-        "name": "namespace",
-        "options": [],
-        "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
-        "refresh": 1,
+        "query": {
+          "query": "label_values(node_process_start_time{}, metrics_source)",
+          "refId": "StandardVariableQuery"
+        },
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
       },
       {
+        "name": "chain_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
         "allFormat": "",
         "allValue": "",
-        "current": { "selected": false, "text": "3", "value": "3" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
-        "refresh": 1,
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
+          "refId": "StandardVariableQuery"
+        },
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
+        "current": { "text": ["mainnet"], "value": "mainnet" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": null,
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "kubernetes_pod_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": true,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
       },
       {
         "allFormat": "",
@@ -3268,29 +3333,6 @@
         "name": "role_type",
         "options": [],
         "query": { "query": "label_values(role_type)", "refId": "Prometheus-role_type-Variable-Query" },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": ".*",
-        "current": { "selected": false, "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": true,
-        "label": "",
-        "multi": true,
-        "multiFormat": "",
-        "name": "kubernetes_pod_name",
-        "options": [],
-        "query": {
-          "query": "label_values(kubernetes_pod_name)",
-          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
-        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
