@@ -465,7 +465,7 @@ impl TransactionProcessor for TokenTransactionProcessor {
         let mut conn = self.get_conn();
 
         // First get all token related table metadata from the batch of transactions. This is in case
-        // an earlier transaction has metadata (in resources) that's missing from a later transaction. 
+        // an earlier transaction has metadata (in resources) that's missing from a later transaction.
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
