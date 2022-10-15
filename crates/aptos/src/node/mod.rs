@@ -673,7 +673,7 @@ impl OperatorArgs {
 
 /// Join the validator set after meeting staking requirements
 ///
-/// Joining the validator set requires sufficient stake to join the set.  Once the transaction
+/// Joining the validator set requires sufficient stake.  Once the transaction
 /// succeeds, you will join the validator set in the next epoch.
 #[derive(Parser)]
 pub struct JoinValidatorSet {
@@ -733,7 +733,7 @@ impl CliCommand<TransactionSummary> for LeaveValidatorSet {
 
 /// Show validator stake information for a specific validator
 ///
-/// This will show information about a specific validator, given it's
+/// This will show information about a specific validator, given its
 /// `--pool-address`.
 #[derive(Parser)]
 pub struct ShowValidatorStake {
@@ -765,7 +765,7 @@ impl CliCommand<serde_json::Value> for ShowValidatorStake {
 
 /// Show validator configuration for a specific validator
 ///
-/// This will show information about a specific validator, given it's
+/// This will show information about a specific validator, given its
 /// `--pool-address`.
 #[derive(Parser)]
 pub struct ShowValidatorConfig {
@@ -1050,7 +1050,7 @@ pub struct RunLocalTestnet {
     /// Clean the state and start with a new chain at genesis
     ///
     /// This will wipe the aptosdb in `test-dir` to remove any incompatible changes, and start
-    /// the chain fresh.  Note, that you will need to publish module again and distribute funds
+    /// the chain fresh.  Note, that you will need to publish the module again and distribute funds
     /// from the faucet accordingly
     #[clap(long)]
     force_restart: bool,
