@@ -196,7 +196,7 @@
       "span": 0,
       "targets": [
         {
-          "expr": "up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=\"validator\"} == 0",
+          "expr": "up{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=\"validator\"} == 0",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -233,7 +233,7 @@
       "span": 0,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_current_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=\"validator\"}[1m]) == 0",
+          "expr": "rate(aptos_consensus_current_round{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=\"validator\"}[1m]) == 0",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -301,7 +301,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
@@ -365,7 +365,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
@@ -427,7 +427,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
@@ -485,7 +485,7 @@
       "span": 0,
       "targets": [
         {
-          "expr": "# Filter out extraneous fields.\nsum by (kubernetes_pod_name, remote_kubernetes_pod_name) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_kubernetes_pod_name\"]\n  # to join in \"remote_kubernetes_pod_name\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_kubernetes_pod_name) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_kubernetes_pod_name, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"kubernetes_pod_name\" -> \"remote_kubernetes_pod_name\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_kubernetes_pod_name\", \"$1\",\n            \"kubernetes_pod_name\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
+          "expr": "# Filter out extraneous fields.\nsum by (kubernetes_pod_name, remote_kubernetes_pod_name) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_kubernetes_pod_name\"]\n  # to join in \"remote_kubernetes_pod_name\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_kubernetes_pod_name) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_kubernetes_pod_name, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"kubernetes_pod_name\" -> \"remote_kubernetes_pod_name\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_kubernetes_pod_name\", \"$1\",\n            \"kubernetes_pod_name\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
           "format": "time_series",
           "instant": true,
           "refId": "A"
@@ -505,7 +505,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "selected": false, "text": "[TEST] TELEMETRY", "value": "[TEST] TELEMETRY" },
+        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -521,67 +521,109 @@
         "type": "datasource"
       },
       {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "namespace",
-        "options": [],
-        "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
+        "name": "metrics_source",
+        "type": "query",
+        "datasource": null,
         "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "chain_name",
         "options": [],
-        "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
+        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": true,
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{}, metrics_source)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
         "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "chain_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["mainnet"], "value": "mainnet" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": null,
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 0
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": false,
+        "multiFormat": "",
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "regex": "",
+        "current": { "text": ["All"], "value": "$__all" },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "kubernetes_pod_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
         "multi": true,
         "multiFormat": "",
-        "name": "kubernetes_pod_name",
-        "options": [],
         "query": {
-          "query": "label_values(aptos_network_peer_connected, kubernetes_pod_name)",
-          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
       }
     ]
   },
