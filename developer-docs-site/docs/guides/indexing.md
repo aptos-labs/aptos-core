@@ -388,7 +388,7 @@ See [coin_process.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/
 
 This is the easiest step and involves just a few additions. 
 
-1. To start with, make sure to add the new processor in the Rust code files: [`mod.rs`]((https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/mod.rs)) and [`runtime.rs`](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/runtime.rs). See below: 
+1. To start with, make sure to add the new processor in the Rust code files: [`mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/mod.rs) and [`runtime.rs`](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/runtime.rs). See below: 
 
 [**mod.rs**](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/mod.rs)
 
