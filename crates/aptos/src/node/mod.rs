@@ -4,7 +4,7 @@
 pub mod analyze;
 
 use crate::common::types::{
-    ConfigSearchMode, OptionalPoolAddressArgs, PromptOptions, TransactionSummary,
+    ConfigSearchMode, OptionalPoolAddressArgs, PoolAddressArgs, PromptOptions, TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
@@ -128,10 +128,14 @@ impl OperatorConfigFileArgs {
 #[derive(Parser)]
 pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
+    ///
+    /// The key should be a bls12381 public key
     #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
 
     /// Hex encoded Consensus proof of possession
+    ///
+    /// The key should be a bls12381 proof of possession
     #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
     pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
 }
@@ -282,15 +286,16 @@ pub struct StakePoolResult {
     pub vesting_contract: Option<AccountAddress>,
 }
 
+/// Show the stake pool
+///
+/// Retrieves the associated stake pool from the multiple types for the given owner address
 #[derive(Parser)]
 pub struct GetStakePool {
-    // The owner address that directly or indirectly owns the stake pool.
+    /// The owner address of the stake pool
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) owner_address: AccountAddress,
-    // Configurations for where queries will be sent to.
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
-    // Configurations for CLI profile to use.
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
 }
@@ -316,15 +321,13 @@ pub struct StakePoolPerformance {
     epoch_info: EpochInfo,
 }
 
+/// Show staking performance of the given staking pool
 #[derive(Parser)]
 pub struct GetPerformance {
-    // The stake pool's address.
-    #[clap(long)]
-    pub(crate) pool_address: AccountAddress,
-    // Configurations for where queries will be sent to.
+    #[clap(flatten)]
+    pub(crate) pool_address_args: PoolAddressArgs,
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
-    // Configurations for CLI profile to use.
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
 }
@@ -337,7 +340,7 @@ impl CliCommand<StakePoolPerformance> for GetPerformance {
 
     async fn execute(mut self) -> CliTypedResult<StakePoolPerformance> {
         let client = &self.rest_options.client(&self.profile_options)?;
-        let pool_address = self.pool_address;
+        let pool_address = self.pool_address_args.pool_address;
         let validator_set = &client
             .get_account_resource_bcs::<ValidatorSet>(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
             .await?
@@ -572,10 +575,10 @@ fn get_stake_pool_state(
     }
 }
 
-/// Register the current account as a validator node operator of it's own owned stake.
+/// Register the current account as a validator node operator
 ///
-/// Use InitializeStakeOwner whenever stake owner
-/// and validator operator are different accounts.
+/// This will create a new stake pool for the given account.  The voter and operator fields will be
+/// defaulted to the stake pool account if not provided.
 #[derive(Parser)]
 pub struct InitializeValidator {
     #[clap(flatten)]
@@ -669,6 +672,9 @@ impl OperatorArgs {
 }
 
 /// Join the validator set after meeting staking requirements
+///
+/// Joining the validator set requires sufficient stake to join the set.  Once the transaction
+/// succeeds, you will join the validator set in the next epoch.
 #[derive(Parser)]
 pub struct JoinValidatorSet {
     #[clap(flatten)]
@@ -696,6 +702,9 @@ impl CliCommand<TransactionSummary> for JoinValidatorSet {
 }
 
 /// Leave the validator set
+///
+/// Leaving the validator set will require you to have unlocked and withdrawn all stake.  After this
+/// transaction is successful, you will leave the validator set in the next epoch.
 #[derive(Parser)]
 pub struct LeaveValidatorSet {
     #[clap(flatten)]
@@ -722,7 +731,10 @@ impl CliCommand<TransactionSummary> for LeaveValidatorSet {
     }
 }
 
-/// Show validator details of the current validator
+/// Show validator stake information for a specific validator
+///
+/// This will show information about a specific validator, given it's
+/// `--pool-address`.
 #[derive(Parser)]
 pub struct ShowValidatorStake {
     #[clap(flatten)]
@@ -751,7 +763,10 @@ impl CliCommand<serde_json::Value> for ShowValidatorStake {
     }
 }
 
-/// Show validator details of the current validator
+/// Show validator configuration for a specific validator
+///
+/// This will show information about a specific validator, given it's
+/// `--pool-address`.
 #[derive(Parser)]
 pub struct ShowValidatorConfig {
     #[clap(flatten)]
@@ -784,6 +799,9 @@ impl CliCommand<ValidatorConfigSummary> for ShowValidatorConfig {
 }
 
 /// Show validator details of the validator set
+///
+/// This will show information about the validators including their voting power, addresses, and
+/// public keys.
 #[derive(Parser)]
 pub struct ShowValidatorSet {
     #[clap(flatten)]
@@ -1011,35 +1029,51 @@ const TESTNET_FOLDER: &str = "testnet";
 #[derive(Parser)]
 pub struct RunLocalTestnet {
     /// An overridable config template for the test node
+    ///
+    /// If provided, the config will be used, and any needed configuration for the local testnet
+    /// will override the config's values
     #[clap(long, parse(from_os_str))]
     config_path: Option<PathBuf>,
 
     /// The directory to save all files for the node
+    ///
+    /// Defaults to .aptos/testnet
     #[clap(long, parse(from_os_str))]
     test_dir: Option<PathBuf>,
 
     /// Random seed for key generation in test mode
+    ///
+    /// This allows you to have deterministic keys for testing
     #[clap(long, parse(try_from_str = FromHex::from_hex))]
     seed: Option<[u8; 32]>,
 
     /// Clean the state and start with a new chain at genesis
+    ///
+    /// This will wipe the aptosdb in `test-dir` to remove any incompatible changes, and start
+    /// the chain fresh.  Note, that you will need to publish module again and distribute funds
+    /// from the faucet accordingly
     #[clap(long)]
     force_restart: bool,
 
     /// Run a faucet alongside the node
+    ///
+    /// Allows you to run a faucet alongside the node to create and fund accounts for testing
     #[clap(long)]
     with_faucet: bool,
 
     /// Port to run the faucet on
+    ///
+    /// When running, you'll be able to use the faucet at `http://localhost:<port>/mint` e.g.
+    /// `http//localhost:8080/mint`
     #[clap(long, default_value = "8081")]
     faucet_port: u16,
 
-    #[clap(flatten)]
-    prompt_options: PromptOptions,
-
-    /// Disable the delegation of minting to a dedicated account
+    /// Disable the delegation of faucet minting to a dedicated account
     #[clap(long)]
     do_not_delegate: bool,
+
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -1163,7 +1197,7 @@ impl CliCommand<()> for RunLocalTestnet {
     }
 }
 
-/// Update consensus key for the validator node.
+/// Update consensus key for the validator node
 #[derive(Parser)]
 pub struct UpdateConsensusKey {
     #[clap(flatten)]
@@ -1205,7 +1239,7 @@ impl CliCommand<TransactionSummary> for UpdateConsensusKey {
     }
 }
 
-/// Update the current validator's network and fullnode addresses
+/// Update the current validator's network and fullnode network addresses
 #[derive(Parser)]
 pub struct UpdateValidatorNetworkAddresses {
     #[clap(flatten)]
@@ -1264,14 +1298,18 @@ impl CliCommand<TransactionSummary> for UpdateValidatorNetworkAddresses {
     }
 }
 
-/// Tool to analyze the performance of an individual validator
+/// Analyze the performance of one or more validators
 #[derive(Parser)]
 pub struct AnalyzeValidatorPerformance {
     /// First epoch to analyze
+    ///
+    /// Defaults to the first epoch
     #[clap(long, default_value = "-2")]
     pub start_epoch: i64,
 
     /// Last epoch to analyze
+    ///
+    /// Defaults to the latest epoch
     #[clap(long)]
     pub end_epoch: Option<i64>,
 
@@ -1279,7 +1317,9 @@ pub struct AnalyzeValidatorPerformance {
     #[clap(arg_enum, long)]
     pub(crate) analyze_mode: AnalyzeMode,
 
-    /// Optional. Run the analysis for specific stake pool (validator) addresses.
+    /// Filter of stake pool addresses to analyze
+    ///
+    /// Defaults to all stake pool addresses
     #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
     pub pool_addresses: Vec<AccountAddress>,
 
@@ -1400,23 +1440,23 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
     }
 }
 
-/// Tool to bootstrap DB from backup
+/// Bootstrap AptosDB from a backup
+///
+/// Enables users to load from a backup to catch their node's DB up to a known state.
 #[derive(Parser)]
 pub struct BootstrapDbFromBackup {
-    #[clap(
-        long,
-        help = "Config file for the source backup, pointing to local files or cloud storage and \
-        commands needed to access them.",
-        parse(from_os_str)
-    )]
+    /// Config file for the source backup
+    ///
+    /// This file configures if we should use local files or cloud storage, and how to access
+    /// the backup.
+    #[clap(long, parse(from_os_str))]
     config_path: PathBuf,
 
-    #[clap(
-        long = "target-db-dir",
-        help = "Target dir where the tool recreates a AptosDB with snapshots and transactions provided \
-        in the backup. The data folder can later be used to start an Aptos node. e.g. /opt/aptos/data/db",
-        parse(from_os_str)
-    )]
+    /// Target database directory
+    ///
+    /// The directory to create the AptosDB with snapshots and transactions from the backup.
+    /// The data folder can later be used to start an Aptos node. e.g. /opt/aptos/data/db
+    #[clap(long = "target-db-dir", parse(from_os_str))]
     pub db_dir: PathBuf,
 
     #[clap(flatten)]
@@ -1470,7 +1510,9 @@ impl CliCommand<()> for BootstrapDbFromBackup {
     }
 }
 
-/// Tool to get Epoch information
+/// Show Epoch information
+///
+/// Displays the current epoch, the epoch length, and the estimated time of the next epoch
 #[derive(Parser)]
 pub struct ShowEpochInfo {
     #[clap(flatten)]
@@ -1511,8 +1553,8 @@ async fn get_epoch_info(client: &Client) -> CliTypedResult<EpochInfo> {
     Ok(EpochInfo {
         epoch: reconfig_resource.epoch(),
         epoch_interval_secs,
-        current_epoch_start_time: Time::new(last_reconfig),
-        next_epoch_start_time: Time::new(last_reconfig + epoch_interval),
+        current_epoch_start_time: Time::new_micros(last_reconfig),
+        next_epoch_start_time: Time::new_micros(last_reconfig + epoch_interval),
     })
 }
 
@@ -1526,24 +1568,26 @@ pub struct EpochInfo {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Time {
-    unix_time: u64,
+    unix_time: u128,
     utc_time: DateTime<Utc>,
 }
 
 impl Time {
-    pub fn new(unix_time: u64) -> Self {
-        let duration = Duration::from_micros(unix_time);
-        let date_time =
-            NaiveDateTime::from_timestamp(duration.as_secs() as i64, duration.subsec_nanos());
+    pub fn new(time: Duration) -> Self {
+        let date_time = NaiveDateTime::from_timestamp(time.as_secs() as i64, time.subsec_nanos());
         let utc_time = DateTime::from_utc(date_time, Utc);
-        // TODO: Allow configurable time
+        // TODO: Allow configurable time zone
         Self {
-            unix_time,
+            unix_time: time.as_micros(),
             utc_time,
         }
     }
 
+    pub fn new_micros(microseconds: u64) -> Self {
+        Self::new(Duration::from_micros(microseconds))
+    }
+
     pub fn new_seconds(seconds: u64) -> Self {
-        Time::new(seconds * SECS_TO_MICROSECS)
+        Self::new(Duration::from_secs(seconds))
     }
 }

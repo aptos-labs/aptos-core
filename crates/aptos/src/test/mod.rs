@@ -22,7 +22,7 @@ use crate::common::utils::write_to_file;
 
 use crate::move_tool::{
     ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
-    InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
+    IncludedArtifactsArgs, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
@@ -794,7 +794,9 @@ impl CliTestFramework {
         CompilePackage {
             move_options: self.move_options(account_strs),
             save_metadata: false,
-            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            included_artifacts_args: IncludedArtifactsArgs {
+                included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            },
         }
         .execute()
         .await
@@ -819,15 +821,15 @@ impl CliTestFramework {
         index: usize,
         gas_options: Option<GasOptions>,
         account_strs: BTreeMap<&str, &str>,
-        legacy_flow: bool,
         included_artifacts: Option<IncludedArtifacts>,
     ) -> CliTypedResult<TransactionSummary> {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
-            legacy_flow,
             override_size_check: false,
-            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::All),
+            included_artifacts_args: IncludedArtifactsArgs {
+                included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            },
         }
         .execute()
         .await

@@ -603,10 +603,14 @@ pub struct EncodingOptions {
 
 #[derive(Debug, Parser)]
 pub struct PublicKeyInputOptions {
-    /// Public key input file name
+    /// Ed25519 Public key input file name
+    ///
+    /// Mutually exclusive with `--public-key`
     #[clap(long, group = "public_key_input", parse(from_os_str))]
     public_key_file: Option<PathBuf>,
-    /// Public key encoded in a type as shown in `encoding`
+    /// Ed25519 Public key encoded in a type as shown in `encoding`
+    ///
+    /// Mutually exclusive with `--public-key-file`
     #[clap(long, group = "public_key_input")]
     public_key: Option<String>,
 }
@@ -669,10 +673,16 @@ pub trait ParsePrivateKey {
 
 #[derive(Debug, Default, Parser)]
 pub struct PrivateKeyInputOptions {
-    /// Private key input file name
+    /// Signing Ed25519 private key file path
+    ///
+    /// Encoded with type from `--encoding`
+    /// Mutually exclusive with `--private-key`
     #[clap(long, group = "private_key_input", parse(from_os_str))]
     private_key_file: Option<PathBuf>,
-    /// Private key encoded in a type as shown in `encoding`
+    /// Signing Ed25519 private key
+    ///
+    /// Encoded with type from `--encoding`
+    /// Mutually exclusive with `--private-key-file`
     #[clap(long, group = "private_key_input")]
     private_key: Option<String>,
 }
@@ -810,7 +820,7 @@ pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> Account
 
 #[derive(Debug, Parser)]
 pub struct SaveFile {
-    /// Output file name
+    /// Output file path
     #[clap(long, parse(from_os_str))]
     pub output_file: PathBuf,
 
@@ -843,20 +853,20 @@ impl SaveFile {
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
-    /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
+    /// Defaults to the URL in the `default` profile
     #[clap(long)]
     pub(crate) url: Option<reqwest::Url>,
 
     /// Connection timeout in seconds, used for the REST endpoint of the fullnode
-    #[clap(long, default_value = "30")]
-    pub connection_timeout_s: u64,
+    #[clap(long, default_value = "30", alias = "connection-timeout-s")]
+    pub connection_timeout_secs: u64,
 }
 
 impl RestOptions {
-    pub fn new(url: Option<reqwest::Url>, connection_timeout_s: Option<u64>) -> Self {
+    pub fn new(url: Option<reqwest::Url>, connection_timeout_secs: Option<u64>) -> Self {
         RestOptions {
             url,
-            connection_timeout_s: connection_timeout_s.unwrap_or(30),
+            connection_timeout_secs: connection_timeout_secs.unwrap_or(30),
         }
     }
 
@@ -882,7 +892,7 @@ impl RestOptions {
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
         Ok(Client::new_with_timeout(
             self.url(profile)?,
-            Duration::from_secs(self.connection_timeout_s),
+            Duration::from_secs(self.connection_timeout_secs),
         ))
     }
 }
@@ -1464,6 +1474,8 @@ impl TransactionOptions {
 #[derive(Parser)]
 pub struct OptionalPoolAddressArgs {
     /// Address of the Staking pool
+    ///
+    /// Defaults to the profile's `AccountAddress`
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) pool_address: Option<AccountAddress>,
 }
