@@ -93,11 +93,44 @@ aptos node get-stake-pool \
         }
     }
     ```
-6. Pull latest of the terraform module `terraform get -update`, and then apply Terraform: `terraform apply`.
-7. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team. 
+
+
+6. **Add monitoring components**
+
+  :::tip Supported only using Terraform
+  This is currently only supported using Terraform.
+  :::
+
+     1. Set the `enable_monitoring` variable in your terraform module. For example:
+
+         ```rust
+         module "aptos-node" {
+           ...
+           enable_monitoring           = true
+           utility_instance_num        = 3  # this will add one more utility instance to run monitoring component
+         }
+         ```
+
+     2. Apply the changes: `terraform apply`.
+
+     3. You will see a new pod getting created. Run `kubectl get pods` to check.
+
+     4. Access the dashboard.
+
+         First, find the IP/DNS for the monitoring load balancer.
+
+         ```bash
+         kubectl get svc ${WORKSPACE}-mon-aptos-monitoring --output jsonpath='{.status.loadBalancer.ingress[0]}'
+         ```
+
+         You can access the dashboard on `http://<ip/DNS>`.
+
+
+7. Pull latest of the terraform module `terraform get -update`, and then apply Terraform: `terraform apply`.
+8. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team. 
    - See [Node Files](/nodes/node-files-all-networks/node-files) for locations and commands to download these files.
-8. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your  **pool address**. Do not change anything else. Keep the keys as they are.
-9. Recreate the secrets. Make sure the secret name matches your `era` number, e.g. if you have `era = 3`, then you should replace the secret name to be:
+9. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your  **pool address**. Do not change anything else. Keep the keys as they are.
+10. Recreate the secrets. Make sure the secret name matches your `era` number, e.g. if you have `era = 3`, then you should replace the secret name to be:
   ```bash
   ${WORKSPACE}-aptos-node-0-genesis-e3
   ```
