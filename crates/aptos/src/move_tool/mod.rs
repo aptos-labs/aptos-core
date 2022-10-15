@@ -189,15 +189,15 @@ impl FrameworkPackageArgs {
 
 /// Creates a new Move package at the given location
 ///
-/// This will create a directory for a move package and a corresponding
+/// This will create a directory for a Move package and a corresponding
 /// `Move.toml` file.
 #[derive(Parser)]
 pub struct InitPackage {
-    /// Name of the new move package
+    /// Name of the new Move package
     #[clap(long)]
     pub(crate) name: String,
 
-    /// Directory to create the new move package
+    /// Directory to create the new Move package
     #[clap(long, parse(from_os_str))]
     pub(crate) package_dir: Option<PathBuf>,
 
