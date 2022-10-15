@@ -129,13 +129,13 @@ impl OperatorConfigFileArgs {
 pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
     ///
-    /// The key should be a bls12381 public key
+    /// The key should be a BLS12-381 public key
     #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
 
     /// Hex encoded Consensus proof of possession
     ///
-    /// The key should be a bls12381 proof of possession
+    /// The key should be a BLS12-381 proof of possession
     #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
     pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
 }
