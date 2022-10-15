@@ -56,6 +56,11 @@ variable "chain_id" {
   default     = "DEVNET"
 }
 
+variable "chain_name" {
+  description = "Aptos chain name"
+  default     = "devnet"
+}
+
 variable "machine_type" {
   description = "Machine type for running fullnode"
   default     = "s-16vcpu-32gb"

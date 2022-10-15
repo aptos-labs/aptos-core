@@ -945,7 +945,7 @@
         "multiFormat": "",
         "query": "prometheus",
         "regex": "",
-        "current": { "text": null, "value": null },
+        "current": { "text": ["[TEST] TELEMETRY"], "value": "[TEST] TELEMETRY" },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -1100,7 +1100,7 @@
     ]
   },
   "schemaVersion": 37,
-  "version": 3,
+  "version": 7,
   "links": [
     {
       "title": "Other Dashboards",

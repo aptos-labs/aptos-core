@@ -78,8 +78,16 @@ While your node is syncing, you'll be able to see the
 `aptos_state_sync_version{type="synced"}` metric gradually increase.
 
 ### Fast Syncing
+Note: Fast sync should only be used as a last resort for validators and
+validator fullnodes. This is because fast sync skips all of the blockchain
+history and as a result: (i) reduces the data availability in the network;
+and (ii) may hinder validator consensus performance if too much data has
+been skipped. Thus, validator and validator fullnode operators should be
+careful to consider alternate ways of syncing before resorting to fast sync.
 
-Note: this is the fastest and cheapest method of syncing your node.
+Note: this is the fastest and cheapest method of syncing your node. It
+requires the node to start from an empty state (i.e., not have any existing
+storage data).
 
 To download the latest blockchain state and continue to apply new
 transaction outputs as transactions are committed, add the following to your
@@ -97,6 +105,48 @@ While your node is syncing, you'll be able to see the
 However, `aptos_state_sync_version{type="synced"}` will only increase once
 the node has boostrapped. This may take several hours depending on the 
 amount of data, network bandwidth and node resources available.
+
+**Note:** If `aptos_state_sync_version{type="synced_states"}` does not
+increase then do the following:
+1. Double-check the node configuration file has correctly been updated.
+2. Make sure that the node is starting up with an empty storage database
+   (i.e., that it has not synced any state previously).
+3. Add the following to your node configuration to account for any potential
+   network delays that may occur when initializing slow network connections:
+
+```
+ state_sync:
+   state_sync_driver:
+     ...
+     max_connection_deadline_secs: 1000000 # Tolerate slow peer discovery & connections
+```
+
+## Security implications and data integrity
+Each of the different syncing modes perform data integrity verifications to
+ensure that the data being synced to the node has been correctly produced
+and signed by the validators. This occurs slightly differently for
+each syncing mode:
+1. Executing transactions from genesis is the most secure syncing mode. It will
+   verify that all transactions since the beginning of time were correctly agreed
+   upon by consensus and that all transactions were correctly executed by the
+   validators. All resulting blockchain state will thus be re-verified by the
+   syncing node.
+2. Applying transaction outputs from genesis is faster than executing all
+   transactions, but it requires that the syncing node trusts the validators to
+   have executed the transactions correctly. However, all other
+   blockchain state is still manually re-verified, e.g., consensus messages,
+   the transaction history and the state hashes are still verified.
+3. Fast syncing skips the transaction history and downloads the latest
+   blockchain state before continuously syncing. To do this, it requires that the
+   syncing node trust the validators to have correctly agreed upon all
+   transactions in the transaction history as well as trust that all transactions
+   were correctly executed by the validators. However, all other blockchain state
+   is still manually re-verified, e.g., epoch changes and the resulting blockchain states.
+
+All of the syncing modes get their root of trust from the validator set
+and cryptographic signatures from those validators over the blockchain data.
+For more information about how this works, see the [state synchronization blogpost](https://medium.com/aptoslabs/the-evolution-of-state-sync-the-path-to-100k-transactions-per-second-with-sub-second-latency-at-52e25a2c6f10).
+
 
 ## State sync architecture
 

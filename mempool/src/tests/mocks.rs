@@ -170,15 +170,6 @@ impl MockSharedMempool {
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {
         let mut pool = self.mempool.lock();
-        pool.remove_transaction(&txn.sender(), txn.sequence_number(), false)
-    }
-
-    /// True if all the given txns are in mempool, else false.
-    pub fn read_timeline(&self, timeline_id: u64, count: usize) -> Vec<SignedTransaction> {
-        let pool = self.mempool.lock();
-        pool.read_timeline(timeline_id, count)
-            .0
-            .into_iter()
-            .collect()
+        pool.commit_transaction(&txn.sender(), txn.sequence_number())
     }
 }

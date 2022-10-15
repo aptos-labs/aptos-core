@@ -5,6 +5,7 @@
 mod mock_vm_test;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_gas::LATEST_GAS_FEATURE_VERSION;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -351,10 +352,9 @@ fn encode_transaction(sender: AccountAddress, program: Script) -> Transaction {
 }
 
 pub fn encode_reconfiguration_transaction() -> Transaction {
-    Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
-        WriteSet::default(),
-        vec![],
-    )))
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(
+        ChangeSet::new(WriteSet::default(), vec![], LATEST_GAS_FEATURE_VERSION).unwrap(),
+    ))
 }
 
 fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {

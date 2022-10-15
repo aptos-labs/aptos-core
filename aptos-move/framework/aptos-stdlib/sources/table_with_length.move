@@ -97,6 +97,23 @@ module aptos_std::table_with_length {
         table::contains(&table.inner, key)
     }
 
+    #[test_only]
+    /// Drop table even if not empty, only when testing.
+    public fun drop_unchecked<K: copy + drop, V>(table: TableWithLength<K, V>) {
+        // Unpack table with length, dropping length count but not
+        // inner table.
+        let TableWithLength{inner, length: _} = table;
+        table::drop_unchecked(inner); // Drop inner table.
+    }
+
+    #[test]
+    /// Verify test-only drop functionality.
+    fun test_drop_unchecked() {
+        let table = new<bool, bool>(); // Declare new table.
+        add(&mut table, true, false); // Add table entry.
+        drop_unchecked(table); // Drop table.
+    }
+
     #[test]
     fun test_upsert() {
         let t = new<u8, u8>();

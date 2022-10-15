@@ -12,7 +12,7 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_data_id_hash, transaction_version))]
 #[diesel(table_name = token_datas)]
 pub struct TokenData {
@@ -34,11 +34,12 @@ pub struct TokenData {
     pub properties_mutable: bool,
     pub royalty_mutable: bool,
     pub default_properties: serde_json::Value,
-    pub inserted_at: chrono::NaiveDateTime,
     pub collection_data_id_hash: String,
+    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub description: String,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_data_id_hash))]
 #[diesel(table_name = current_token_datas)]
 pub struct CurrentTokenData {
@@ -60,14 +61,16 @@ pub struct CurrentTokenData {
     pub royalty_mutable: bool,
     pub default_properties: serde_json::Value,
     pub last_transaction_version: i64,
-    pub inserted_at: chrono::NaiveDateTime,
     pub collection_data_id_hash: String,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub description: String,
 }
 
 impl TokenData {
     pub fn from_write_table_item(
         table_item: &APIWriteTableItem,
         txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<(Self, CurrentTokenData)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
@@ -123,7 +126,8 @@ impl TokenData {
                         properties_mutable: token_data.mutability_config.properties,
                         royalty_mutable: token_data.mutability_config.royalty,
                         default_properties: token_data.default_properties.clone(),
-                        inserted_at: chrono::Utc::now().naive_utc(),
+                        transaction_timestamp: txn_timestamp,
+                        description: token_data.description.clone(),
                     },
                     CurrentTokenData {
                         collection_data_id_hash,
@@ -145,7 +149,8 @@ impl TokenData {
                         royalty_mutable: token_data.mutability_config.royalty,
                         default_properties: token_data.default_properties,
                         last_transaction_version: txn_version,
-                        inserted_at: chrono::Utc::now().naive_utc(),
+                        last_transaction_timestamp: txn_timestamp,
+                        description: token_data.description,
                     },
                 )));
             } else {

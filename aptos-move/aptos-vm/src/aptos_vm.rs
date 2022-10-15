@@ -73,6 +73,7 @@ use std::{
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
+static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 
 /// Remove this once the bundle is removed from the code.
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
@@ -154,6 +155,20 @@ impl AptosVM {
         }
     }
 
+    /// Sets addigional details in counters when invoked the first time.
+    pub fn set_processed_transactions_detailed_counters() {
+        // Only the first call succeeds, due to OnceCell semantics.
+        PROCESSED_TRANSACTIONS_DETAILED_COUNTERS.set(true).ok();
+    }
+
+    /// Get whether we should capture additional details in counters
+    pub fn get_processed_transactions_detailed_counters() -> bool {
+        match PROCESSED_TRANSACTIONS_DETAILED_COUNTERS.get() {
+            Some(value) => *value,
+            None => false,
+        }
+    }
+
     pub fn internals(&self) -> AptosVMInternals {
         AptosVMInternals::new(&self.0)
     }
@@ -229,9 +244,15 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
-                let txn_output =
-                    get_transaction_output(&mut (), session, gas_meter.balance(), txn_data, status)
-                        .unwrap_or_else(|e| discard_error_vm_status(e).1);
+                let txn_output = get_transaction_output(
+                    &mut (),
+                    session,
+                    gas_meter.balance(),
+                    txn_data,
+                    status,
+                    gas_meter.feature_version(),
+                )
+                .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
             }
             TransactionStatus::Discard(status) => {
@@ -280,7 +301,7 @@ impl AptosVM {
         let epilogue_change_set_ext = session
             .finish()
             .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut ())?;
+            .into_change_set(&mut (), gas_meter.feature_version())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
@@ -379,7 +400,8 @@ impl AptosVM {
             self.resolve_pending_code_publish(&mut session, gas_meter)?;
 
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-            let change_set_ext = session_output.into_change_set(&mut ())?;
+            let change_set_ext =
+                session_output.into_change_set(&mut (), gas_meter.feature_version())?;
 
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -519,7 +541,8 @@ impl AptosVM {
         )?;
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-        let change_set_ext = session_output.into_change_set(&mut ())?;
+        let change_set_ext =
+            session_output.into_change_set(&mut (), gas_meter.feature_version())?;
 
         // Charge gas for write set
         gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -727,9 +750,11 @@ impl AptosVM {
         let mut gas_meter = UnmeteredGasMeter;
 
         Ok(match writeset_payload {
-            WriteSetPayload::Direct(change_set) => {
-                ChangeSetExt::new(DeltaChangeSet::empty(), change_set.clone())
-            }
+            WriteSetPayload::Direct(change_set) => ChangeSetExt::new(
+                DeltaChangeSet::empty(),
+                change_set.clone(),
+                self.0.get_gas_feature_version(),
+            ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
                 let senders = match txn_sender {
@@ -759,7 +784,9 @@ impl AptosVM {
                     .map_err(|e| e.into_vm_status());
 
                 match execution_result {
-                    Ok(session_out) => session_out.into_change_set(&mut ()).map_err(Err)?,
+                    Ok(session_out) => session_out
+                        .into_change_set(&mut (), self.0.get_gas_feature_version())
+                        .map_err(Err)?,
                     Err(e) => {
                         return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
                     }
@@ -880,6 +907,7 @@ impl AptosVM {
             0.into(),
             &txn_data,
             ExecutionStatus::Success,
+            self.0.get_gas_feature_version(),
         )?;
         Ok((VMStatus::Executed, output))
     }

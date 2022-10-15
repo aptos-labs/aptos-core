@@ -148,6 +148,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 .filter_map(|(sk, wo)| self.try_into_write_set_change(sk, wo).ok())
                 .collect(),
             block_height: None,
+            epoch: None,
         }
     }
 

@@ -47,7 +47,7 @@ impl ConfigTool {
     }
 }
 
-/// Generates shell completion files
+/// Generate shell completion files
 ///
 /// First generate the completion file, then follow the shell specific directions on how
 /// to install the completion file.

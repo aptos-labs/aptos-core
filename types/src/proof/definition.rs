@@ -292,19 +292,28 @@ impl SparseMerkleProof {
                 // route from the leaf node to the root.
                 ensure!(
                     element_key == leaf.key,
-                    "Keys do not match. Key in proof: {:x}. Expected key: {:x}.",
+                    "Keys do not match. Key in proof: {:x}. Expected key: {:x}. \
+                     Element hash: {:x}. Value hash in proof {:x}",
                     leaf.key,
-                    element_key
+                    element_key,
+                    hash,
+                    leaf.value_hash
                 );
                 ensure!(
                     hash == leaf.value_hash,
-                    "Value hashes do not match. Value hash in proof: {:x}. \
-                     Expected value hash: {:x}",
+                    "Value hashes do not match for key {:x}. Value hash in proof: {:x}. \
+                     Expected value hash: {:x}. ",
+                    element_key,
                     leaf.value_hash,
-                    hash,
+                    hash
                 );
             }
-            (Some(_hash), None) => bail!("Expected inclusion proof. Found non-inclusion proof."),
+            (Some(hash), None) => {
+                bail!(
+                    "Expected inclusion proof, value hash: {:x}. Found non-inclusion proof.",
+                    hash
+                )
+            }
             (None, Some(leaf)) => {
                 // This is a non-inclusion proof. The proof intends to show that if a leaf node
                 // representing `element_key` is inserted, it will break a currently existing leaf
@@ -312,13 +321,18 @@ impl SparseMerkleProof {
                 // route from that leaf node to the root.
                 ensure!(
                     element_key != leaf.key,
-                    "Expected non-inclusion proof, but key exists in proof.",
+                    "Expected non-inclusion proof, but key exists in proof. \
+                     Key: {:x}. Key in proof: {:x}.",
+                    element_key,
+                    leaf.key,
                 );
                 ensure!(
                     element_key.common_prefix_bits_len(leaf.key) >= self.siblings.len(),
                     "Key would not have ended up in the subtree where the provided key in proof \
                      is the only existing key, if it existed. So this is not a valid \
-                     non-inclusion proof.",
+                     non-inclusion proof. Key: {:x}. Key in proof: {:x}.",
+                    element_key,
+                    leaf.key
                 );
             }
             (None, None) => {

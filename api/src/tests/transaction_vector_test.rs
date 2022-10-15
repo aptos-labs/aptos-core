@@ -94,12 +94,12 @@ fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
                 identifier_strategy(),
                 identifier_strategy()).prop_map(|(t_vec, addr, module, name)| {
 
-                TypeTag::Struct(StructTag {
+                TypeTag::Struct(Box::new(StructTag {
                     address: addr,
                     module: Identifier::new(module).unwrap(),
                     name: Identifier::new(name).unwrap(),
                     type_params: t_vec,
-                })}),
+                }))}),
         ]
     })
 }

@@ -85,7 +85,7 @@ An example of how BCS serializes a string is shown below:
 
 ```typescript
 // A string is serialized as: byte length + byte representation of the string. The byte length is required for deserialization. Without it, no way the deserializer knows how many bytes to deserialize.
-const bytes: Unint8Array = bcs_serialize_string("aptos");
+const bytes: Uint8Array = bcs_serialize_string("aptos");
 assert(bytes == [5, 0x61, 0x70, 0x74, 0x6f, 0x73]);
 ```
 

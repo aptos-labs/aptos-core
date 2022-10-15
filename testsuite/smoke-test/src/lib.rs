@@ -22,8 +22,6 @@ mod indexer;
 #[cfg(test)]
 mod network;
 #[cfg(test)]
-mod nft_transaction;
-#[cfg(test)]
 mod rest_api;
 #[cfg(test)]
 mod rosetta;
@@ -37,6 +35,8 @@ mod transaction;
 mod txn_broadcast;
 #[cfg(test)]
 mod txn_emitter;
+#[cfg(test)]
+mod upgrade;
 
 #[cfg(test)]
 mod smoke_test_environment;

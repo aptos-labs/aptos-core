@@ -63,8 +63,18 @@ variable "chain_id" {
   default     = "DEVNET"
 }
 
+variable "chain_name" {
+  description = "Aptos chain name"
+  default     = "devnet"
+}
+
+variable "fullnode_name" {
+  description = "Name of the fullnode node owner"
+  type        = string
+}
+
 variable "pfn_helm_values" {
-  description = "Map of values to pass to testnet Helm"
+  description = "Map of values to pass to pfn-addons Helm"
   type        = any
   default     = {}
 }
@@ -120,7 +130,7 @@ variable "utility_instance_type" {
 
 variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c6i.4xlarge"
+  default     = "c6i.8xlarge"
 }
 
 variable "num_extra_instance" {
@@ -130,5 +140,35 @@ variable "num_extra_instance" {
 
 variable "enable_backup" {
   description = "enable data backup from fullnode"
+  default     = false
+}
+
+variable "fullnode_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default     = "io1"
+  validation {
+    condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
+  }
+}
+
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
   default     = false
 }

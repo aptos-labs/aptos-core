@@ -871,7 +871,7 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
                 format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
             }
             Struct(struct_tag) => match struct_tag {
-                tag if tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
+                tag if &**tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Signer => common::type_not_allowed(type_tag),

@@ -5,13 +5,136 @@ slug: "issues-and-workarounds"
 
 # Issues and Workarounds
 
-This page documents issues that frequently come up and the suggested workarounds. 
+This page provides workarounds and answers for issues and questions that frequently come up. 
 
 :::tip Help keep this page up-to-date
 If you found an issue that is not on this page, submit a [GitHub Issue](https://github.com/aptos-labs/aptos-core/issues). Make sure to follow the issue format used in this document. 
 :::
 
 ## Nodes
+
+### Invalid EpochChangeProof: Waypoint value mismatch
+
+#### Description
+
+Receive this error from a validator node:
+
+```json
+{"error":"Invalid EpochChangeProof: Waypoint value mismatch: waypoint value = 3384a932349524093cda8cea714691e668d668fb34260d8a5f77c667d7724372, given value = 81ee9bd880acd25ad617e55913b7345dc01b861adf43971259a22e9a5c82315c","event":"error","name":"initialize"}
+```
+
+#### Workaround
+
+Delete the `secure-data.json` file because very likely you are using an older version of it.  Check your `validator.yaml` file and you will see something like `path: /opt/aptos/data/secure-data.json`. Or see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node) for the location of this file. For Docker, you can delete this file by `docker` commands such as: `docker-compose down --volumes` (check the `docker-compose` help). Finally, **remember to restart the node. **
+
+### How to find out when the next epoch starts
+
+:::tip Current epoch duration
+The Aptos current epoch duration is 1 hour.
+:::
+
+You can find out when the next epoch starts in multiple ways: 
+
+**Use the CLI**
+```bash
+aptos node show-epoch-info --url https://fullnode.mainnet.aptoslabs.com/v1
+```
+which produces an output like below (example output for mainnet):
+```json
+{
+  "Result": {
+    "epoch": 692,
+    "epoch_interval_secs": 3600,
+    "current_epoch_start_time": {
+      "unix_time": 1665429258117522,
+      "utc_time": "2022-10-10T19:14:18.117522Z"
+    },
+    "next_epoch_start_time": {
+      "unix_time": 1665436458117522,
+      "utc_time": "2022-10-10T21:14:18.117522Z"
+    }
+  }
+}
+```
+
+**Find it in your stake pool information output**
+
+You can see when the next epoch starts in the output of the command `aptos node get-stake-pool`. See [Checking your stake pool information](/nodes/validator-node/operator/staking-pool-operations/#checking-your-stake-pool-information).
+
+Finally, you can use Aptos Explorer and an online epoch converter to find out when the next epoch starts. See below:
+
+**You can use the Aptos Explorer and epoch converter**
+
+1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
+2. Switch to **RESOURCES** tab.
+3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `last_reconfiguration_time`. You will find the last epoch transition timestamp in microseconds. The text display looks like this:
+  ```json
+  {
+    "epoch": "25",
+    "events": {
+      "counter": "25",
+      "guid": {
+        "id": {
+          "addr": "0x1",
+          "creation_num": "2"
+        }
+      }
+    },
+    "last_reconfiguration_time": "1664919592960637"
+  }
+  ```
+
+4. Go to https://www.epochconverter.com/ and include the epoch timestamp to convert it to a human-readable date. 
+
+### How to check if a validator address is in the validator set
+
+You can check if a validator address is in the Aptos validator set either on the command line or by using the Aptos Explorer.
+
+**CLI** 
+
+Run the below command:
+```bash
+aptos node show-validator-set --profile operator | jq -r '.Result.active_validators[].addr' | grep <stake pool address>
+```
+
+And ensure you see the validator in the output.
+
+**Aptos Explorer**
+
+Follow these steps on the Aptos Explorer:
+
+1. Go to account [`0x1`](https://explorer.aptoslabs.com/account/0x1) page on the Aptos Explorer.
+1. Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
+2. Switch to the **RESOURCES** tab.
+3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for the validator address. 
+
+### How to find stake pool address
+
+To find out which stake pool address to use (for example, to bootstrap your node), run the below command. This example is for mainnet. See the `--url` value for testnet or devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md). Also see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node):
+
+```bash
+aptos node get-stake-pool \
+  --owner-address 0x0756c80f0597fc221fe043d5388949b34151a4efe5753965bbfb0ed7d0be08ea \
+  --url https://fullnode.mainnet.aptoslabs.com/v1
+```
+
+### How to check if an address is the correct stake pool address or a correct validator address
+
+Follow these steps on the Aptos Explorer:
+
+1. Go to account [`0x1`](https://explorer.aptoslabs.com/account/0x1) page on the Aptos Explorer.
+1.  Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
+2. Switch to **RESOURCES** tab.
+3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `StakePool`. The address with the `StakePool` resource is the correct stake pool address.
+4. You can double-check by searching for the operator and seeing if that’s your operator address. 
+
+### How to see previous epoch rewards
+
+To see the previous epoch rewards for a given pool address, click on a URL of the below format. This example is for mainnet and for the pool address `0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4`. Use the network and pool address of your choice in this place:
+
+```html
+https://fullnode.mainnet.aptoslabs.com/v1/accounts/0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4/events/10
+```
 
 ### Terraform "Connection Refused" error
 
@@ -32,6 +155,14 @@ This likely means that the state of the install is out of sync with the saved te
 
   terraform state rm <state>
   ```
+
+### How to find chain ID of my node
+
+On your node, run this command to find out the chain ID of your node:
+
+```bash
+curl http://127.0.0.1:8080/v1
+```
 
 ### Fullnode "NoAvailablePeers" error
 
@@ -101,9 +232,6 @@ If your validator node is facing persistent issues, for example, it is unable to
    level: DEBUG
 ```
 - Make sure to also include any other information you think might be useful and whether or not restarting your validator helps.
-
-
-
 
 
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api

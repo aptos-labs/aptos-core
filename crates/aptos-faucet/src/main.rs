@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+// README: The aptos-faucet is deprecated in favor of the tap. Do not add new code
+// to this until you've spoken with the Ecosystem Platform team + dport.
+
 use aptos_faucet::FaucetArgs;
 use clap::Parser;
 
@@ -161,6 +164,7 @@ mod tests {
                     accumulator_root_hash: HashValue::zero().into(),
                     changes: vec![],
                     block_height: None,
+                    epoch: None,
                 };
                 let serializable_txn: aptos_rest_client::aptos_api_types::Transaction = (
                     txn.as_signed_user_txn().unwrap(),

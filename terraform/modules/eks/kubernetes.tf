@@ -16,6 +16,34 @@ resource "kubernetes_storage_class" "io1" {
   }
 }
 
+resource "kubernetes_storage_class" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = false
+    }
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "gp3"
+  }
+
+  depends_on = [aws_eks_addon.aws-ebs-csi-driver]
+}
+
+resource "kubernetes_storage_class" "io2" {
+  metadata {
+    name = "io2"
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "io2"
+    iops = "40000"
+  }
+}
+
 resource "null_resource" "delete-gp2" {
   provisioner "local-exec" {
     command = <<-EOT

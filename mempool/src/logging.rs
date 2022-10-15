@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared_mempool::types::{BatchId, QuorumStoreRequest};
+use crate::shared_mempool::types::{MultiBatchId, QuorumStoreRequest};
 use anyhow::Error;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::Schema;
@@ -112,7 +112,7 @@ pub struct LogSchema<'a> {
     network_level: Option<usize>,
     upstream_network: Option<&'a NetworkId>,
     #[schema(debug)]
-    batch_id: Option<&'a BatchId>,
+    batch_id: Option<&'a MultiBatchId>,
     backpressure: Option<bool>,
 }
 

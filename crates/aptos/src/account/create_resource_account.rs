@@ -13,11 +13,10 @@ use clap::Parser;
 use serde::Serialize;
 use std::str::FromStr;
 
-/// Command to create a resource account on-chain
+/// Create a resource account on-chain
 ///
-/// To create an account there are two options:
-/// 1. Submit a create account transaction with an account that has APT coins
-/// 2. Use a faucet to create the account
+/// This will create a resource account which can be used as an autonomous account
+/// not controlled directly by one account.
 #[derive(Debug, Parser)]
 pub struct CreateResourceAccount {
     /// Resource account seed

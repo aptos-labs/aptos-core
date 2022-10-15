@@ -11,6 +11,8 @@ use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Formatter};
 
+const NAME_LENGTH: usize = 128;
+const URI_LENGTH: usize = 512;
 /**
  * This file defines deserialized move types as defined in our 0x3 contracts.
  */
@@ -33,11 +35,11 @@ impl TokenDataIdType {
     }
 
     pub fn get_collection_trunc(&self) -> String {
-        truncate_str(&self.collection, 128)
+        truncate_str(&self.collection, NAME_LENGTH)
     }
 
     pub fn get_name_trunc(&self) -> String {
-        truncate_str(&self.name, 128)
+        truncate_str(&self.name, NAME_LENGTH)
     }
 
     pub fn get_collection_data_id_hash(&self) -> String {
@@ -70,7 +72,7 @@ impl CollectionDataIdType {
     }
 
     pub fn get_name_trunc(&self) -> String {
-        truncate_str(&self.name, 128)
+        truncate_str(&self.name, NAME_LENGTH)
     }
 }
 
@@ -112,11 +114,11 @@ pub struct TokenDataType {
 
 impl TokenDataType {
     pub fn get_uri_trunc(&self) -> String {
-        truncate_str(&self.uri, 512)
+        truncate_str(&self.uri, URI_LENGTH)
     }
 
     pub fn get_name_trunc(&self) -> String {
-        truncate_str(&self.name, 128)
+        truncate_str(&self.name, NAME_LENGTH)
     }
 }
 
@@ -165,11 +167,11 @@ impl CollectionDataType {
     }
 
     pub fn get_uri_trunc(&self) -> String {
-        truncate_str(&self.uri, 512)
+        truncate_str(&self.uri, URI_LENGTH)
     }
 
     pub fn get_name_trunc(&self) -> String {
-        truncate_str(&self.name, 128)
+        truncate_str(&self.name, NAME_LENGTH)
     }
 }
 
