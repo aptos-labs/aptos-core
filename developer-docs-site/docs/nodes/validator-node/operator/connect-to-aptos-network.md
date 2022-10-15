@@ -30,7 +30,7 @@ aptos node get-stake-pool \
 1. Stop your node and remove the data directory. 
    - **Make sure you remove the `secure-data.json` file also**. [Click here to see the location of the `secure-data.json` file](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team. 
-   - See [Node Files](/nodes/node-files) for locations and commands to download these files.
+   - See [Node Files](/nodes/node-files-all-networks/node-files) for locations and commands to download these files.
 3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **pool address**. Do not change anything else. Keep the keys as they are. 
 4. Pull the latest changes from the `mainnet` branch. 
 5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). Add the below configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](/concepts/state-sync#fast-syncing).
@@ -48,7 +48,7 @@ aptos node get-stake-pool \
 1. Stop your node and remove the data volumes: `docker compose down --volumes`. 
    - **Make sure you remove the `secure-data.json` file too.** [Click here to see the location of the `secure-data.json` file](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team. 
-   - See [Node Files](/nodes/node-files) for locations and commands to download these files.
+   - See [Node Files](/nodes/node-files-all-networks/node-files) for locations and commands to download these files.
 3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **pool address**.
 4. Update your Docker image to the latest of the network branch (e.g. mainnet, testnet).
 5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). Add this configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](/concepts/state-sync#fast-syncing).
@@ -95,7 +95,7 @@ aptos node get-stake-pool \
     ```
 6. Pull latest of the terraform module `terraform get -update`, and then apply Terraform: `terraform apply`.
 7. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team. 
-   - See [Node Files](/nodes/node-files) for locations and commands to download these files.
+   - See [Node Files](/nodes/node-files-all-networks/node-files) for locations and commands to download these files.
 8. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your  **pool address**. Do not change anything else. Keep the keys as they are.
 9. Recreate the secrets. Make sure the secret name matches your `era` number, e.g. if you have `era = 3`, then you should replace the secret name to be:
   ```bash
