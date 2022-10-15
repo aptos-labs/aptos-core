@@ -16,8 +16,8 @@ Make sure to see the row describing [**What not to do**](#what-not-to-do).
 
 |Description | Mainnet | Devnet | Long-lived Testnet | Aptos Incentivized Testnet (AIT)|
 |---|---|---|---|---|
-|**Chain ID**| 1 |[On Aptos Explorer **select Devnet from top right**](https://explorer.aptoslabs.com/?network=Devnet).| 2|  Available during AIT program.|
-|**REST API URL**| <div style={{width: 200}}>https://fullnode.mainnet.aptoslabs.com/v1</div> |<div style={{width: 200}}>https://fullnode.devnet.aptoslabs.com/v1</div> | <div style={{width: 200}}>https://fullnode.testnet.aptoslabs.com/v1</div> | <div style={{width: 200}}>Available during AIT program. </div>|
+|<div style={{width: 120}}>**Chain ID**</div>| 1 |[On Aptos Explorer **select Devnet from top right**](https://explorer.aptoslabs.com/?network=Devnet).| 2|  Available during AIT program.|
+|**REST API URL**| <div style={{width: 220}}>https://fullnode.mainnet.aptoslabs.com/v1</div> |<div style={{width: 220}}>https://fullnode.devnet.aptoslabs.com/v1</div> | <div style={{width: 220}}>https://fullnode.testnet.aptoslabs.com/v1</div> | <div style={{width: 110}}>Available during AIT program. </div>|
 |**Genesis blob and Waypoint**| In the `mainnet` directory on https://github.com/aptos-labs/aptos-networks |In the `devnet` directory on https://github.com/aptos-labs/aptos-networks  | <div style={{width: 200}}>In the `testnet` directory on https://github.com/aptos-labs/aptos-networks </div>| Available during AIT program.  |
 |**Faucet**| No Faucet |<div style={{width: 200}}>https://faucet.devnet.aptoslabs.com/</div> | <div style={{width: 200}}>https://faucet.testnet.aptoslabs.com/ </div>|Available during AIT program.|
 |**Epoch**| 7200 seconds (two hours, set by governance) |--- | --- |Available during AIT program.|
@@ -30,5 +30,5 @@ Make sure to see the row describing [**What not to do**](#what-not-to-do).
 |**Network status**| Always live. |Mostly live, with brief interruptions during regular updates. |Mostly live, with brief interruptions during regular updates. | Live only during Incentivized Testnet drives. |
 |**Type of nodes** |Validators and validator fullnodes. |Validators and public fullnodes. | Validators and public fullnodes. | Validators and validator fullnodes.|
 |**How to run a node**| See [Validators](/nodes/validator-node/validators) and [Public Fullnode](/nodes/full-node/public-fullnode) sections.  |N/A, run by Aptos Labs team. |See [Validators](/nodes/validator-node/validators) and [Public Fullnode](/nodes/full-node/public-fullnode) sections. | See the node deployment guides published during AIT program.|
-|<span id="what-not-to-do">**What not to do**</span>||Do not attempt to sync your local AIT fullnode or AIT validator node with devnet. | Make sure you deploy your local AIT fullnode, AIT validator node and AIT validator fullnode in the test mode, and follow the instructions in the node deployment guides published during AIT program.|
+|<span id="what-not-to-do">**What not to do**</span>||Do not attempt to sync your local AIT fullnode or AIT validator node with devnet. | |Make sure you deploy your local AIT fullnode, AIT validator node and AIT validator fullnode in the test mode, and follow the instructions in the node deployment guides published during AIT program.|
 
