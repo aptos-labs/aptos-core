@@ -120,3 +120,15 @@ fn test_nft_auction_house() {
     )]);
     run_tests_for_pkg("marketplace", named_address);
 }
+
+#[test]
+fn test_resource_account() {
+    let named_address = BTreeMap::from([(
+        String::from("resource_account"),
+        create_resource_address(
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+            vec![].as_slice(),
+        ),
+    )]);
+    run_tests_for_pkg("resource_account", named_address);
+}

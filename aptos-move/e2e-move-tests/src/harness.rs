@@ -125,6 +125,22 @@ impl MoveHarness {
         data.account().clone()
     }
 
+    pub fn new_account_with_balance_and_sequence_number(
+        &mut self,
+        balance: u64,
+        sequence_number: u64,
+    ) -> Account {
+        let mut rng = StdRng::from_seed(OsRng.gen());
+
+        let privkey = Ed25519PrivateKey::generate(&mut rng);
+        let pubkey = privkey.public_key();
+        let acc = Account::with_keypair(privkey, pubkey);
+        let data = AccountData::with_account(acc.clone(), balance, sequence_number);
+        self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(*acc.address(), sequence_number);
+        data.account().clone()
+    }
+
     /// Gets the account where the Aptos framework is installed (0x1).
     pub fn aptos_framework_account(&mut self) -> Account {
         self.new_account_at(AccountAddress::ONE)
