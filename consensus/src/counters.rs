@@ -497,3 +497,12 @@ pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Time it takes for proposer election to compute proposer (when not cached)
+pub static PROPOSER_ELECTION_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_proposer_election_duration",
+        "Time it takes for proposer election to compute proposer (when not cached)"
+    )
+    .unwrap()
+});

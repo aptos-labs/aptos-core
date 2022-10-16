@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, MoveHarness};
+use aptos::common::types::RotationProofChallenge;
 use aptos_crypto::multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey};
 use aptos_crypto::{Signature, SigningKey, Uniform, ValidCryptoMaterial};
 use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
-    state_store::state_key::StateKey, state_store::table::TableHandle,
-    transaction::authenticator::AuthenticationKey,
+    account_address::AccountAddress, account_config::AccountResource,
+    account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey,
+    state_store::table::TableHandle, transaction::authenticator::AuthenticationKey,
 };
-
-use aptos::common::types::RotationProofChallenge;
 use cached_packages::aptos_stdlib;
 use language_e2e_tests::account::Account;
 use move_deps::move_core_types::parser::parse_struct_tag;
@@ -22,7 +21,7 @@ fn rotate_auth_key_ed25519_to_ed25519() {
 
     let account2 = harness.new_account_with_key_pair();
     // assert that the payload is successfully processed (the signatures are correct)
-    assert_successful_payload_key_rotation(
+    assert_successful_key_rotation_transaction(
         0,
         0,
         &mut harness,
@@ -34,7 +33,7 @@ fn rotate_auth_key_ed25519_to_ed25519() {
     );
 
     // verify that we can still get to account1's originating address
-    verify_originating_address(&mut harness, account2.auth_key(), *account1.address());
+    verify_originating_address(&mut harness, account2.auth_key(), *account1.address(), 1);
 }
 
 #[test]
@@ -47,7 +46,7 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
     let auth_key = AuthenticationKey::multi_ed25519(&public_key);
 
     // assert that the payload is successfully processed (the signatures are correct)
-    assert_successful_payload_key_rotation(
+    assert_successful_key_rotation_transaction(
         0,
         1,
         &mut harness,
@@ -59,7 +58,7 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
     );
 
     // verify that we can still get to account1's originating address
-    verify_originating_address(&mut harness, auth_key.to_vec(), *account1.address());
+    verify_originating_address(&mut harness, auth_key.to_vec(), *account1.address(), 1);
 }
 
 #[test]
@@ -69,7 +68,7 @@ fn rotate_auth_key_twice() {
 
     let account2 = harness.new_account_with_key_pair();
     // assert that the payload is successfully processed (the signatures are correct)
-    assert_successful_payload_key_rotation(
+    assert_successful_key_rotation_transaction(
         0,
         0,
         &mut harness,
@@ -82,10 +81,10 @@ fn rotate_auth_key_twice() {
     // rotate account1's keypair to account2
     account1.rotate_key(account2.privkey, account2.pubkey);
     // verify that we can still get to account1's originating address
-    verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
+    verify_originating_address(&mut harness, account1.auth_key(), *account1.address(), 1);
 
     let account3 = harness.new_account_with_key_pair();
-    assert_successful_payload_key_rotation(
+    assert_successful_key_rotation_transaction(
         0,
         0,
         &mut harness,
@@ -96,10 +95,10 @@ fn rotate_auth_key_twice() {
         account3.pubkey.clone(),
     );
     account1.rotate_key(account3.privkey, account3.pubkey);
-    verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
+    verify_originating_address(&mut harness, account1.auth_key(), *account1.address(), 2);
 }
 
-pub fn assert_successful_payload_key_rotation<
+pub fn assert_successful_key_rotation_transaction<
     S: SigningKey + ValidCryptoMaterial,
     V: ValidCryptoMaterial,
 >(
@@ -112,8 +111,8 @@ pub fn assert_successful_payload_key_rotation<
     new_private_key: S,
     new_public_key: V,
 ) {
-    // construct a proof challenge struct that proves that
-    // the user intends to rotate their auth key
+    // Construct a proof challenge struct that proves that
+    // the user intends to rotate their auth key.
     let rotation_proof = RotationProofChallenge {
         account_address: CORE_CODE_ADDRESS,
         module_name: String::from("account"),
@@ -126,7 +125,7 @@ pub fn assert_successful_payload_key_rotation<
 
     let rotation_msg = bcs::to_bytes(&rotation_proof).unwrap();
 
-    // sign the rotation message by the current private key and the new private key
+    // Sign the rotation message by the current private key and the new private key.
     let signature_by_curr_privkey = current_account
         .privkey
         .sign_arbitrary_message(&rotation_msg);
@@ -149,8 +148,9 @@ pub fn verify_originating_address(
     harness: &mut MoveHarness,
     auth_key: Vec<u8>,
     expected_address: AccountAddress,
+    expected_num_of_events: u64,
 ) {
-    // get the address redirection table
+    // Get the address redirection table
     let originating_address_handle = harness
         .read_resource::<TableHandle>(
             &CORE_CODE_ADDRESS,
@@ -161,7 +161,16 @@ pub fn verify_originating_address(
         originating_address_handle,
         AccountAddress::from_bytes(auth_key).unwrap().to_vec(),
     );
-    // verify that the value in the address redirection table is expected
+    // Verify that the value in the address redirection table is expected
     let result = harness.read_state_value(state_key).unwrap();
     assert_eq!(result, expected_address.to_vec());
+
+    let account_resource = parse_struct_tag("0x1::account::Account").unwrap();
+    let key_rotation_events = harness
+        .read_resource::<AccountResource>(&expected_address, account_resource)
+        .unwrap()
+        .key_rotation_events()
+        .clone();
+
+    assert_eq!(key_rotation_events.count(), expected_num_of_events);
 }

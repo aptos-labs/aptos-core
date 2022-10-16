@@ -83,6 +83,8 @@ impl FromStr for GithubRepo {
 #[derive(Clone, Default, Parser)]
 pub struct GitOptions {
     /// Github repository e.g. 'aptos-labs/aptos-core'
+    ///
+    /// Mutually exclusive with `--local-repository-dir`
     #[clap(long)]
     pub(crate) github_repository: Option<GithubRepo>,
 
@@ -95,6 +97,8 @@ pub struct GitOptions {
     pub(crate) github_token_file: Option<PathBuf>,
 
     /// Path to local git repository
+    ///
+    /// Mutually exclusive with `--github-repository`
     #[clap(long, parse(from_os_str))]
     pub(crate) local_repository_dir: Option<PathBuf>,
 }

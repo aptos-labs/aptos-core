@@ -36,21 +36,21 @@ done
 echo "##### Terraform fmt #####"
 terraform fmt -recursive -check .
 
-# Validate all the terraform modules
-echo "##### Terraform validate #####"
-base_dir=$(pwd)
-for dir in ${tf_dirs[@]}; do
-    echo "Validating $dir"
-    cd $dir
-    terraform init -backend=false && terraform validate
-    cd $base_dir
-done
+# # Validate all the terraform modules
+# echo "##### Terraform validate #####"
+# base_dir=$(pwd)
+# for dir in ${tf_dirs[@]}; do
+#     echo "Validating $dir"
+#     cd $dir
+#     terraform init -backend=false && terraform validate
+#     cd $base_dir
+# done
 
-# Run tflint
-echo "##### tflint #####"
-base_dir=$(pwd)
-./tflint --init --config="${base_dir}/terraform/.tflint.hcl"
-for dir in ${tf_dirs[@]}; do
-    echo "Linting $dir"
-    ./tflint --config="${base_dir}/terraform/.tflint.hcl" --var-file="${base_dir}/terraform/tflint.tfvars" $dir
-done
+# # Run tflint
+# echo "##### tflint #####"
+# base_dir=$(pwd)
+# ./tflint --init --config="${base_dir}/terraform/.tflint.hcl"
+# for dir in ${tf_dirs[@]}; do
+#     echo "Linting $dir"
+#     ./tflint --config="${base_dir}/terraform/.tflint.hcl" --var-file="${base_dir}/terraform/tflint.tfvars" $dir
+# done

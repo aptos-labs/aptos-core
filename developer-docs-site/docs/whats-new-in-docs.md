@@ -5,6 +5,22 @@ slug: "whats-new-in-docs"
 
 # Whats New in Docs
 
+## 12 October 2022
+
+- Added [Node Connections](/docs/nodes/full-node/fullnode-network-connections.md) document that describes how to configure node network connections.
+
+## 11 October 2022
+
+- Added [Data Pruning](/docs/guides/data-pruning.md) document that describes how to change the data pruning settings.
+
+## 10 October 2022
+
+- Added [Staking Pool Operations](/docs/nodes/validator-node/operator/staking-pool-operations.md) document.
+
+## 06 October 2022
+
+- Added [Node Files](/docs/nodes/node-files.md) document that lists all the files required during node deployment process. Includes commands to download each file.
+
 This page shows the key updates to the developer documentation on this site.
 
 ## 03 October 2022
@@ -54,7 +70,7 @@ The [hardware requirements](/docs/nodes/validator-node/operator/node-requirement
 
 ## 06 September 2022
 
-- A new concept document explaining the [State Synchronization](/concepts/state-sync.md) is posted.
+- A new concept document explaining the [State Synchronization](/guides/state-sync.md) is posted.
 
 - The [Staking](/concepts/staking.md) document is updated.
 

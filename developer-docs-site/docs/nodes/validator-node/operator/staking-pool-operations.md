@@ -18,7 +18,7 @@ Make sure that this initializing the stake pool step was performed by the owner.
 ## Joining validator set
 
 :::danger Errors? 
-If you run into any errors, see the [Issues and Workarounds](/docs/issues-and-workarounds.md).
+**The validator node cannot sync until the stake pool becomes active.** If you see errors, see the [Issues and Workarounds](/docs/issues-and-workarounds.md).
 :::
 
 Follow the below steps to set up the validator node using the operator account and join the validator set.
@@ -58,6 +58,10 @@ This will show you the coin balance you have in the validator account. You will 
     "value": "5000"
   }
 ```
+
+:::tip Already in validator set? Skip to Step 6
+If you know you are already in the validator set, then skip steps 3, 4, and 5 and go directly to step 6 to confirm it.
+:::
 
 ### 3. Update validator network addresses on-chain
 

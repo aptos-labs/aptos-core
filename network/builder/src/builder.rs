@@ -38,6 +38,8 @@ use network::{
         network::{AppConfig, NewNetworkEvents, NewNetworkSender},
     },
 };
+
+use netcore::transport::tcp::TCPBufferCfg;
 use network_discovery::DiscoveryChangeListener;
 use std::{
     clone::Clone,
@@ -90,6 +92,7 @@ impl NetworkBuilder {
         inbound_connection_limit: usize,
         inbound_rate_limit_config: Option<RateLimitConfig>,
         outbound_rate_limit_config: Option<RateLimitConfig>,
+        tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
@@ -109,6 +112,7 @@ impl NetworkBuilder {
             inbound_connection_limit,
             inbound_rate_limit_config,
             outbound_rate_limit_config,
+            tcp_buffer_cfg,
         );
 
         NetworkBuilder {
@@ -152,6 +156,7 @@ impl NetworkBuilder {
             MAX_INBOUND_CONNECTIONS,
             None,
             None,
+            TCPBufferCfg::default(),
         );
 
         builder.add_connectivity_manager(
@@ -207,6 +212,12 @@ impl NetworkBuilder {
             config.max_inbound_connections,
             config.inbound_rate_limit_config,
             config.outbound_rate_limit_config,
+            TCPBufferCfg::new_configs(
+                config.inbound_rx_buffer_size_bytes,
+                config.inbound_tx_buffer_size_bytes,
+                config.outbound_rx_buffer_size_bytes,
+                config.outbound_tx_buffer_size_bytes,
+            ),
         );
 
         network_builder.add_connection_monitoring(

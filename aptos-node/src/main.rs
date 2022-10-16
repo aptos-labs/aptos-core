@@ -11,5 +11,7 @@ use clap::Parser;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 fn main() {
+    // Check that we are not including any Move test natives
+    aptos_vm::natives::assert_no_test_natives();
     AptosNodeArgs::parse().run()
 }

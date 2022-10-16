@@ -243,6 +243,8 @@ async fn fetch_nexts(
             )
         });
     let mut timestamp = block_event.proposed_time();
+    let mut epoch = block_event.epoch();
+    let mut epoch_bcs = aptos_api_types::U64::from(epoch);
     let mut block_height = block_event.height();
     let mut block_height_bcs = aptos_api_types::U64::from(block_height);
 
@@ -259,6 +261,8 @@ async fn fetch_nexts(
                 if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) = t.transaction
                 {
                     timestamp = txn.timestamp_usecs();
+                    epoch = txn.epoch();
+                    epoch_bcs = aptos_api_types::U64::from(epoch);
                     block_height += 1;
                     block_height_bcs = aptos_api_types::U64::from(block_height);
                 }
@@ -271,16 +275,20 @@ async fn fetch_nexts(
                             unreachable!("Indexer should never see pending transactions")
                         }
                         Transaction::UserTransaction(ref mut ut) => {
-                            ut.info.block_height = Some(block_height_bcs)
+                            ut.info.block_height = Some(block_height_bcs);
+                            ut.info.epoch = Some(epoch_bcs);
                         }
                         Transaction::GenesisTransaction(ref mut gt) => {
-                            gt.info.block_height = Some(block_height_bcs)
+                            gt.info.block_height = Some(block_height_bcs);
+                            gt.info.epoch = Some(epoch_bcs);
                         }
                         Transaction::BlockMetadataTransaction(ref mut bmt) => {
-                            bmt.info.block_height = Some(block_height_bcs)
+                            bmt.info.block_height = Some(block_height_bcs);
+                            bmt.info.epoch = Some(epoch_bcs);
                         }
                         Transaction::StateCheckpointTransaction(ref mut sct) => {
-                            sct.info.block_height = Some(block_height_bcs)
+                            sct.info.block_height = Some(block_height_bcs);
+                            sct.info.epoch = Some(epoch_bcs);
                         }
                     };
                     txn

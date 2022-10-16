@@ -80,7 +80,7 @@ spec:
           initialDelaySeconds: 30
         readinessProbe:
           tcpSocket:
-            port: 8080
+            port: 6182
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
