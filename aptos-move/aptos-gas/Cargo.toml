@@ -14,12 +14,12 @@ anyhow = "1.0.57"
 bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 clap = { version = "3.1.17", features = ["derive"] }
 
-move-binary-format = { git = "https://github.com/move-language/move", rev = "b71fba7ba74656334db952bcb4031e787d3928bc" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "b71fba7ba74656334db952bcb4031e787d3928bc" }
-move-model = { git = "https://github.com/move-language/move", rev = "b71fba7ba74656334db952bcb4031e787d3928bc" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "b71fba7ba74656334db952bcb4031e787d3928bc" }
-move-table-extension = { git = "https://github.com/move-language/move", rev = "b71fba7ba74656334db952bcb4031e787d3928bc" }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "b71fba7ba74656334db952bcb4031e787d3928bc" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-model = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
 
 aptos-global-constants = { path = "../../config/global-constants" }
 aptos-types = { path = "../../types" }
