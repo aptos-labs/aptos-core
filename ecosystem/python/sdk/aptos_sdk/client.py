@@ -46,7 +46,7 @@ class RestClient:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
-    def account_balance(self, account_address: str) -> int:
+    def account_balance(self, account_address: AccountAddress) -> int:
         """Returns the test coin balance associated with the account"""
         return self.account_resource(
             account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
@@ -332,7 +332,9 @@ class RestClient:
                 Serializer.sequence_serializer(Serializer.bool),
             ),
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
-            TransactionArgument([], Serializer.sequence_serializer(Serializer.bytes)),
+            TransactionArgument(
+                [], Serializer.sequence_serializer(Serializer.to_bytes)
+            ),
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
@@ -534,9 +536,9 @@ class RestClient:
         self, sender: Account, package_metadata: bytes, modules: List[bytes]
     ) -> str:
         transaction_arguments = [
-            TransactionArgument(package_metadata, Serializer.bytes),
+            TransactionArgument(package_metadata, Serializer.to_bytes),
             TransactionArgument(
-                modules, Serializer.sequence_serializer(Serializer.bytes)
+                modules, Serializer.sequence_serializer(Serializer.to_bytes)
             ),
         ]
 

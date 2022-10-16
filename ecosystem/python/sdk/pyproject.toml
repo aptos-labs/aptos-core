@@ -17,6 +17,8 @@ isort = "^5.10.1"
 autoflake = "1.4.0"
 mypy = "^0.982"
 flake8 = ">=3.8.3,<6.0.0"
+mypy-extensions = "^0.4.3"
+typing-extensions = "^4.4.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
