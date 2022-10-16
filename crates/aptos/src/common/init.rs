@@ -20,9 +20,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
-pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com";
-pub const DEFAULT_FAUCET_URL: &str = "https://faucet.devnet.aptoslabs.com";
-const NUM_DEFAULT_COINS: u64 = 10000;
+/// 1 APT (might not actually get that much, depending on the faucet)
+const NUM_DEFAULT_OCTAS: u64 = 100000000;
 
 /// Tool to initialize current directory for the aptos tool
 ///
@@ -88,25 +87,28 @@ impl CliCommand<()> for InitTool {
         eprintln!("Configuring for profile {}", profile_name);
 
         // Choose a network
-        // TODO: Change custom to a specific network int he future
-        eprintln!("Choose network from [testnet, devnet, local, custom | defaults to custom]");
+        eprintln!(
+            "Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]"
+        );
         let input = read_line("network")?;
         let input = input.trim();
         let network = if input.is_empty() {
             eprintln!("No network given, using devnet...");
-            Network::Custom
+            Network::Devnet
         } else {
             Network::from_str(input)?
         };
 
-        let mut is_community_faucet = false;
-
         match network {
+            Network::Mainnet => {
+                profile_config.rest_url =
+                    Some("https://fullnode.mainnet.aptoslabs.com".to_string());
+                profile_config.faucet_url = None;
+            }
             Network::Testnet => {
                 profile_config.rest_url =
                     Some("https://fullnode.testnet.aptoslabs.com".to_string());
                 profile_config.faucet_url = None;
-                is_community_faucet = true;
             }
             Network::Devnet => {
                 profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
@@ -193,12 +195,12 @@ impl CliCommand<()> for InitTool {
             } else {
                 eprintln!(
                     "Account {} doesn't exist, creating it and funding it with {} Octas",
-                    address, NUM_DEFAULT_COINS
+                    address, NUM_DEFAULT_OCTAS
                 );
                 match fund_account(
                     Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
-                    NUM_DEFAULT_COINS,
+                    NUM_DEFAULT_OCTAS,
                     address,
                 )
                 .await
@@ -209,10 +211,12 @@ impl CliCommand<()> for InitTool {
             }
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);
-        } else if is_community_faucet {
-            eprintln!("Account {} does not exist, you may need to fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet", address);
+        } else if network == Network::Testnet {
+            eprintln!("Account {} does not exist, you will need to create and fun the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account", address);
+        } else if network == Network::Mainnet {
+            eprintln!("Account {} does not exist, you will need to create and fun the account through a faucet or by transferring funds from another account", address);
         } else {
-            eprintln!("Account {} has been initialized locally, but must have coins transferred to it to create the account onchain", address);
+            eprintln!("Account {} has been initialized locally, but you must have coins transferred to it to create the account onchain", address);
         }
 
         // Ensure the loaded config has profiles setup for a possible empty file
@@ -235,26 +239,32 @@ impl InitTool {
         // Rest Endpoint
         let rest_url = if let Some(ref rest_url) = self.rest_url {
             eprintln!("Using command line argument for rest URL {}", rest_url);
-            rest_url.clone()
+            Some(rest_url.to_string())
         } else {
+            let current = profile_config.rest_url.as_deref();
             eprintln!(
-                "Enter your rest endpoint [Current: {} | No input: {}]",
-                profile_config.rest_url.as_deref().unwrap_or("None"),
-                DEFAULT_REST_URL
+                "Enter your rest endpoint [Current: {} | No input: Exit (or keep the existing if present)]",
+                current.unwrap_or("None"),
             );
             let input = read_line("Rest endpoint")?;
             let input = input.trim();
             if input.is_empty() {
-                eprintln!("No rest url given, using {}...", DEFAULT_REST_URL);
-                reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
-                    CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
-                })?
+                if let Some(current) = current {
+                    eprintln!("No rest url given, keeping the existing url...");
+                    Some(current.to_string())
+                } else {
+                    eprintln!("No rest url given, exiting...");
+                    return Err(CliError::AbortedError);
+                }
             } else {
-                reqwest::Url::parse(input)
-                    .map_err(|err| CliError::UnableToParse("Rest Endpoint", err.to_string()))?
+                Some(
+                    reqwest::Url::parse(input)
+                        .map_err(|err| CliError::UnableToParse("Rest Endpoint", err.to_string()))?
+                        .to_string(),
+                )
             }
         };
-        profile_config.rest_url = Some(rest_url.to_string());
+        profile_config.rest_url = rest_url;
 
         // Faucet Endpoint
         let faucet_url = if self.skip_faucet {
@@ -262,34 +272,36 @@ impl InitTool {
             None
         } else if let Some(ref faucet_url) = self.faucet_url {
             eprintln!("Using command line argument for faucet URL {}", faucet_url);
-            Some(faucet_url.clone())
+            Some(faucet_url.to_string())
         } else {
+            let current = profile_config.faucet_url.as_deref();
             eprintln!(
-                "Enter your faucet endpoint [Current: {} | No input: {} | 'skip' to not use a faucet]",
-                profile_config
-                    .faucet_url.as_deref()
+                "Enter your faucet endpoint [Current: {} | No input: Skip (or keep the existing one if present) | 'skip' to not use a faucet]",
+               current
                     .unwrap_or("None"),
-                DEFAULT_FAUCET_URL
             );
             let input = read_line("Faucet endpoint")?;
             let input = input.trim();
             if input.is_empty() {
-                eprintln!("No faucet url given, using {}...", DEFAULT_FAUCET_URL);
-                Some(reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
-                    CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
-                })?)
+                if let Some(current) = current {
+                    eprintln!("No faucet url given, keeping the existing url...");
+                    Some(current.to_string())
+                } else {
+                    eprintln!("No faucet url given, skipping faucet...");
+                    None
+                }
             } else if input.to_lowercase() == "skip" {
-                eprintln!("Skipping faucet");
+                eprintln!("Skipping faucet...");
                 None
             } else {
                 Some(
-                    reqwest::Url::parse(input).map_err(|err| {
-                        CliError::UnableToParse("Faucet Endpoint", err.to_string())
-                    })?,
+                    reqwest::Url::parse(input)
+                        .map_err(|err| CliError::UnableToParse("Faucet Endpoint", err.to_string()))?
+                        .to_string(),
                 )
             }
         };
-        profile_config.faucet_url = faucet_url.as_ref().map(|inner| inner.to_string());
+        profile_config.faucet_url = faucet_url;
         Ok(())
     }
 }
@@ -297,8 +309,9 @@ impl InitTool {
 /// A simplified list of all networks supported by the CLI
 ///
 /// Any command using this, will be simpler to setup as profiles
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Network {
+    Mainnet,
     Testnet,
     Devnet,
     Local,
@@ -310,13 +323,14 @@ impl FromStr for Network {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().trim() {
+            "mainnet" => Self::Mainnet,
             "testnet" => Self::Testnet,
             "devnet" => Self::Devnet,
             "local" => Self::Local,
             "custom" => Self::Custom,
             str => {
                 return Err(CliError::CommandArgumentError(format!(
-                    "Invalid network {}.  Must be one of [testnet, devnet, local, custom]",
+                    "Invalid network {}.  Must be one of [devnet, testnet, mainnet, local, custom]",
                     str
                 )))
             }
@@ -326,7 +340,6 @@ impl FromStr for Network {
 
 impl Default for Network {
     fn default() -> Self {
-        // This unfortunately has to be custom if people play with their configs
-        Self::Custom
+        Self::Devnet
     }
 }
