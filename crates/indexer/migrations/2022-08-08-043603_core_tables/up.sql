@@ -302,7 +302,7 @@ CREATE TABLE table_metadatas (
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX tm_insat_index ON table_metadatas (inserted_at);
--- table metadatas in write set changes
+-- Tracks processor version status
 CREATE TABLE processor_statuses (
   name VARCHAR(50) NOT NULL,
   version BIGINT NOT NULL,
