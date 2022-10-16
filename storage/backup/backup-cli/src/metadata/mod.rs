@@ -6,6 +6,7 @@ pub mod view;
 
 use crate::storage::{FileHandle, ShellSafeName, TextLine};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -16,6 +17,7 @@ pub(crate) enum Metadata {
     EpochEndingBackup(EpochEndingBackupMeta),
     StateSnapshotBackup(StateSnapshotBackupMeta),
     TransactionBackup(TransactionBackupMeta),
+    Identity(IdentityMeta),
 }
 
 impl Metadata {
@@ -55,6 +57,12 @@ impl Metadata {
         })
     }
 
+    pub fn new_random_identity() -> Self {
+        Self::Identity(IdentityMeta {
+            id: HashValue::random(),
+        })
+    }
+
     pub fn name(&self) -> ShellSafeName {
         match self {
             Self::EpochEndingBackup(e) => {
@@ -64,6 +72,7 @@ impl Metadata {
             Self::TransactionBackup(t) => {
                 format!("transaction_{}-{}.meta", t.first_version, t.last_version,)
             }
+            Metadata::Identity(_) => "identity.meta".into(),
         }
         .try_into()
         .unwrap()
@@ -95,4 +104,9 @@ pub struct TransactionBackupMeta {
     pub first_version: Version,
     pub last_version: Version,
     pub manifest: FileHandle,
+}
+
+#[derive(Clone, Deserialize, Serialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct IdentityMeta {
+    pub id: HashValue,
 }
