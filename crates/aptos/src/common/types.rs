@@ -4,14 +4,10 @@
 use crate::common::init::Network;
 use crate::common::utils::prompt_yes_with_override;
 use crate::{
-    common::{
-        init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
-        utils::{
-            chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
-            write_to_user_only_file,
-        },
+    common::utils::{
+        chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+        get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
+        to_common_success_result, write_to_file, write_to_file_with_opts, write_to_user_only_file,
     },
     config::GlobalConfig,
     genesis::git::from_yaml,
@@ -886,9 +882,7 @@ impl RestOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
-            reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
-            })
+            Err(CliError::CommandArgumentError("No rest url given.  Please add --url or add a rest_url to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 
@@ -1194,9 +1188,7 @@ impl FaucetOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
         } else {
-            reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
-            })
+            Err(CliError::CommandArgumentError("No faucet given.  Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 }
