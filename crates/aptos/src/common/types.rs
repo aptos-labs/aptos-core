@@ -1225,16 +1225,6 @@ pub struct GasOptions {
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
-    /// [Deprecated] Estimate maximum gas via simulation
-    ///
-    /// Deprecated parameter, the default behavior is now to estimate max gas automatically, and ask for
-    /// confirmation
-    ///
-    /// This will simulate the transaction, and use the simulated actual amount of gas
-    /// to be used as the max gas.
-    #[clap(long)]
-    pub(crate) estimate_max_gas: bool,
-
     /// Sender account address
     ///
     /// This allows you to override the account address from the derived account address
