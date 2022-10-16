@@ -116,6 +116,17 @@ pub enum EntryFunctionCall {
         opt_in: bool,
     },
 
+    /// Transfers `amount` of tokens from `from` to `to`.
+    /// The receiver `to` has to opt-in direct transfer first
+    TokenTransferWithOptIn {
+        creator: AccountAddress,
+        collection_name: Vec<u8>,
+        token_name: Vec<u8>,
+        token_property_version: u64,
+        to: AccountAddress,
+        amount: u64,
+    },
+
     /// Token owner lists their token for swapping
     TokenCoinSwapListTokenForSwap {
         coin_type: TypeTag,
@@ -251,6 +262,21 @@ impl EntryFunctionCall {
                 types,
             ),
             TokenOptInDirectTransfer { opt_in } => token_opt_in_direct_transfer(opt_in),
+            TokenTransferWithOptIn {
+                creator,
+                collection_name,
+                token_name,
+                token_property_version,
+                to,
+                amount,
+            } => token_transfer_with_opt_in(
+                creator,
+                collection_name,
+                token_name,
+                token_property_version,
+                to,
+                amount,
+            ),
             TokenCoinSwapListTokenForSwap {
                 coin_type,
                 _creators_address,
@@ -575,6 +601,37 @@ pub fn token_opt_in_direct_transfer(opt_in: bool) -> TransactionPayload {
     ))
 }
 
+/// Transfers `amount` of tokens from `from` to `to`.
+/// The receiver `to` has to opt-in direct transfer first
+pub fn token_transfer_with_opt_in(
+    creator: AccountAddress,
+    collection_name: Vec<u8>,
+    token_name: Vec<u8>,
+    token_property_version: u64,
+    to: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("transfer_with_opt_in").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&collection_name).unwrap(),
+            bcs::to_bytes(&token_name).unwrap(),
+            bcs::to_bytes(&token_property_version).unwrap(),
+            bcs::to_bytes(&to).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
 /// Token owner lists their token for swapping
 pub fn token_coin_swap_list_token_for_swap(
     coin_type: TypeTag,
@@ -825,6 +882,21 @@ mod decoder {
         }
     }
 
+    pub fn token_transfer_with_opt_in(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenTransferWithOptIn {
+                creator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                collection_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                token_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                token_property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                to: bcs::from_bytes(script.args().get(4)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(5)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn token_coin_swap_list_token_for_swap(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -934,6 +1006,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "token_opt_in_direct_transfer".to_string(),
             Box::new(decoder::token_opt_in_direct_transfer),
+        );
+        map.insert(
+            "token_transfer_with_opt_in".to_string(),
+            Box::new(decoder::token_transfer_with_opt_in),
         );
         map.insert(
             "token_coin_swap_list_token_for_swap".to_string(),
