@@ -213,6 +213,8 @@ impl StateComputer for ExecutionProxy {
         if skip_clean {
             return Ok(());
         }
+        debug!("QS: commit epoch {} round {}", latest_epoch, latest_round);
+
         self.async_commit_notifier
             .clone()
             .send((latest_epoch, latest_round, payloads))
@@ -229,6 +231,7 @@ impl StateComputer for ExecutionProxy {
         // held by BlockExecutor to prevent memory leak.
         self.executor.finish();
 
+        debug!("QS: sync_to epoch {} round {}", target.ledger_info().epoch(), target.ledger_info().round());
         self.async_commit_notifier
             .clone()
             .send((target.ledger_info().epoch(), target.ledger_info().round(), Vec::new()))

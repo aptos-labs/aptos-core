@@ -301,8 +301,8 @@ impl BatchReader {
             .last_committed_round
             .fetch_max(certified_time.round(), Ordering::SeqCst);
         assert!(
-            prev_round < certified_time.round(),
-            "Non-increasing executed rounds reported to BatchStore"
+            prev_round <= certified_time.round(),
+            "Decreasing executed rounds reported to BatchStore"
         );
         let expired_keys = self.clear_expired_payload(certified_time);
         if let Err(e) = self
