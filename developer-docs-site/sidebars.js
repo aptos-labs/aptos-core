@@ -73,6 +73,7 @@ const sidebars = {
         "guides/interacting-with-the-blockchain",
         "guides/state-sync",
         "guides/data-pruning",
+        "guides/indexing",
         "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
@@ -105,7 +106,6 @@ const sidebars = {
       link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
       items: ["nodes/node-files-all-networks/node-files-devnet", "nodes/node-files-all-networks/node-files-testnet"],
     },
-
     {
       type: "category",
       label: "Validators",
@@ -174,6 +174,7 @@ const sidebars = {
         "nodes/full-node/bootstrap-fullnode",
       ],
     },
+    "nodes/indexer-fullnode",
     {
       type: "category",
       label: "Local Testnet",
@@ -204,15 +205,15 @@ const sidebars = {
       collapsed: true,
       link: { type: "doc", id: "sdks/index" },
       items: [
-        "sdks/python-sdk",
         {
           type: "category",
-          label: "Typescript SDK",
+          label: "TypeScript SDK",
           link: { type: "doc", id: "sdks/ts-sdk/index" },
           collapsible: true,
           collapsed: true,
           items: ["sdks/ts-sdk/typescript-sdk", "sdks/ts-sdk/typescript-sdk-overview"],
         },
+        "sdks/python-sdk",
         "sdks/rust-sdk",
       ],
     },
