@@ -15,63 +15,41 @@ The Aptos node binary does **not** collect personal information such as username
 
 ### Core metrics
 
-- **Metrics**: All the [Prometheus](https://prometheus.io/) metrics that are collected within the node.
-- **Logs**: Logs of warn-level and higher level, with the ability to collect up to debug logs.
-- Core metrics keys (16): [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/core_metrics.rs#L14-L29](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/core_metrics.rs#L14-L29).
-- `IP_ADDRESS`
-- `TELEMETRY_TOKEN`
-- **Total event keys**: 18
-- **Frequency**: Every 30 seconds.
+- Core metrics: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/core_metrics.rs#L14-L29](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/core_metrics.rs#L14-L29).
 
 ### Node information
 
 The public IP address of the node and core metrics, including node type, synced version and number of network connections.
 
 - **Node configuration as a mapping of string key to JSON map**: [https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs#L63-L97](https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs#L63-L97).
-- `IP_ADDRESS`
-- `TELEMETRY_TOKEN`
-- **Frequency**: Every 1 hour
 
 ### CLI telemetry
 
 The commands and subcommands run by the Aptos CLI tool.
 
-- **CLI metric keys (4)**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/cli_metrics.rs#L12-L15](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/cli_metrics.rs#L12-L15).
-- **Build information keys (15)**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26).
-- `IP_ADDRESS`
-- `TELEMETRY_TOKEN`
-- **Total event keys:** 21
-- **Frequency**: On any CLI command result.
+- **CLI metrics**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/cli_metrics.rs#L12-L15](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/cli_metrics.rs#L12-L15).
+- **Build information**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26).
 
 ### Network metrics
 
-- **Network metric keys (6)**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/network_metrics.rs#L12-L17](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/network_metrics.rs#L12-L17).
-- `IP_ADDRESS`
-- `TELEMETRY_TOKEN`
-- **Total event keys**: 8
-- **Frequency**: Every minute.
+- **Network metrics**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/network_metrics.rs#L12-L17](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/network_metrics.rs#L12-L17).
 
 ### Build information
 
 Rust build information including the versions of Rust, cargo, build target architecture and the build tag.
 
-- **Build information keys (15**): [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26).
-- `IP_ADDRESS`
-- `TELEMETRY_TOKEN`
-- **Total event keys**: 17
-- **Frequency**: Every 1 hour.
+- **Build information**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26).
 
 ### System information
 
 System information including operating system information (including versions), hardware information and resource utilization (including CPU, memory and disk).
 
-- **System information keys (19)**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/system_information.rs#L14-L32](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/system_information.rs#L14-L32)
-- `IP_ADDRESS`
-- `TELEMETRY_TOKEN`
-- **Total event keys**: 21
-- **Frequency**: Every 5 minutes.
+- **System information**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/system_information.rs#L14-L32](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/system_information.rs#L14-L32).
 
+### Others
 
+- **Metrics**: All the [Prometheus](https://prometheus.io/) metrics that are collected within the node.
+- **Logs**: Logs of warn-level and higher level, with the ability to collect up to debug logs.
 
 ## Disabling telemetry
 
@@ -96,8 +74,8 @@ All the below variables are set by default to `false`, i.e., sending of these te
 - `APTOS_FORCE_ENABLE_TELEMETRY`: This overrides the chain ID check and forces the node to send telemetry regardless of whether remote service accepts or not.
 - `APTOS_DISABLE_TELEMETRY_PUSH_METRICS`: This disables sending the [Prometheus](https://prometheus.io/) metrics.
 - `APTOS_DISABLE_TELEMETRY_PUSH_LOGS`: This disables sending the logs.
-- `APTOS_DISBALE_TELEMETRY_PUSH_EVENTS`: This disables sending the custom events to [BigQuery](https://cloud.google.com/bigquery).
-- `APTOS_DISABLE_LOG_ENV_POLLING`: This disables the node local task that polls the service for `RUST_LOG_TELEMETRY` config.
+- `APTOS_DISBALE_TELEMETRY_PUSH_EVENTS`: This disables sending the custom events.
+- `APTOS_DISABLE_LOG_ENV_POLLING`: This disables the dynamic ability to send verbose logs.
 - `APTOS_DISABLE_PROMETHEUS_NODE_METRICS`: This disables sending the node resource metrics such as system CPU, memory, etc.
 
 
