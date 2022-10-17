@@ -97,7 +97,7 @@ resource "helm_release" "fullnode" {
       service = {
         type = "LoadBalancer"
         annotations = {
-          "external-dns.alpha.kubernetes.io/hostname" = "pfn${count.index}.${local.domain}"
+          "external-dns.alpha.kubernetes.io/hostname" = var.zone_name != "" ? "pfn${count.index}.${local.domain}" : ""
         }
       }
       backup = {
@@ -155,7 +155,7 @@ resource "helm_release" "monitoring" {
         name = var.fullnode_name
       }
       service = {
-        domain = trimsuffix(local.domain, ".")
+        domain = var.zone_name != "" ? trimsuffix(local.domain, ".") : ""
       }
       kube-state-metrics = {
         enabled = var.enable_kube_state_metrics
