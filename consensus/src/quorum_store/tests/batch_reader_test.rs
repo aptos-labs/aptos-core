@@ -28,7 +28,9 @@ async fn test_extend_expiration_vs_save() {
         AccountAddress::random(), // self peer id
         tx1,                      // batch store sender
         self_tx,                  // self sender
-        1000,                     // max expiry rounds
+        0,
+        0,
+        2100,
         0,                        // grace period rounds
         0,                        // memory_quota
         1000,                     // db quota

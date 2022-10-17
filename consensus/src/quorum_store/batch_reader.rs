@@ -118,7 +118,9 @@ pub struct BatchReader {
     expirations: Mutex<RoundExpirations<HashValue>>,
     batch_store_tx: Sender<BatchStoreCommand>,
     self_tx: Sender<BatchReaderCommand>,
-    max_expiry_round_gap: Round,
+    batch_expiry_round_gap_when_init: Round,
+    batch_expiry_round_gap_behind_latest_certified: Round,
+    batch_expiry_round_gap_beyond_latest_certified: Round,
     expiry_grace_rounds: Round,
     memory_quota: usize,
     db_quota: usize,
@@ -134,7 +136,9 @@ impl BatchReader {
         my_peer_id: PeerId,
         batch_store_tx: Sender<BatchStoreCommand>,
         self_tx: Sender<BatchReaderCommand>,
-        max_expiry_round_gap: Round,
+        batch_expiry_round_gap_when_init: Round,
+        batch_expiry_round_gap_behind_latest_certified: Round,
+        batch_expiry_round_gap_beyond_latest_certified: Round,
         expiry_grace_rounds: Round,
         memory_quota: usize,
         db_quota: usize,
@@ -148,7 +152,9 @@ impl BatchReader {
             expirations: Mutex::new(RoundExpirations::new()),
             batch_store_tx,
             self_tx,
-            max_expiry_round_gap,
+            batch_expiry_round_gap_when_init,
+            batch_expiry_round_gap_behind_latest_certified,
+            batch_expiry_round_gap_beyond_latest_certified,
             expiry_grace_rounds,
             memory_quota,
             db_quota,
@@ -220,8 +226,8 @@ impl BatchReader {
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
         if value.expiration.epoch() == self.epoch()
-        // && value.expiration.round() > self.last_certified_round()
-        // && value.expiration.round() <= self.last_certified_round() + self.max_expiry_round_gap
+        && value.expiration.round() + self.batch_expiry_round_gap_behind_latest_certified >= self.last_certified_round()
+        && value.expiration.round() <= self.last_certified_round() + self.batch_expiry_round_gap_beyond_latest_certified
         {
             if value.expiration.round() > self.last_certified_round() {
                 counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_HIGHER.observe((value.expiration.round() - self.last_certified_round()) as f64);
@@ -238,11 +244,13 @@ impl BatchReader {
             self.update_cache(digest, value)?;
             Ok(true)
         } else {
-            bail!("Incorrect expiration {:?} for BatchReader in epoch {}, last committed round {} and max gap {}",
+            bail!("Incorrect expiration {:?} with init expiration gap {} for BatchReader in epoch {}, last committed round {} and max behind gap {} max beyond gap {}",
 	      value.expiration,
+          self.batch_expiry_round_gap_when_init,
 	      self.epoch(),
 	      self.last_certified_round(),
-	      self.max_expiry_round_gap);
+	      self.batch_expiry_round_gap_behind_latest_certified,
+          self.batch_expiry_round_gap_beyond_latest_certified);
         }
     }
 

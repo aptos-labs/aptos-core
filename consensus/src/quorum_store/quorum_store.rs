@@ -65,11 +65,15 @@ pub struct QuorumStoreConfig {
     pub end_batch_ms: u128,
     pub max_batch_bytes: usize,
     pub batch_request_timeout_ms: usize,
-    /// Batches may have expiry set for max_batch_expiry_rounds_gap rounds after the
+    /// Used when setting up the expiration time for the batch initation.
+    pub batch_expiry_round_gap_when_init: Round,
+    /// Batches may have expiry set for batch_expiry_rounds_gap rounds after the
     /// latest committed round, and it will not be cleared from storage for another
     /// so other batch_expiry_grace_rounds rounds, so the peers on the network
     /// can still fetch the data they fall behind (later, they would have to state-sync).
-    pub max_batch_expiry_round_gap: Round,
+    /// Used when checking the expiration time of the received batch against current logical time to prevent DDoS.
+    pub batch_expiry_round_gap_behind_latest_certified: Round,
+    pub batch_expiry_round_gap_beyond_latest_certified: Round,
     pub batch_expiry_grace_rounds: Round,
     pub memory_quota: usize,
     pub db_quota: usize,
@@ -140,7 +144,9 @@ impl QuorumStore {
             db,
             validator_verifier.clone(),
             validator_signer.clone(),
-            config.max_batch_expiry_round_gap,
+            config.batch_expiry_round_gap_when_init,
+            config.batch_expiry_round_gap_behind_latest_certified,
+            config.batch_expiry_round_gap_beyond_latest_certified,
             config.batch_expiry_grace_rounds,
             config.batch_request_num_peers,
             config.batch_request_timeout_ms,

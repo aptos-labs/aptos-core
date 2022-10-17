@@ -92,7 +92,9 @@ async fn test_batch_creation() {
         end_batch_ms: 500,
         max_batch_bytes: 9 * txn_size,
         batch_request_timeout_ms: 1000,
-        max_batch_expiry_round_gap: 20,
+        batch_expiry_round_gap_when_init: 20,
+        batch_expiry_round_gap_behind_latest_certified: 20,
+        batch_expiry_round_gap_beyond_latest_certified: 100,
         batch_expiry_grace_rounds: 5,
         memory_quota: 100000000,
         db_quota: 10000000000,
@@ -110,7 +112,9 @@ async fn test_batch_creation() {
         config.mempool_txn_pull_max_count,
         config.mempool_txn_pull_max_bytes,
         config.max_batch_bytes as u64,
-        config.max_batch_expiry_round_gap,
+        config.batch_expiry_round_gap_when_init,
+        config.batch_expiry_round_gap_behind_latest_certified,
+        config.batch_expiry_round_gap_beyond_latest_certified,
         config.end_batch_ms,
     );
 
@@ -199,7 +203,9 @@ async fn test_block_request() {
         end_batch_ms: 500,
         max_batch_bytes: 1000000,
         batch_request_timeout_ms: 1000,
-        max_batch_expiry_round_gap: 20,
+        batch_expiry_round_gap_when_init: 20,
+        batch_expiry_round_gap_behind_latest_certified: 20,
+        batch_expiry_round_gap_beyond_latest_certified: 100,
         batch_expiry_grace_rounds: 5,
         memory_quota: 100000000,
         db_quota: 10000000000,
@@ -217,7 +223,9 @@ async fn test_block_request() {
         config.mempool_txn_pull_max_count,
         config.mempool_txn_pull_max_bytes,
         config.max_batch_bytes as u64,
-        config.max_batch_expiry_round_gap,
+        config.batch_expiry_round_gap_when_init,
+        config.batch_expiry_round_gap_behind_latest_certified,
+        config.batch_expiry_round_gap_beyond_latest_certified,
         config.end_batch_ms,
     );
 

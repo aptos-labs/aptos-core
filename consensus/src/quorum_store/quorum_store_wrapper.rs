@@ -55,7 +55,9 @@ pub struct QuorumStoreWrapper {
     // TODO: check if this is necessary, also check batch_builder
     // For ensuring that batch size does not exceed QuorumStore limit.
     max_batch_bytes: u64,
-    max_batch_expiry_round_gap: Round,
+    batch_expiry_round_gap_when_init: Round,
+    batch_expiry_round_gap_behind_latest_certified: Round,
+    batch_expiry_round_gap_beyond_latest_certified: Round,
     end_batch_ms: u128,
     last_end_batch_time: Instant,
     db: Arc<dyn BatchIdDB>,
@@ -74,7 +76,9 @@ impl QuorumStoreWrapper {
         mempool_txn_pull_max_count: u64,
         mempool_txn_pull_max_bytes: u64,
         max_batch_bytes: u64,
-        max_batch_expiry_round_gap: Round,
+        batch_expiry_round_gap_when_init: Round,
+        batch_expiry_round_gap_behind_latest_certified: Round,
+        batch_expiry_round_gap_beyond_latest_certified: Round,
         end_batch_ms: u128,
     ) -> Self {
         let batch_id = if let Some(id) = db
@@ -99,7 +103,9 @@ impl QuorumStoreWrapper {
             mempool_txn_pull_max_count,
             mempool_txn_pull_max_bytes,
             max_batch_bytes,
-            max_batch_expiry_round_gap,
+            batch_expiry_round_gap_when_init,
+            batch_expiry_round_gap_behind_latest_certified,
+            batch_expiry_round_gap_beyond_latest_certified,
             end_batch_ms,
             last_end_batch_time: Instant::now(),
             db,
@@ -186,7 +192,7 @@ impl QuorumStoreWrapper {
                 .expect("Could not save to db");
 
             let (proof_tx, proof_rx) = oneshot::channel();
-            let expiry_round = self.latest_logical_time.round() + self.max_batch_expiry_round_gap;
+            let expiry_round = self.latest_logical_time.round() + self.batch_expiry_round_gap_when_init;
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
 
             self.quorum_store_sender
