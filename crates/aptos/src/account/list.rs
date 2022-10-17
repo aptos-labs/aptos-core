@@ -39,16 +39,18 @@ impl FromStr for ListQuery {
             "balance" => Ok(ListQuery::Balance),
             "modules" => Ok(ListQuery::Modules),
             "resources" => Ok(ListQuery::Resources),
-            _ => Err("Invalid query. Valid values are modules, resources"),
+            _ => Err("Invalid query. Valid values are balance, modules, resources"),
         }
     }
 }
 
-/// Command to list resources, modules, or other items owned by an address
+/// List resources, modules, or balance owned by an address
 ///
+/// This allows you to list the current resources at the time of query.  This can change due to
+/// any transactions that have occurred after the request.
 #[derive(Debug, Parser)]
 pub struct ListAccount {
-    /// Address of the account you want to list resources/modules for
+    /// Address of the account you want to list resources/modules/balance for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: Option<AccountAddress>,
 
@@ -68,7 +70,6 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
         "ListAccount"
     }
 
-    // TODO: Format this in a reasonable way while providing all information
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let account = if let Some(account) = self.account {
             account

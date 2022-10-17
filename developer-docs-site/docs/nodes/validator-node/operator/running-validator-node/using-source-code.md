@@ -105,7 +105,7 @@ With your development environment ready, now you can start to setup your validat
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-9. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page: 
+9. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page: 
    - `validator.yaml`
    - `fullnode.yaml`
    - `genesis.blob`
@@ -143,12 +143,14 @@ With your development environment ready, now you can start to setup your validat
 12. Start your validator by running the below command:
 
     ```bash
+    cargo clean
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
     ```
 
     Run validator fullnode on **another machine**:
 
     ```bash
+    cargo clean
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
     ```
 

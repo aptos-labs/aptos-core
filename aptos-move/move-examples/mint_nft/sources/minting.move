@@ -5,7 +5,7 @@
 /// - Initialization of this module
 /// Let's say we have an original account at address `0xcafe`. We can use it to call
 /// `create_resource_account_and_publish_package(origin, vector::empty<>(), ...)` - this will create a resource address at
-/// `0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a`. The module `mint_nft` will be published under the
+/// `0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5`. The module `mint_nft` will be published under the
 /// resource account's address.
 ///
 /// - When using this module, we expect the flow to look like:
