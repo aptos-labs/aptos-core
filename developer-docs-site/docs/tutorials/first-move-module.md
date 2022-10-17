@@ -92,7 +92,7 @@ You will see output resembling:
 
 ## Step 3: Compile and test the module
 
-Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory for your use. Open a terminal and change directories into the `hello_blockchain` directory: 
+Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory for your use. Open a terminal and change directories into the [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) directory: 
 
 ```bash
 cd aptos-core/aptos-move/move-examples/hello_blockchain
