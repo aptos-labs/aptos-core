@@ -97,7 +97,11 @@ pub async fn handle_metrics_ingest(
             match res {
                 Ok(res) => {
                     METRICS_INGEST_BACKEND_REQUEST_DURATION
-                        .with_label_values(&[name, res.status().as_str()])
+                        .with_label_values(&[
+                            &claims.peer_id.to_string(),
+                            name,
+                            res.status().as_str(),
+                        ])
                         .observe(start_timer.elapsed().as_secs_f64());
                     if res.status().is_success() {
                         debug!("remote write to victoria metrics succeeded");
