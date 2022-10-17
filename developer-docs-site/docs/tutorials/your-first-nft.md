@@ -81,12 +81,12 @@ The following output should appear after executing the `simple-nft` example, tho
 
 ```yaml
 === Addresses ===
-Alice: 0x9df0f527f3a0b445e4d5c320cfa269cdefafc7cd1ed17ffce4b3fd485b17aafb
-Bob: 0xfcc74af84dde26b0050dce35d6b3d11c60f5c8c58728ca3a0b11035942a0b1de
+Alice: 0x8b73ad9557a5c103d9e9a482aed88182cef94fee1bf2302a915896a3d3b722f9
+Bob: 0x314b4b0980c13abebf9d4ef67f4fb9863b9e3ae6f5ff765a91169e7ebfdf0b2d
 
 === Initial Coin Balances ===
-Alice: 20000
-Bob: 20000
+Alice: 100000000
+Bob: 100000000
 
 === Creating Collection and Token ===
 Alice's collection: {
@@ -120,7 +120,7 @@ Alice's token data: {
     },
     "name": "Alice's first token",
     "royalty": {
-        "payee_address": "0x9df0f527f3a0b445e4d5c320cfa269cdefafc7cd1ed17ffce4b3fd485b17aafb",
+        "payee_address": "0x8b73ad9557a5c103d9e9a482aed88182cef94fee1bf2302a915896a3d3b722f9",
         "royalty_points_denominator": "1000000",
         "royalty_points_numerator": "0"
     },
