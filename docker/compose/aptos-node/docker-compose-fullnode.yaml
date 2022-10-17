@@ -12,6 +12,10 @@ services:
       - type: bind
         source: ./blocked.ips
         target: /usr/local/etc/haproxy/blocked.ips
+      # Bind /var/run to PWD to allow access to haproxy runtime socket
+      - type: bind
+        source: .
+        target: /var/run
     networks:
       - shared
     expose:
