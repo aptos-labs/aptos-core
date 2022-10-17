@@ -33,7 +33,6 @@ const sidebars = {
         "tutorials/first-coin",
       ],
     },
-
     {
       type: "category",
       label: "Concepts",
@@ -106,6 +105,20 @@ const sidebars = {
       link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
       items: ["nodes/node-files-all-networks/node-files-devnet", "nodes/node-files-all-networks/node-files-testnet"],
     },
+    "nodes/identity-and-configuration",
+    /** Delete during clean up
+    {
+      type: "category",
+      label: "AIT-3",
+      link: { type: "doc", id: "nodes/ait/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "nodes/ait/whats-new-in-ait3",
+        "nodes/ait/steps-in-ait3",
+        
+      ],
+    },  */
     {
       type: "category",
       label: "Validators",
@@ -191,6 +204,7 @@ const sidebars = {
       collapsed: true,
       items: ["nodes/node-health-checker/node-health-checker-faq"],
     },
+    "nodes/leaderboard-metrics",
     "reference/telemetry",
     {
       type: "html",

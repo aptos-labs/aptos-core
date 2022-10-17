@@ -1465,7 +1465,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": []
       },
@@ -1514,7 +1520,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": []
       },
@@ -2110,7 +2122,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "percentunit"
         },
         "overrides": []
@@ -2187,7 +2205,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "deckbytes"
         },
         "overrides": []
@@ -2240,7 +2264,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "decbytes"
         },
         "overrides": []
@@ -2292,7 +2322,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "iops"
         },
         "overrides": []
@@ -2344,7 +2380,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "Bps"
         },
         "overrides": []
@@ -2396,7 +2438,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "percentunit"
         },
         "overrides": []
@@ -2429,6 +2477,74 @@
       "type": "row"
     },
     {
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "left",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineWidth": 1,
+            "scaleDistribution": { "type": "linear" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "AuthenticAMD" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "GenuineIntel" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 11, "w": 12, "x": 0, "y": 78 },
+      "id": 123,
+      "options": {
+        "barRadius": 0.05,
+        "barWidth": 0.61,
+        "groupWidth": 0.7,
+        "legend": { "calcs": [], "displayMode": "list", "placement": "right", "showLegend": true },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "xField": "cpu_core_count",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "editorMode": "code",
+          "format": 1,
+          "location": "US",
+          "project": "analytics-test-345723",
+          "rawQuery": true,
+          "rawSql": "with \npre_result as (\n  select \n    distinct peer_id \n    ,first_value(last_cpu_vendor_id) over (partition by peer_id order by epoch desc) as cpu_brand\n    ,first_value(rewards_growth) over (partition by peer_id order by epoch desc) as rewards_growth\n    ,first_value(last_cpu_core_count) over (partition by peer_id order by epoch desc) as cpu_core_count\n  from `analytics-test-345723.aptos_node_telemetry.all_chain_telemetry_rollup_metrics`\n  where \n    chain_name = '$chain_name'\n    -- and substring($kubernetes_pod_name, length($kubernetes_pod_name)-64)\n)\n\n,pre_result2 as (\n  select\n    substring(concat('0',cast(cpu_core_count as string)),-2) as cpu_core_count \n    ,cpu_brand\n    ,avg(rewards_growth) as rewards_growth\n    ,count(distinct peer_id) as count_peers\n  from pre_result\n  group by 1,2\n  order by 2\n)\n\nselect \n  coalesce(t1.cpu_core_count,t2.cpu_core_count) as cpu_core_count\n  ,t1.count_peers as AuthenticAMD\n  ,t2.count_peers as GenuineIntel\nfrom (\n  select cpu_core_count, rewards_growth, count_peers\n  from pre_result2\n  where cpu_brand = 'AuthenticAMD') t1\nfull join (\n  select cpu_core_count, rewards_growth, count_peers\n  from pre_result2\n  where cpu_brand = 'GenuineIntel') t2\non t1.cpu_core_count = t2.cpu_core_count\norder by cpu_core_count",
+          "refId": "A",
+          "sql": {
+            "columns": [{ "parameters": [], "type": "function" }],
+            "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "CPU brand & core count (COUNT distribution)",
+      "type": "barchart"
+    },
+    {
       "datasource": { "type": "datasource", "uid": "-- Mixed --" },
       "fieldConfig": {
         "defaults": {
@@ -2438,7 +2554,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "dark-red" },
+              { "color": "dark-red", "value": null },
               { "color": "light-red", "value": 95 },
               { "color": "orange", "value": 99 },
               { "color": "yellow", "value": 99.5 },
@@ -2449,8 +2565,8 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 15, "w": 24, "x": 0, "y": 78 },
-      "id": 114,
+      "gridPos": { "h": 11, "w": 12, "x": 12, "y": 78 },
+      "id": 117,
       "options": {
         "basemap": { "config": {}, "name": "Layer 0", "type": "default" },
         "controls": {
@@ -2465,10 +2581,10 @@
             "config": {
               "showLegend": true,
               "style": {
-                "color": { "field": "rewards_growth", "fixed": "dark-green" },
-                "opacity": 0,
+                "color": { "field": "latest_epoch_rewards_growth", "fixed": "dark-green" },
+                "opacity": 0.5,
                 "rotation": { "fixed": 0, "max": 360, "min": -360, "mode": "mod" },
-                "size": { "field": "voting_power", "fixed": 5, "max": 10, "min": 1 },
+                "size": { "fixed": 5, "max": 10, "min": 1 },
                 "symbol": { "fixed": "img/icons/marker/circle.svg", "mode": "fixed" },
                 "textConfig": {
                   "fontSize": 12,
@@ -2480,7 +2596,7 @@
               }
             },
             "filterData": { "id": "byRefId", "options": "B" },
-            "name": "Layer 2",
+            "name": "Rewards Growth",
             "tooltip": true,
             "type": "markers"
           }
@@ -2499,7 +2615,7 @@
           "location": "US",
           "project": "analytics-test-345723",
           "rawQuery": true,
-          "rawSql": "  select \n    distinct peer_id, \n    first_value(latitude) over (partition by peer_id order by epoch desc) as latitude,\n    first_value(longitude) over (partition by peer_id order by epoch desc) as longitude,\n    first_value(voting_power) over (partition by peer_id order by epoch desc) as voting_power,\n    avg(rewards_growth) over (partition by peer_id) as rewards_growth\n  from `analytics-test-345723.aptos_node_telemetry.all_chain_telemetry_rollup_metrics`\n  where \n    chain_name = '$chain_name'",
+          "rawSql": "with \n result as (\n  select \n    distinct peer_id\n    ,first_value(latitude) over (partition by peer_id order by epoch desc) as latitude\n    ,first_value(longitude) over (partition by peer_id order by epoch desc) as longitude\n    ,first_value(voting_power) over (partition by peer_id order by epoch desc) as voting_power\n    ,first_value(rewards_growth) over (partition by peer_id order by epoch desc) as latest_epoch_rewards_growth\n  from `analytics-test-345723.aptos_node_telemetry.all_chain_telemetry_rollup_metrics`\n  where \n    chain_name = '$chain_name')\n  \n  select * from result",
           "refId": "B",
           "sql": {
             "columns": [{ "parameters": [], "type": "function" }],
@@ -2520,7 +2636,176 @@
           "table": "custom_events_devnet_telemetry_rollup_metrics"
         }
       ],
-      "title": "Validator Map (Colorcoded by Rewards Rate, Sized by Voting Power)",
+      "title": "LATEST EPOCH rewards growth",
+      "transparent": true,
+      "type": "geomap"
+    },
+    {
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 109,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineWidth": 1,
+            "scaleDistribution": { "type": "linear" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 99.95 },
+              { "color": "yellow", "value": 99.99 },
+              { "color": "green", "value": 100 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "GenuineIntel" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "continuous-GrYlRd" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "AuthenticAMD" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 11, "w": 12, "x": 0, "y": 89 },
+      "id": 122,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.63,
+        "legend": { "calcs": [], "displayMode": "list", "placement": "right", "showLegend": true },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "editorMode": "code",
+          "format": 1,
+          "location": "US",
+          "project": "analytics-test-345723",
+          "rawQuery": true,
+          "rawSql": "with \npre_result as (\n  select \n    distinct peer_id \n    ,first_value(last_cpu_vendor_id) over (partition by peer_id order by epoch desc) as cpu_brand\n    ,first_value(rewards_growth) over (partition by peer_id order by epoch desc) as rewards_growth\n    ,first_value(last_cpu_core_count) over (partition by peer_id order by epoch desc) as cpu_core_count\n  from `analytics-test-345723.aptos_node_telemetry.all_chain_telemetry_rollup_metrics`\n  where \n    chain_name = '$chain_name'\n    -- and substring($kubernetes_pod_name, length($kubernetes_pod_name)-64)\n)\n\n,pre_result2 as (\n  select\n    substring(concat('0',cast(cpu_core_count as string)),-2) as cpu_core_count \n    ,cpu_brand\n    ,avg(rewards_growth) as rewards_growth\n    ,count(distinct peer_id) as count_peers\n  from pre_result\n  group by 1,2\n  order by 2\n)\n\nselect \n  coalesce(t1.cpu_core_count,t2.cpu_core_count) as cpu_core_count\n  ,t1.rewards_growth as AuthenticAMD\n  ,t2.rewards_growth as GenuineIntel\nfrom (\n  select cpu_core_count, rewards_growth, count_peers\n  from pre_result2\n  where cpu_brand = 'AuthenticAMD') t1\nfull join (\n  select cpu_core_count, rewards_growth, count_peers\n  from pre_result2\n  where cpu_brand = 'GenuineIntel') t2\non t1.cpu_core_count = t2.cpu_core_count\norder by cpu_core_count",
+          "refId": "A",
+          "sql": {
+            "columns": [{ "parameters": [], "type": "function" }],
+            "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "CPU brand & core count (rewards rate)",
+      "type": "barchart"
+    },
+    {
+      "datasource": { "type": "datasource", "uid": "-- Mixed --" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "dark-red", "value": null },
+              { "color": "light-red", "value": 95 },
+              { "color": "orange", "value": 99 },
+              { "color": "yellow", "value": 99.5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 11, "w": 12, "x": 12, "y": 89 },
+      "id": 119,
+      "options": {
+        "basemap": { "config": {}, "name": "Layer 0", "type": "default" },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": { "field": "latest_epoch_rewards_growth", "fixed": "dark-green" },
+                "opacity": 0.5,
+                "rotation": { "fixed": 0, "max": 360, "min": -360, "mode": "mod" },
+                "size": { "fixed": 5, "max": 10, "min": 1 },
+                "symbol": { "fixed": "img/icons/marker/circle.svg", "mode": "fixed" },
+                "textConfig": {
+                  "fontSize": 12,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "textAlign": "center",
+                  "textBaseline": "middle"
+                }
+              }
+            },
+            "filterData": { "id": "byRefId", "options": "B" },
+            "name": "Rewards Growth",
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": { "mode": "details" },
+        "view": { "id": "zero", "lat": 0, "lon": 0, "zoom": 1 }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "dataset": "aptos_node_telemetry",
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "editorMode": "code",
+          "format": 1,
+          "hide": false,
+          "location": "US",
+          "project": "analytics-test-345723",
+          "rawQuery": true,
+          "rawSql": "with \n result as (\n  select \n    distinct peer_id\n    ,first_value(latitude) over (partition by peer_id order by epoch desc) as latitude\n    ,first_value(longitude) over (partition by peer_id order by epoch desc) as longitude\n    ,first_value(voting_power) over (partition by peer_id order by epoch desc) as voting_power\n    ,first_value(rewards_growth) over (partition by peer_id order by epoch desc) as latest_epoch_rewards_growth\n  from `analytics-test-345723.aptos_node_telemetry.all_chain_telemetry_rollup_metrics`\n  where \n    chain_name = '$chain_name')\n  \n  select * from result\n  where latest_epoch_rewards_growth < 99.9",
+          "refId": "B",
+          "sql": {
+            "columns": [{ "parameters": [], "type": "function" }],
+            "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+            "limit": 50,
+            "whereJsonTree": {
+              "children1": {
+                "b9bb8ab9-cdef-4012-b456-7183d3b68752": {
+                  "properties": { "value": [], "valueSrc": [] },
+                  "type": "rule"
+                }
+              },
+              "id": "abbbb8b8-0123-4456-b89a-b183d3b68752",
+              "properties": { "conjunction": "AND" },
+              "type": "group"
+            }
+          },
+          "table": "custom_events_devnet_telemetry_rollup_metrics"
+        }
+      ],
+      "title": "LATEST EPOCH rewards growth (ONLY when < 99.9)",
       "transparent": true,
       "type": "geomap"
     },
@@ -2531,7 +2816,13 @@
           "color": { "mode": "thresholds" },
           "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": [
           {
@@ -2540,7 +2831,7 @@
           }
         ]
       },
-      "gridPos": { "h": 26, "w": 24, "x": 0, "y": 93 },
+      "gridPos": { "h": 15, "w": 11, "x": 0, "y": 100 },
       "id": 116,
       "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true, "sortBy": [] },
       "pluginVersion": "9.1.1",
@@ -2563,6 +2854,100 @@
       ],
       "title": "Latest CPU Architecture & Build Info",
       "type": "table"
+    },
+    {
+      "datasource": { "type": "datasource", "uid": "-- Mixed --" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "dark-red", "value": null },
+              { "color": "light-red", "value": 95 },
+              { "color": "orange", "value": 99 },
+              { "color": "yellow", "value": 99.5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 11, "w": 12, "x": 12, "y": 100 },
+      "id": 118,
+      "options": {
+        "basemap": { "config": {}, "name": "Layer 0", "type": "default" },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": { "field": "rewards_growth", "fixed": "dark-green" },
+                "opacity": 0.5,
+                "rotation": { "fixed": 0, "max": 360, "min": -360, "mode": "mod" },
+                "size": { "fixed": 5, "max": 10, "min": 1 },
+                "symbol": { "fixed": "img/icons/marker/circle.svg", "mode": "fixed" },
+                "textConfig": {
+                  "fontSize": 12,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "textAlign": "center",
+                  "textBaseline": "middle"
+                }
+              }
+            },
+            "filterData": { "id": "byRefId", "options": "B" },
+            "name": "Rewards Growth",
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": { "mode": "details" },
+        "view": { "id": "zero", "lat": 0, "lon": 0, "zoom": 1 }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "dataset": "aptos_node_telemetry",
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "editorMode": "code",
+          "format": 1,
+          "hide": false,
+          "location": "US",
+          "project": "analytics-test-345723",
+          "rawQuery": true,
+          "rawSql": " with \n result as (\n  select \n    distinct peer_id\n    ,first_value(latitude) over (partition by peer_id order by epoch desc) as latitude\n    ,first_value(longitude) over (partition by peer_id order by epoch desc) as longitude\n    ,first_value(voting_power) over (partition by peer_id order by epoch desc) as voting_power\n    ,avg(rewards_growth) over (partition by peer_id) as rewards_growth\n  from `analytics-test-345723.aptos_node_telemetry.all_chain_telemetry_rollup_metrics`\n  where \n    chain_name = '$chain_name')\n  \n  select * from result\n  where rewards_growth < 99.9",
+          "refId": "B",
+          "sql": {
+            "columns": [{ "parameters": [], "type": "function" }],
+            "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+            "limit": 50,
+            "whereJsonTree": {
+              "children1": {
+                "b9bb8ab9-cdef-4012-b456-7183d3b68752": {
+                  "properties": { "value": [], "valueSrc": [] },
+                  "type": "rule"
+                }
+              },
+              "id": "abbbb8b8-0123-4456-b89a-b183d3b68752",
+              "properties": { "conjunction": "AND" },
+              "type": "group"
+            }
+          },
+          "table": "custom_events_devnet_telemetry_rollup_metrics"
+        }
+      ],
+      "title": "AVERAGE rewards growth (ONLY when < 99.9)",
+      "transparent": true,
+      "type": "geomap"
     }
   ],
   "refresh": "1m",
@@ -2591,109 +2976,119 @@
         "type": "datasource"
       },
       {
-        "name": "metrics_source",
-        "type": "query",
-        "datasource": null,
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
         "multi": false,
         "multiFormat": "",
+        "name": "metrics_source",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{}, metrics_source)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "label": "",
-        "hide": 0,
-        "sort": 0
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       },
       {
-        "name": "chain_name",
-        "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "refresh": 1,
-        "options": [],
-        "includeAll": false,
         "allFormat": "",
         "allValue": "",
+        "current": { "text": ["mainnet"], "value": "mainnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
         "multi": false,
         "multiFormat": "",
+        "name": "chain_name",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
-        "label": "",
-        "hide": 0,
-        "sort": 1
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
-        "name": "cluster",
-        "type": "query",
-        "datasource": null,
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
+        "current": { "text": ["All"], "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
         "multi": false,
         "multiFormat": "",
+        "name": "cluster",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["All"], "value": "$__all" },
-        "label": "",
-        "hide": 0,
-        "sort": 0
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       },
       {
-        "name": "namespace",
-        "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
+        "current": { "text": ["All"], "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
         "multi": false,
         "multiFormat": "",
+        "name": "namespace",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["All"], "value": "$__all" },
-        "label": "",
-        "hide": 0,
-        "sort": 1
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
-        "name": "kubernetes_pod_name",
-        "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
         "multi": true,
         "multiFormat": "",
+        "name": "kubernetes_pod_name",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "label": "",
-        "hide": 0,
-        "sort": 1
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -2702,6 +3097,6 @@
   "timezone": "",
   "title": "Overview",
   "uid": "overview",
-  "version": 149,
+  "version": 173,
   "weekStart": ""
 }
