@@ -7,12 +7,10 @@ id: "install-aptos-cli"
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool. See [Use Aptos CLI](use-aptos-cli) for how to use the CLI.
 
-To download the Aptos source code, related tools, and IDE plugins for the Move programming language, follow [Getting Started](../../guides/getting-started.md).
+To download the Aptos source code, related tools, and IDE plugins for the Move programming language, follow the instructions below. Whenever possible, install the CLI by downloading the precompiled binary for your platform, as described below. If needed, you may build from source.
 
-Install the CLI by downloading the precompiled binary for your platform, as described below. 
-
-:::tip Move Prover Dependencies
-If you want to use the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to validate your Move code, [install the Move Prover dependencies](#optional-install-the-dependencies-of-move-prover) after installing the CLI binary.
+:::tip Use setup script
+Aptos offers the [dev_setup.sh](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies. 
 :::
 
 ## Download precompiled binary
@@ -92,7 +90,7 @@ These instructions have been tested on Windows 11 and Windows Server 2022. Windo
 
 ## (Optional) Install the dependencies of Move Prover
 
-If you want to use the Move Prover, install the dependencies by following the below steps:
+If you want to use the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to validate your Move code, install the Move Prover dependencies after installing the CLI binary.
 
 :::tip
 Currently, Windows is not supported by the Move Prover.

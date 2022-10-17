@@ -12,7 +12,19 @@ To kickstart your journey in the Aptos ecosystem, set up your environment as nee
 
 See the [Workflows](#workflows) for use cases associated with each path. See the [Aptos developer resources](#aptos-developer-resources) for quick links to Aptos networks, SDKs, and other tools.
 
+## Supported operating systems
+
+Aptos can be built on various operating systems, including Linux, macOS. and Windows. Aptos is tested extensively on Linux and macOS, and less so on Windows. Here are the versions we use:
+
+* Linux - Ubuntu version 20.04 and 22.04
+* macOS - macOS Monterey
+* Microsoft Windows - Windows 11
+
+See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for instructions by operating system.
+
 ## Workflows
+
+### CLI only
 
 Most Aptos users will want to have the Aptos CLI installed. [Install](../cli-tools/aptos-cli-tool/install-aptos-cli.md) and [use](../cli-tools/aptos-cli-tool/use-aptos-cli.md) the Aptos CLI if you will:
 
@@ -20,6 +32,8 @@ Most Aptos users will want to have the Aptos CLI installed. [Install](../cli-too
 * [Manage accounts](../cli-tools/aptos-cli-tool/use-aptos-cli.md#account-examples).
 * [Generate keys](../cli-tools/aptos-cli-tool/use-aptos-cli.md#key-examples).
 * [Compile Move packages](../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples).
+
+### Source code and CLI
 
 In addition to installing the CLI, [clone](#clone-the-aptos-core-repo) and [review](https://github.com/aptos-labs/aptos-core) the Aptos repository if you will:
 
@@ -36,7 +50,7 @@ The [Aptos source files](https://github.com/aptos-labs/aptos-core) themselves al
 
 ## Install the CLI
 
-[Install Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link. See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for the supported operating systems.
+[Install Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link.
 
 ## Clone the Aptos-core repo
 
