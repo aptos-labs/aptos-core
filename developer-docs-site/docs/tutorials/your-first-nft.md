@@ -81,8 +81,8 @@ The following output should appear after executing the `simple-nft` example, tho
 
 ```yaml
 === Addresses ===
-Alice: 0x8b73ad9557a5c103d9e9a482aed88182cef94fee1bf2302a915896a3d3b722f9
-Bob: 0x314b4b0980c13abebf9d4ef67f4fb9863b9e3ae6f5ff765a91169e7ebfdf0b2d
+Alice: 0xeef95e86c160fa10a71675c6075f44f8f2c6125f57b4b589424f1fbee385f754
+Bob: 0x4dcd7b180c123fdb989d10f71fba6c978bda268c2e3660c169bdb55f67aab776
 
 === Initial Coin Balances ===
 Alice: 100000000
@@ -99,7 +99,7 @@ Alice's collection: {
     },
     "name": "Alice's",
     "supply": "1",
-    "uri": "https://aptos.dev"
+    "uri": "https://alice.com"
 }
 Alice's token balance: 1
 Alice's token data: {
@@ -110,7 +110,7 @@ Alice's token data: {
     },
     "description": "Alice's simple token",
     "largest_property_version": "0",
-    "maximum": "1",
+    "maximum": "18446744073709551615",
     "mutability_config": {
         "description": false,
         "maximum": false,
@@ -120,8 +120,8 @@ Alice's token data: {
     },
     "name": "Alice's first token",
     "royalty": {
-        "payee_address": "0x8b73ad9557a5c103d9e9a482aed88182cef94fee1bf2302a915896a3d3b722f9",
-        "royalty_points_denominator": "1000000",
+        "payee_address": "0xeef95e86c160fa10a71675c6075f44f8f2c6125f57b4b589424f1fbee385f754",
+        "royalty_points_denominator": "0",
         "royalty_points_numerator": "0"
     },
     "supply": "1",
