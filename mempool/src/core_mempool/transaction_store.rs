@@ -148,15 +148,16 @@ impl TransactionStore {
     }
 
     /// Return (SystemTime, is the timestamp for end-to-end)
-    pub(crate) fn get_insertion_time(
+    pub(crate) fn get_insertion_time_and_bucket(
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<(&SystemTime, bool)> {
+    ) -> Option<(&SystemTime, bool, &str)> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
             return Some((
                 &txn.insertion_time,
                 txn.timeline_state != TimelineState::NonQualified,
+                self.get_bucket(txn.ranking_score),
             ));
         }
         None
@@ -401,11 +402,13 @@ impl TransactionStore {
                                 counters::core_mempool_txn_commit_latency(
                                     CONSENSUS_READY_LABEL,
                                     E2E_LABEL,
+                                    self.timeline_index.get_bucket(txn.ranking_score),
                                     time_delta,
                                 );
                                 counters::core_mempool_txn_commit_latency(
                                     BROADCAST_READY_LABEL,
                                     E2E_LABEL,
+                                    self.timeline_index.get_bucket(txn.ranking_score),
                                     time_delta,
                                 );
                                 counters::core_mempool_txn_ranking_score(
@@ -418,6 +421,7 @@ impl TransactionStore {
                                 counters::core_mempool_txn_commit_latency(
                                     CONSENSUS_READY_LABEL,
                                     LOCAL_LABEL,
+                                    self.timeline_index.get_bucket(txn.ranking_score),
                                     time_delta,
                                 );
                             }
@@ -586,15 +590,17 @@ impl TransactionStore {
                         }
                         if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time)
                         {
+                            let bucket = self.timeline_index.get_bucket(txn.ranking_score);
                             counters::core_mempool_txn_commit_latency(
                                 BROADCAST_BATCHED_LABEL,
                                 E2E_LABEL,
+                                bucket,
                                 time_delta,
                             );
                             counters::core_mempool_txn_ranking_score(
                                 BROADCAST_BATCHED_LABEL,
                                 BROADCAST_BATCHED_LABEL,
-                                self.timeline_index.get_bucket(txn.ranking_score),
+                                bucket,
                                 txn.ranking_score,
                             );
                         }

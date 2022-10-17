@@ -170,10 +170,11 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
 pub fn core_mempool_txn_commit_latency(
     stage: &'static str,
     scope: &'static str,
+    bucket: &str,
     latency: Duration,
 ) {
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
-        .with_label_values(&[stage, scope])
+        .with_label_values(&[stage, scope, bucket])
         .observe(latency.as_secs_f64());
 }
 
@@ -185,7 +186,7 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
         "Latency of txn reaching various stages in core mempool after insertion",
         LARGER_LATENCY_BUCKETS.to_vec()
     );
-    register_histogram_vec!(histogram_opts, &["stage", "scope"]).unwrap()
+    register_histogram_vec!(histogram_opts, &["stage", "scope", "bucket"]).unwrap()
 });
 
 pub fn core_mempool_txn_ranking_score(
