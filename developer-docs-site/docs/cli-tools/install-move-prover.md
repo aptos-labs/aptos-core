@@ -1,11 +1,11 @@
 ---
-title: "Install Move Prover"
+title: "Installing Move Prover"
 id: "install-move-prover"
 ---
 
 # (Optional) Install the Move Prover
 
-If you want to use the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to validate your Move code, install the Move Prover dependencies after installing the CLI binary.
+If you want to use the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to validate your Move code, install the Move Prover dependencies after [installing the CLI binary](aptos-cli-tool/install-aptos-cli.md).
 
 :::tip
 Currently, Windows is not supported by the Move Prover.

@@ -5,12 +5,16 @@ id: "install-aptos-cli"
 
 # Installing Aptos CLI
 
-The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool. See [Use Aptos CLI](use-aptos-cli) for how to use the CLI.
+The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool using precompiled binaries that reduce variables in setting up your environment. Also see:
+
+* [Building Aptos CLI from Source](../build-from-source.md) for an advanced alternative to using the precompiled binaries.
+* [Installing the Move Prover](../install-move-prover.md) for an optional tool to validate your Move code.
+* [Using Aptos CLI](use-aptos-cli.md) for detailed instructions on employing the Aptos CLI.
 
 To download the Aptos source code, related tools, and IDE plugins for the Move programming language, follow the instructions below. Whenever possible, install the CLI by downloading the precompiled binary for your platform, as described below. If needed, you may build from source.
 
 :::tip Use setup script
-Aptos offers the [dev_setup.sh](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies. 
+Aptos offers the [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies. 
 :::
 
 ## Download precompiled binary

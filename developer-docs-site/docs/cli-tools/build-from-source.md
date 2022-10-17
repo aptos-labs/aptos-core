@@ -5,7 +5,11 @@ id: "build-aptos-cli"
 
 # (Advanced users only) Build the CLI binary from the source code
 
-If you are an advanced user and would like to build the CLI binary by downloading the source code, follow the below steps. **This is not recommended** unless you are on a platform unsupported by the prebuilt binaries.
+If you are an advanced user and would like to build the CLI binary by downloading the source code, follow the below steps. **This is not recommended** unless you are on a platform unsupported by the prebuilt binaries. Otherwise, [install the prebuilt CLI binaries](aptos-cli-tool/install-aptos-cli.md) to ease ramp up and reduce variables in your environment.
+
+:::tip Use setup script
+Aptos offers the [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies on Windows. 
+:::
 
 <details>
 <summary>macOS</summary>
@@ -26,10 +30,10 @@ If you are an advanced user and would like to build the CLI binary by downloadin
 
 If the script above doesn't work for you, you can install these manually, but it's **not recommended**.
 
-1. Install [Rust](https://www.rust-lang.org/tools/install)
-1. Install [Git](https://git-scm.com/download)
-1. Install [CMake](https://cmake.org/download/)
-1. Install [LLVM](https://releases.llvm.org/)
+1. [Rust](https://www.rust-lang.org/tools/install)
+1. [Git](https://git-scm.com/download)
+1. [CMake](https://cmake.org/download/)
+1. [LLVM](https://releases.llvm.org/)
 
 #### Building the Aptos CLI
 
@@ -97,12 +101,14 @@ Windows.  All dependencies must be manually installed.
 
 **> Manual installation of dependencies**
 
-1. Install [Rust](https://www.rust-lang.org/tools/install).
-1. Install [Git](https://git-scm.com/download).
-1. Install [CMake](https://cmake.org/download/).
-1. If on Windows ARM, install [Visual Studio Preview](https://visualstudio.microsoft.com/vs/preview/).
-1. Install [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022).
-1. Install [LLVM](https://releases.llvm.org/).
+If on Windows, you must install these manually:
+
+1. [Rust](https://www.rust-lang.org/tools/install).
+1. [Git](https://git-scm.com/download).
+1. [CMake](https://cmake.org/download/).
+1. For Windows ARM, [Visual Studio Preview](https://visualstudio.microsoft.com/vs/preview/).
+1. [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022).
+1. [LLVM](https://releases.llvm.org/).
 
 #### Building aptos-core
 
