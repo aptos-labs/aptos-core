@@ -203,7 +203,7 @@ We are excited that you are here, and we look forward to getting to know you. We
     <div class="d-flex w-100 justify-content-between">
       <h4 class="mb-1">List group item heading 2</h4>
     </div>
-    <small class="text-muted">And some muted small print. This one with multiple lines. More lines and more lines and more lines.</small>
+    <small>And some muted small print. This one with multiple lines. More lines and more lines and more lines.</small>
   </a>
   <a href="#" class="list-group-item list-group-item-action">
     <div class="d-flex w-100 justify-content-between">
