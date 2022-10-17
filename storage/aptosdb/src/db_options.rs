@@ -43,6 +43,16 @@ pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(super) fn state_verkle_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        VERKLE_NODE_CF_NAME,
+        STALE_NODE_INDEX_CF_NAME,
+        STALE_NODE_INDEX_CROSS_EPOCH_CF_NAME,
+    ]
+}
+
 pub(super) fn gen_ledger_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
     let cfs = ledger_db_column_families();
     let mut cfds = Vec::with_capacity(cfs.len());
@@ -70,6 +80,24 @@ pub(super) fn gen_ledger_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamil
 
 pub(super) fn gen_state_merkle_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
     let cfs = state_merkle_db_column_families();
+    let mut table_options = BlockBasedOptions::default();
+    table_options.set_cache_index_and_filter_blocks(rocksdb_config.cache_index_and_filter_blocks);
+    table_options.set_block_size(rocksdb_config.block_size as usize);
+    let cache = Cache::new_lru_cache(rocksdb_config.block_cache_size as usize)
+        .expect("Create Rocksdb block cache failed.");
+    table_options.set_block_cache(&cache);
+    let mut cfds = Vec::with_capacity(cfs.len());
+    for cf_name in cfs {
+        let mut cf_opts = Options::default();
+        cf_opts.set_compression_type(DBCompressionType::Lz4);
+        cf_opts.set_block_based_table_factory(&table_options);
+        cfds.push(ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts));
+    }
+    cfds
+}
+
+pub(super) fn gen_state_verkle_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = state_verkle_db_column_families();
     let mut table_options = BlockBasedOptions::default();
     table_options.set_cache_index_and_filter_blocks(rocksdb_config.cache_index_and_filter_blocks);
     table_options.set_block_size(rocksdb_config.block_size as usize);

@@ -12,6 +12,7 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
     state_store::buffered_state::BufferedState,
+    state_verkle_db::StateVerkleDb,
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
     StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
@@ -75,6 +76,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
+    pub state_verkle_db: Arc<StateVerkleDb>,
     pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
@@ -267,6 +269,7 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
+        state_verkle_db: Arc<DB>,
         state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
         buffered_state_target_items: usize,
@@ -277,9 +280,11 @@ impl StateStore {
             state_merkle_db,
             max_nodes_per_lru_cache_shard,
         ));
+        let state_verkle_db = Arc::new(StateVerkleDb::new(state_verkle_db));
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
+            state_verkle_db,
             state_pruner,
             epoch_snapshot_pruner,
         });

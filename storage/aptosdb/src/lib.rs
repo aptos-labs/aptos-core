@@ -26,6 +26,7 @@ mod lru_node_cache;
 mod pruner;
 mod state_merkle_db;
 mod state_store;
+mod state_verkle_db;
 mod transaction_store;
 mod utils;
 mod versioned_node_cache;
@@ -108,6 +109,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::db_options::{gen_state_verkle_cfds, state_verkle_db_column_families};
 use crate::pruner::{
     ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
     state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
@@ -121,6 +123,7 @@ use storage_interface::{
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
+pub const STATE_VERKLE_DB_NAME: &str = "state_verkle_db";
 
 // This is last line of defense against large queries slipping through external facing interfaces,
 // like the API and State Sync, etc.
@@ -262,6 +265,7 @@ impl AptosDB {
     fn new_with_dbs(
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
+        state_verkle_rocksdb: DB,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
@@ -269,6 +273,7 @@ impl AptosDB {
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
+        let arc_state_verkle_rocksdb = Arc::new(state_verkle_rocksdb);
         let state_pruner = StatePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
@@ -280,6 +285,7 @@ impl AptosDB {
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&arc_state_verkle_rocksdb),
             state_pruner,
             epoch_snapshot_pruner,
             buffered_state_target_items,
@@ -325,9 +331,10 @@ impl AptosDB {
 
         let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let state_verkle_db_path = db_root_path.as_ref().join(STATE_VERKLE_DB_NAME);
         let instant = Instant::now();
 
-        let (ledger_db, state_merkle_db) = if readonly {
+        let (ledger_db, state_merkle_db, state_verkle_db) = if readonly {
             (
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
@@ -340,6 +347,12 @@ impl AptosDB {
                     state_merkle_db_path.clone(),
                     STATE_MERKLE_DB_NAME,
                     state_merkle_db_column_families(),
+                )?,
+                DB::open_cf_readonly(
+                    &gen_rocksdb_options(&rocksdb_configs.state_verkle_db_config, true),
+                    state_verkle_db_path.clone(),
+                    STATE_VERKLE_DB_NAME,
+                    state_verkle_db_column_families(),
                 )?,
             )
         } else {
@@ -356,12 +369,19 @@ impl AptosDB {
                     STATE_MERKLE_DB_NAME,
                     gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
                 )?,
+                DB::open_cf(
+                    &gen_rocksdb_options(&rocksdb_configs.state_verkle_db_config, false),
+                    state_verkle_db_path.clone(),
+                    STATE_VERKLE_DB_NAME,
+                    gen_state_verkle_cfds(&rocksdb_configs.state_verkle_db_config),
+                )?,
             )
         };
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
             state_merkle_db,
+            state_verkle_db,
             pruner_config,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
@@ -434,11 +454,15 @@ impl AptosDB {
         let state_merkle_db_primary_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
         let state_merkle_db_secondary_path =
             secondary_db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let state_verkle_db_primary_path = db_root_path.as_ref().join(STATE_VERKLE_DB_NAME);
+        let state_verkle_db_secondary_path =
+            secondary_db_root_path.as_ref().join(STATE_VERKLE_DB_NAME);
 
         // Secondary needs `max_open_files = -1` per
         // https://github.com/facebook/rocksdb/wiki/Read-only-and-Secondary-instances
         rocksdb_configs.ledger_db_config.max_open_files = -1;
         rocksdb_configs.state_merkle_db_config.max_open_files = -1;
+        rocksdb_configs.state_verkle_db_config.max_open_files = -1;
 
         Ok(Self::new_with_dbs(
             DB::open_cf_as_secondary(
@@ -454,6 +478,13 @@ impl AptosDB {
                 state_merkle_db_secondary_path,
                 "state_merkle_db_sec",
                 state_merkle_db_column_families(),
+            )?,
+            DB::open_cf_as_secondary(
+                &gen_rocksdb_options(&rocksdb_configs.state_verkle_db_config, false),
+                state_verkle_db_primary_path,
+                state_verkle_db_secondary_path,
+                "state_verkle_db_sec",
+                state_verkle_db_column_families(),
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
             BUFFERED_STATE_TARGET_ITEMS,

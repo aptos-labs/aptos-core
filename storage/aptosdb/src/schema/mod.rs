@@ -46,6 +46,7 @@ pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accum
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
 pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
+pub const VERKLE_NODE_CF_NAME: ColumnFamilyName = "verkle_node";
 pub const VERSION_DATA_CF_NAME: ColumnFamilyName = "version_data";
 pub const WRITE_SET_CF_NAME: ColumnFamilyName = "write_set";
 
