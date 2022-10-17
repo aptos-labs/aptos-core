@@ -1,13 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::proof_builder::{ProofBuilder, ProofBuilderCommand};
-use crate::quorum_store::quorum_store::QuorumStoreError;
-use crate::quorum_store::tests::utils::{
-    compute_digest_from_signed_transaction, create_vec_signed_transactions,
+use crate::quorum_store::{
+    proof_builder::{ProofBuilder, ProofBuilderCommand},
+    quorum_store::QuorumStoreError,
+    tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
 };
-use aptos_types::validator_signer::ValidatorSigner;
-use aptos_types::validator_verifier::random_validator_verifier;
+use aptos_types::{
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
+};
 use consensus_types::proof_of_store::{LogicalTime, SignedDigest, SignedDigestInfo};
 use futures::channel::oneshot;
 use std::sync::Arc;
@@ -23,7 +24,7 @@ async fn test_proof_builder_basic() {
     tokio::spawn(proof_builder.start(proof_builder_rx, verifier.clone()));
 
     let digest = compute_digest_from_signed_transaction(create_vec_signed_transactions(100));
-    let signed_digest_info = SignedDigestInfo::new(digest, LogicalTime::new(1, 20),1, 1);
+    let signed_digest_info = SignedDigestInfo::new(digest, LogicalTime::new(1, 20), 1, 1);
     let (proof_tx, proof_rx) = oneshot::channel();
 
     assert!(proof_builder_tx
@@ -35,8 +36,15 @@ async fn test_proof_builder_basic() {
         .await
         .is_ok());
     for i in 0..arc_signers.len() {
-        let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signers[i].clone()).unwrap();
+        let signed_digest = SignedDigest::new(
+            1,
+            digest,
+            LogicalTime::new(1, 20),
+            1,
+            1,
+            arc_signers[i].clone(),
+        )
+        .unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await
@@ -75,8 +83,15 @@ async fn test_proof_builder_basic() {
         .await
         .is_ok());
     for i in 0..arc_signers.len() {
-        let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signers[i].clone()).unwrap();
+        let signed_digest = SignedDigest::new(
+            1,
+            digest,
+            LogicalTime::new(1, 20),
+            1,
+            1,
+            arc_signers[i].clone(),
+        )
+        .unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await
@@ -98,8 +113,15 @@ async fn test_proof_builder_basic() {
         .await
         .is_ok());
     for _ in 0..arc_signers.len() {
-        let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signers[1].clone()).unwrap();
+        let signed_digest = SignedDigest::new(
+            1,
+            digest,
+            LogicalTime::new(1, 20),
+            1,
+            1,
+            arc_signers[1].clone(),
+        )
+        .unwrap();
         assert!(proof_builder_tx
             .send(ProofBuilderCommand::AppendSignature(signed_digest))
             .await

@@ -94,6 +94,7 @@ impl QuorumStoreDataManager {
 
 #[async_trait::async_trait]
 impl DataManager for QuorumStoreDataManager {
+    // Execution result has been certified (TODO: double check).
     async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>) {
         self.data_reader
             .load()
@@ -125,7 +126,7 @@ impl DataManager for QuorumStoreDataManager {
             .as_ref()
             .clone()
             .try_send(WrapperCommand::CleanRequest(logical_time, digests));
-            
+
         if !payload_is_empty {
             let expired_set = self.expiration_status.lock().expire(logical_time.round());
             for expired in expired_set {

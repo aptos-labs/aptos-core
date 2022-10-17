@@ -6,17 +6,21 @@ use crate::quorum_store::{
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::{debug, info};
-use aptos_types::aggregate_signature::PartialSignatures;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::PeerId;
+use aptos_types::{
+    aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
+};
 use consensus_types::proof_of_store::{
     ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
 };
 use futures::channel::oneshot;
-use std::collections::{BTreeMap, HashMap};
-use std::time::Duration;
-use tokio::sync::mpsc::Receiver;
-use tokio::{sync::oneshot as TokioOneshot, time};
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Duration,
+};
+use tokio::{
+    sync::{mpsc::Receiver, oneshot as TokioOneshot},
+    time,
+};
 
 #[derive(Debug)]
 pub(crate) enum ProofBuilderCommand {

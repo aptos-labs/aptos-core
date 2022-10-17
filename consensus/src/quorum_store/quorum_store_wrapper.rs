@@ -234,12 +234,18 @@ impl QuorumStoreWrapper {
         match msg {
             Ok((proof, batch_id)) => {
                 if self.max_batch_id >= batch_id && batch_id > 0 {
-                    debug!("QS: batch id out of order: Ok max_batch_id {} batch_id {}", self.max_batch_id, batch_id);
+                    debug!(
+                        "QS: batch id out of order: Ok max_batch_id {} batch_id {}",
+                        self.max_batch_id, batch_id
+                    );
                 } else {
                     self.max_batch_id = batch_id;
                 }
-                if self.last_batch_id+1 != batch_id && batch_id > 0 {
-                    debug!("QS: batch id not sequential: Ok last_batch_id {} batch_id {}", self.last_batch_id, batch_id);
+                if self.last_batch_id + 1 != batch_id && batch_id > 0 {
+                    debug!(
+                        "QS: batch id not sequential: Ok last_batch_id {} batch_id {}",
+                        self.last_batch_id, batch_id
+                    );
                 }
                 self.last_batch_id = batch_id;
 
@@ -259,12 +265,18 @@ impl QuorumStoreWrapper {
                 counters::TIMEOUT_BATCHES_COUNT.inc();
 
                 if self.max_batch_id >= batch_id && batch_id > 0 {
-                    debug!("QS: batch id out of order: Timeout max_batch_id {} batch_id {}", self.max_batch_id, batch_id);
+                    debug!(
+                        "QS: batch id out of order: Timeout max_batch_id {} batch_id {}",
+                        self.max_batch_id, batch_id
+                    );
                 } else {
                     self.max_batch_id = batch_id;
                 }
-                if self.last_batch_id+1 != batch_id && batch_id > 0 {
-                    debug!("QS: batch id not sequential: Timeout last_batch_id {} batch_id {}", self.last_batch_id, batch_id);
+                if self.last_batch_id + 1 != batch_id && batch_id > 0 {
+                    debug!(
+                        "QS: batch id not sequential: Timeout last_batch_id {} batch_id {}",
+                        self.last_batch_id, batch_id
+                    );
                 }
                 self.last_batch_id = batch_id;
 
@@ -324,6 +336,8 @@ impl QuorumStoreWrapper {
                     "Non-increasing logical time"
                 );
                 self.latest_logical_time = logical_time;
+                // Cleans up all batches that expire in rounds <= logical_time.round(). This is
+                // safe since clean request must occur only after execution result is certified.
                 for batch_id in self.batch_expirations.expire(logical_time.round()) {
                     if self.batches_in_progress.remove(&batch_id).is_some() {
                         debug!(

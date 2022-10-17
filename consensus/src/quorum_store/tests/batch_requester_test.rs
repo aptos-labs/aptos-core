@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::batch_requester::BatchRequester;
-use crate::quorum_store::tests::utils::{
-    compute_digest_from_signed_transaction, create_vec_signed_transactions,
+use crate::quorum_store::{
+    batch_requester::BatchRequester,
+    tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
+    types::Batch,
 };
-use crate::quorum_store::types::Batch;
 use crate::test_utils::mock_quorum_store_sender::MockQuorumStoreSender;
 use aptos_types::account_address::AccountAddress;
 use claims::{assert_err, assert_some};
-use tokio::sync::mpsc::channel;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc::channel, oneshot};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_batch_requester() {
@@ -44,7 +43,7 @@ async fn test_batch_requester() {
         _ => unreachable!(),
     }
     assert_eq!(signers.len(), 3);
-    
+
     batch_requester.serve_request(digest, signed_transactions.clone());
     assert_eq!(
         oneshot_rx.await.expect("sender dropped"),

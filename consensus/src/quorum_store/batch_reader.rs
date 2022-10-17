@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network::QuorumStoreSender;
-use crate::quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand};
 use crate::quorum_store::{
+    batch_requester::BatchRequester,
+    batch_store::BatchStoreCommand,
     counters,
     types::{Batch, PersistedValue},
     utils::RoundExpirations,
@@ -11,20 +12,22 @@ use crate::quorum_store::{
 use anyhow::bail;
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::SignedTransaction, validator_verifier::ValidatorVerifier, PeerId};
 use consensus_types::{
     common::Round,
     proof_of_store::{LogicalTime, ProofOfStore},
 };
-use dashmap::DashMap;
+use dashmap::{
+    mapref::entry::Entry::{Occupied, Vacant},
+    DashMap,
+};
 use executor_types::Error;
 use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Mutex,
+        Arc, Mutex,
     },
     time::Duration,
 };
@@ -109,7 +112,7 @@ fn payload_storage_mode(persisted_value: &PersistedValue) -> StorageMode {
 pub struct BatchReader {
     epoch: OnceCell<u64>,
     my_peer_id: PeerId,
-    last_committed_round: AtomicU64,
+    last_certified_round: AtomicU64,
     db_cache: DashMap<HashValue, PersistedValue>,
     peer_quota: DashMap<PeerId, QuotaManager>,
     expirations: Mutex<RoundExpirations<HashValue>>,
@@ -126,7 +129,7 @@ pub struct BatchReader {
 impl BatchReader {
     pub(crate) fn new(
         epoch: u64,
-        last_committed_round: Round,
+        last_certified_round: Round,
         db_content: HashMap<HashValue, PersistedValue>,
         my_peer_id: PeerId,
         batch_store_tx: Sender<BatchStoreCommand>,
@@ -135,11 +138,11 @@ impl BatchReader {
         expiry_grace_rounds: Round,
         memory_quota: usize,
         db_quota: usize,
-    ) -> (Self, Vec<HashValue>) {
+    ) -> (Arc<Self>, Vec<HashValue>) {
         let self_ob = Self {
             epoch: OnceCell::with_value(epoch),
             my_peer_id,
-            last_committed_round: AtomicU64::new(last_committed_round),
+            last_certified_round: AtomicU64::new(last_certified_round),
             db_cache: DashMap::new(),
             peer_quota: DashMap::new(),
             expirations: Mutex::new(RoundExpirations::new()),
@@ -158,7 +161,7 @@ impl BatchReader {
             "QS: Batchreader {} {} {}",
             db_content.len(),
             epoch,
-            last_committed_round
+            last_certified_round
         );
         for (digest, value) in db_content {
             let expiration = value.expiration;
@@ -170,7 +173,7 @@ impl BatchReader {
             assert!(epoch >= expiration.epoch());
 
             if epoch > expiration.epoch()
-                || last_committed_round > expiration.round() + expiry_grace_rounds
+                || last_certified_round >= expiration.round() + expiry_grace_rounds
             {
                 expired_keys.push(digest);
             } else {
@@ -184,7 +187,7 @@ impl BatchReader {
             "QS: Batchreader recovery expired keys len {}",
             expired_keys.len()
         );
-        (self_ob, expired_keys)
+        (Arc::new(self_ob), expired_keys)
     }
 
     fn epoch(&self) -> u64 {
@@ -217,8 +220,8 @@ impl BatchReader {
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
         if value.expiration.epoch() == self.epoch()
-            // && value.expiration.round() > self.last_committed_round()
-        // && value.expiration.round() <= self.last_committed_round() + self.max_expiry_round_gap
+        // && value.expiration.round() > self.last_certified_round()
+        // && value.expiration.round() <= self.last_certified_round() + self.max_expiry_round_gap
         {
             if let Some(entry) = self.db_cache.get(&digest) {
                 if entry.expiration.round() >= value.expiration.round() {
@@ -232,13 +235,12 @@ impl BatchReader {
             bail!("Incorrect expiration {:?} for BatchReader in epoch {}, last committed round {} and max gap {}",
 	      value.expiration,
 	      self.epoch(),
-	      self.last_committed_round(),
+	      self.last_certified_round(),
 	      self.max_expiry_round_gap);
         }
     }
 
     pub async fn shutdown(&self) {
-        // if !self.shutdown_flag.swap(true, Ordering::Relaxed) {
         self.shutdown_flag.swap(true, Ordering::Relaxed);
         self.shutdown_notify.notified().await;
     }
@@ -259,24 +261,24 @@ impl BatchReader {
         let expired_digests = self.expirations.lock().unwrap().expire(expired_round);
         let mut ret = Vec::new();
         for h in expired_digests {
-            let cache_expiration_round = self
-                .db_cache
-                .get(&h)
-                .expect("Expired entry not in cache")
-                .expiration
-                .round();
-
-            // We need to check up-to-date expiration again because receiving the same
-            // digest with a higher expiration would update the persisted value and
-            // effectively extend the expiration.
-            if cache_expiration_round < expired_round {
-                let (_, persisted_value) = self
-                    .db_cache
-                    .remove(&h)
-                    .expect("Expired entry not in cache");
-                self.free_quota(persisted_value);
+            let removed_value = match self.db_cache.entry(h) {
+                Occupied(entry) => {
+                    // We need to check up-to-date expiration again because receiving the same
+                    // digest with a higher expiration would update the persisted value and
+                    // effectively extend the expiration.
+                    if entry.get().expiration.round() <= expired_round {
+                        Some(entry.remove())
+                    } else {
+                        None
+                    }
+                }
+                Vacant(_) => unreachable!("Expired entry not in cache"),
+            };
+            // No longer holding the lock on db_cache entry.
+            if let Some(value) = removed_value {
+                self.free_quota(value);
                 ret.push(h);
-            } // Otherwise, expiration got extended, ignore.
+            }
         }
         ret
     }
@@ -293,17 +295,27 @@ impl BatchReader {
     }
 
     // TODO: make sure state-sync also sends the message, or execution cleans.
+    // When self.expiry_grace_rounds == 0, certified time contains a round for
+    // which execution result has been certified by a quorum, and as such, the
+    // batches with expiration in this round can be cleaned up. The parameter
+    // expiry grace rounds just keeps the batches around for a little longer
+    // for lagging nodes to be able to catch up (without state-sync).
     pub async fn update_certified_round(&self, certified_time: LogicalTime) {
+        debug!("QS: batch reader updating time {:?}", certified_time);
         assert!(self.epoch() == certified_time.epoch(), "QS: wrong epoch");
 
-        debug!("QS: batch reader updating time {:?}", certified_time);
         let prev_round = self
-            .last_committed_round
+            .last_certified_round
             .fetch_max(certified_time.round(), Ordering::SeqCst);
+        // Note: prev_round may be equal to certified_time round due to state-sync
+        // at the epoch boundary.
         assert!(
-            prev_round < certified_time.round(),
-            "Non-increasing executed rounds reported to BatchStore"
+            prev_round <= certified_time.round(),
+            "Decreasing executed rounds reported to BatchReader {} {}",
+            prev_round,
+            certified_time.round(),
         );
+
         let expired_keys = self.clear_expired_payload(certified_time);
         if let Err(e) = self
             .batch_store_tx
@@ -314,8 +326,8 @@ impl BatchReader {
         }
     }
 
-    fn last_committed_round(&self) -> Round {
-        self.last_committed_round.load(Ordering::Relaxed)
+    fn last_certified_round(&self) -> Round {
+        self.last_certified_round.load(Ordering::Relaxed)
     }
 
     pub async fn get_batch(

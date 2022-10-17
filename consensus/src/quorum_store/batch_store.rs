@@ -105,7 +105,6 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         if let Err(_) = db.delete_batches(expired_keys) {
             // TODO: do something
         }
-        let batch_reader: Arc<BatchReader> = Arc::new(batch_reader);
         let batch_reader_clone = batch_reader.clone();
         let net = network_sender.clone();
         let metrics_monitor = tokio_metrics::TaskMonitor::new();
