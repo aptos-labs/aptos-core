@@ -26,13 +26,14 @@ This tutorial details how to compile, test, publish and interact with Move modul
 
 After installing the CLI binary, next step is to create and fund an account on the Aptos blockchain. 
 
-1. Begin by starting a new terminal and run the below command to initialize a new local account: 
+Begin by starting a new terminal and run the below command to initialize a new local account: 
 
 ```bash
 aptos init
 ```
 
-You will see output asking for an endpoint: 
+You will see output asking for an endpoint:
+
 ```text
 Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com/v1]
 ```
@@ -65,7 +66,7 @@ Assuming you elected to create anew, you will see:
 
 ```text
 No key given, generating key...
-Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a doesn't exist, creating it and funding it with 10000 coins
+Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a doesn't exist, creating it and funding it with 10000 Octas
 Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a!  Run `aptos help` for more information about commands
 {
   "Result": "Success"
@@ -74,15 +75,16 @@ Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c
 
 The account address in the above output  `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are used interchangeably in this document. Of course, substitute your own address as needed.
 
-2. Now fund this account by running this command: 
+Now fund this account by running this command: 
 
 ```bash
 aptos account fund-with-faucet --account default
 ```
 You will see output resembling:
-```
+
+```text
 {
-  "Result": "Added 500000 coins to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
+  "Result": "Added 500000 Octas to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
 }
 ```
 
@@ -102,13 +104,39 @@ Run the below command to compile the `hello_blockchain` module:
 aptos move compile --named-addresses hello_blockchain=default
 ```
 
+You will see output resembling:
+
+```text
+{
+  "Result": [
+    "a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message"
+  ]
+}
+```
+
 To test the module run: 
 
 ```bash
 aptos move test --named-addresses hello_blockchain=default
 ```
 
-The CLI entry must contain `--named-addresses` because the [`Move.toml`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/hello_blockchain/Move.toml) file leaves this as undefined (see below). To prepare the module for the account created in the previous step, we specify that the named address `hello_blockchain` is set to our account address, using the `default` profile alias.
+And receive output like:
+
+```text
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING Examples
+Running Move unit tests
+[ PASS    ] 0x1a42874787568af30c785622899a27dacce066d671fa487e7fb958d6d0c85077::message::sender_can_set_message
+[ PASS    ] 0x1a42874787568af30c785622899a27dacce066d671fa487e7fb958d6d0c85077::message_tests::sender_can_set_message
+Test result: OK. Total tests: 2; passed: 2; failed: 0
+{
+  "Result": "Success"
+}
+```
+
+The `compile` command must contain `--named-addresses` as above because the [`Move.toml`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/hello_blockchain/Move.toml) file leaves this as undefined (see below). To prepare the module for the account created in the previous step, we specify that the named address `hello_blockchain` is set to our account address, using the `default` profile alias.
 
 ```toml
 [addresses]
@@ -119,7 +147,7 @@ hello_blockchain = "_"
 
 ## Step 4: Publish the Move module
 
-After the code was compiled and tested, we can publish the module to the account created for this tutorial. Run this below command:
+After the code iss compiled and tested, we can publish the module to the account created for this tutorial with the command:
 
 ```bash
 aptos move publish --named-addresses hello_blockchain=default
