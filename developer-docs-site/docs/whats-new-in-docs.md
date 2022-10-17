@@ -5,14 +5,15 @@ slug: "whats-new-in-docs"
 
 # Whats New in Docs
 
-## 12 October 2022
-
-- Added [Node Connections](/docs/nodes/full-node/fullnode-network-connections.md) document that describes how to configure node network connections.
 This page shows the key updates to the developer documentation on this site.
 
 ## 13 October 2022
 
 - Added [user documentation](/docs/guides/use-aptos-explorer.md) for [Aptos Explorer](https://explorer.aptoslabs.com/) to Aptos.dev covering common use cases and popular Explorer screen descriptions.
+
+## 12 October 2022
+
+- Added [Node Connections](/docs/nodes/full-node/fullnode-network-connections.md) document that describes how to configure node network connections.
 
 ## 11 October 2022
 
