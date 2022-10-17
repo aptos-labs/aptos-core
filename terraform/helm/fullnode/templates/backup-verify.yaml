@@ -37,7 +37,7 @@ spec:
             - command-adapter
             - --config
             # use the same config with the backup sts
-            - /opt/aptos/etc/{{ .Values.backup.config.location }}.toml
+            - /opt/aptos/etc/{{ .Values.backup.config.location }}.yaml
             env:
             - name: RUST_LOG
               value: "info"
