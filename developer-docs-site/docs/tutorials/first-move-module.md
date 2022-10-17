@@ -18,15 +18,15 @@ This tutorial details how to compile, test, publish and interact with Move modul
 
 ## Step 1: Install the CLI
 
-[Install the precombiled binary for the Aptos CLI][install_cli].
+[Install the precompiled binary for the Aptos CLI][install_cli].
 
 ---
 
 ## Step 2: Create an account and fund it 
 
-After installing the CLI binary, next step is to create and fund an account on the Aptos blockchain. 
+After installing the CLI binary, create and fund an account on the Aptos blockchain. 
 
-Begin by starting a new terminal and run the below command to initialize a new local account: 
+Start a new terminal and run the following command to initialize a new local account: 
 
 ```bash
 aptos init
@@ -92,7 +92,7 @@ You will see output resembling:
 
 ## Step 3: Compile and test the module
 
-Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory. Open a terminal and change directories into the `hello_blockchain` directory: 
+Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory for your use. Open a terminal and change directories into the `hello_blockchain` directory: 
 
 ```bash
 cd aptos-core/aptos-move/move-examples/hello_blockchain
@@ -147,13 +147,13 @@ hello_blockchain = "_"
 
 ## Step 4: Publish the Move module
 
-After the code iss compiled and tested, we can publish the module to the account created for this tutorial with the command:
+After the code is compiled and tested, we can publish the module to the account created for this tutorial with the command:
 
 ```bash
 aptos move publish --named-addresses hello_blockchain=default
 ```
 
-You will see the output similar to the below:
+You will see the output similar to:
 
 ```bash
 package size 1631 bytes
@@ -213,7 +213,7 @@ The `set_message` function modifies the `hello_blockchain` `MessageHolder` resou
 https://fullnode.devnet.aptoslabs.com/v1/accounts/a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a/resource/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder
 ```
 
-which, after the first execution contains the following:
+After the first execution, this should contain:
 
 ```json
 {
@@ -257,13 +257,13 @@ where, after a call to set the message to `hello, blockchain, again`, the event 
 ```
 
 :::tip
-
 Other accounts can reuse the published module by calling the exact same function as in this example. It is left as an exercise to the reader.
-
 :::
 
-[account_basics]: /concepts/basics-accounts
-[alice_account_rest]: https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/
-[bob_account_explorer]: https://explorer.aptoslabs.com/account/ec6ec14e4abe10aaa6ad53b0b63a1806
-[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli#download-precompiled-binary
-[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
+## Supporting documentation
+
+* [account_basics](../concepts/basics-accounts.md)
+* [alice_account_rest](https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/)
+* [bob_account_explorer](https://explorer.aptoslabs.com/account/ec6ec14e4abe10aaa6ad53b0b63a1806)
+* [install_cli](../cli-tools/aptos-cli-tool/install-aptos-cli.md#download-precompiled-binary)
+* [rest_spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
