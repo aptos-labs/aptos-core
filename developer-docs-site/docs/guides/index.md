@@ -13,6 +13,7 @@ Start here to get into the core concepts of the Aptos blockchain.
 - ### [Interacting with the Aptos blockchain](interacting-with-the-blockchain.md)
 - ### [State Synchronization](state-sync.md)
 - ### [Data Pruning](data-pruning.md)
+- ### [Indexing](indexing)
 - ### [Building your own wallet](building-your-own-wallet.md)
 - ### [Install Petra Extension](install-petra-wallet-extension)
 - ### [Building the Wallet Extension](building-wallet-extension.md)

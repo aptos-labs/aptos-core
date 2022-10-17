@@ -18,6 +18,7 @@ mod mint_nft;
 mod offer_signer_capability;
 mod rotate_auth_key;
 mod scripts;
+mod simple_defi;
 mod stake;
 mod string_args;
 mod vector_numeric_address;

@@ -18,9 +18,11 @@ const POOL_ADDRESSES: &str = "pool-addresses.yaml";
 const EMPLOYEE_POOL_ADDRESSES: &str = "employee-pool-addresses.yaml";
 
 /// Get pool addresses from a mainnet genesis setup
+///
+/// Outputs all pool addresses to a file from the genesis files
 #[derive(Parser)]
 pub struct PoolAddresses {
-    /// Output directory for Genesis file and waypoint
+    /// Output directory for pool addresses
     #[clap(long, parse(from_os_str))]
     output_dir: Option<PathBuf>,
 

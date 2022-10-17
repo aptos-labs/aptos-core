@@ -46,7 +46,8 @@ impl FromStr for ListQuery {
 
 /// List resources, modules, or balance owned by an address
 ///
-///
+/// This allows you to list the current resources at the time of query.  This can change due to
+/// any transactions that have occurred after the request.
 #[derive(Debug, Parser)]
 pub struct ListAccount {
     /// Address of the account you want to list resources/modules/balance for

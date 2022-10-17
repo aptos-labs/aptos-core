@@ -245,8 +245,10 @@ impl CliCommand<RotateSummary> for RotateKey {
     }
 }
 
-/// Lookup the account address through on-chain lookup table
+/// Lookup the account address through the on-chain lookup table
 ///
+/// If the account is rotated, it will provide the address accordingly.  If the account was not
+/// rotated, it will provide the derived address only if the account exists onchain.
 #[derive(Debug, Parser)]
 pub struct LookupAddress {
     #[clap(flatten)]

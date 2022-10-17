@@ -157,8 +157,6 @@ impl CollectionData {
     /// If collection data is not in resources of the same transaction, then try looking for it in the database. Since collection owner
     /// cannot change, we can just look in the current_collection_datas table.
     /// Retrying a few times since this collection could've been written in a separate thread.
-    /// Note, there's an edge case where this could still break. If the collection is written in the same thread in an earlier transaction, we won't be able to process.
-    /// TODO: Fast follow with a fix for above problem.
     pub fn get_collection_creator(
         conn: &mut PgPoolConnection,
         table_handle: &str,

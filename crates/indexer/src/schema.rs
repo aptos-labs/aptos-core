@@ -263,6 +263,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    processor_status (processor) {
+        processor -> Varchar,
+        last_success_version -> Int8,
+        last_updated -> Timestamp,
+    }
+}
+
+diesel::table! {
     processor_statuses (name, version) {
         name -> Varchar,
         version -> Int8,
@@ -466,6 +474,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ledger_infos,
     move_modules,
     move_resources,
+    processor_status,
     processor_statuses,
     signatures,
     table_items,
