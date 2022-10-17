@@ -122,53 +122,50 @@ The Aptos network is comprised of nodes of three types: validator node, validato
           </p>
         </div>
         <div class="list-group list-group-flush">
-          <a href="#" class="list-group-item">
+          <a href="/nodes/full-node/public-fullnode" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Public fullnode</h4>
             </div>
-            <small>See a snapshot of all active Aptos deployments.</small>
+            <small>Follow this section to install a public fullnode.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/indexer-fullnode" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Indexer fullnode</h4>
             </div>
             <small
-              >And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small
-            >
+              >Describes how to run an indexer fullnode on the Aptos network. </small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/local-testnet/local-testnet-index" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Local testnet</h4>
             </div>
-            <small>And some small print.</small>
+            <small>Run a local testnet with a validator node.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/full-node/fullnode-network-connections" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Fullnode network connections</h4>
             </div>
-            <small>See a snapshot of all active Aptos deployments.</small>
+            <small>Describes in detail how to configure your node's network connections.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/full-node/network-identity-fullnode" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Network identity for fullnode</h4>
             </div>
             <small
-              >And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small
+              >Create a static network identity for your fullnode.</small
             >
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/full-node/update-fullnode-with-new-devnet-releases" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Update fullnode</h4>
             </div>
-            <small>And some small print.</small>
+            <small>When devnet is wiped and updated with newer versions, follow this document to update your fullnode.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/full-node/bootstrap-fullnode" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Bootstrap a new fullnode</h4>
             </div>
-            <small>And some small print.</small>
+            <small>Use data restore to bootstrap a new fullnode.</small>
           </a>
         </div>
       </div>
@@ -185,24 +182,35 @@ The Aptos network is comprised of nodes of three types: validator node, validato
         <div class="card-body">
         </div>
         <div class="list-group list-group-flush">
-          <a href="#" class="list-group-item">
+          <a href="/nodes/aptos-deployments" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Aptos blockchain deployments</h4>
             </div>
-            <small>See a snapshot of all active Aptos deployments.</small>
+            <small>See a snapshot of all Aptos deployments.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/identity-and-configuration" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Identity and configuration</h4>
             </div>
-            <small>And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small>
+            <small>A mental-model of identity and configuration plus a description of the identity YAMLs.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/node-files-all-networks/node-files" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Node files</h4>
             </div>
-            <small>And some small print.</small>
+            <small>All the files you need while deploying nodes, whether on mainnet, testnet or devnet.</small>
+          </a>
+          <a href="/guides/indexing" class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+              <h4 class="mb-1">Indexing</h4>
+            </div>
+            <small>Access Aptos-provided indexer service or build your own custom indexer for the Aptos blockchain.</small>
+          </a>
+          <a href="/guides/state-sync" class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+              <h4 class="mb-1">State synchronization</h4>
+            </div>
+            <small>Synchronize your nodes to the latest Aptos blockchain state.</small>
           </a>
         </div>
       </div>
@@ -212,24 +220,29 @@ The Aptos network is comprised of nodes of three types: validator node, validato
         <div class="card-body">
         </div>
         <div class="list-group list-group-flush">
-          <a href="#" class="list-group-item">
-            <div class="d-flex w-100 justify-content-between">
+        <a href="/guides/data-pruning" class="list-group-item">
+            <div class="d-flex w-100 justify-content-between align-items-start">
+              <h4 class="mb-1">Data pruning</h4>
+            </div>
+            <small>Manage your validator node's disk space by controling the pruning settings. Proceed with caution.</small>
+          </a>
+          <a href="/nodes/node-health-checker/index" class="list-group-item">
+            <div class="d-flex w-100 justify-content-between align-items-start">
               <h4 class="mb-1">Node health checker</h4>
             </div>
-            <small>See a snapshot of all active Aptos deployments.</small>
+            <small>If you are a node operator, use the NHC service to check if your node is running correctly.</small>
           </a>
-          <a href="#" class="list-group-item">
-            <div class="d-flex w-100 justify-content-between">
+          <a href="/reference/telemetry/" class="list-group-item">
+            <div class="d-flex w-100 justify-content-between align-items-start">
               <h4 class="mb-1">Telemetry</h4>
             </div>
-            <small>And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small>
+            <small>Know what telemetry metrics are sent by your node, and control the telemetry settings.</small>
           </a>
-          <a href="#" class="list-group-item">
-            <div class="d-flex w-100 justify-content-between">
+          <a href="/nodes/leaderboard-metrics" class="list-group-item">
+            <div class="d-flex w-100 justify-content-between align-items-start">
               <h4 class="mb-1">Leaderboard metrics</h4>
             </div>
-            <small>And some small print.</small>
+            <small>A guide to interpret the validator rewards performance, as shown on the leaderboard metrics site.</small>
           </a>
         </div>
       </div>
