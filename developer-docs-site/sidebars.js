@@ -33,7 +33,6 @@ const sidebars = {
         "tutorials/first-coin",
       ],
     },
-
     {
       type: "category",
       label: "Concepts",
@@ -98,7 +97,14 @@ const sidebars = {
     },
     "nodes/aptos-deployments",
     "nodes/leaderboard-metrics",
-    "nodes/node-files",
+    {
+      type: "category",
+      label: "Node Files For Mainnet",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
+      items: ["nodes/node-files-all-networks/node-files-devnet", "nodes/node-files-all-networks/node-files-testnet"],
+    },
     "nodes/identity-and-configuration",
     /** Delete during clean up
     {
@@ -113,7 +119,6 @@ const sidebars = {
         
       ],
     },  */
-
     {
       type: "category",
       label: "Validators",
@@ -239,7 +244,6 @@ const sidebars = {
       value: "White Paper",
       className: "sidebar-title",
     },
-
     {
       type: "category",
       label: "Aptos White Paper",
