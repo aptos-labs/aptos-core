@@ -4,11 +4,11 @@
 pub mod analyze;
 
 use crate::common::types::{
-    ConfigSearchMode, OptionalPoolAddressArgs, PromptOptions, TransactionSummary,
+    ConfigSearchMode, OptionalPoolAddressArgs, PoolAddressArgs, PromptOptions, TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
-use crate::node::analyze::analyze_validators::AnalyzeValidators;
+use crate::node::analyze::analyze_validators::{AnalyzeValidators, ValidatorStats};
 use crate::node::analyze::fetch_metadata::FetchMetadata;
 use crate::{
     common::{
@@ -21,6 +21,7 @@ use crate::{
     genesis::git::from_yaml,
 };
 use aptos_config::config::NodeConfig;
+use aptos_crypto::bls12381::PublicKey;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
@@ -32,7 +33,6 @@ use aptos_types::network_address::NetworkAddress;
 use aptos_types::on_chain_config::{ConfigurationResource, ConsensusScheme, ValidatorSet};
 use aptos_types::stake_pool::StakePool;
 use aptos_types::staking_contract::StakingContractStore;
-use aptos_types::validator_config::ValidatorConfig;
 use aptos_types::validator_info::ValidatorInfo;
 use aptos_types::validator_performances::ValidatorPerformances;
 use aptos_types::vesting::VestingAdminStore;
@@ -44,6 +44,7 @@ use backup_cli::storage::command_adapter::{config::CommandAdapterConfig, Command
 use backup_cli::utils::{
     ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
 };
+use bcs::Result;
 use cached_packages::aptos_stdlib;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
@@ -127,10 +128,14 @@ impl OperatorConfigFileArgs {
 #[derive(Parser)]
 pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
+    ///
+    /// The key should be a BLS12-381 public key
     #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
 
     /// Hex encoded Consensus proof of possession
+    ///
+    /// The key should be a BLS12-381 proof of possession
     #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
     pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
 }
@@ -264,30 +269,33 @@ pub enum StakePoolState {
 
 #[derive(Debug, Serialize)]
 pub struct StakePoolResult {
-    state: StakePoolState,
-    pool_address: AccountAddress,
-    operator_address: AccountAddress,
-    voter_address: AccountAddress,
-    pool_type: StakePoolType,
-    total_stake: u64,
-    commission_percentage: u64,
-    commission_not_yet_unlocked: u64,
-    lockup_expiration_utc_time: DateTime<Utc>,
-    consensus_public_key: bls12381::PublicKey,
-    validator_network_addresses: Vec<NetworkAddress>,
-    fullnode_network_addresses: Vec<NetworkAddress>,
-    epoch_info: EpochInfo,
+    pub state: StakePoolState,
+    pub pool_address: AccountAddress,
+    pub operator_address: AccountAddress,
+    pub voter_address: AccountAddress,
+    pub pool_type: StakePoolType,
+    pub total_stake: u64,
+    pub commission_percentage: u64,
+    pub commission_not_yet_unlocked: u64,
+    pub lockup_expiration_utc_time: DateTime<Utc>,
+    pub consensus_public_key: String,
+    pub validator_network_addresses: Vec<NetworkAddress>,
+    pub fullnode_network_addresses: Vec<NetworkAddress>,
+    pub epoch_info: EpochInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vesting_contract: Option<AccountAddress>,
 }
 
+/// Show the stake pool
+///
+/// Retrieves the associated stake pool from the multiple types for the given owner address
 #[derive(Parser)]
 pub struct GetStakePool {
-    // The owner address that directly or indirectly owns the stake pool.
+    /// The owner address of the stake pool
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) owner_address: AccountAddress,
-    // Configurations for where queries will be sent to.
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
-    // Configurations for CLI profile to use.
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
 }
@@ -301,65 +309,7 @@ impl CliCommand<Vec<StakePoolResult>> for GetStakePool {
     async fn execute(mut self) -> CliTypedResult<Vec<StakePoolResult>> {
         let owner_address = self.owner_address;
         let client = &self.rest_options.client(&self.profile_options)?;
-
-        let epoch_info = get_epoch_info(client).await?;
-        let validator_set = &client
-            .get_account_resource_bcs::<ValidatorSet>(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
-            .await?
-            .into_inner();
-        let mut stake_pool_results: Vec<StakePoolResult> = vec![];
-        // Add direct stake pool if any.
-        let direct_stake_pool = get_stake_pool_info(
-            client,
-            owner_address,
-            StakePoolType::Direct,
-            0,
-            0,
-            epoch_info.clone(),
-            validator_set,
-        )
-        .await;
-        if let Ok(direct_stake_pool) = direct_stake_pool {
-            stake_pool_results.push(direct_stake_pool);
-        };
-
-        // Fetch all stake pools managed via staking contracts.
-        let staking_contract_pools = get_staking_contract_pools(
-            client,
-            owner_address,
-            StakePoolType::StakingContract,
-            epoch_info.clone(),
-            validator_set,
-        )
-        .await;
-        if let Ok(mut staking_contract_pools) = staking_contract_pools {
-            stake_pool_results.append(&mut staking_contract_pools);
-        };
-
-        // Fetch all stake pools managed via employee vesting accounts.
-        let vesting_admin_store = client
-            .get_account_resource_bcs::<VestingAdminStore>(
-                owner_address,
-                "0x1::vesting::AdminStore",
-            )
-            .await;
-        if let Ok(vesting_admin_store) = vesting_admin_store {
-            let vesting_contracts = vesting_admin_store.into_inner().vesting_contracts;
-            for vesting_contract in vesting_contracts {
-                let mut staking_contract_pools = get_staking_contract_pools(
-                    client,
-                    vesting_contract,
-                    StakePoolType::Vesting,
-                    epoch_info.clone(),
-                    validator_set,
-                )
-                .await
-                .unwrap();
-                stake_pool_results.append(&mut staking_contract_pools);
-            }
-        };
-
-        Ok(stake_pool_results)
+        get_stake_pools(client, owner_address).await
     }
 }
 
@@ -371,15 +321,13 @@ pub struct StakePoolPerformance {
     epoch_info: EpochInfo,
 }
 
+/// Show staking performance of the given staking pool
 #[derive(Parser)]
 pub struct GetPerformance {
-    // The stake pool's address.
-    #[clap(long)]
-    pub(crate) pool_address: AccountAddress,
-    // Configurations for where queries will be sent to.
+    #[clap(flatten)]
+    pub(crate) pool_address_args: PoolAddressArgs,
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
-    // Configurations for CLI profile to use.
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
 }
@@ -392,7 +340,7 @@ impl CliCommand<StakePoolPerformance> for GetPerformance {
 
     async fn execute(mut self) -> CliTypedResult<StakePoolPerformance> {
         let client = &self.rest_options.client(&self.profile_options)?;
-        let pool_address = self.pool_address;
+        let pool_address = self.pool_address_args.pool_address;
         let validator_set = &client
             .get_account_resource_bcs::<ValidatorSet>(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
             .await?
@@ -454,12 +402,79 @@ impl CliCommand<StakePoolPerformance> for GetPerformance {
     }
 }
 
+/// Retrieves the stake pools associated with an account
+pub async fn get_stake_pools(
+    client: &Client,
+    owner_address: AccountAddress,
+) -> CliTypedResult<Vec<StakePoolResult>> {
+    let epoch_info = get_epoch_info(client).await?;
+    let validator_set = &client
+        .get_account_resource_bcs::<ValidatorSet>(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
+        .await?
+        .into_inner();
+    let mut stake_pool_results: Vec<StakePoolResult> = vec![];
+    // Add direct stake pool if any.
+    let direct_stake_pool = get_stake_pool_info(
+        client,
+        owner_address,
+        StakePoolType::Direct,
+        0,
+        0,
+        epoch_info.clone(),
+        validator_set,
+        None,
+    )
+    .await;
+    if let Ok(direct_stake_pool) = direct_stake_pool {
+        stake_pool_results.push(direct_stake_pool);
+    };
+
+    // Fetch all stake pools managed via staking contracts.
+    let staking_contract_pools = get_staking_contract_pools(
+        client,
+        owner_address,
+        StakePoolType::StakingContract,
+        epoch_info.clone(),
+        validator_set,
+        None,
+    )
+    .await;
+    if let Ok(mut staking_contract_pools) = staking_contract_pools {
+        stake_pool_results.append(&mut staking_contract_pools);
+    };
+
+    // Fetch all stake pools managed via employee vesting accounts.
+    let vesting_admin_store = client
+        .get_account_resource_bcs::<VestingAdminStore>(owner_address, "0x1::vesting::AdminStore")
+        .await;
+    if let Ok(vesting_admin_store) = vesting_admin_store {
+        let vesting_contracts = vesting_admin_store.into_inner().vesting_contracts;
+        for vesting_contract in vesting_contracts {
+            let mut staking_contract_pools = get_staking_contract_pools(
+                client,
+                vesting_contract,
+                StakePoolType::Vesting,
+                epoch_info.clone(),
+                validator_set,
+                Some(vesting_contract),
+            )
+            .await
+            .unwrap();
+            stake_pool_results.append(&mut staking_contract_pools);
+        }
+    };
+
+    Ok(stake_pool_results)
+}
+
+/// Retrieve 0x1::staking_contract related pools
 pub async fn get_staking_contract_pools(
     client: &Client,
     staker_address: AccountAddress,
     pool_type: StakePoolType,
     epoch_info: EpochInfo,
     validator_set: &ValidatorSet,
+    vesting_contract: Option<AccountAddress>,
 ) -> CliTypedResult<Vec<StakePoolResult>> {
     let mut stake_pool_results: Vec<StakePoolResult> = vec![];
     let staking_contract_store = client
@@ -478,6 +493,7 @@ pub async fn get_staking_contract_pools(
             staking_contract.value.commission_percentage,
             epoch_info.clone(),
             validator_set,
+            vesting_contract,
         )
         .await
         .unwrap();
@@ -494,6 +510,7 @@ pub async fn get_stake_pool_info(
     commission_percentage: u64,
     epoch_info: EpochInfo,
     validator_set: &ValidatorSet,
+    vesting_contract: Option<AccountAddress>,
 ) -> CliTypedResult<StakePoolResult> {
     let stake_pool = client
         .get_account_resource_bcs::<StakePool>(pool_address, "0x1::stake::StakePool")
@@ -507,6 +524,14 @@ pub async fn get_stake_pool_info(
     let commission_not_yet_unlocked = (total_stake - principal) * commission_percentage / 100;
     let state = get_stake_pool_state(validator_set, &pool_address);
 
+    let consensus_public_key = if validator_config.consensus_public_key.is_empty() {
+        "".into()
+    } else {
+        PublicKey::try_from(&validator_config.consensus_public_key[..])
+            .unwrap()
+            .to_encoded_string()
+            .unwrap()
+    };
     Ok(StakePoolResult {
         state,
         pool_address,
@@ -517,10 +542,15 @@ pub async fn get_stake_pool_info(
         commission_percentage,
         commission_not_yet_unlocked,
         lockup_expiration_utc_time: Time::new_seconds(stake_pool.locked_until_secs).utc_time,
-        consensus_public_key: validator_config.consensus_public_key.clone(),
-        validator_network_addresses: validator_config.validator_network_addresses().unwrap(),
-        fullnode_network_addresses: validator_config.fullnode_network_addresses().unwrap(),
+        consensus_public_key,
+        validator_network_addresses: validator_config
+            .validator_network_addresses()
+            .unwrap_or_default(),
+        fullnode_network_addresses: validator_config
+            .fullnode_network_addresses()
+            .unwrap_or_default(),
         epoch_info,
+        vesting_contract,
     })
 }
 
@@ -545,10 +575,10 @@ fn get_stake_pool_state(
     }
 }
 
-/// Register the current account as a validator node operator of it's own owned stake.
+/// Register the current account as a validator node operator
 ///
-/// Use InitializeStakeOwner whenever stake owner
-/// and validator operator are different accounts.
+/// This will create a new stake pool for the given account.  The voter and operator fields will be
+/// defaulted to the stake pool account if not provided.
 #[derive(Parser)]
 pub struct InitializeValidator {
     #[clap(flatten)]
@@ -642,6 +672,9 @@ impl OperatorArgs {
 }
 
 /// Join the validator set after meeting staking requirements
+///
+/// Joining the validator set requires sufficient stake.  Once the transaction
+/// succeeds, you will join the validator set in the next epoch.
 #[derive(Parser)]
 pub struct JoinValidatorSet {
     #[clap(flatten)]
@@ -669,6 +702,9 @@ impl CliCommand<TransactionSummary> for JoinValidatorSet {
 }
 
 /// Leave the validator set
+///
+/// Leaving the validator set will require you to have unlocked and withdrawn all stake.  After this
+/// transaction is successful, you will leave the validator set in the next epoch.
 #[derive(Parser)]
 pub struct LeaveValidatorSet {
     #[clap(flatten)]
@@ -695,7 +731,10 @@ impl CliCommand<TransactionSummary> for LeaveValidatorSet {
     }
 }
 
-/// Show validator details of the current validator
+/// Show validator stake information for a specific validator
+///
+/// This will show information about a specific validator, given its
+/// `--pool-address`.
 #[derive(Parser)]
 pub struct ShowValidatorStake {
     #[clap(flatten)]
@@ -724,7 +763,10 @@ impl CliCommand<serde_json::Value> for ShowValidatorStake {
     }
 }
 
-/// Show validator details of the current validator
+/// Show validator configuration for a specific validator
+///
+/// This will show information about a specific validator, given its
+/// `--pool-address`.
 #[derive(Parser)]
 pub struct ShowValidatorConfig {
     #[clap(flatten)]
@@ -757,6 +799,9 @@ impl CliCommand<ValidatorConfigSummary> for ShowValidatorConfig {
 }
 
 /// Show validator details of the validator set
+///
+/// This will show information about the validators including their voting power, addresses, and
+/// public keys.
 #[derive(Parser)]
 pub struct ShowValidatorSet {
     #[clap(flatten)]
@@ -861,27 +906,72 @@ impl TryFrom<&ValidatorInfo> for ValidatorInfoSummary {
     type Error = bcs::Error;
 
     fn try_from(info: &ValidatorInfo) -> Result<Self, Self::Error> {
+        let config = info.config();
+        let config = ValidatorConfig {
+            consensus_public_key: config.consensus_public_key.to_bytes().to_vec(),
+            validator_network_addresses: config.validator_network_addresses.clone(),
+            fullnode_network_addresses: config.fullnode_network_addresses.clone(),
+            validator_index: config.validator_index,
+        };
         Ok(ValidatorInfoSummary {
             account_address: info.account_address,
             consensus_voting_power: info.consensus_voting_power(),
-            config: info.config().try_into()?,
+            config: ValidatorConfigSummary::try_from(&config)?,
         })
     }
 }
 
 impl From<&ValidatorInfoSummary> for ValidatorInfo {
     fn from(summary: &ValidatorInfoSummary) -> Self {
+        let config = &summary.config;
         ValidatorInfo::new(
             summary.account_address,
             summary.consensus_voting_power,
-            (&summary.config).into(),
+            aptos_types::validator_config::ValidatorConfig::new(
+                PublicKey::from_encoded_string(&config.consensus_public_key).unwrap(),
+                bcs::to_bytes(&config.validator_network_addresses).unwrap(),
+                bcs::to_bytes(&config.fullnode_network_addresses).unwrap(),
+                config.validator_index,
+            ),
         )
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct ValidatorConfig {
+    pub consensus_public_key: Vec<u8>,
+    pub validator_network_addresses: Vec<u8>,
+    pub fullnode_network_addresses: Vec<u8>,
+    pub validator_index: u64,
+}
+
+impl ValidatorConfig {
+    pub fn new(
+        consensus_public_key: Vec<u8>,
+        validator_network_addresses: Vec<u8>,
+        fullnode_network_addresses: Vec<u8>,
+        validator_index: u64,
+    ) -> Self {
+        ValidatorConfig {
+            consensus_public_key,
+            validator_network_addresses,
+            fullnode_network_addresses,
+            validator_index,
+        }
+    }
+
+    pub fn fullnode_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
+        bcs::from_bytes(&self.fullnode_network_addresses)
+    }
+
+    pub fn validator_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
+        bcs::from_bytes(&self.validator_network_addresses)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ValidatorConfigSummary {
-    pub consensus_public_key: bls12381::PublicKey,
+    pub consensus_public_key: String,
     /// This is an bcs serialized Vec<NetworkAddress>
     pub validator_network_addresses: Vec<NetworkAddress>,
     /// This is an bcs serialized Vec<NetworkAddress>
@@ -893,8 +983,16 @@ impl TryFrom<&ValidatorConfig> for ValidatorConfigSummary {
     type Error = bcs::Error;
 
     fn try_from(config: &ValidatorConfig) -> Result<Self, Self::Error> {
+        let consensus_public_key = if config.consensus_public_key.is_empty() {
+            "".into()
+        } else {
+            PublicKey::try_from(&config.consensus_public_key[..])
+                .unwrap()
+                .to_encoded_string()
+                .unwrap()
+        };
         Ok(ValidatorConfigSummary {
-            consensus_public_key: config.consensus_public_key.clone(),
+            consensus_public_key,
             // TODO: We should handle if some of these are not parsable
             validator_network_addresses: config.validator_network_addresses()?,
             fullnode_network_addresses: config.fullnode_network_addresses()?,
@@ -905,8 +1003,13 @@ impl TryFrom<&ValidatorConfig> for ValidatorConfigSummary {
 
 impl From<&ValidatorConfigSummary> for ValidatorConfig {
     fn from(summary: &ValidatorConfigSummary) -> Self {
+        let consensus_public_key = if summary.consensus_public_key.is_empty() {
+            vec![]
+        } else {
+            summary.consensus_public_key.as_bytes().to_vec()
+        };
         ValidatorConfig {
-            consensus_public_key: summary.consensus_public_key.clone(),
+            consensus_public_key,
             validator_network_addresses: bcs::to_bytes(&summary.validator_network_addresses)
                 .unwrap(),
             fullnode_network_addresses: bcs::to_bytes(&summary.fullnode_network_addresses).unwrap(),
@@ -926,35 +1029,51 @@ const TESTNET_FOLDER: &str = "testnet";
 #[derive(Parser)]
 pub struct RunLocalTestnet {
     /// An overridable config template for the test node
+    ///
+    /// If provided, the config will be used, and any needed configuration for the local testnet
+    /// will override the config's values
     #[clap(long, parse(from_os_str))]
     config_path: Option<PathBuf>,
 
     /// The directory to save all files for the node
+    ///
+    /// Defaults to .aptos/testnet
     #[clap(long, parse(from_os_str))]
     test_dir: Option<PathBuf>,
 
     /// Random seed for key generation in test mode
+    ///
+    /// This allows you to have deterministic keys for testing
     #[clap(long, parse(try_from_str = FromHex::from_hex))]
     seed: Option<[u8; 32]>,
 
     /// Clean the state and start with a new chain at genesis
+    ///
+    /// This will wipe the aptosdb in `test-dir` to remove any incompatible changes, and start
+    /// the chain fresh.  Note, that you will need to publish the module again and distribute funds
+    /// from the faucet accordingly
     #[clap(long)]
     force_restart: bool,
 
     /// Run a faucet alongside the node
+    ///
+    /// Allows you to run a faucet alongside the node to create and fund accounts for testing
     #[clap(long)]
     with_faucet: bool,
 
     /// Port to run the faucet on
+    ///
+    /// When running, you'll be able to use the faucet at `http://localhost:<port>/mint` e.g.
+    /// `http//localhost:8080/mint`
     #[clap(long, default_value = "8081")]
     faucet_port: u16,
 
-    #[clap(flatten)]
-    prompt_options: PromptOptions,
-
-    /// Disable the delegation of minting to a dedicated account
+    /// Disable the delegation of faucet minting to a dedicated account
     #[clap(long)]
     do_not_delegate: bool,
+
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -1078,7 +1197,7 @@ impl CliCommand<()> for RunLocalTestnet {
     }
 }
 
-/// Update consensus key for the validator node.
+/// Update consensus key for the validator node
 #[derive(Parser)]
 pub struct UpdateConsensusKey {
     #[clap(flatten)]
@@ -1120,7 +1239,7 @@ impl CliCommand<TransactionSummary> for UpdateConsensusKey {
     }
 }
 
-/// Update the current validator's network and fullnode addresses
+/// Update the current validator's network and fullnode network addresses
 #[derive(Parser)]
 pub struct UpdateValidatorNetworkAddresses {
     #[clap(flatten)]
@@ -1179,20 +1298,30 @@ impl CliCommand<TransactionSummary> for UpdateValidatorNetworkAddresses {
     }
 }
 
-/// Tool to analyze the performance of an individual validator
+/// Analyze the performance of one or more validators
 #[derive(Parser)]
 pub struct AnalyzeValidatorPerformance {
     /// First epoch to analyze
+    ///
+    /// Defaults to the first epoch
     #[clap(long, default_value = "-2")]
     pub start_epoch: i64,
 
     /// Last epoch to analyze
+    ///
+    /// Defaults to the latest epoch
     #[clap(long)]
     pub end_epoch: Option<i64>,
 
     /// Analyze mode for the validator: [All, DetailedEpochTable, ValidatorHealthOverTime, NetworkHealthOverTime]
     #[clap(arg_enum, long)]
     pub(crate) analyze_mode: AnalyzeMode,
+
+    /// Filter of stake pool addresses to analyze
+    ///
+    /// Defaults to all stake pool addresses
+    #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub pool_addresses: Vec<AccountAddress>,
 
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
@@ -1233,8 +1362,18 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
         let print_detailed = self.analyze_mode == AnalyzeMode::DetailedEpochTable
             || self.analyze_mode == AnalyzeMode::All;
         for epoch_info in epochs {
-            let epoch_stats =
+            let mut epoch_stats =
                 AnalyzeValidators::analyze(&epoch_info.blocks, &epoch_info.validators);
+            if !self.pool_addresses.is_empty() {
+                let mut filtered_stats: HashMap<AccountAddress, ValidatorStats> = HashMap::new();
+                for pool_address in &self.pool_addresses {
+                    filtered_stats.insert(
+                        *pool_address,
+                        *epoch_stats.validator_stats.get(pool_address).unwrap(),
+                    );
+                }
+                epoch_stats.validator_stats = filtered_stats;
+            }
             if print_detailed {
                 println!(
                     "Detailed table for {}epoch {}:",
@@ -1301,23 +1440,23 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
     }
 }
 
-/// Tool to bootstrap DB from backup
+/// Bootstrap AptosDB from a backup
+///
+/// Enables users to load from a backup to catch their node's DB up to a known state.
 #[derive(Parser)]
 pub struct BootstrapDbFromBackup {
-    #[clap(
-        long,
-        help = "Config file for the source backup, pointing to local files or cloud storage and \
-        commands needed to access them.",
-        parse(from_os_str)
-    )]
+    /// Config file for the source backup
+    ///
+    /// This file configures if we should use local files or cloud storage, and how to access
+    /// the backup.
+    #[clap(long, parse(from_os_str))]
     config_path: PathBuf,
 
-    #[clap(
-        long = "target-db-dir",
-        help = "Target dir where the tool recreates a AptosDB with snapshots and transactions provided \
-        in the backup. The data folder can later be used to start an Aptos node. e.g. /opt/aptos/data/db",
-        parse(from_os_str)
-    )]
+    /// Target database directory
+    ///
+    /// The directory to create the AptosDB with snapshots and transactions from the backup.
+    /// The data folder can later be used to start an Aptos node. e.g. /opt/aptos/data/db
+    #[clap(long = "target-db-dir", parse(from_os_str))]
     pub db_dir: PathBuf,
 
     #[clap(flatten)]
@@ -1371,7 +1510,9 @@ impl CliCommand<()> for BootstrapDbFromBackup {
     }
 }
 
-/// Tool to get Epoch information
+/// Show Epoch information
+///
+/// Displays the current epoch, the epoch length, and the estimated time of the next epoch
 #[derive(Parser)]
 pub struct ShowEpochInfo {
     #[clap(flatten)]
@@ -1412,8 +1553,8 @@ async fn get_epoch_info(client: &Client) -> CliTypedResult<EpochInfo> {
     Ok(EpochInfo {
         epoch: reconfig_resource.epoch(),
         epoch_interval_secs,
-        current_epoch_start_time: Time::new(last_reconfig),
-        next_epoch_start_time: Time::new(last_reconfig + epoch_interval),
+        current_epoch_start_time: Time::new_micros(last_reconfig),
+        next_epoch_start_time: Time::new_micros(last_reconfig + epoch_interval),
     })
 }
 
@@ -1427,24 +1568,26 @@ pub struct EpochInfo {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Time {
-    unix_time: u64,
+    unix_time: u128,
     utc_time: DateTime<Utc>,
 }
 
 impl Time {
-    pub fn new(unix_time: u64) -> Self {
-        let duration = Duration::from_micros(unix_time);
-        let date_time =
-            NaiveDateTime::from_timestamp(duration.as_secs() as i64, duration.subsec_nanos());
+    pub fn new(time: Duration) -> Self {
+        let date_time = NaiveDateTime::from_timestamp(time.as_secs() as i64, time.subsec_nanos());
         let utc_time = DateTime::from_utc(date_time, Utc);
-        // TODO: Allow configurable time
+        // TODO: Allow configurable time zone
         Self {
-            unix_time,
+            unix_time: time.as_micros(),
             utc_time,
         }
     }
 
+    pub fn new_micros(microseconds: u64) -> Self {
+        Self::new(Duration::from_micros(microseconds))
+    }
+
     pub fn new_seconds(seconds: u64) -> Self {
-        Time::new(seconds * SECS_TO_MICROSECS)
+        Self::new(Duration::from_secs(seconds))
     }
 }

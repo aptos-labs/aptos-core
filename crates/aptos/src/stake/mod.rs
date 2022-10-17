@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    CliCommand, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
+    CliCommand, CliError, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
+use crate::node::{get_stake_pools, StakePoolType};
 use aptos_types::account_address::{
     create_vesting_contract_address, default_stake_pool_address, AccountAddress,
 };
@@ -13,7 +14,7 @@ use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 
-/// Tool for manipulating stake
+/// Tool for manipulating stake and stake pools
 ///
 #[derive(Parser)]
 pub enum StakeTool {
@@ -49,9 +50,9 @@ impl StakeTool {
     }
 }
 
-/// Stake APT coins to the stake pool
+/// Add APT to a stake pool
 ///
-/// This command allows stake pool owners to add APT coins to their stake.
+/// This command allows stake pool owners to add APT to their stake.
 #[derive(Parser)]
 pub struct AddStake {
     /// Amount of Octas (10^-8 APT) to add to stake
@@ -63,20 +64,54 @@ pub struct AddStake {
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for AddStake {
+impl CliCommand<Vec<TransactionSummary>> for AddStake {
     fn command_name(&self) -> &'static str {
         "AddStake"
     }
 
-    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
-            .await
-            .map(|inner| inner.into())
+    async fn execute(mut self) -> CliTypedResult<Vec<TransactionSummary>> {
+        let client = self
+            .txn_options
+            .rest_options
+            .client(&self.txn_options.profile_options)?;
+        let amount = self.amount;
+        let owner_address = self.txn_options.sender_address()?;
+        let mut transaction_summaries: Vec<TransactionSummary> = vec![];
+
+        let stake_pool_results = get_stake_pools(&client, owner_address).await?;
+        for stake_pool in stake_pool_results {
+            match stake_pool.pool_type {
+                StakePoolType::Direct => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::stake_add_stake(amount))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::StakingContract => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::staking_contract_add_stake(
+                                stake_pool.operator_address,
+                                amount,
+                            ))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::Vesting => {
+                    return Err(CliError::UnexpectedError(
+                        "Adding stake is not supported for vesting contracts".into(),
+                    ))
+                }
+            }
+        }
+        Ok(transaction_summaries)
     }
 }
 
-/// Unlock staked APT coins
+/// Unlock staked APT in a stake pool
 ///
 /// APT coins can only be unlocked if they no longer have an applied lockup period
 #[derive(Parser)]
@@ -90,20 +125,54 @@ pub struct UnlockStake {
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for UnlockStake {
+impl CliCommand<Vec<TransactionSummary>> for UnlockStake {
     fn command_name(&self) -> &'static str {
         "UnlockStake"
     }
 
-    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
-            .await
-            .map(|inner| inner.into())
+    async fn execute(mut self) -> CliTypedResult<Vec<TransactionSummary>> {
+        let client = self
+            .txn_options
+            .rest_options
+            .client(&self.txn_options.profile_options)?;
+        let amount = self.amount;
+        let owner_address = self.txn_options.sender_address()?;
+        let mut transaction_summaries: Vec<TransactionSummary> = vec![];
+
+        let stake_pool_results = get_stake_pools(&client, owner_address).await?;
+        for stake_pool in stake_pool_results {
+            match stake_pool.pool_type {
+                StakePoolType::Direct => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::stake_unlock(amount))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::StakingContract => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::staking_contract_unlock_stake(
+                                stake_pool.operator_address,
+                                amount,
+                            ))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::Vesting => {
+                    return Err(CliError::UnexpectedError(
+                        "Unlocking stake is not supported for vesting contracts".into(),
+                    ))
+                }
+            }
+        }
+        Ok(transaction_summaries)
     }
 }
 
-/// Withdraw unlocked staked APT coins
+/// Withdraw unlocked staked APT from a stake pool
 ///
 /// This allows users to withdraw stake back into their CoinStore.
 /// Before calling `WithdrawStake`, `UnlockStake` must be called first.
@@ -131,7 +200,7 @@ impl CliCommand<TransactionSummary> for WithdrawStake {
     }
 }
 
-/// Increase lockup of all staked APT coins in the stake pool
+/// Increase lockup of all staked APT in a stake pool
 ///
 /// Lockup may need to be increased in order to vote on a proposal.
 #[derive(Parser)]
@@ -141,20 +210,57 @@ pub struct IncreaseLockup {
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for IncreaseLockup {
+impl CliCommand<Vec<TransactionSummary>> for IncreaseLockup {
     fn command_name(&self) -> &'static str {
         "IncreaseLockup"
     }
 
-    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_increase_lockup())
-            .await
-            .map(|inner| inner.into())
+    async fn execute(mut self) -> CliTypedResult<Vec<TransactionSummary>> {
+        let client = self
+            .txn_options
+            .rest_options
+            .client(&self.txn_options.profile_options)?;
+        let owner_address = self.txn_options.sender_address()?;
+        let mut transaction_summaries: Vec<TransactionSummary> = vec![];
+
+        let stake_pool_results = get_stake_pools(&client, owner_address).await?;
+        for stake_pool in stake_pool_results {
+            match stake_pool.pool_type {
+                StakePoolType::Direct => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::stake_increase_lockup())
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::StakingContract => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::staking_contract_reset_lockup(
+                                stake_pool.operator_address,
+                            ))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::Vesting => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::vesting_reset_lockup(
+                                stake_pool.vesting_contract.unwrap(),
+                            ))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+            }
+        }
+        Ok(transaction_summaries)
     }
 }
 
-/// Initialize stake owner
+/// Initialize a stake pool owner
 ///
 /// Initializing stake owner adds the capability to delegate the
 /// stake pool to an operator, or delegate voting to a different account.
@@ -195,7 +301,9 @@ impl CliCommand<TransactionSummary> for InitializeStakeOwner {
     }
 }
 
-/// Delegate operator capability from the stake owner to another account
+/// Delegate operator capability from the current operator to another account
+///
+/// By default, the operator of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetOperator {
     /// Account Address of delegated operator
@@ -209,20 +317,68 @@ pub struct SetOperator {
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for SetOperator {
+impl CliCommand<Vec<TransactionSummary>> for SetOperator {
     fn command_name(&self) -> &'static str {
         "SetOperator"
     }
 
-    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_set_operator(self.operator_address))
-            .await
-            .map(|inner| inner.into())
+    async fn execute(mut self) -> CliTypedResult<Vec<TransactionSummary>> {
+        let client = self
+            .txn_options
+            .rest_options
+            .client(&self.txn_options.profile_options)?;
+        let owner_address = self.txn_options.sender_address()?;
+        let new_operator_address = self.operator_address;
+        let mut transaction_summaries: Vec<TransactionSummary> = vec![];
+
+        let stake_pool_results = get_stake_pools(&client, owner_address).await?;
+        for stake_pool in stake_pool_results {
+            match stake_pool.pool_type {
+                StakePoolType::Direct => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::stake_set_operator(
+                                new_operator_address,
+                            ))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::StakingContract => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(
+                                aptos_stdlib::staking_contract_switch_operator_with_same_commission(
+                                    stake_pool.operator_address,
+                                    new_operator_address,
+                                ),
+                            )
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::Vesting => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(
+                                aptos_stdlib::vesting_update_operator_with_same_commission(
+                                    stake_pool.vesting_contract.unwrap(),
+                                    new_operator_address,
+                                ),
+                            )
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+            }
+        }
+        Ok(transaction_summaries)
     }
 }
 
-/// Delegate voting capability from the stake owner to another account
+/// Delegate voting capability from the current voter to another account
+///
+/// By default, the voter of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetDelegatedVoter {
     /// Account Address of delegated voter
@@ -236,19 +392,64 @@ pub struct SetDelegatedVoter {
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for SetDelegatedVoter {
+impl CliCommand<Vec<TransactionSummary>> for SetDelegatedVoter {
     fn command_name(&self) -> &'static str {
         "SetDelegatedVoter"
     }
 
-    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_set_delegated_voter(self.voter_address))
-            .await
-            .map(|inner| inner.into())
+    async fn execute(mut self) -> CliTypedResult<Vec<TransactionSummary>> {
+        let client = self
+            .txn_options
+            .rest_options
+            .client(&self.txn_options.profile_options)?;
+        let owner_address = self.txn_options.sender_address()?;
+        let new_voter_address = self.voter_address;
+        let mut transaction_summaries: Vec<TransactionSummary> = vec![];
+
+        let stake_pool_results = get_stake_pools(&client, owner_address).await?;
+        for stake_pool in stake_pool_results {
+            match stake_pool.pool_type {
+                StakePoolType::Direct => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::stake_set_delegated_voter(
+                                new_voter_address,
+                            ))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::StakingContract => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::staking_contract_update_voter(
+                                stake_pool.operator_address,
+                                new_voter_address,
+                            ))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+                StakePoolType::Vesting => {
+                    transaction_summaries.push(
+                        self.txn_options
+                            .submit_transaction(aptos_stdlib::vesting_update_voter(
+                                stake_pool.vesting_contract.unwrap(),
+                                new_voter_address,
+                            ))
+                            .await
+                            .map(|inner| inner.into())?,
+                    );
+                }
+            }
+        }
+        Ok(transaction_summaries)
     }
 }
 
+/// Create a staking contract stake pool
+///
+///
 #[derive(Parser)]
 pub struct CreateStakingContract {
     /// Account Address of operator
@@ -361,13 +562,18 @@ impl CliCommand<TransactionSummary> for UnlockVestedCoins {
     }
 }
 
-/// Allows operators to request commission from running a stake pool (only if there's a staking
-/// contract set up with the staker).
+/// Request commission from running a stake pool
+///
+/// Allows operators or owners to request commission from running a stake pool (only if there's a
+/// staking contract set up with the staker).  The commission will be withdrawable at the end of the
+/// stake pool's current lockup period.
 #[derive(Parser)]
 pub struct RequestCommission {
+    /// Address of the owner of the stake pool
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub owner_address: AccountAddress,
 
+    /// Address of the operator of the stake pool
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub operator_address: AccountAddress,
 
@@ -386,12 +592,17 @@ impl CliCommand<TransactionSummary> for RequestCommission {
             .txn_options
             .rest_options
             .client(&self.txn_options.profile_options)?;
+
+        // If this is a vesting stake pool, retrieve the associated vesting contract
         let vesting_admin_store = client
             .get_account_resource_bcs::<VestingAdminStore>(
                 self.owner_address,
                 "0x1::vesting::AdminStore",
             )
             .await;
+
+        // Note: this only works if the vesting contract has exactly one staking contract
+        // associated
         let staker_address = if let Ok(vesting_admin_store) = vesting_admin_store {
             vesting_admin_store.into_inner().vesting_contracts[0]
         } else {

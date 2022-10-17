@@ -6,9 +6,9 @@ module aptos_framework::coin {
     use std::signer;
 
     use aptos_framework::account;
+    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
-    use aptos_std::event::{Self, EventHandle};
 
     use aptos_std::type_info;
 
@@ -324,7 +324,7 @@ module aptos_framework::coin {
         }
     }
 
-    /// Creates a new Coin with given `CoinType` and returns minting/burning capabilities.
+    /// Creates a new Coin with given `CoinType` and returns minting/freezing/burning capabilities.
     /// The given signer also becomes the account hosting the information  about the coin
     /// (name, supply, etc.). Supply is initialized as non-parallelizable integer.
     public fun initialize<CoinType>(

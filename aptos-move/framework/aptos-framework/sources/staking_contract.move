@@ -30,13 +30,13 @@ module aptos_framework::staking_contract {
     use std::signer;
     use std::vector;
 
-    use aptos_std::event::{EventHandle, emit_event};
     use aptos_std::pool_u64::{Self, Pool};
     use aptos_std::simple_map::{Self, SimpleMap};
 
     use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
+    use aptos_framework::event::{EventHandle, emit_event};
     use aptos_framework::stake::{Self, OwnerCapability};
     use aptos_framework::staking_config;
 

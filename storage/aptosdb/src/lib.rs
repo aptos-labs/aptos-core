@@ -1490,7 +1490,10 @@ impl DbWriter for AptosDB {
             // Executing and committing from more than one threads not allowed -- consensus and
             // state sync must hand over to each other after all pending execution and committing
             // complete.
-            let _lock = self.ledger_commit_lock.lock();
+            let _lock = self
+                .ledger_commit_lock
+                .try_lock()
+                .expect("Concurrent committing detected.");
 
             let num_txns = txns_to_commit.len() as u64;
             // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
@@ -1608,6 +1611,9 @@ impl DbWriter for AptosDB {
             // Note: this must happen after txns have been saved to db because types can be newly
             // created in this same chunk of transactions.
             if let Some(indexer) = &self.indexer {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["indexer_index"])
+                    .start_timer();
                 let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
                 indexer.index(self.state_store.clone(), first_version, &write_sets)?;
             }

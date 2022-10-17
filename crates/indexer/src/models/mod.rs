@@ -8,6 +8,7 @@ pub mod ledger_info;
 pub mod move_modules;
 pub mod move_resources;
 pub mod move_tables;
+pub mod processor_status;
 pub mod processor_statuses;
 pub mod signatures;
 pub mod token_models;

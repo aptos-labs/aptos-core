@@ -117,7 +117,8 @@ fn insert_transactions(
             diesel::insert_into(schema::transactions::table)
                 .values(&txns[start_ind..end_ind])
                 .on_conflict(version)
-                .do_nothing(),
+                .do_update()
+                .set((epoch.eq(excluded(epoch)),)),
             None,
         )?;
     }
@@ -148,18 +149,7 @@ fn insert_user_transactions_w_sigs(
                 .values(&all_user_transactions[start_ind..end_ind])
                 .on_conflict(ut_schema::version)
                 .do_update()
-                .set((
-                    ut_schema::block_height.eq(excluded(ut_schema::block_height)),
-                    ut_schema::parent_signature_type.eq(excluded(ut_schema::parent_signature_type)),
-                    ut_schema::sender.eq(excluded(ut_schema::sender)),
-                    ut_schema::sequence_number.eq(excluded(ut_schema::sequence_number)),
-                    ut_schema::max_gas_amount.eq(excluded(ut_schema::max_gas_amount)),
-                    ut_schema::expiration_timestamp_secs
-                        .eq(excluded(ut_schema::expiration_timestamp_secs)),
-                    ut_schema::gas_unit_price.eq(excluded(ut_schema::gas_unit_price)),
-                    ut_schema::timestamp.eq(excluded(ut_schema::timestamp)),
-                    ut_schema::entry_function_id_str.eq(excluded(ut_schema::entry_function_id_str)),
-                )),
+                .set((ut_schema::epoch.eq(excluded(ut_schema::epoch)),)),
             None,
         )?;
     }

@@ -7,6 +7,7 @@ use field_count::FieldCount;
 #[derive(AsChangeset, Debug, FieldCount, Insertable, Queryable)]
 #[diesel(treat_none_as_null = true)]
 #[diesel(table_name = processor_statuses)]
+/// We are deprecating this in favor of ProcessorStatusV2
 pub struct ProcessorStatus {
     pub name: &'static str,
     pub version: i64,

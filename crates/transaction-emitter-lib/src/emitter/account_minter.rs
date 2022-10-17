@@ -109,6 +109,18 @@ impl<'t> AccountMinter<'t> {
             self.mint_to_root(&req.rest_clients, coins_for_source)
                 .await?;
         } else {
+            let balance = &self
+                .pick_mint_client(&req.rest_clients)
+                .get_account_balance(self.source_account.address())
+                .await?
+                .into_inner();
+            info!(
+                "Source account {} current balance is {}, needed {} coins",
+                self.source_account.address(),
+                balance.get(),
+                coins_for_source
+            );
+
             if req.promt_before_spending {
                 if !prompt_yes(&format!(
                     "plan will consume in total {} balance, are you sure you want to proceed",
@@ -128,17 +140,6 @@ impl<'t> AccountMinter<'t> {
                 );
             }
 
-            let balance = &self
-                .pick_mint_client(&req.rest_clients)
-                .get_account_balance(self.source_account.address())
-                .await?
-                .into_inner();
-            info!(
-                "Source account {} current balance is {}, needed {} coins",
-                self.source_account.address(),
-                balance.get(),
-                coins_for_source
-            );
             if balance.get() < coins_for_source {
                 return Err(anyhow!(
                     "Source ({}) doesn't have enough coins, balance {} < needed {}",
@@ -485,7 +486,17 @@ pub async fn execute_and_wait_transactions(
             (indices, txns)
         };
 
-        let results = client.submit_batch_bcs(&txns).await.unwrap().into_inner();
+        let response = client.submit_batch_bcs(&txns).await;
+        let results = match response {
+            Err(e) => {
+                warn!(
+                    "[{:?}] Submitting transactions connection refused: {:?}, num txns: {}, first txn: {:?}",
+                    client.path_prefix_string(), e, txns.len(), txns.first()
+                );
+                return Err(format_err!("{:?}", e));
+            }
+            Ok(result) => result.into_inner(),
+        };
         let mut failures = results
             .transaction_failures
             .into_iter()
@@ -556,7 +567,6 @@ pub async fn execute_and_wait_transactions(
         );
         failure_counter.fetch_add(local_failures, Ordering::Relaxed);
     }
-
     // Log error, but not return, because timeout or other errors can commit the transaction in the background,
     // and the wait for transaction below will fail if transaction is not there.
     if let Err(e) = result {

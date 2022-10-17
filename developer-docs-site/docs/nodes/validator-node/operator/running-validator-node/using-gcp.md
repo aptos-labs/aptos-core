@@ -3,56 +3,56 @@ title: "On GCP"
 slug: "run-validator-node-using-gcp"
 ---
 
-# Run on GCP
+# On GCP
 
-:::tip Set up GCP account and create a project
+This is a step-by-step guide to install an Aptos node on Google GCP. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
 
+:::danger Did you set up your GCP account and created a project?
 This guide assumes you already have GCP account setup, and have created a new project for deploying Aptos node. If you are not familiar with GCP (Google Cloud Platform), checkout this [Prerequisites section](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) for GCP account setup.
 :::
 
-:::tip IMPORTANT: Before you proceed
+## Before you proceed
 
-Install the below pre-requisites if have not done so:
+Make sure the following are installed on your local computer:
+  - **Aptos CLI**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
+  - **Terraform 1.2.4**: https://www.terraform.io/downloads.html
+  - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
+  - **Google Cloud CLI**: https://cloud.google.com/sdk/docs/install-sdk
 
-   * Aptos CLI 0.3.1: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
-   * Terraform 1.2.4: https://www.terraform.io/downloads.html
-   * Kubernetes CLI: https://kubernetes.io/docs/tasks/tools/
-   * Google Cloud CLI: https://cloud.google.com/sdk/docs/install-sdk
-
-:::
+## Install
 
 :::tip One validator node + one validator fullnode
-When you follow all the below instructions, you will run one validator node and one validator fullnode in the cluster. 
+Follow the below instructions **twice**, i.e., first on one machine to run a validator node and the second time on another machine to run a validator fullnode. 
 :::
 
 1. Create a working directory for your configuration.
 
-    * Choose a workspace name e.g. `testnet`. Note: this defines Terraform workspace name, which in turn is used to form resource names.
-    ```
-    export WORKSPACE=testnet
-    ```
+    * Choose a workspace name, for example, `mainnet` for mainnet, or `testnet` for testnet, and so on. **Note**: This defines the Terraform workspace name, which, in turn, is used to form the resource names.
+      ```bash
+      export WORKSPACE=mainnet
+      ```
 
     * Create a directory for the workspace
-    ```
-    mkdir -p ~/$WORKSPACE
-    ```
+      ```bash
+      mkdir -p ~/$WORKSPACE
+      ```
 
     * Choose a username for your node, for example `alice`.
 
-      ```
+      ```bash
       export USERNAME=alice
       ```
 
-2. Create a storage bucket for storing the Terraform state on Google Cloud Storage.  Use the GCP UI or Google Cloud Storage command to create the bucket.  The name of the bucket must be unique.  See the Google Cloud Storage documentation here: https://cloud.google.com/storage/docs/creating-buckets#prereq-cli
+2. Create a storage bucket for storing the Terraform state on Google Cloud Storage.  Use the GCP UI or Google Cloud Storage command to create the bucket.  The name of the bucket must be unique. See the Google Cloud Storage documentation here: https://cloud.google.com/storage/docs/creating-buckets#prereq-cli.
 
-  ```
+  ```bash
   gsutil mb gs://BUCKET_NAME
   # for example
   gsutil mb gs://<project-name>-aptos-terraform-dev
   ```
 
 3. Create Terraform file called `main.tf` in your working directory:
-  ```
+  ```bash
   cd ~/$WORKSPACE
   touch main.tf
   ```
@@ -69,27 +69,27 @@ When you follow all the below instructions, you will run one validator node and 
 
   module "aptos-node" {
     # download Terraform module from aptos-labs/aptos-core repo
-    source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/gcp?ref=testnet"
+    source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/gcp?ref=mainnet"
     region        = "us-central1"  # Specify the region
     zone          = "c"            # Specify the zone suffix
     project       = "<GCP Project ID>" # Specify your GCP project ID
-    era           = 1              # bump era number to wipe the chain
-    chain_id      = 43
-    image_tag     = "testnet" # Specify the docker image tag to use
-    validator_name = "<Name of Your Validator, no space, e.g. aptosbot>"
+    era           = 1  # bump era number to wipe the chain
+    chain_id      = 1  # for mainnet. Use different value for testnet or devnet.
+    image_tag     = "mainnet" # Specify the docker image tag to use
+    validator_name = "<Name of your validator, no space, e.g. aptosbot>"
   }
   ```
 
   For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/gcp/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
 
 5. Initialize Terraform in the same directory of your `main.tf` file
-  ```
+  ```bash
   terraform init
   ```
 This will download all the Terraform dependencies for you, in the `.terraform` folder in your current working directory.
 
 6. Create a new Terraform workspace to isolate your environments:
-  ```
+  ```bash
   terraform workspace new $WORKSPACE
   # This command will list all workspaces
   terraform workspace list
@@ -97,7 +97,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
 7. Apply the configuration.
 
-  ```
+  ```bash
   terraform apply
   ```
 
@@ -111,7 +111,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
 9. Get your node IP info:
 
-    ```
+    ```bash
     export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-validator-lb --output jsonpath='{.status.loadBalancer.ingress[0].ip}')"
 
     export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-fullnode-lb --output jsonpath='{.status.loadBalancer.ingress[0].ip}')"
@@ -119,7 +119,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
 10. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
 
-    ```
+    ```bash
     aptos genesis generate-keys --output-dir ~/$WORKSPACE/keys
     ```
 
@@ -129,14 +129,14 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
       - `validator-identity.yaml`, and
       - `validator-full-node-identity.yaml`.
       
-      :::caution IMPORTANT
+      :::danger IMPORTANT
 
-       Backup your private key files somewhere safe. These key files are important for you to establish ownership of your node. **Never share private keys with anyone.**
+       Backup your `private-keys.yaml` somewhere safe. These keys are important for you to establish ownership of your node. **Never share private keys with anyone.**
       :::
 
-11. Configure the Validator information. This is all the information you need to register on Aptos community website later.
+11. Configure the validator information. 
 
-    ```
+    ```bash
     aptos genesis set-validator-configuration \
       --local-repository-dir ~/$WORKSPACE \
       --username $USERNAME \
@@ -149,14 +149,9 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the genesis blob and waypoint for the network you want to connect to, you can find a full list of networks [here](https://github.com/aptos-labs/aptos-genesis-waypoint)
-
-  For example, to download testnet genesis and waypoint:
-
-  ```
-  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/waypoint.txt -o waypoint.txt
-  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/genesis.blob -o genesis.blob
-  ```
+12. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
+    - `genesis.blob`
+    - `waypoint.txt`
 
 13. To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).
@@ -173,7 +168,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
 14. Insert `genesis.blob`, `waypoint.txt` and the identity files as secret into k8s cluster.
 
-    ```
+    ```bash
     kubectl create secret generic ${WORKSPACE}-aptos-node-0-genesis-e1 \
         --from-file=genesis.blob=genesis.blob \
         --from-file=waypoint.txt=waypoint.txt \
@@ -181,15 +176,15 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
         --from-file=validator-full-node-identity.yaml=keys/validator-full-node-identity.yaml
     ```
 
-    :::note
+    :::tip
     
     The `-e1` suffix refers to the era number. If you changed the era number, make sure it matches when creating the secret.
 
     :::
 
-15. Check all pods running.
+15. Check that all pods are running.
 
-    ```
+    ```bash
     kubectl get pods
 
     NAME                                        READY   STATUS    RESTARTS   AGE
@@ -198,4 +193,4 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
     node1-aptos-node-0-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have successfully completed setting up your node.
+Now you have successfully completed setting up your node. Make sure that you have set up one machine to run a validator node and a second machine to run a validator fullnode.

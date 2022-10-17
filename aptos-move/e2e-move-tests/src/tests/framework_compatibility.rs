@@ -18,8 +18,6 @@ fn can_upgrade_framework_on_testnet() {
     publish(&acc1, &mut h, "aptos-framework");
     let acc3 = h.new_account_at(AccountAddress::from_hex_literal("0x3").unwrap());
     publish(&acc3, &mut h, "aptos-token");
-    let acc4 = h.new_account_at(AccountAddress::from_hex_literal("0x4").unwrap());
-    publish(&acc4, &mut h, "aptos-names");
 }
 
 fn publish(acc: &Account, h: &mut MoveHarness, path: &str) {
