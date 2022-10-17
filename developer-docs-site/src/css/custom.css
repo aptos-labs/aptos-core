@@ -599,7 +599,7 @@ b.navbar__title{
   margin-bottom: 0.5rem;
 }
 .card-body {
-  flex: 1 1 auto;
+  /* flex: 1 1 auto; */
   padding: 1rem 1rem;
 }
 .d-flex {
