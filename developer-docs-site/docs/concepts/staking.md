@@ -9,17 +9,15 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 ## Concept
 
-:::tip
+:::tip Consensus
 We strongly recommend that you read the consensus section of the [Life of a Transaction](/guides/basics-life-of-txn#consensus) before proceeding further. 
 :::
 
-In a distributed system like blockchain, executing a transaction is different from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before the results are persisted in storage and the state of the ledger is updated. 
+In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before the results are persisted in storage and the state of the ledger is updated. 
 
-A validator can participate in the consensus process. However, the validator can acquire the voting power only when they stake, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is made proportionate to the amount of validator's stake. In exchange, the validator is rewarded in proportion to the amount of validator's stake. Hence, the performance of the network, i.e., consensus, is aligned with the validator's interest, i.e., rewards.   
+A validator can participate in the consensus process. However, the validator can acquire the voting power only when they stake, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is made proportionate to the amount of validator's stake. In exchange, the validator is rewarded in proportion to the amount of validator's stake. Hence, the performance of the network, i.e., consensus, is aligned with the validator's interest, i.e., rewards.  
 
-However, when a validator stakes a very large amount of the utility coin into escrow, it gives the validator a vote weight large enough to control the consensus outcome. This gives the validator the power to threaten the security of the blockchain network, for example, by approving a fraudulent transaction. In the Aptos blockchain, there is a limit to the amount any validator can stake, to prevent any single validator from turning rogue. Furthermore, staking mitigates such security attacks because fraudulent validators would have to be willing to forego rewards and even the valuation of their assets in order to attack the network.
-
-In this way, staking in the Aptos blockchain drives the consensus while securing the blockchain network. 
+Note that currently no slashing is implemented. 
 
 The rest of this document presents how staking works on the Aptos blockchain.
 
@@ -39,13 +37,22 @@ Below is a summary flow diagram of how staking on the Aptos blockchain works. Th
 
 ### How a custodian can stake on Aptos
 
-The Aptos staking module defines a capability that represents ownership. See [https://github.com/aptos-labs/aptos-core/blob/0daade4f734d1ba29a896b00d7ddde2249e87970/aptos-move/framework/aptos-framework/sources/configs/stake.move#L85](https://github.com/aptos-labs/aptos-core/blob/0daade4f734d1ba29a896b00d7ddde2249e87970/aptos-move/framework/aptos-framework/sources/configs/stake.move#L85).
+The Aptos staking module defines a capability that represents ownership. 
 
-This `OwnerCapability` resource can be used to control the stake pool. Three personas: the owner, the operator and the voter, are supported. Using this owner-operator-voter model, a custodian can assume the owner persona and stake on the Aptos blockchain, and participate in the Aptos governance. This model allows delegations and staking services to be built as the owner can provide funds to the validator and the voter personas.
+:::tip Ownership
+See the `OwnerCapability` defined in  [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move).
+:::
+
+The `OwnerCapability` resource can be used to control the stake pool. Three personas are supported: 
+- Owner
+- Operator
+- Voter
+
+Using this owner-operator-voter model, a custodian can assume the owner persona and stake on the Aptos blockchain and participate in the Aptos governance. This model allows delegations and staking services to be built as it separates the account that is control of the funds from the other accounts (operator, voter), hence allows secure delegations of responsibilities. 
 
 This section describes how this works, using Bob and Alice in the example. 
 
-#### Owner
+### Owner
 
 The owner is the owner of the funds. For example, Bob creates an account on the Aptos blockchain. Now Bob has the `OwnerCapability` resource. Bob can assign his account’s operator address to the account of Alice, a trusted node operator, to appoint Alice as a validator.
 
@@ -57,7 +64,7 @@ As an owner:
 - Bob can change the node operator Alice to some other node operator anytime Bob wishes to do so.
 - The reward will be deposited into Bob's (owner's) account.
 
-#### Operator
+### Operator
 
 A node operator is assigned by the fund owner to run the validator node. The two personas, the owner and the operator, can be two separate entities or the same. For example, Alice (operator) runs the validator node, operating at the behest of Bob, the fund owner.
 
@@ -68,7 +75,7 @@ As an operator:
 - Alice has the permissions to change the consensus key and network addresses. The consensus key is used by Alice to participate in the validator consensus process, i.e., to vote and propose a block. Alice is allowed to change ("rotate") this key in case this key is compromised.
 - However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource.
 
-#### Voter
+### Voter
 
 An owner can designate a voter. This enables the voter to participate in governance. The voter  will use the voter key to sign the governance votes in the transactions.
 
@@ -86,17 +93,91 @@ The following is a high-level description of how validation works on the Aptos b
   - All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached the block can be finalized. Hence the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, not to the voter validators.**
   - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block. Rewards are given at the end of the epoch. 
 
+## Validator state and stake state
+
+States are defined for a validator and the stake. 
+
+- **Validator state:** A validator can be in any one of these four states. Moreover, the validator can go from inactive (not tracked in the validator set anywhere) state to any one of the other three states: 
+  - inactive
+  - pending_active.
+  - active.
+  - pending_inactive.
+- **Stake state:** A validator in pending_inactive or active state, can have their stake in either of these four states: 
+  - inactive.
+  - pending_active.
+  - active.
+  - pending_inactive. 
+  
+  These stake states are applicable for the existing validators in the validator set adding or removing their stake.
+
+### Validator state
+
+See the validator states in the below diagram. 
+
+### Validator state edge cases
+
+There are two edge cases to call out:
+1. A validator can be moved from active state directly to the inactive state during an epoch change if their stake drops below the required minimum. This happens during an epoch change.
+2. Aptos governance can also directly remove validators from the active set. **Note that governance proposals will always trigger an epoch change.**
+
+<ThemedImage
+alt="Signed Transaction Flow"
+sources={{
+    light: useBaseUrl('/img/docs/validator-state.svg'),
+    dark: useBaseUrl('/img/docs/validator-state-dark.svg'),
+  }}
+/>
+
+
+The below ruleset is applicable during the changes of a state:
+
+### Ruleset
+
+- Voting power can only change (increase or decrease) on epoch boundary.
+- A validator’s consensus key and the validator and validator fullnode network addresses can only change on epoch boundary.
+- Pending inactive stake cannot be moved into inactive (and thus withdrawable) until before lockup expires.
+- No validators in the active validator set can have their stake below the minimum required stake.
+
+### Stake state
+
+<ThemedImage
+alt="Signed Transaction Flow"
+sources={{
+    light: useBaseUrl('/img/docs/stake-state.svg'),
+    dark: useBaseUrl('/img/docs/stake-state-dark.svg'),
+  }}
+/>
+
+## Validator flow
+
+:::tip Staking pool operations
+See [Staking pool operations](/nodes/validator-node/operator/staking-pool-operations.md) for the correct sequence of commands to run for the below flow.
+:::
+
+1. Owner initializes the stake pool with `aptos stake initialize-stake-owner`.
+2. When the owner is ready to deposit the stake (or have funds assigned by a staking service in exchange for ownership capability), owner calls `aptos stake add-stake`.
+3. When the validator node is ready, the operator can call `aptos node join-validator-set` to join the active validator set. Changes will be effective in the next epoch.
+4. Validator validates (proposes blocks as a leader-validator) and gains rewards. The stake will automatically be locked up for a fixed duration (set by governance) and automatically renewed at expiration.
+5. At any point, if the operator wants to update the consensus key or validator network addresses, they can call `aptos node update-consensus-key` or `aptos node update-validator-network-addresses`. Similar to changes to stake, the changes to consensus key or validator network addresses are only effective in the next epoch.
+6. Validator can request to unlock their stake at any time. However, their stake will only become withdrawable when their current lockup expires. This can be at most as long as the fixed lockup duration.
+7. After exiting, the validator can either explicitly leave the validator set by calling `aptos node leave-validator-set` or if their stake drops below the min required, they would get removed at the end of the epoch.
+8. Validator can always rejoin the validator set by going through steps 2-3 again.
+9. An owner can always switch operators by calling `aptos stake set-operator`.
+10. An owner can always switch designated voter by calling `aptos stake set-delegated-voter`.
+
 ## Joining the validator set
 
 Participating as a validator node on the Aptos network works like this: 
 
-1. Run a validator node and configure the on-chain settings appropriately.
-2. Deposit your Aptos coins funds as stake or have funds assigned by a staking service. The stake must be at least the minimum amount required.
-3. Validate and gain rewards. 
-4. Your stake will automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
+1. Operator runs a validator node and configures the on-chain validator network addresses and rotates the consensus key. 
+2. Owner deposits her Aptos coins funds as stake, or have funds assigned by a staking service. The stake must be at least the minimum amount required.
+3. **The validator node cannot sync until the stake pool becomes active.**
+4. Operator validates and gains rewards. 
+5. The staked pool is automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
+6.  Operator must wait until the new epoch starts before their validator becomes active.
 
 :::tip Joining the validator set
-For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](/nodes/validator-node/operator/connect-to-aptos-network#joining-validator-set).
+For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](/nodes/validator-node/operator/staking-pool-operations#joining-validator-set).
 :::
 
 ### Minimum and maximum stake
@@ -132,8 +213,8 @@ The lockup duration is decided by the Aptos governance, i.e., by the covenants t
 
 An epoch in the Aptos blockchain is defined as a duration of time, in seconds, during which a number of blocks are voted on by the validators, the validator set is updated, and the rewards are distributed to the validators. 
 
-:::tip
-For the AIT-3 an epoch on the Aptos blockchain is defined as 7200 seconds (two hours).
+:::tip Epoch on Mainnet
+The Aptos mainnet epoch is set as 7200 seconds (two hours).
 :::
 
 ### Triggers at the epoch start
@@ -156,14 +237,12 @@ At the start of each epoch, the following key events are triggered:
 Rewards for staking are calculated by using:
 
 1. The `rewards_rate`, an annual percentage yield (APY), i.e., rewards accrue as a compound interest on your current staked amount.
-2. Your staked amount, and 
+2. Your staked amount.
 3. Your proposer performance in the Aptos governance.
 
-:::tip Set by the governance
-The `rewards_rate` is set by the Aptos governance.
+:::tip Rewards rate
+The `rewards_rate` is set by the Aptos governance. Also see [Validation on the Aptos blockchain](#validation-on-the-aptos-blockchain).
 :::
-
-Also see [Validation on the Aptos blockchain](#validation-on-the-aptos-blockchain).
 
 ### Rewards formula
 
@@ -181,7 +260,9 @@ Rewards are paid every epoch. Any reward you (i.e., validator) earned at the end
 
 The validator rewards calculation uses the validator's proposer performance. Once you are in the validator set, you can propose in every epoch. The more successfully you propose, i.e., your proposals pass, the more rewards you will receive. 
 
-:::tip
+Note that rewards are given only to the **leader-validators**, i.e., validators who propose the new block, and not to the **voter-validators** who vote on the leader's proposal for the new block. See [Validation on the Aptos blockchain](#validation-on-the-aptos-blockchain).
+
+:::tip Rewards are subject to lockup period
 All the validator rewards are also subject to lockup period as they are added to the original staked amount. 
 :::
 

@@ -1,16 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::init::Network;
 use crate::common::utils::prompt_yes_with_override;
 use crate::{
-    common::{
-        init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
-        utils::{
-            chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
-            write_to_user_only_file,
-        },
+    common::utils::{
+        chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+        get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
+        to_common_success_result, write_to_file, write_to_file_with_opts, write_to_user_only_file,
     },
     config::GlobalConfig,
     genesis::git::from_yaml,
@@ -186,6 +183,8 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
     /// Private key for commands.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub private_key: Option<Ed25519PrivateKey>,
@@ -603,10 +602,14 @@ pub struct EncodingOptions {
 
 #[derive(Debug, Parser)]
 pub struct PublicKeyInputOptions {
-    /// Public key input file name
+    /// Ed25519 Public key input file name
+    ///
+    /// Mutually exclusive with `--public-key`
     #[clap(long, group = "public_key_input", parse(from_os_str))]
     public_key_file: Option<PathBuf>,
-    /// Public key encoded in a type as shown in `encoding`
+    /// Ed25519 Public key encoded in a type as shown in `encoding`
+    ///
+    /// Mutually exclusive with `--public-key-file`
     #[clap(long, group = "public_key_input")]
     public_key: Option<String>,
 }
@@ -669,10 +672,16 @@ pub trait ParsePrivateKey {
 
 #[derive(Debug, Default, Parser)]
 pub struct PrivateKeyInputOptions {
-    /// Private key input file name
+    /// Signing Ed25519 private key file path
+    ///
+    /// Encoded with type from `--encoding`
+    /// Mutually exclusive with `--private-key`
     #[clap(long, group = "private_key_input", parse(from_os_str))]
     private_key_file: Option<PathBuf>,
-    /// Private key encoded in a type as shown in `encoding`
+    /// Signing Ed25519 private key
+    ///
+    /// Encoded with type from `--encoding`
+    /// Mutually exclusive with `--private-key-file`
     #[clap(long, group = "private_key_input")]
     private_key: Option<String>,
 }
@@ -810,7 +819,7 @@ pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> Account
 
 #[derive(Debug, Parser)]
 pub struct SaveFile {
-    /// Output file name
+    /// Output file path
     #[clap(long, parse(from_os_str))]
     pub output_file: PathBuf,
 
@@ -843,20 +852,20 @@ impl SaveFile {
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
-    /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
+    /// Defaults to the URL in the `default` profile
     #[clap(long)]
     pub(crate) url: Option<reqwest::Url>,
 
     /// Connection timeout in seconds, used for the REST endpoint of the fullnode
-    #[clap(long, default_value = "30")]
-    pub connection_timeout_s: u64,
+    #[clap(long, default_value = "30", alias = "connection-timeout-s")]
+    pub connection_timeout_secs: u64,
 }
 
 impl RestOptions {
-    pub fn new(url: Option<reqwest::Url>, connection_timeout_s: Option<u64>) -> Self {
+    pub fn new(url: Option<reqwest::Url>, connection_timeout_secs: Option<u64>) -> Self {
         RestOptions {
             url,
-            connection_timeout_s: connection_timeout_s.unwrap_or(30),
+            connection_timeout_secs: connection_timeout_secs.unwrap_or(30),
         }
     }
 
@@ -873,16 +882,14 @@ impl RestOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
-            reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
-            })
+            Err(CliError::CommandArgumentError("No rest url given.  Please add --url or add a rest_url to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
         Ok(Client::new_with_timeout(
             self.url(profile)?,
-            Duration::from_secs(self.connection_timeout_s),
+            Duration::from_secs(self.connection_timeout_secs),
         ))
     }
 }
@@ -1181,9 +1188,7 @@ impl FaucetOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
         } else {
-            reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
-            })
+            Err(CliError::CommandArgumentError("No faucet given.  Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 }
@@ -1220,16 +1225,6 @@ pub struct GasOptions {
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
-    /// [Deprecated] Estimate maximum gas via simulation
-    ///
-    /// Deprecated parameter, the default behavior is now to estimate max gas automatically, and ask for
-    /// confirmation
-    ///
-    /// This will simulate the transaction, and use the simulated actual amount of gas
-    /// to be used as the max gas.
-    #[clap(long)]
-    pub(crate) estimate_max_gas: bool,
-
     /// Sender account address
     ///
     /// This allows you to override the account address from the derived account address
@@ -1464,6 +1459,8 @@ impl TransactionOptions {
 #[derive(Parser)]
 pub struct OptionalPoolAddressArgs {
     /// Address of the Staking pool
+    ///
+    /// Defaults to the profile's `AccountAddress`
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) pool_address: Option<AccountAddress>,
 }

@@ -8,7 +8,7 @@ use anyhow::Result;
 use aptos_logger::{trace, warn};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    transaction::{Transaction, TransactionOutput, TransactionStatus},
+    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use executor_types::ExecutedChunk;
@@ -103,7 +103,7 @@ pub fn update_counters_for_processed_chunk(
     process_type: &str,
 ) {
     let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
-
+    let detailed_counters_label = if detailed_counters { "true" } else { "false" };
     if transactions.len() != transaction_outputs.len() {
         warn!(
             "Chunk lenthgs don't match: txns: {} and outputs: {}",
@@ -113,10 +113,45 @@ pub fn update_counters_for_processed_chunk(
     }
 
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
-        let status = match output.status() {
-            TransactionStatus::Keep(_) => "success",
-            TransactionStatus::Discard(_) => "failed",
-            TransactionStatus::Retry => "retry",
+        let (state, reason, error_code) = match output.status() {
+            TransactionStatus::Keep(execution_status) => match execution_status {
+                ExecutionStatus::Success => ("keep_success", "", "".to_string()),
+                ExecutionStatus::OutOfGas => ("keep_rejected", "OutOfGas", "error".to_string()),
+                ExecutionStatus::MoveAbort { info, .. } => (
+                    "keep_rejected",
+                    "MoveAbort",
+                    if detailed_counters {
+                        info.as_ref()
+                            .map(|v| v.reason_name.to_lowercase())
+                            .unwrap_or_else(|| "none".to_string())
+                    } else {
+                        "error".to_string()
+                    },
+                ),
+                ExecutionStatus::ExecutionFailure { .. } => {
+                    ("keep_rejected", "ExecutionFailure", "error".to_string())
+                }
+                ExecutionStatus::MiscellaneousError(e) => (
+                    "keep_rejected",
+                    "MiscellaneousError",
+                    if detailed_counters {
+                        e.map(|v| format!("{:?}", v).to_lowercase())
+                            .unwrap_or_else(|| "none".to_string())
+                    } else {
+                        "error".to_string()
+                    },
+                ),
+            },
+            TransactionStatus::Discard(discard_status_code) => (
+                "discard",
+                "error_code",
+                if detailed_counters {
+                    format!("{:?}", discard_status_code).to_lowercase()
+                } else {
+                    "error".to_string()
+                },
+            ),
+            TransactionStatus::Retry => ("retry", "", "".to_string()),
         };
 
         let kind = match txn {
@@ -127,29 +162,42 @@ pub fn update_counters_for_processed_chunk(
         };
 
         metrics::APTOS_PROCESSED_TXNS_COUNT
-            .with_label_values(&[process_type, kind, status])
+            .with_label_values(&[process_type, kind, state])
             .inc();
+
+        if !error_code.is_empty() {
+            metrics::APTOS_PROCESSED_FAILED_TXNS_REASON_COUNT
+                .with_label_values(&[
+                    detailed_counters_label,
+                    process_type,
+                    state,
+                    reason,
+                    &error_code,
+                ])
+                .inc();
+        }
 
         if let Transaction::UserTransaction(user_txn) = txn {
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "script"])
+                        .with_label_values(&[process_type, "script", state])
                         .inc();
                 }
                 aptos_types::transaction::TransactionPayload::ModuleBundle(_module) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "module"])
+                        .with_label_values(&[process_type, "module", state])
                         .inc();
                 }
                 aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "function"])
+                        .with_label_values(&[process_type, "function", state])
                         .inc();
 
                     let is_core = function.module().address() == &CORE_CODE_ADDRESS;
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_MODULE
                         .with_label_values(&[
+                            detailed_counters_label,
                             process_type,
                             if is_core { "core" } else { "user" },
                             if detailed_counters {
@@ -159,6 +207,7 @@ pub fn update_counters_for_processed_chunk(
                             } else {
                                 "user_module"
                             },
+                            state,
                         ])
                         .inc();
                     if is_core && detailed_counters {
@@ -167,6 +216,7 @@ pub fn update_counters_for_processed_chunk(
                                 process_type,
                                 function.module().name().as_str(),
                                 function.function().as_str(),
+                                state,
                             ])
                             .inc();
                     }
@@ -183,6 +233,7 @@ pub fn update_counters_for_processed_chunk(
             };
             metrics::APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS
                 .with_label_values(&[
+                    detailed_counters_label,
                     process_type,
                     if is_core { "core" } else { "user" },
                     &creation_number,

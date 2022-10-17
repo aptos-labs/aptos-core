@@ -29,7 +29,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 06 October 2022
 
-- Added [Node Files](/docs/nodes/node-files.md) document that lists all the files required during node deployment process. Includes commands to download each file.
+- Added [Node Files](/docs/nodes/node-files-all-networks/node-files.md) document that lists all the files required during node deployment process. Includes commands to download each file.
 
 ## 05 October 2022
 

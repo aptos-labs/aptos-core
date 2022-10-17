@@ -1,9 +1,8 @@
 # Publishing Runbook
 
 When preparing to make a release of the SDK follow these steps:
-1. Update version numbers of all crates to be published from `0.0.X` to `0.0.X
-   + 1` including updating the version requirement for any packages which have
-   workspace dependencies which are also being published.
+1. Update version numbers of all crates to be published from `0.0.X` to `0.0.X + 1` (e.g., from `0.0.2` to `0.0.3`) including updating the version requirement for any packages which have
+workspace dependencies which are also being published. 
 2. Perform a dry-run publish (use `cargo publish --dry-run`) in order to verify that publishing will be successful.
 3. Create a PR and get it merged into master.
 4. Once the PR has landed in master, check out the commit which does the versions bump.

@@ -123,12 +123,22 @@ pub static APTOS_PROCESSED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the executed transactions since last restart.
+pub static APTOS_PROCESSED_FAILED_TXNS_REASON_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_processed_failed_txns_reason_count",
+        "Count of the transactions since last restart. state is success, failed or retry",
+        &["is_detailed", "process", "state", "reason", "error_code"]
+    )
+    .unwrap()
+});
+
 /// Counter of executed user transactions by payload type
 pub static APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_processed_user_transactions_by_payload",
         "Counter of processed user transactions by payload type",
-        &["process", "payload_type"]
+        &["process", "payload_type", "state"]
     )
     .unwrap()
 });
@@ -139,7 +149,7 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_MODULE: Lazy<IntCoun
         register_int_counter_vec!(
             "aptos_processed_user_transactions_entry_function_by_module",
             "Counter of processed EntryFunction user transactions by module",
-            &["process", "account", "name"]
+            &["is_detailed", "process", "account", "name", "state"]
         )
         .unwrap()
     });
@@ -150,7 +160,7 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_CORE_METHOD: Lazy<In
         register_int_counter_vec!(
             "aptos_processed_user_transactions_entry_function_by_core_method",
             "Counter of processed EntryFunction user transaction for core address by method",
-            &["process", "module", "method"]
+            &["process", "module", "method", "state"]
         )
         .unwrap()
     });
@@ -160,7 +170,7 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS: Lazy<IntCounterVec> = 
     register_int_counter_vec!(
         "aptos_processed_user_transactions_core_events",
         "Counter of processed EntryFunction user transaction for core address by method",
-        &["process", "account", "creation_number"]
+        &["is_detailed", "process", "account", "creation_number"]
     )
     .unwrap()
 });

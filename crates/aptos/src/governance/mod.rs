@@ -415,7 +415,8 @@ struct ProposalSubmissionSummary {
 
 /// Submit a vote on a proposal
 ///
-/// Votes can only be given on proposals that are currently open for voting.
+/// Votes can only be given on proposals that are currently open for voting.  You can vote
+/// with `--yes` for a yes vote, and `--no` for a no vote.
 #[derive(Parser)]
 pub struct SubmitVote {
     /// Id of the proposal to vote on
