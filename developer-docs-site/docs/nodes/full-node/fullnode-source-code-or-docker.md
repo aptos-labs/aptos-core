@@ -4,50 +4,37 @@ slug: "fullnode-source-code-or-docker"
 sidebar_position: 10
 ---
 
-# Fullnode Using Aptos Source or Docker
+# Public Fullnode Using Aptos Source or Docker
 
-You can run your own [Fullnode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes or validators.
+You can run your own [public fullnode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Public fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes (public fullnodes or validator fullnodes) or validators.
 
-Alternatively, you can use the fullnodes provided by Aptos Labs. However, such Aptos Labs-provided fullnodes have rate limits, which can impede your development. By running your own fullnode you can directly synchronize with the Aptos blockchain and avoid such rate limits.
+Alternatively, you can use the public fullnodes provided by Aptos Labs. However, such Aptos Labs-provided public fullnodes have rate limits, which can impede your development. By running your own public fullnode you can directly synchronize with the Aptos blockchain and avoid such rate limits.
 
-Fullnodes can be run by anyone. This tutorial explains how to configure a public fullnode to connect to the Aptos devnet.
-
-:::tip Default connection to devnet
-If you follow the default setup in this document, then your public fullnode will be connected to the Aptos devnet with a REST endpoint accessible on your computer at localhost:8080. To connect to a different Aptos network, such as devnet or testnet, make sure to change the settings from `devnet` to other networks. To connect to other networks, you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks.
-:::
-
-## Before you proceed
-
-Before you get started with this tutorial, read the following sections:
-
-* [Validator node concepts](/concepts/basics-validator-nodes).
-* [Fullnode concepts](/concepts/basics-fullnodes).
-* [REST specifications](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
-
+Public fullnodes can be run by anyone. This tutorial explains how to configure a public fullnode to connect to an Aptos network.
 
 ## Hardware requirements
 
 We recommend the following hardware resources:
 
-- For running a production grade fullnode:
+- For running a production grade public fullnode:
 
   - **CPU**: 8 cores, 16 threads (Intel Xeon Skylake or newer).
   - **Memory**: 32GB RAM.
 
-- For running the fullnode for development or testing:
+- For running the public fullnode for development or testing:
 
   - **CPU**: 2 cores.
   - **Memory**: 4GB RAM.
 
 ## Storage requirements
 
-The amount of data stored by Aptos depends on the ledger history (length) of the blockchain and the number of on-chain states (e.g., accounts). These values depend on several factors, including: the age of the blockchain, the average transaction rate and the configuration of the ledger pruner. Also see [Validator Hardware Requirements](/nodes/validator-node/operator/node-requirements#hardware-requirements).
+The amount of data stored by Aptos depends on the ledger history (length) of the blockchain and the number of on-chain states (e.g., accounts). These values depend on several factors, including: the age of the blockchain, the average transaction rate and the configuration of the ledger pruner. Follow the storage requirements described in [Validator Hardware Requirements](/nodes/validator-node/operator/node-requirements#hardware-requirements). 
 
-:::tip
-Given that devnet is currently being reset on a weekly basis, we estimate that Aptos will not require more than several GBs of storage. See the `#devnet-release` channel on Aptos Discord.
+:::tip Devnet blockchain storage
+The Aptos devnet is currently reset on a weekly basis. Hence we estimate that if you are connecting to the devnet, then the Aptos blockchain will not require more than several GBs of storage. See the `#devnet-release` channel on Aptos Discord.
 :::
 
-## Configuring a fullnode
+## Configuring a public fullnode
 
 You can configure a public fullnode in one of two ways:
 
@@ -56,7 +43,7 @@ You can configure a public fullnode in one of two ways:
 
 This document describes how to configure your public fullnode using both methods.
 
-### Approach #1: Building and running from Aptos-core source code
+### Method 1: Building and running from source
 
 1. Clone the Aptos repo.
 
@@ -84,7 +71,7 @@ This document describes how to configure your public fullnode using both methods
 
 With your development environment ready, now you can start to setup your fullnode.
 
-5. Checkout the `devnet` branch using `git checkout --track origin/devnet`.
+5. Checkout the `mainnet` branch using `git checkout --track origin/mainnet`.
 
 6. Make sure your current working directory is `aptos-core`.
 
@@ -92,22 +79,22 @@ With your development environment ready, now you can start to setup your fullnod
    ```bash
    cp config/src/config/test_data/public_full_node.yaml fullnode.yaml
    ```
-   to create a copy of the fullnode config template. You will edit this file to ensure that your fullnode:
+   to create a copy of the public fullnode configuration YAML template. You will edit this file to ensure that your public fullnode:
 
-    - Contains the correct genesis blob that is published by the Aptos devnet.
-    - Synchronizes correctly with the devnet, by using the checkpoint file `waypoint.txt` published by the devnet, and
-    - Stores the devnet database at a location of your choice on your local machine.
+    - Contains the correct genesis blob that is published by the Aptos mainnet.
+    - Synchronizes correctly with the mainnet, by using the checkpoint file `waypoint.txt` published by the mainnet. 
+    - Stores the mainnet database at a location of your choice on your local machine.
 
-7. Make sure your current working directory is `aptos-core`. The Aptos devnet publishes the `genesis.blob` and `waypoint.txt` files. Download them:
+7. Make sure your current working directory is `aptos-core`. The Aptos mainnet publishes the `genesis.blob` and `waypoint.txt` files. Download them:
 
-    - Click [genesis][devnet_genesis] for genesis blob or run the below command on your terminal:
+    - Run the below command on your terminal to download the file:
       ```bash
-      curl -O https://devnet.aptoslabs.com/genesis.blob
+      curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob
       ```
 
-    - Click [waypoint][devnet_waypoint] for waypoint.txt and save the file, or run the below command on your terminal:
+    - Run the below command on your terminal to download the file:
       ```bash
-      curl -O https://devnet.aptoslabs.com/waypoint.txt
+      curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
       ```
   
     :::tip
@@ -149,47 +136,75 @@ You have now successfully configured and started running a fullnode connected to
 This will build a release binary: `aptos-core/target/release/aptos-node`. The release binaries tend to be substantially faster than debug binaries but lack debugging information useful for development. To build a debug binary, omit the `--release` flag.
 :::
 
-### Approach #2: Using Docker
+---
 
-This section describes how to configure and run your fullnode using Docker.
+### Method 2: Using Docker
 
-:::caution Supported only on x86-64 CPUs
-Running Aptos-core via Docker is currently only supported on x86-64 CPUs and not on ARM64 CPUs (which includes M1/M2 Macs).
+This section describes how to configure and run your public fullnode using Docker.
 
-We currently only publish Docker images compatible with x86-64 CPUs.
-If you have an M1/M2 (ARM64) Mac, use the Aptos-core source approach.
-If M1/M2 support is important to you, please comment on and follow this issue: https://github.com/aptos-labs/aptos-core/issues/1412
+:::danger Supported only on x86-64 CPUs
+Running Aptos-core via Docker is currently only supported on x86-64 CPUs. If you have an Apple M1/M2 (ARM64) Mac, use the Aptos-core source approach. If M1/M2 support is important to you, comment on this issue: https://github.com/aptos-labs/aptos-core/issues/1412
 :::
 
 1. Install [Docker](https://docs.docker.com/get-docker/).
-2. Create a directory for your local public fullnode, and `cd` into it.
-   For example:
-   ```bash
-   mkdir aptos-fullnode && cd aptos-fullnode
-   ```
-3. Run the following script to prepare your local config and data dir for Devnet:
-    ```bash
-    mkdir data && \
-    curl -O https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/config/src/config/test_data/public_full_node.yaml && \
-    curl -O https://devnet.aptoslabs.com/waypoint.txt && \
-    curl -O https://devnet.aptoslabs.com/genesis.blob
-    ```
+2. Run the following script to prepare your local configuration and data directory for mainnet:
+```bash
+mkdir mainnet && cd mainnet
+mkdir data && \
+curl -O https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/fullnode.yaml && \
+curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt && \
+curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob
+```
 
-    :::tip
-    To connect to other networks, you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks
-    :::
+3. Make sure that the `fullnode.yaml` configuration file that you downloaded contains only the following configuration content. This will ensure that this configuration is for public fullnode and not for either a validator node or a validator fullnode:
 
-4. Finally, start the fullnode via Docker:
-   ```bash
-    docker run --pull=always --rm -p 8080:8080 -p 9101:9101 -p 6180:6180 -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data --workdir /opt/aptos/etc --name=aptos-fullnode aptoslabs/validator:devnet aptos-node -f /opt/aptos/etc/public_full_node.yaml
-   ```
-Ensure you have opened the relevant ports: 8080, 9101 and 6180. You may also need to update the 127.0.0.1 with 0.0.0.0 in the `public_full_node.yaml` for the fields `listen_address` and `address` field in the `api` list.
+```yaml
+base:
+  role: "full_node"
+  data_dir: "/opt/aptos/data"
+  waypoint:
+    from_file: "/opt/aptos/etc/waypoint.txt"
 
-## Verify the correctness of your fullnode
+execution:
+  genesis_file_location: "/opt/aptos/etc/genesis.blob"
+
+full_node_networks:
+- network_id: "public"
+  discovery_method: "onchain"
+  listen_address: "/ip4/0.0.0.0/tcp/6182"
+
+api:
+  enabled: true
+  address: "0.0.0.0:8080"
+```
+
+**NOTE**: Set `listen_address: "/ip4/127.0.0.1/tcp/6182"` if you do not want other full nodes connecting to yours. Also see the below note.
+
+4. Run the below `docker` command. **NOTE** that from time to time the Docker image tag will be updated and you should use the latest official image tag in place of `mainnet_506f94721ca0fd0d339472fffe149a1fda469cad`. See https://github.com/aptos-labs/aptos-networks/tree/main/mainnet or this page for updates:
+
+```bash
+docker run --pull=always \
+    --rm -p 8080:8080 
+    -p 9101:9101 -p 6180:6180 \
+    -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data \
+    --workdir /opt/aptos/etc \
+    --name=aptos-fullnode aptoslabs/validator:mainnet_506f94721ca0fd0d339472fffe149a1fda469cad aptos-node \
+    -f /opt/aptos/etc/fullnode.yaml
+```
+
+**NOTE**: Ensure you have opened the relevant ports: 8080, 9101 and 6180. You may also need to update the 127.0.0.1 with 0.0.0.0 in the `fullnode.yaml` for the fields `listen_address` and `address` field in the `api` list.
+
+:::tip
+To connect to a network other than mainnet, all you need is to download and use the network-specific genesis blob and waypoint files. See here ➜ https://github.com/aptos-labs/aptos-networks.
+:::
+
+Ensure you have opened the relevant ports: 8080, 9101 and 6180. You may also need to update the 127.0.0.1 with 0.0.0.0 in the `fullnode.yaml` for the fields `listen_address` and `address` field in the `api` list.
+
+## Verify the correctness of your public fullnode
 
 ### Verify initial synchronization
 
-During the initial synchronization of your fullnode, there may be a lot of data to transfer. You can monitor the progress by querying the metrics port to see what version your node is currently synced to. Run the following command to see the current synced version of your node:
+During the initial synchronization of your public fullnode, there may be a lot of data to transfer. You can monitor the progress by querying the metrics port to see what version your node is currently synced to. Run the following command to see the current synced version of your node:
 
 ```bash
 curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{.*\"synced\"}" | awk '{print $2}'
