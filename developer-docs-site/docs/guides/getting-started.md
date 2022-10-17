@@ -161,7 +161,7 @@ This section contains links to frequently referred Aptos developer resources.
 ### Aptos CLI
 
 - [Aptos CLI releases](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true)
-- [Aptos CLI documentation](/cli-tools/aptos-cli-tool/aptos-cli-index)
+- [Aptos CLI documentation](/cli-tools/aptos-cli-tool/use-aptos-cli)
 
 ### Aptos SDK
 

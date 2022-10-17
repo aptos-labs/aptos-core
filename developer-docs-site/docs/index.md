@@ -88,7 +88,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 <div class="col">
     <div class="card h-100" >
     <div class="card-body d-flex flex-column" >
-    <a href="/cli-tools/aptos-cli-tool/aptos-cli-index" class="card-title card-link stretched-link"> <h2>CLI</h2></a>
+    <a href="/cli-tools/aptos-cli-tool/use-aptos-cli" class="card-title card-link stretched-link"> <h2>CLI</h2></a>
     <p class="card-text">CLI for developing and deploying on the Aptos blockchain.</p>
 </div>
 </div>
