@@ -12,7 +12,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 13 October 2022
 
-- [Aptos Explorer](https://explorer.aptoslabs.com/) offers [user documentation](/docs/guides/use-aptos-explorer.md) covering common use cases and popular Explorer screen descriptions in Aptos.dev.
+- Added [user documentation](/docs/guides/use-aptos-explorer.md) for [Aptos Explorer](https://explorer.aptoslabs.com/) to Aptos.dev covering common use cases and popular Explorer screen descriptions.
 
 ## 11 October 2022
 
