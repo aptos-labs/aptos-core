@@ -102,7 +102,7 @@ resource "helm_release" "fullnode" {
       }
       backup = {
         # only enable backup for fullnode 0
-        enable = count.index == 0 ? var.enable_backup : false
+        enable = count.index == var.backup_fullnode_index ? var.enable_backup : false
         config = {
           location = "gcs"
           gcs = {
