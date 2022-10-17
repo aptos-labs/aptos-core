@@ -95,6 +95,7 @@ const sidebars = {
       value: "Nodes",
       className: "sidebar-title",
     },
+    "nodes/nodes-landing",
     "nodes/aptos-deployments",
     "nodes/leaderboard-metrics",
     {
