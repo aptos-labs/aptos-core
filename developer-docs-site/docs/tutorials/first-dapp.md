@@ -50,9 +50,21 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 We will now set up the frontend user interface for our dapp. We will use [`create-react-app`](https://create-react-app.dev/) to set up the app in this tutorial, but neither React nor `create-react-app` are required. You can use your preferred JavaScript framework.
 
+First run:
+
 ```bash
 npx create-react-app first-dapp --template typescript
+```
+
+Accept installation of the `create-react-app` package if prompted. Then navigate to the newly created `first-dapp` directory:
+
+```bash
 cd first-dapp
+```
+
+And start the app with:
+
+```bash
 npm start
 ```
 
@@ -68,7 +80,7 @@ Next we will update our app to use this API to display the Wallet account's addr
 
 The first step when integrating with the `window.aptos` API is to delay rendering the application until the `window.onload` event has fired.
 
-Open up `src/index.tsx` and change the following code snippet:
+Still in the `first-dapp` directory, open the `src/index.tsx` file and change the following code snippet:
 
 ```typescript
 root.render(
@@ -90,7 +102,7 @@ window.addEventListener('load', () => {
 });
 ```
 
-This change will ensure that the `window.aptos` API has been initialized by the time we render the app (if we render too early, the Wallet extension may not have had a chance to initialize the API yet and thus `window.aptos` will be `undefined`).
+This change will ensure that the `window.aptos` API has been initialized by the time we render the app. If we render too early, the Wallet extension may not have had a chance to initialize the API yet and thus `window.aptos` will be `undefined`.
 
 ### (Optional) TypeScript setup for `window.aptos`
 
