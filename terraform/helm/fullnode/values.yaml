@@ -19,6 +19,9 @@ aptos_chains:
   testnet:
     waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/waypoint.txt
     genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob
+  mainnet:
+    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
+    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob
 
 fullnode:
   # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
@@ -81,7 +84,6 @@ ingress:
   ingressClassName:
   annotations: {}
 
-
 serviceAccount:
   # -- Specifies whether a service account should be created
   create: true
@@ -131,7 +133,7 @@ backup:
 
 backup_verify:
   # -- The schedule for backup verification
-  schedule: '@daily'
+  schedule: "@daily"
   resources:
     limits:
       cpu: 0.5
