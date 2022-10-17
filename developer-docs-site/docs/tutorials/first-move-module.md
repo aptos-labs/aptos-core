@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 This tutorial details how to compile, test, publish and interact with Move modules on the Aptos blockchain. The steps in summary are:
 
-1. Install the precombiled binary for the Aptos CLI.
+1. Install the precompiled binary for the Aptos CLI.
 2. Create an account on the Aptos blockchain and fund it.
 3. Compile and test a Move module.
 4. Publish a Move module to the Aptos blockchain.
@@ -32,16 +32,38 @@ After installing the CLI binary, next step is to create and fund an account on t
 aptos init
 ```
 
-The output will be similar to below. 
+You will see output asking for an endpoint: 
 ```text
 Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com/v1]
+```
 
+Press **return** to accept the default fullnode in devnet or specify the endpoint of your choosing:
+
+```text
 No rest url given, using https://fullnode.devnet.aptoslabs.com/v1...
+```
+
+See and respond to the prompt for your faucet endpoint by accepting the default faucet in devnet, specifying one of your choosing, or entering `skip` to avoid configuring a faucet for now:
+
+```text
 Enter your faucet endpoint [Current: None | No input: https://faucet.devnet.aptoslabs.com | 'skip' to not use a faucet]
+````
 
+Assuming you selected the default, you will see:
+
+```text
 No faucet url given, using https://faucet.devnet.aptoslabs.com...
-Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
+```
 
+See and respond to the prompt for your private key by accepting the default to create anew or by entering an existing key:
+
+```text
+Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
+```
+
+Assuming you elected to create anew, you will see:
+
+```text
 No key given, generating key...
 Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a doesn't exist, creating it and funding it with 10000 coins
 Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a!  Run `aptos help` for more information about commands
@@ -50,17 +72,17 @@ Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c
 }
 ```
 
-The account address in the above output:  `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account, and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are interchangeable.
+The account address in the above output  `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are used interchangeably in this document. Of course, substitute your own address as needed.
 
 2. Now fund this account by running this command: 
 
 ```bash
 aptos account fund-with-faucet --account default
 ```
-You will see an output similar to the below:
+You will see output resembling:
 ```
 {
-  "Result": "Added 10000 coins to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
+  "Result": "Added 500000 coins to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
 }
 ```
 
