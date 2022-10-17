@@ -6,7 +6,7 @@ hide_table_of_contents: true
 
 # Nodes Home
 
-Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
+The Aptos network is comprised of nodes of three types: validator node, validator fullnode and public fullnode. To participate in consensus, you are required to run both a validator node and a validator fullnode, and stake. This section describes everything you need to stake and participate in consensus and governance. Also learn how to run a public fullnode on a local network and connect to either a testnet or a devnet. 
 
 
 
@@ -15,55 +15,52 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 <div class="docs-card-container">
   <div class="row row-cols-1 row-cols-md-2a g-4">
     <div class="col">
-      <div class="card-no-border card-body h-100 d-flex flex-column">
+      <div class="card-no-border card-body h-100 d-flex flex-column align-items-start">
         <div class="card-body">
           <h2 class="card-title">Validation on Aptos</h2>
           <p class="card-text">
-            Some quick example text to build on the card title and make up the
-            bulk of the card's content.
+            Everything you need to know about how validation, staking and governance works on Aptos.
           </p>
         </div>
         <div class="list-group list-group-flush">
-          <a href="#" class="list-group-item">
+          <a href="/concepts/staking#validation-on-the-aptos-blockchain" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">How validation works</h4>
             </div>
-            <small>See a snapshot of all active Aptos deployments.</small>
+            <small>Validator-leader proposes and earns rewards on success.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/concepts/staking#validator-state-and-stake-state" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Validator states</h4>
             </div>
-            <small>And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small>
+            <small>Learn how a validator gets into a validator set.</small>
           </a>
           <div class="card-body">
           <h2 class="card-title">Staking</h2>
           </div>
-          <a href="#" class="list-group-item">
+          <a href="/concepts/staking" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Staking on Aptos (concept)</h4>
             </div>
-            <small>And some small print.</small>
+            <small>A comprehensive guide to how staking works on Aptos.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/concepts/governance" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Governance</h4>
             </div>
-            <small>See a snapshot of all active Aptos deployments.</small>
+            <small>Who can propose, who can vote, and how an AIP is resolved.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/validator-node/owner/index" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Owner</h4>
             </div>
-            <small>And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small>
+            <small>Describes the owner operations performed for staking.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/validator-node/owner/index" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Voter</h4>
             </div>
-            <small>And some small print.</small>
+            <small>Describes the voter operations performed for staking.</small>
           </a>
         </div>
       </div>
@@ -73,50 +70,45 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
         <div class="card-body">
           <h2 class="card-title">Operator</h2>
           <p class="card-text">
-            Some quick example text to build on the card title and make up the
-            bulk of the card's content.
+            A comprehensive guide to deploying nodes, staking operations and participate in consensus.
           </p>
         </div>
         <div class="list-group list-group-flush">
-          <a href="#" class="list-group-item">
+          <a href="/nodes/validator-node/operator/node-requirements" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Node requirements</h4>
             </div>
-            <small>See a snapshot of all active Aptos deployments.</small>
+            <small>Details the compute and storage resources you need. Read this first before anything.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/validator-node/operator/running-validator-node/running-validator-node" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Running validator node</h4>
             </div>
-            <small>And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small>
+            <small>In the cloud or on-premises, Docker or source, you will step-by-step instructions here.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/validator-node/operator/node-liveness-criteria" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Node liveness criteria</h4>
             </div>
-            <small>And some small print.</small>
+            <small>Your nodes must pass these liveness criteria to be in an Aptos network.</small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/validator-node/operator/connect-to-aptos-network" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Connecting to Aptos network</h4>
             </div>
-            <small>And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small>
+            <small>Steps to connect your nodes to an Aptos network. </small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/validator-node/operator/staking-pool-operations" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Staking pool operations</h4>
             </div>
-            <small>And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small>
+            <small>Step-by-step guide for how to perform staking pool operations. </small>
           </a>
-          <a href="#" class="list-group-item">
+          <a href="/nodes/validator-node/operator/shutting-down-nodes" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Shutting down nodes</h4>
             </div>
-            <small>And some muted small print. This one with multiple lines. More
-              lines and more lines and more lines.</small>
+            <small>Leave the validator set first, and then shut down your node. </small>
           </a>
         </div>
       </div>
@@ -126,8 +118,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
         <div class="card-body">
           <h2 class="card-title">Fullnode</h2>
           <p class="card-text">
-            Some quick example text to build on the card title and make up the
-            bulk of the card's content.
+            A section with detailed, step-by-step instructions on everything fullnode. 
           </p>
         </div>
         <div class="list-group list-group-flush">
