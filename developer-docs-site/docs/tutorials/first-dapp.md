@@ -5,15 +5,15 @@ slug: "your-first-dapp"
 
 # Your First Dapp
 
-In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos blockchain. A dapp usually consists of a user interface written in JavaScript, which  interacts with one or more Move modules.
+In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos blockchain. A dapp usually consists of a graphical user interface, which interacts with one or more Move modules.
 
-For this tutorial, we will use the Move module `HelloBlockchain` described in [Your First Move Module](first-move-module.md) and focus on building the user interface.
+For this tutorial, we will use the Move module [`HelloBlockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) described in [Your First Move Module](first-move-module.md) and focus on building the user interface.
 
-We will use:
+We will use the:
 
-- The [Aptos Typescript SDK][ts_sdk].
-- The [Aptos Wallet][building_wallet], and
-- The [Aptos CLI][install_cli] to interact with the Aptos blockchain.
+- [Aptos Typescript SDK][ts_sdk]
+- [Aptos Wallet][building_wallet]
+- [Aptos CLI][install_cli] to interact with the Aptos blockchain
 
 The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 
@@ -32,9 +32,10 @@ After you install it:
 
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
 2. Copy the private key. You will need it to set up the Aptos CLI in the next section.
+3. See the [user instructions](https://petra.app/docs/use) on petra.app for help.
 
 :::tip
-Ensure that your account has sufficient funds to perform transactions by clicking the **Faucet** button.
+Ensure your account has sufficient funds to perform transactions by clicking the **Faucet** button.
 :::
 
 ### Aptos CLI
