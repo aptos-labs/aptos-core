@@ -58,7 +58,6 @@ If the script above doesn't work for you, you can install these manually, but it
 
 **> Using the automated script**
 
-1. If on Mac, ensure you have `brew` installed https://brew.sh/
 1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
 1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
 1. Change directory into `aptos-core`: `cd aptos-core`

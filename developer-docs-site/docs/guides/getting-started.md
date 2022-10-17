@@ -59,13 +59,19 @@ The [Aptos source files](https://github.com/aptos-labs/aptos-core) themselves al
 
 ## Install the Aptos CLI
 
-[Install Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link.
+[Install the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link.
+This tool will help you compile, test, and publish contracts as well as run contracts directly on the blockchain.
 
 ## Clone the Aptos-core repo
 
-As described in [Workflows](#workflows), you may interact with Aptos using only the CLI. If you need the source, clone the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
+As described in [Workflows](#workflows), you may interact with Aptos using only the CLI. For more advanced users, if you need the source you may clone the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
 
-1. Clone the Aptos repo.
+1. Setup Git
+   [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) is required to clone the aptos-core repo, and will be need to be installed prior to continuing.  You can install it with the instructions on the official [Git website](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+
+1. Clone the Aptos repository
+
+   To clone the Aptos repository (repo), you first need to open a command line prompt (Terminal on Mac / Linux, Powershell on Windows).  Then, you can run the following command to clone the Git repository from Github.
 
       ```
       git clone https://github.com/aptos-labs/aptos-core.git
@@ -73,17 +79,84 @@ As described in [Workflows](#workflows), you may interact with Aptos using only 
 
 1. `cd` into `aptos-core` directory.
 
+   Now we'll want to go into the newly created directory `aptos-core`
     ```
     cd aptos-core
     ```
+   
+1. Setup Build Dependencies
 
-1. Update your current shell environment to run `cargo build` and other Aptos-related commands:
+   Prepare your developer environment by installing the dependencies needed to build, test and inspect Aptos Core.
+   No matter your selected mechanism for installing these dependencies, **it is imperative you keep your entire toolchain up-to-date**. If you encounter issues later, update all packages and try again.
 
-    ```
-    source ~/.cargo/env
-    ```
+<details>
+<summary>macOS</summary>
 
-1. Optionally, check out a release branch to install an Aptos node:
+**> Using the automated script**
+
+1. Ensure you have `brew` package manager installed: https://brew.sh/
+1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh`
+1. Update your current shell environment: `source ~/.cargo/env`.
+
+:::tip
+You can see the available options for the script by running `./scripts/dev_setup.sh --help`
+:::
+
+**> Manual installation of dependencies**
+
+If the script above doesn't work for you, you can install these manually, but it's **not recommended**.
+
+1. [Rust](https://www.rust-lang.org/tools/install)
+1. [CMake](https://cmake.org/download/)
+1. [LLVM](https://releases.llvm.org/)
+1. [LLD](https://lld.llvm.org/)
+
+</details>
+
+<details>
+<summary>Linux</summary>
+
+**> Using the automated script**
+
+1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh`
+1. Update your current shell environment: `source ~/.cargo/env`
+
+:::tip
+You can see the available options for the script by running `./scripts/dev_setup.sh --help`
+:::
+
+**> Manual installation of dependencies**
+
+If the script above does not work for you, you can install these manually, but it is **not recommended**:
+
+1. [Rust](https://www.rust-lang.org/tools/install).
+1. [CMake](https://cmake.org/download/).
+1. [LLVM](https://releases.llvm.org/).
+1. [libssl-dev](https://packages.ubuntu.com/bionic/libssl-dev) and [libclang-dev](https://packages.ubuntu.com/bionic/libclang-dev)
+
+</details>
+
+<details>
+<summary>Windows</summary>
+
+:::tip
+The aptos-core codebase currently has no script similar to the `dev_setup.sh` script for
+Windows.  All dependencies must be manually installed.
+:::
+
+**> Manual installation of dependencies**
+
+1. Install [Rust](https://www.rust-lang.org/tools/install).
+1. Install [CMake](https://cmake.org/download/).
+1. If on Windows ARM, install [Visual Studio Preview](https://visualstudio.microsoft.com/vs/preview/).
+1. Install [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022). Note: This may be installed already with Rust.
+1. Install [LLVM](https://releases.llvm.org/).  The last prebuilt release is [11.0.0](https://releases.llvm.org/download.html#11.0.0)
+1. Open a new powershell terminal after installing all dependencies
+</details>
+
+5. Optionally, check out a release branch to install an Aptos node:
+
+    We suggest you checkout `devnet` for your first development.
 
     <Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
@@ -111,35 +184,6 @@ As described in [Workflows](#workflows), you may interact with Aptos using only 
     ```
     </TabItem>
     </Tabs>
-
-## Prepare development environment
-
-Prepare your developer environment by installing the dependencies needed to build, test and inspect Aptos Core. You can do this either via the Aptos [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) Bash script or by manually installing all dependencies. as shown below.
-
-No matter your selected mechanism for installing these dependencies, **it is imperative you keep your entire toolchain up-to-date**. If you encounter issues later, update all packages and try again.
-
-### Use the script
-The `dev_setup.sh` script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. Note, you may be prompted for your password:
-
-```
-./scripts/dev_setup.sh
-```
-
-:::tip
-You can see the available options for the script by running `./scripts/dev_setup.sh --help`
-:::
-
-### Install packages manually
-
-If the script doesn't work for your operating system, manually install these packages:
-* [Rust](https://www.rust-lang.org/tools/install)
-* [Git](https://git-scm.com/download)
-* [CMake](https://cmake.org/download/)
-* [LLVM](https://releases.llvm.org/)
-* Linux only - [libssl-dev](https://packages.ubuntu.com/bionic/libssl-dev) and [libclang-dev](https://packages.ubuntu.com/bionic/libclang-dev)
-* Windows only - [C++ build tools](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022)
-
-See [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) for other potential packages needed in your environment.
 
 Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](tutorials/index.md) to get started in Aptos.
 
