@@ -5,7 +5,6 @@ import { HexString, MaybeHexString } from "./hex_string";
 import {
   clear,
   DEFAULT_TXN_EXP_SEC_FROM_NOW,
-  DEFAULT_MAX_GAS_AMOUNT,
   DEFAULT_TXN_TIMEOUT_SEC,
   fixNodeUrl,
   Memoize,
@@ -671,7 +670,7 @@ export class AptosClient {
     ]);
 
     const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
-      maxGasAmount: BigInt(DEFAULT_MAX_GAS_AMOUNT),
+      maxGasAmount: BigInt(0),
       gasUnitPrice: BigInt(gasEstimate),
       expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + DEFAULT_TXN_EXP_SEC_FROM_NOW),
       ...extraArgs,

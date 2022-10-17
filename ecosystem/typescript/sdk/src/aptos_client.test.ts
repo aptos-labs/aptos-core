@@ -99,7 +99,9 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload, {
+      maxGasAmount: 20000n,
+    });
 
     const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
@@ -131,7 +133,7 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("0");
 
-    const builder = new TransactionBuilderRemoteABI(client, { sender: account1.address() });
+    const builder = new TransactionBuilderRemoteABI(client, { sender: account1.address(), maxGasAmount: 20000n });
     const rawTxn = await builder.build(
       "0x1::coin::transfer",
       ["0x1::aptos_coin::AptosCoin"],
@@ -194,7 +196,9 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, entryFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, entryFunctionPayload, {
+      maxGasAmount: 20000n,
+    });
 
     const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       const sigHexStr1 = account1.signBuffer(signingMessage);
@@ -318,7 +322,9 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload, {
+      maxGasAmount: 20000n,
+    });
 
     const bcsTxn = AptosClient.generateBCSSimulation(account1, rawTxn);
     const transactionRes = (await client.submitBCSSimulation(bcsTxn))[0];
@@ -367,7 +373,9 @@ test(
 
     // Create collection and token on Alice's account
     await ensureTxnSuccess(
-      tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+      tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev", 10000, {
+        maxGasAmount: 20000n,
+      }),
     );
 
     await ensureTxnSuccess(
@@ -385,6 +393,7 @@ test(
         ["key"],
         ["2"],
         ["int"],
+        { maxGasAmount: 20000n },
       ),
     );
 
@@ -411,6 +420,7 @@ test(
       tokenName,
       1,
       propertyVersion,
+      { maxGasAmount: 20000n },
     );
 
     await client.waitForTransaction(txnHash, { checkSuccess: true });
@@ -449,6 +459,7 @@ test(
           ).toUint8Array(),
         ),
       ],
+      { maxGasAmount: 20000n },
     );
 
     await client.waitForTransaction(txnHash);
@@ -470,7 +481,9 @@ test(
 
     const helperAccount = new AptosAccount();
 
-    const pendingTxn = await client.rotateAuthKeyEd25519(alice, helperAccount.signingKey.secretKey);
+    const pendingTxn = await client.rotateAuthKeyEd25519(alice, helperAccount.signingKey.secretKey, {
+      maxGasAmount: 20000n,
+    });
 
     await client.waitForTransaction(pendingTxn.hash);
 

@@ -6,7 +6,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-N/A
+- Remove default max gas amount.  The max gas amount should be determined by the user or application, and having a default value can lead to unexpected consequences.  In this case, it will be set to 0, which will make it fail on submission if not set.
 
 ## 1.3.16 (2022-10-12)
 

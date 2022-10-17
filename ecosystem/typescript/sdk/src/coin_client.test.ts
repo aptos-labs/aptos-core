@@ -18,7 +18,9 @@ test(
     await faucetClient.fundAccount(alice.address(), 100_000_000);
     await faucetClient.fundAccount(bob.address(), 0);
 
-    await client.waitForTransaction(await coinClient.transfer(alice, bob, 42), { checkSuccess: true });
+    await client.waitForTransaction(await coinClient.transfer(alice, bob, 42, { maxGasAmount: 20000n }), {
+      checkSuccess: true,
+    });
 
     expect(await coinClient.checkBalance(bob)).toBe(BigInt(42));
   },

@@ -26,7 +26,14 @@ test(
 
     // Create collection and token on Alice's account
     await client.waitForTransaction(
-      await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+      await tokenClient.createCollection(
+        alice,
+        collectionName,
+        "Alice's simple collection",
+        "https://aptos.dev",
+        10000,
+        { maxGasAmount: 20000n },
+      ),
       { checkSuccess: true },
     );
 
@@ -45,6 +52,7 @@ test(
         ["key"],
         ["2"],
         ["int"],
+        { maxGasAmount: 20000n },
       ),
       { checkSuccess: true },
     );
@@ -66,28 +74,42 @@ test(
     expect(tokenData.name).toBe(tokenName);
 
     await client.waitForTransaction(
-      await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
+      await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1, 0, {
+        maxGasAmount: 20000n,
+      }),
       { checkSuccess: true },
     );
     aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
     await client.waitForTransaction(
-      await tokenClient.cancelTokenOffer(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName),
+      await tokenClient.cancelTokenOffer(
+        alice,
+        bob.address().hex(),
+        alice.address().hex(),
+        collectionName,
+        tokenName,
+        0,
+        { maxGasAmount: 20000n },
+      ),
       { checkSuccess: true },
     );
     aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
     await client.waitForTransaction(
-      await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
+      await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1, 0, {
+        maxGasAmount: 20000n,
+      }),
       { checkSuccess: true },
     );
     aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
     await client.waitForTransaction(
-      await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collectionName, tokenName),
+      await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collectionName, tokenName, 0, {
+        maxGasAmount: 20000n,
+      }),
       { checkSuccess: true },
     );
 
