@@ -53,8 +53,10 @@ As described in [Workflows](#workflows), you may interact with Aptos using only 
     ```
     cd aptos-core
     ```
-
-3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment by installing most of the dependencies needed to build, test and inspect Aptos Core. Note, you may be prompted for your password:
+3. Setup Dependencies
+<details>
+<summary>macOS and Linux</summary>
+Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment by installing most of the dependencies needed to build, test and inspect Aptos Core. Note, you may be prompted for your password:
 
     ```
     ./scripts/dev_setup.sh
@@ -62,6 +64,24 @@ As described in [Workflows](#workflows), you may interact with Aptos using only 
     :::tip
     You can see the available options for the script by running `./scripts/dev_setup.sh --help`
     :::
+</details>
+<details>
+<summary>Windows</summary>
+
+:::tip
+The aptos-core codebase currently has no script similar to the `dev_setup.sh` script for
+Windows.  All dependencies must be manually installed.
+:::
+
+**> Manual installation of dependencies**
+
+1. Install [Rust](https://www.rust-lang.org/tools/install).
+1. Install [Git](https://git-scm.com/download).
+1. Install [CMake](https://cmake.org/download/).
+1. If on Windows ARM, install [Visual Studio Preview](https://visualstudio.microsoft.com/vs/preview/).
+1. Install [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022).
+1. Install [LLVM](https://releases.llvm.org/).
+</details>
 
 4. Update your current shell environment to run `cargo build` and other Aptos-related commands:
 
