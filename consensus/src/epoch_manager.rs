@@ -578,7 +578,9 @@ impl EpochManager {
             qs_config.mempool_txn_pull_max_count,
             qs_config.mempool_txn_pull_max_bytes,
             qs_config.max_batch_bytes as u64,
-            qs_config.max_batch_expiry_round_gap,
+            qs_config.batch_expiry_round_gap_when_init,
+            qs_config.batch_expiry_round_gap_behind_latest_certified,
+            qs_config.batch_expiry_round_gap_beyond_latest_certified,
             qs_config.end_batch_ms,
         );
         let metrics_monitor = tokio_metrics::TaskMonitor::new();
@@ -806,7 +808,9 @@ impl EpochManager {
                 end_batch_ms: 500,
                 max_batch_bytes: 100000,
                 batch_request_timeout_ms: 10000,
-                max_batch_expiry_round_gap: 100,
+                batch_expiry_round_gap_when_init: 20,
+                batch_expiry_round_gap_behind_latest_certified: 20,
+                batch_expiry_round_gap_beyond_latest_certified: 100,
                 batch_expiry_grace_rounds: 5,
                 memory_quota: 100000000,
                 db_quota: 10000000000,
