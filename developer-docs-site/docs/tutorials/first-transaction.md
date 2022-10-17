@@ -109,11 +109,9 @@ The above output demonstrates that the `transfer-coin` example executes the foll
   * The funding and creation of Alice's account from a faucet.
   * The creation of Bob's account from a faucet.
 * The transferring of 1000 coins from Alice to Bob.
-* The 4 coins of gas paid for by Alice to make that transfer.
+* The 26200 coins of gas paid for by Alice to make that transfer.
 * Another transfer of 1000 coins from Alice to Bob.
-* The additional 4 coins of gas paid for by Alice to make that transfer.
-
-TODO: Update the above values to reflect the new output.
+* The additional 26200 coins of gas paid for by Alice to make that transfer.
 
 Next, see below a walkthrough of the SDK functions that are used to accomplish the above steps.
 
