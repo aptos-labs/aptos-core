@@ -536,11 +536,11 @@ impl Logger for AptosData {
             match sender.try_send(LoggerServiceEvent::Flush(oneshot_sender)) {
                 Ok(_) => {
                     if let Err(err) = oneshot_receiver.recv_timeout(FLUSH_TIMEOUT) {
-                        eprintln("[Logging] Unable to flush: {}", err);
+                        eprintln("[Logging] Unable to flush recv: {}", err);
                     }
                 }
                 Err(err) => {
-                    eprintln!("[Logging] Unable to flush: {}", err);
+                    eprintln!("[Logging] Unable to flush send: {}", err);
                 }
             }
         }
