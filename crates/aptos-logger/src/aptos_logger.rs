@@ -25,7 +25,6 @@ use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use std::fmt::Debug;
 use std::io::Stdout;
-use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
 use std::{
     collections::BTreeMap,
@@ -536,7 +535,7 @@ impl Logger for AptosData {
             match sender.try_send(LoggerServiceEvent::Flush(oneshot_sender)) {
                 Ok(_) => {
                     if let Err(err) = oneshot_receiver.recv_timeout(FLUSH_TIMEOUT) {
-                        eprintln("[Logging] Unable to flush recv: {}", err);
+                        eprintln!("[Logging] Unable to flush recv: {}", err);
                     }
                 }
                 Err(err) => {
