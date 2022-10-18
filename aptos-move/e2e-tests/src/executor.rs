@@ -357,6 +357,7 @@ impl FakeExecutor {
                 .map(Transaction::UserTransaction)
                 .collect(),
             &self.data_store,
+            true,
         )
     }
 

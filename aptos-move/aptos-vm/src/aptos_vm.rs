@@ -917,6 +917,7 @@ impl AptosVM {
     pub fn execute_block_and_keep_vm_status(
         transactions: Vec<Transaction>,
         state_view: &impl StateView,
+        include_test_natives: bool,
     ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
         let mut state_view_cache = StateViewCache::new(state_view);
         let count = transactions.len();
@@ -993,7 +994,7 @@ impl VMExecutor for AptosVM {
             debug!("Parallel execution error {:?}", err);
             Ok(result)
         } else {
-            let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;
+            let output = Self::execute_block_and_keep_vm_status(transactions, state_view, false)?;
             Ok(output
                 .into_iter()
                 .map(|(_vm_status, txn_output)| txn_output)
