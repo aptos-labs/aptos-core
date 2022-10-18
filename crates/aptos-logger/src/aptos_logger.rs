@@ -540,6 +540,7 @@ impl Logger for AptosData {
                 }
                 Err(err) => {
                     eprintln!("[Logging] Unable to flush send: {}", err);
+                    std::thread::sleep(FLUSH_TIMEOUT);
                 }
             }
         }
