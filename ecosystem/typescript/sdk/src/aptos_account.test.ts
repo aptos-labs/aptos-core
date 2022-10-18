@@ -72,5 +72,5 @@ test("Gets the resource account address", () => {
   const seedInHex = "3031" // hexadecimal form of "01" which is 3031
   const seed = new HexString(seedInHex).toUint8Array();
 
-  expect(AptosAccount.getResourceAccountAddress(sourceAddress, seed).hex()).toBe("0x915e47f986471a5faba9cb2f726611cd554344419ddd6d5b3e9f00bcafd30169");
+  expect(AptosAccount.getResourceAccountAddress(sourceAddress, seed).hex()).toBe("0x5b4901c8b6ba76078f6f0b6fbae3dd9ce200e400e9f90b10d284c46fc460f24f");
 })
