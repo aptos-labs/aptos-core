@@ -19,7 +19,7 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_deps::move_core_types::{
+use move_core_types::{
     language_storage::{ResourceKey, StructTag},
     move_resource::MoveStructType,
 };

@@ -3,7 +3,7 @@
 
 use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_types::account_address::AccountAddress;
-use move_deps::move_core_types::vm_status::StatusCode;
+use move_core_types::vm_status::StatusCode;
 use package_builder::PackageBuilder;
 
 #[test]
