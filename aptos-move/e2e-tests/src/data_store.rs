@@ -14,7 +14,7 @@ use aptos_types::{
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
-use move_deps::move_core_types::language_storage::ModuleId;
+use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

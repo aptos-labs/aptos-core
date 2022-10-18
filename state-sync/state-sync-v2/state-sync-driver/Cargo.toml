@@ -54,7 +54,7 @@ aptosdb = { path = "../../../storage/aptosdb" }
 channel = { path = "../../../crates/channel" }
 executor = { path = "../../../execution/executor" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
-move-deps = { path = "../../../aptos-move/move-deps", features = ["address32"] }
+move-core-types = { workspace = true }
 network = { path = "../../../network", features = ["fuzzing"] }
 storage-service-client = { path = "../../storage-service/client" }
 storage-service-types = { path = "../../storage-service/types" }

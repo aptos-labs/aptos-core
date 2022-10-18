@@ -7,7 +7,7 @@ ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "--"]
 
-FROM rust:1.63.0-buster@sha256:0110d1b4193029735f1db1c0ed661676ed4b6f705b11b1ebe95c655b52e6906f AS rust-base
+FROM rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300 AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 

@@ -44,7 +44,7 @@ cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 consensus = { path = "../../consensus" }
 forge = { path = "../forge", features = ["testing"] }
 framework = { path = "../../aptos-move/framework" }
-move-deps = { path = "../../aptos-move/move-deps" }
+move-core-types = { workspace = true }
 
 [dev-dependencies]
 base64 = "0.13.0"
