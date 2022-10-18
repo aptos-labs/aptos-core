@@ -86,19 +86,19 @@ An output very similar to the following will appear after executing the above co
 
 ```yaml
 === Addresses ===
-Alice: 0x5a6cb7b07b8005bccd699deb252d15a79d7a6767dee2b2d34f7151fab7bce0fe
-Bob: 0x4d08f4e086c81b318067c4b7501f791479aae1641376a70eec6520fabe4fdfe1
+Alice: 0xbd20517751571ba3fd06326c23761bc0bc69cf450898ffb43412fbe670c28806
+Bob: 0x8705f98a74f5efe17740276ed75031927402c3a965e10f2ee16cda46d99d8f7f
 
 === Initial Balances ===
 Alice: 100000000
 Bob: 0
 
 === Intermediate Balances ===
-Alice: 99972800
+Alice: 99944900
 Bob: 1000
 
 === Final Balances ===
-Alice: 99945600
+Alice: 99889800
 Bob: 2000
 ```
 
@@ -109,9 +109,9 @@ The above output demonstrates that the `transfer-coin` example executes the foll
   * The funding and creation of Alice's account from a faucet.
   * The creation of Bob's account from a faucet.
 * The transferring of 1000 coins from Alice to Bob.
-* The 26200 coins of gas paid for by Alice to make that transfer.
+* The 54100 coins of gas paid for by Alice to make that transfer.
 * Another transfer of 1000 coins from Alice to Bob.
-* The additional 26200 coins of gas paid for by Alice to make that transfer.
+* The additional 54100 coins of gas paid for by Alice to make that transfer.
 
 Next, see below a walkthrough of the SDK functions that are used to accomplish the above steps.
 
