@@ -532,10 +532,14 @@ impl Logger for AptosData {
     fn flush(&self) {
         if let Some(sender) = &self.sender {
             let (oneshot_sender, oneshot_receiver) = sync::mpsc::sync_channel(1);
-            sender
-                .send(LoggerServiceEvent::Flush(oneshot_sender))
-                .unwrap();
-            oneshot_receiver.recv().unwrap();
+            match sender.try_send(LoggerServiceEvent::Flush(oneshot_sender)) {
+                Ok(_) => {
+                    oneshot_receiver.recv_timeout(FLUSH_TIMEOUT).unwrap();
+                }
+                Err(err) => {
+                    eprintln!("[Logging] Unable to flush: {}", err);
+                }
+            }
         }
     }
 }
