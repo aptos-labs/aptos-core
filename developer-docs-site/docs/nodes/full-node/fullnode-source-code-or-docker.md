@@ -184,13 +184,15 @@ api:
 
 ```bash
 docker run --pull=always \
-    --rm -p 8080:8080 
+    --rm -p 8080:8080 \
     -p 9101:9101 -p 6180:6180 \
     -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data \
     --workdir /opt/aptos/etc \
     --name=aptos-fullnode aptoslabs/validator:mainnet_506f94721ca0fd0d339472fffe149a1fda469cad aptos-node \
     -f /opt/aptos/etc/fullnode.yaml
 ```
+
+**NOTE**: You may need to prefix the command with `sudo` depending on your configuration
 
 **NOTE**: Ensure you have opened the relevant ports: 8080, 9101 and 6180. You may also need to update the 127.0.0.1 with 0.0.0.0 in the `fullnode.yaml` for the fields `listen_address` and `address` field in the `api` list.
 
