@@ -42,7 +42,7 @@ impl KeyTool {
     }
 }
 
-/// CLI tool for extracting full peer information for an upstream peer
+/// Extract full peer information for an upstream peer
 ///
 /// This command builds a YAML blob that can be copied into a user's network configuration.
 /// A host is required to build the network address used for the connection, and the

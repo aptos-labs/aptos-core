@@ -1,6 +1,5 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use crate::models::ledger_info::LedgerInfo;
 use crate::{
     database::{execute_with_better_error, PgDbPool},
     indexer::{
@@ -9,18 +8,16 @@ use crate::{
         processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
-    schema::ledger_infos::{self, dsl},
+    models::{
+        ledger_info::LedgerInfo,
+        processor_status::{ProcessorStatusV2, ProcessorStatusV2Query},
+    },
+    schema::{ledger_infos, processor_status},
 };
 use anyhow::{ensure, Context, Result};
 use aptos_api::context::Context as ApiContext;
 use aptos_logger::{debug, info};
 use chrono::ParseError;
-use diesel::{
-    prelude::*,
-    sql_query,
-    sql_types::{BigInt, Text},
-    RunQueryDsl,
-};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
 use std::{fmt::Debug, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -66,16 +63,9 @@ impl Tailer {
             processor_name = self.processor.name(),
             "Checking if chain id is correct"
         );
-        let mut conn = self
-            .connection_pool
-            .get()
-            .expect("DB connection should be available at this stage");
+        let mut conn = self.connection_pool.get()?;
 
-        let query_chain = dsl::ledger_infos
-            .select(dsl::chain_id)
-            .load::<i64>(&mut conn)
-            .expect("Error loading chain id from db");
-        let maybe_existing_chain_id = query_chain.first();
+        let maybe_existing_chain_id = LedgerInfo::get(&mut conn)?.map(|li| li.chain_id);
 
         let new_chain_id = self
             .transaction_fetcher
@@ -86,13 +76,13 @@ impl Tailer {
 
         match maybe_existing_chain_id {
             Some(chain_id) => {
-                ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
+                ensure!(chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
                 info!(
                     processor_name = self.processor.name(),
                     chain_id = chain_id,
                     "Chain id matches! Continue to index...",
                 );
-                Ok(*chain_id as u64)
+                Ok(chain_id as u64)
             }
             None => {
                 info!(
@@ -163,91 +153,34 @@ impl Tailer {
         (num_txns, results)
     }
 
-    /// Get starting version from database. Starting version is defined as the first version that's either
-    /// not successful or missing from the DB.
-    pub fn get_start_version(
-        &self,
-        processor_name: &String,
-        lookback_versions: i64,
-    ) -> Option<i64> {
-        let mut conn = self
-            .connection_pool
-            .get()
-            .expect("DB connection should be available to get starting version");
+    /// Store last processed version from database. We can assume that all previously processed
+    /// versions are successful because any gap would cause the processor to panic
+    pub fn update_last_processed_version(&self, processor_name: &str, version: u64) -> Result<()> {
+        let mut conn = self.connection_pool.get()?;
 
-        // This query gets the first version that isn't equal to the next version (versions would be sorted of course).
-        // There's also special handling if the gap happens in the beginning.
-        let sql = "
-          WITH raw_boundaries AS
-          (
-              SELECT
-                  MAX(version) AS MAX_V,
-                  MIN(version) AS MIN_V
-              FROM
-                  processor_statuses
-              WHERE
-                  name = $1
-                  AND success = TRUE
-          ),
-          boundaries AS
-          (
-              SELECT
-                  MAX(version) AS MAX_V,
-                  MIN(version) AS MIN_V
-              FROM
-                  processor_statuses, raw_boundaries
-              WHERE
-                  name = $1
-                  AND success = true
-                  and version >= GREATEST(MAX_V - $2, 0)
-          ),
-          gap AS
-          (
-              SELECT
-                  MIN(version) + 1 AS maybe_gap
-              FROM
-                  (
-                      SELECT
-                          version,
-                          LEAD(version) OVER (
-                      ORDER BY
-                          version ASC) AS next_version
-                      FROM
-                          processor_statuses,
-                          boundaries
-                      WHERE
-                          name = $1
-                          AND success = TRUE
-                          AND version >= GREATEST(MAX_V - $2, 0)
-                  ) a
-              WHERE
-                  version + 1 <> next_version
-          )
-          SELECT
-              CASE
-                  WHEN
-                      MIN_V <> GREATEST(MAX_V - $2, 0)
-                  THEN
-                      GREATEST(MAX_V - $2, 0)
-                  ELSE
-                      COALESCE(maybe_gap, MAX_V + 1)
-              END
-              AS version
-          FROM
-              gap, boundaries
-          ";
-        #[derive(Debug, QueryableByName)]
-        pub struct Gap {
-            #[diesel(sql_type = BigInt)]
-            pub version: i64,
+        let status = ProcessorStatusV2 {
+            processor: processor_name.to_owned(),
+            last_success_version: version as i64,
+        };
+        execute_with_better_error(
+            &mut conn,
+            diesel::insert_into(processor_status::table)
+                .values(&status)
+                .on_conflict(processor_status::processor)
+                .do_update()
+                .set(&status),
+            Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
+        )?;
+        Ok(())
+    }
+    /// Get last version processed successfully from databse
+    pub fn get_start_version(&self, processor_name: &String) -> Result<Option<i64>> {
+        let mut conn = self.connection_pool.get()?;
+
+        match ProcessorStatusV2Query::get_by_processor(processor_name, &mut conn)? {
+            Some(status) => Ok(Some(status.last_success_version + 1)),
+            None => Ok(None),
         }
-        let mut res: Vec<Option<Gap>> = sql_query(sql)
-            .bind::<Text, _>(processor_name)
-            // This is the number used to determine how far we look back for gaps. Increasing it may result in slower startup
-            .bind::<BigInt, _>(lookback_versions)
-            .get_results(&mut conn)
-            .unwrap();
-        res.pop().unwrap().map(|g| g.version)
     }
 }
 
@@ -275,6 +208,7 @@ mod test {
     };
     use aptos_api_test_context::new_test_context;
     use aptos_api_types::{LedgerInfo as APILedgerInfo, Transaction, U64};
+    use diesel::RunQueryDsl;
     use serde_json::json;
 
     struct FakeFetcher {

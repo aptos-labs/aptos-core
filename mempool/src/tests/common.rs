@@ -149,9 +149,7 @@ pub(crate) fn batch_add_signed_txn(
     transactions: Vec<SignedTransaction>,
 ) -> Result<()> {
     for txn in transactions.into_iter() {
-        if let Err(e) = add_signed_txn(pool, txn) {
-            return Err(e);
-        }
+        add_signed_txn(pool, txn)?
     }
     Ok(())
 }

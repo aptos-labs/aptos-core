@@ -16,7 +16,8 @@ The more function calls, branching conditional statements, etc. that a transacti
 Likewise, the more reads from and writes into global storage that a transaction requires, the more storage gas it will cost.
 Finally, the more bytes in a transaction payload, the more it will cost.
 
-As explained in the [optimization principles](#optimization-principles) section, storage gas has by far the largest affect on base gas.
+As explained in the [optimization principles](#optimization-principles) section, storage gas has by far the largest effect on base gas. For background on the Aptos gas model, see [The Making of the Aptos Gas Schedule](https://aptoslabs.medium.com/the-making-of-the-aptos-gas-schedule-508d5686a350).
+
 
 ## Instruction gas
 

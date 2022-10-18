@@ -21,5 +21,6 @@ cargo build -p $CRATE_NAME --profile cli
 
 # Compress the CLI.
 $ZIP_NAME="$NAME-$VERSION-Windows-x86_64.zip"
+echo "Compressing CLI to $ZIP_NAME"
 Compress-Archive -Path target\cli\$CRATE_NAME.exe -DestinationPath $ZIP_NAME
 

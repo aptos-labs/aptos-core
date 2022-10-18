@@ -260,6 +260,7 @@ test(
         await client.simulateTransaction(accountOrAddress, txnRequest, {
           estimateGasUnitPrice: true,
           estimateMaxGasAmount: true,
+          estimatePrioritizedGasUnitPrice: true,
         })
       )[0];
       expect(parseInt(transactionRes.gas_used, 10) > 0);

@@ -22,4 +22,4 @@ aptos-types = { path = "../../../types" }
 [dev-dependencies]
 claims = "0.7"
 
-move-deps = { path = "../../../aptos-move/move-deps", features = ["address32"] }
+move-core-types = { workspace = true }

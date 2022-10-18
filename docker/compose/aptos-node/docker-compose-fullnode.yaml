@@ -18,14 +18,14 @@ services:
       # Public fullnode access
       - 6182
       # REST API
-      - 80
+      - 8080
       # Fullnode metrics
       - 9101
       # Haproxy stats page
       - 9102
     ports:
       - "6182:6182"
-      - "80:80"
+      - "8080:8080"
       # Only expose these internally
       - "127.0.0.1:9101:9101"
       - "127.0.0.1:9102:9102"
@@ -56,7 +56,7 @@ services:
       # Public fullnode access
       - 6182
       # REST API
-      - 80
+      - 8080
       # Validator metrics
       - 9101
 
