@@ -91,6 +91,16 @@ pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_LOWER: Lazy<His
     .unwrap()
 });
 
+/// Histogram for the gaps between expiration round and the current round when pulling the proofs, and expiration round is lower.
+pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_gap_batch_expiration_and_current_round_when_pull",
+        "Histogram for the gaps between expiration round and the current round when pulling the proofs, and expiration round is lower.",
+        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Counters
 
 /// Count of the pulled txns.

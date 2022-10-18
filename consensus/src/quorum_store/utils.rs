@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::monitor;
-use crate::quorum_store::types::{BatchId, SerializedTransaction};
+use crate::quorum_store::{types::{BatchId, SerializedTransaction}, counters};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -243,8 +243,11 @@ impl ProofQueue {
             .iter()
             .take_while(|(_, expiration_time)| *expiration_time < current_time)
             .count();
-        for (digest, _) in self.digest_queue.drain(0..num_expired) {
+        for (digest, expiration_time) in self.digest_queue.drain(0..num_expired) {
             assert_some!(self.digest_proof.remove(&digest));
+            if expiration_time < current_time && expiration_time.round() < current_time.round() {
+                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS.observe((current_time.round() - expiration_time.round()) as f64);
+            }
         }
         debug!("QS: num_expired {}", num_expired);
 
@@ -269,6 +272,9 @@ impl ProofQueue {
                     }
                     None => {} // Proof was already committed, skip.
                 }
+            }
+            if *expiration < current_time && expiration.round() < current_time.round() {
+                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS.observe((current_time.round() - expiration.round()) as f64);
             }
         }
         ret

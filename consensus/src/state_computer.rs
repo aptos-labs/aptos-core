@@ -231,12 +231,12 @@ impl StateComputer for ExecutionProxy {
         // held by BlockExecutor to prevent memory leak.
         self.executor.finish();
 
-        // debug!("QS: sync_to epoch {} round {}", target.ledger_info().epoch(), target.ledger_info().round());
-        // self.async_commit_notifier
-        //     .clone()
-        //     .send((target.ledger_info().epoch(), target.ledger_info().round(), Vec::new()))
-        //     .await
-        //     .expect("Failed to send async commit notification in fast_sync_forward");
+        debug!("QS: sync_to epoch {} round {}", target.ledger_info().epoch(), target.ledger_info().round());
+        self.async_commit_notifier
+            .clone()
+            .send((target.ledger_info().epoch(), target.ledger_info().round(), Vec::new()))
+            .await
+            .expect("Failed to send async commit notification in fast_sync_forward");
 
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
