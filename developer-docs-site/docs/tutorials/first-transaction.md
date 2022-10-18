@@ -113,7 +113,7 @@ The above output demonstrates that the `transfer-coin` example executes the foll
 * Another transfer of 1000 coins from Alice to Bob.
 * The additional 54100 coins of gas paid for by Alice to make that transfer.
 
-Next, see below a walkthrough of the SDK functions that are used to accomplish the above steps.
+Now see the below walkthrough of the SDK functions used to accomplish the above steps.
 
 ---
 
@@ -146,9 +146,9 @@ See the Rust [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/mai
 
 ### Step 4.1: Initializing the clients
 
-In the first step, the `transfer-coin` example initializes both the REST and faucet clients.
+In the first step, the `transfer-coin` example initializes both the REST and faucet clients:
 
-- The REST client interacts with the REST API, and
+- The REST client interacts with the REST API.
 - The faucet client interacts with the devnet Faucet service for creating and funding accounts.
 
 <Tabs groupId="sdk-examples">
@@ -158,7 +158,7 @@ In the first step, the `transfer-coin` example initializes both the REST and fau
 :!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_1
 ```
 
-Using the API client we can create a `CoinClient`, which we use for common coin operations such as transferring coins and checking balances.
+Using the API client we can create a `CoinClient` that we use for common coin operations such as transferring coins and checking balances.
 ```ts
 :!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_1a
 ```
@@ -200,7 +200,7 @@ In the example we initialize the URL values as such:
 
 :::tip
 
-By default the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
+By default, the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
   - `APTOS_NODE_URL`
   - `APTOS_FAUCET_URL`
 :::
@@ -209,7 +209,7 @@ By default the URLs for both the services point to Aptos devnet services. Howeve
 
 ### Step 4.2: Creating local accounts
 
-The next step is to create two accounts locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+The next step is to create two accounts locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -236,7 +236,7 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
 
 ### Step 4.3: Creating blockchain accounts
 
-In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to only create Bob's account:
+In Aptos, each account must have an on-chain representation in order to receive tokens and coins and interact with other dApps. An account represents a medium for storing assets; hence, it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to create but not fund Bob's account:
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -312,7 +312,7 @@ let balance = self
 
 ### Step 4.5: Transferring
 
-Like the previous step, this is another helper step that constructs a transaction which transfers the coins from Alice to Bob. For correctly generated transactions, the API will return a transaction hash that can be used in the subsequent step to check on the transaction status. The Aptos blockchain does perform a handful of validation checks on submission and if any of those fail, the user will instead be given an error. These validations include the transaction signature, unused sequence number, and submitting the transaction to the appropriate chain.
+Like the previous step, this is another helper step that constructs a transaction transferring the coins from Alice to Bob. For correctly generated transactions, the API will return a transaction hash that can be used in the subsequent step to check on the transaction status. The Aptos blockchain does perform a handful of validation checks on submission; and if any of those fail, the user will instead be given an error. These validations use the transaction signature and unused sequence number, and submitting the transaction to the appropriate chain.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
