@@ -9,7 +9,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
     vm_status::StatusCode,
 };
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::AbortLocation,

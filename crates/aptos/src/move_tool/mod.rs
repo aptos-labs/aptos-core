@@ -40,18 +40,8 @@ use clap::{ArgEnum, Parser, Subcommand};
 use framework::natives::code::UpgradePolicy;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
-use move_deps::move_cli::base::test::UnitTestResult;
-use move_deps::move_command_line_common::env::MOVE_HOME;
-use move_deps::{
-    move_cli,
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-    },
-    move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
-    move_prover, move_prover_boogie_backend,
-    move_unit_test::UnitTestingConfig,
-};
+use move_cli::base::test::UnitTestResult;
+use move_command_line_common::env::MOVE_HOME;
 use std::fmt::{Display, Formatter};
 use std::{
     collections::BTreeMap,
@@ -61,6 +51,16 @@ use std::{
 };
 use tokio::task;
 use transactional_tests_runner::TransactionalTestOpts;
+use {
+    move_cli,
+    move_core_types::{
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
+    },
+    move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
+    move_prover, move_prover_boogie_backend,
+    move_unit_test::UnitTestingConfig,
+};
 
 /// Tool for Move related operations
 ///

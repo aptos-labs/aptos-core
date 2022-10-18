@@ -27,7 +27,7 @@ use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
-use move_deps::move_core_types::transaction_argument::TransactionArgument;
+use move_core_types::transaction_argument::TransactionArgument;
 use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;

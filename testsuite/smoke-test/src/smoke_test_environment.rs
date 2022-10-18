@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos::test::CliTestFramework;
+use aptos_config::config::NodeConfig;
 use aptos_config::{keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
@@ -26,6 +27,7 @@ pub struct SwarmBuilder {
     num_fullnodes: usize,
     genesis_framework: Option<ReleaseBundle>,
     init_config: Option<InitConfigFn>,
+    vfn_config: Option<NodeConfig>,
     init_genesis_config: Option<InitGenesisConfigFn>,
 }
 
@@ -37,6 +39,7 @@ impl SwarmBuilder {
             num_fullnodes: 0,
             genesis_framework: None,
             init_config: None,
+            vfn_config: None,
             init_genesis_config: None,
         }
     }
@@ -57,6 +60,11 @@ impl SwarmBuilder {
 
     pub fn with_init_config(mut self, init_config: InitConfigFn) -> Self {
         self.init_config = Some(init_config);
+        self
+    }
+
+    pub fn with_vfn_config(mut self, config: NodeConfig) -> Self {
+        self.vfn_config = Some(config);
         self
     }
 
@@ -96,6 +104,7 @@ impl SwarmBuilder {
                 &version,
                 builder.genesis_framework,
                 builder.init_config,
+                builder.vfn_config,
                 Some(Arc::new(move |genesis_config| {
                     if let Some(init_genesis_config) = &init_genesis_config {
                         (init_genesis_config)(genesis_config);

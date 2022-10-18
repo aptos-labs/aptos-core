@@ -7,15 +7,14 @@ use aptos_types::{
     contract_event::ContractEvent,
 };
 use aptos_vm::move_vm_ext::MoveResolverExt;
-use move_deps::{
-    move_core_types::language_storage::StructTag, move_resource_viewer::MoveValueAnnotator,
-};
+use move_core_types::language_storage::StructTag;
+use move_resource_viewer::MoveValueAnnotator;
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
 };
 
-pub use move_deps::move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
+pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 pub struct AptosValueAnnotator<'a, T>(MoveValueAnnotator<'a, T>);
 

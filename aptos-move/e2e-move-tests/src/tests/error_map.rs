@@ -7,7 +7,7 @@ use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use framework::BuildOptions;
-use move_deps::move_core_types::value::MoveValue;
+use move_core_types::value::MoveValue;
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`

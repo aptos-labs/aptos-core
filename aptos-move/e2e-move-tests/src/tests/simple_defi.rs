@@ -10,7 +10,7 @@ use aptos_types::{
 use cached_packages::aptos_stdlib;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::account::Account;
-use move_deps::move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
+use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
