@@ -134,6 +134,8 @@ You have now successfully configured and started running a fullnode connected to
 
 :::tip Debugging?
 This will build a release binary: `aptos-core/target/release/aptos-node`. The release binaries tend to be substantially faster than debug binaries but lack debugging information useful for development. To build a debug binary, omit the `--release` flag.
+
+You can also run this directly as `./aptos-core/target/release/aptos-node -f ./fullnode.yaml` after running `cargo build -p aptos-node --release`
 :::
 
 ---
