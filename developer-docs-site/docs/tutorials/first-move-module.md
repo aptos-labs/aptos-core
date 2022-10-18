@@ -18,7 +18,7 @@ This tutorial details how to compile, test, publish and interact with Move modul
 
 ## Step 1: Install the CLI
 
-[Install the precombiled binary for the Aptos CLI][install_cli].
+[Install the precompiled binary for the Aptos CLI][install_cli].
 
 ---
 
