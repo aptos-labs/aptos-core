@@ -26,8 +26,8 @@ route:
 
   # The child route trees.
   # https://prometheus.io/docs/alerting/latest/configuration/#route
-  routes: { { .Values.monitoring.alertmanager.alertRouteTrees | toJson } }
+  routes: {{ .Values.monitoring.alertmanager.alertRouteTrees | toJson }}
 
 # A list of notification receivers
 # https://prometheus.io/docs/alerting/latest/configuration/#receiver
-receivers: { { .Values.monitoring.alertmanager.alertReceivers | toJson } }
+receivers: {{ .Values.monitoring.alertmanager.alertReceivers | toJson }}
