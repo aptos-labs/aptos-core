@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use goldenfile::Mint;
-use move_deps::move_command_line_common::testing::EXP_EXT;
+use move_command_line_common::testing::EXP_EXT;
 use std::{cell::RefCell, fmt::Debug, fs::File, io::Write, path::PathBuf};
 
 pub const GOLDEN_DIR_PATH: &str = "goldens";

@@ -4,7 +4,7 @@
 use crate::{tests::common, MoveHarness};
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use language_e2e_tests::account::Account;
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 
 #[test]
 fn can_upgrade_framework_on_testnet() {

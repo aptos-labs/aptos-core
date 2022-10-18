@@ -143,6 +143,11 @@ variable "enable_backup" {
   default     = false
 }
 
+variable "backup_fullnode_index" {
+  description = "index of fullnode to backup data from"
+  default     = 0
+}
+
 variable "fullnode_storage_class" {
   description = "Which storage class to use for the validator and fullnode"
   default     = "io1"

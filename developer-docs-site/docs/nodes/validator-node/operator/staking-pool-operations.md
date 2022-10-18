@@ -18,7 +18,7 @@ Make sure that this initializing the stake pool step was performed by the owner.
 ## Joining validator set
 
 :::danger Errors? 
-If you see errors, see the [Issues and Workarounds](/docs/issues-and-workarounds.md).
+**The validator node cannot sync until the stake pool becomes active.** If you see errors, see the [Issues and Workarounds](/docs/issues-and-workarounds.md).
 :::
 
 Follow the below steps to set up the validator node using the operator account and join the validator set.

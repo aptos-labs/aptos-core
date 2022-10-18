@@ -74,6 +74,9 @@ impl GenesisTool {
 }
 
 /// Generate genesis from a git repository
+///
+/// This will create a genesis.blob and a waypoint.txt to be used for
+/// running a network
 #[derive(Parser)]
 pub struct GenerateGenesis {
     /// Output directory for Genesis file and waypoint
