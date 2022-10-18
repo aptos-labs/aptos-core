@@ -2,7 +2,6 @@
   "description": "This is a pure dependency package.json which installs dependencies for js utility scripts used in the repo",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@7.10.0",
   "devDependencies": {
     "@types/node": "^18.11.0",
     "prettier": "^2.7.1",
