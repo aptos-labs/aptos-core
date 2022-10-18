@@ -19,7 +19,7 @@ proptest = { version = "1.0.0", optional = true }
 proptest-derive = { version = "0.3.0", optional = true }
 tempfile = "3.3.0"
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e", features = ["address32"] }
+move-core-types = { workspace = true }
 
 [build-dependencies]
 framework = { path = ".." }

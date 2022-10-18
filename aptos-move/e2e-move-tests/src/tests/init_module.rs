@@ -3,7 +3,7 @@
 
 use crate::{assert_abort, assert_success, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
-use move_deps::move_core_types::parser::parse_struct_tag;
+use move_core_types::parser::parse_struct_tag;
 use package_builder::PackageBuilder;
 use serde::{Deserialize, Serialize};
 
