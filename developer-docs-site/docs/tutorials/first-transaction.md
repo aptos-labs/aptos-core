@@ -388,7 +388,7 @@ Breaking the above down into pieces:
 
 In TypeScript, just calling `coinClient.transfer` is sufficient to wait for the transaction to complete. The function will return the `Transaction` returned by the API once it is processed (either successfully or unsuccessfully) or throw an error if processing time exceeds the timeout.
 
-You can set `checkSuccess` to true when calling `transfer` if you'd like it to throw if the transaction was not committed successfully:
+You can set `checkSuccess` to true when calling `transfer` if you'd like it to throw an error if the transaction was not committed successfully:
 ```ts
 :!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_6a
 ```
@@ -412,8 +412,10 @@ The transaction hash can be used to query the status of a transaction:
   </TabItem>
 </Tabs>
 
-[account_basics]: /concepts/basics-accounts
-[typescript-sdk]: /sdks/ts-sdk/index
-[python-sdk]: /sdks/python-sdk
-[rust-sdk]: /sdks/rust-sdk
-[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
+## Supporting documentation
+
+* [account_basics](../concepts/basics-accounts.md)
+* [typescript-sdk](../sdks/ts-sdk/index.md)
+* [python-sdk](../sdks/python-sdk.md)
+* [rust-sdk](../sdks/rust-sdk.md)
+* [rest_spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
