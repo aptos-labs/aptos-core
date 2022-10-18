@@ -3,9 +3,9 @@
 
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
-use move_deps::move_core_types::identifier::Identifier;
-use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
-use move_deps::move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
+use move_core_types::identifier::Identifier;
+use move_core_types::language_storage::{StructTag, TypeTag};
+use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`

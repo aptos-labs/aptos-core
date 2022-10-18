@@ -25,7 +25,7 @@ aptos-types = { path = "../../types", features = ["fuzzing"] }
 
 consensus = { path = "../../consensus", features = ["fuzzing"] }
 consensus-types = { path = "../../consensus/consensus-types", features = ["fuzzing"] }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "fuzzing"] }
+move-core-types = { workspace = true, features = ["fuzzing"] }
 network = { path = "../../network" }
 
 [[bin]]
