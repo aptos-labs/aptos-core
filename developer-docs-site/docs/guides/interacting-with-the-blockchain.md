@@ -58,7 +58,7 @@ The payload for instructing the blockchain to create a new account is:
 }
 ```
 
-This instructs the Move virtual machine to execute the `script` `0x1::aptos_account::create_account`. The first argument is the address of the account to create and the second is the authentication key pre-image (which is mentioned in [Accounts][accounts]). For single signer authentication, this is the public key concatenated with the `0` byte (or `pubkey_A | 0x00`). This is required to prevent account address land grabbing. The execution of this instruction verifies that the last 16-bytes of the authentication key are the same as the 16-byte account address. We are actively working on improving this API to support taking in a 32-byte account address that would eliminate concerns around land grabbing or account manipulation.
+This instructs the Move virtual machine to execute the `script` `0x1::aptos_account::create_account`. The first argument is the address of the account to create and the second is the authentication key pre-image (which is mentioned in [Accounts][accounts]). For single signer authentication, this is the public key concatenated with the `0` byte (or `pubkey_A | 0x00`). This is required to prevent account address land grabbing. The execution of this instruction verifies that the 32-bytes of the authentication key are the same as the 32-byte account address. We are actively working on improving this API to support taking in a 32-byte account address that would eliminate concerns around land grabbing or account manipulation.
 
 ## Publishing a new Move module
 
