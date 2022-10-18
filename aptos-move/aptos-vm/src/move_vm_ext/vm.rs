@@ -27,6 +27,7 @@ impl MoveVmExt {
         abs_val_size_gas_params: AbstractValueSizeGasParameters,
         gas_feature_version: u64,
         treat_friend_as_private: bool,
+        include_test_natives: bool,
     ) -> VMResult<Self> {
         Ok(Self {
             inner: MoveVM::new_with_configs(
@@ -34,6 +35,7 @@ impl MoveVmExt {
                     native_gas_params,
                     abs_val_size_gas_params,
                     gas_feature_version,
+                    include_test_natives,
                 ),
                 VerifierConfig {
                     max_loop_depth: Some(5),

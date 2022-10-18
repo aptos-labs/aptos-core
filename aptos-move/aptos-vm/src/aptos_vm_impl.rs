@@ -117,6 +117,7 @@ impl AptosVMImpl {
             abs_val_size_gas_params,
             gas_feature_version,
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            include_test_natives,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

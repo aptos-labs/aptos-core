@@ -38,6 +38,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        true,
     )
 }
 

@@ -570,6 +570,7 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 self.features
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                true,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -616,6 +617,7 @@ impl FakeExecutor {
             LATEST_GAS_FEATURE_VERSION,
             self.features
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            true,
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
