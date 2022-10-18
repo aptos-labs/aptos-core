@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::MAX_APPLICATION_MESSAGE_SIZE;
 use serde::{Deserialize, Serialize};
+
+// The maximum message size per state sync message
+pub const MAX_MESSAGE_SIZE: usize = 12 * 1024 * 1024; /* 12 MiB */
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -73,9 +75,9 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
+            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactions,
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
@@ -108,7 +110,7 @@ impl Default for StorageServiceConfig {
             max_epoch_chunk_size: 100,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
-            max_network_chunk_bytes: MAX_APPLICATION_MESSAGE_SIZE as u64,
+            max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
             max_state_chunk_size: 2000,
             max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 2000,
@@ -176,7 +178,7 @@ impl Default for AptosDataClientConfig {
         Self {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
-            response_timeout_ms: 5000,
+            response_timeout_ms: 10000,
             summary_poll_interval_ms: 200,
             use_compression: true,
         }
