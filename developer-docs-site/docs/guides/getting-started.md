@@ -101,6 +101,14 @@ This section contains links to frequently referred Aptos developer resources.
 - [Aptos Explorer](https://explorer.aptoslabs.com/): Use the top-right drop-down menu to select the network.
 - [Aptos Community](https://aptoslabs.com/community): Links to discussion forum, Discord and AIT.
 
+
+### Aptos testnet
+
+- **REST API Open API spec**: [https://fullnode.mainnet.aptoslabs.com/v1/spec#/](https://fullnode.mainnet.aptoslabs.com/v1/spec#/)
+- **REST service:** [https://fullnode.mainnet.aptoslabs.com/v1](https://fullnode.mainnet.aptoslabs.com/v1)
+- **Genesis and waypoint**: [https://github.com/aptos-labs/aptos-networks/tree/main/mainnet](https://github.com/aptos-labs/aptos-networks/tree/main/mainnet)
+- **ChainID**: [Click here to see it on the Aptos Explorer](https://explorer.aptoslabs.com/?network=mainnet).
+- 
 ### Aptos testnet
 
 - **REST API Open API spec**: [https://fullnode.testnet.aptoslabs.com/v1/spec#/](https://fullnode.testnet.aptoslabs.com/v1/spec#/)
