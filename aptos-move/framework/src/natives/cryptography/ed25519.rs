@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::natives::make_test_only_native_from_func;
 use crate::natives::util::make_native_from_func;
 use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
 use aptos_crypto::{ed25519, traits::*};
@@ -149,4 +150,25 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     ];
 
     crate::natives::helpers::make_module_natives(natives)
+}
+
+pub fn make_all_test() -> impl Iterator<Item = (String, NativeFunction)> {
+    let natives = [(
+        "generate_keys",
+        make_test_only_native_from_func(native_test_only_generate_keys),
+    )];
+
+    crate::natives::helpers::make_module_natives(natives)
+}
+
+fn native_test_only_generate_keys(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    //TODO
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![Value::vector_u8(vec![0_u8, 1_u8])],
+    ))
 }

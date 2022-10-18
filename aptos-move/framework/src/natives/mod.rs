@@ -18,9 +18,16 @@ use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use cryptography::ed25519;
 use gas_algebra_ext::AbstractValueSize;
+use move_binary_format::errors::PartialVMResult;
+use std::collections::VecDeque;
+use std::sync::Arc;
 
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
+use move_vm_runtime::native_functions::{
+    make_table_from_iter, NativeContext, NativeFunction, NativeFunctionTable,
+};
+use move_vm_types::loaded_data::runtime_types::Type;
+use move_vm_types::natives::function::NativeResult;
 use move_vm_types::values::Value;
 
 pub mod status {
@@ -223,6 +230,30 @@ pub fn all_natives(
     );
 
     make_table_from_iter(framework_addr, natives)
+}
+
+pub fn all_test_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
+    let mut natives = vec![];
+
+    macro_rules! add_natives_from_module {
+        ($module_name: expr, $natives: expr) => {
+            natives.extend(
+                $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
+            );
+        };
+    }
+
+    // Dummy natives.
+    add_natives_from_module!("dummy", cryptography::ed25519::make_all_test());
+
+    make_table_from_iter(framework_addr, natives)
+}
+
+/// Wraps a test-only native function inside an Arc<UnboxedNativeFunction>.
+pub fn make_test_only_native_from_func(
+    func: fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>,
+) -> NativeFunction {
+    Arc::new(func)
 }
 
 /// A temporary hack to patch Table -> table module name as long as it is not upgraded
