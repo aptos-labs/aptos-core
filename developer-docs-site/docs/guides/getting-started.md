@@ -102,7 +102,7 @@ This section contains links to frequently referred Aptos developer resources.
 - [Aptos Community](https://aptoslabs.com/community): Links to discussion forum, Discord and AIT.
 
 
-### Aptos testnet
+### Aptos mainnet
 
 - **REST API Open API spec**: [https://fullnode.mainnet.aptoslabs.com/v1/spec#/](https://fullnode.mainnet.aptoslabs.com/v1/spec#/)
 - **REST service:** [https://fullnode.mainnet.aptoslabs.com/v1](https://fullnode.mainnet.aptoslabs.com/v1)
