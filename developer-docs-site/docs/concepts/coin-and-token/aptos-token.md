@@ -128,35 +128,14 @@ If the file is no longer available, the wallet can fall back to use the `animati
 }
 ```
 
-## Token transfer
-
-To protect a user from receiving undesired NFTs, a user must be first offered an NFT, followed by the user claiming the offered NFTs. Then only these NFTs will be deposited in the user's token store. This is the default token transfer behavior. For example:
-
-- If Alice wants to send Bob an NFT, she must first offer Bob this NFT. This NFT is still stored under Alice’s account. 
-- Only when Bob claims the NFT, this NFT will be removed from Alice’s account and stored in Bob’s token store. 
-
-:::tip Token transfer module
-The token transfer is implemented in the [`token_transfer`](https://github.com/aptos-labs/aptos-core/blob/c238d8d1156b842ec768e3ad646643f1b4165f5b/aptos-move/framework/aptos-token/sources/token_transfers.move) module. 
-:::
-
-### Direct transfer
-
-On the other hand, if a user wants to receive direct transfer of the NFT, skipping the initial steps of offer and claim, then the user can call [`opt_in_direct_transfer`](https://github.com/aptos-labs/aptos-core/blob/283348c6ea4ce198fb27eb3ef1c1e471739aa1aa/aptos-move/framework/aptos-token/sources/token.move#L297) to allow other people to directly transfer the NFTs into the user's token store.  
-
-Note that in both the default token transfer and the direct transfer method, the user will receive the NFT into the user's token store. 
-
-:::tip Turning off direct transfer
-The user can also turn off this direct transfer behavior by calling the same `opt_in_direct_transfer` function to reset the behavior to the default behavior. 
-:::
-
 ## Token data model
 
 <ThemedImage
-  alt="Signed Transaction Flow"
-  sources={{
-    light: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
-    dark: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
-  }}
+alt="Signed Transaction Flow"
+sources={{
+light: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
+dark: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
+}}
 />
 
 ## Token resources
@@ -183,3 +162,56 @@ The token related data are stored at both creator’s account and owner’s acco
 | `TokenStore` | The main struct for storing the token owned by this address. It maps `TokenId` to the actual token. |
 | `Token` | amount is the number of tokens. |
 | `TokenId` | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |
+
+## Token lifecycle
+
+### Token creation
+
+Every Aptos token belongs to a collection. The developer first needs to create a collection through `create_collection_script` and then create the token belonging to the collection `create_token_script`.
+To achieve parallel `TokenData` and `Token` creation, a developer can create unlimited collection and `TokenData` where the `maximum` of the collection and `TokenData` are set as 0. With this setting, the token contract won’t track the supply of types of token (`TokenData` count) and supply of token within each token type. As the result, the `TokenData` and token can be created in parallel.
+
+We also enforce simple validation of the input size and duplication:
+* The token name should be unique within each collection
+* The collection name should be unique within each account
+* The token and collection name length should be smaller than 128 characters
+* The uri length should be smaller than 512 characters
+* The property map can hold at most 1000 properties, and each key should be smaller than 128 characters
+
+### Token mutation
+
+Our standard supports mutation with a principle that the mutable fields are specified during the token creation. This allows the token owner to be informed which fields are mutable when they get the token from the creator.
+Our contract uses `CollectionMutabilityConfig` to check if a field is mutable. Our contract uses `TokenMutabilityConfig` to check if a `TokenData` field is mutable.
+
+For mutation of properties, we have both (1) `default_properties` stored in `TokenData` shared by all tokens belonging to the `TokenData` and (2) `token_properties` stored in the token itself. To mutate `default_properties`, developers can use `mutate_tokendata_property` to mutate the properties when `TokenMutabilityConfig` is set to be `true`.
+
+> **CAUTION: Set the `TokenMutabilityConfig` field to `false` unless it is absolutely necessary. Allowing `default_properties` to be mutable provides creators too much power; creators can change the burnable config to provide themselves the authority to burn tokens after token creation.**
+
+To mutate `token_properties` stored in the token, our standard uses the `TOKEN_PROPERTY_MUTABLE` property stored in `default_properties`. When the creator creates the `TokenData` with the `TOKEN_PROPERTY_MUTABLE` property set to `true`, the creator can mutate `token_properties`. Note that if the `mutate_tokendata_property` is set to be true, the creator can mutate the `token_properties` anyway since they can overwrite the setting in the `default_properties`.
+
+### Token burn
+
+We provide `burn` and `burn_by_creator` functions for token owners and token creators to burn tokens. However, these two functions are also guarded by configs that are specified during the token creation so that both creator and owner are clear on who can burn the token.
+Burn is allowed only when the `BURNABLE_BY_OWNER` property is set to `true` in `default_properties`. Burn by creator is allowed when `BURNABLE_BY_CREATOR` is `true` in `default_properties`.
+Once all the tokens belonging to a `TokenData` are burned, the `TokenData` will be removed from the creator’s account. Similarly, if all `TokenData` belonging to a collection are removed, the `CollectionData` will be removed from the creator’s account.
+
+## Token transfer
+
+To protect a user from receiving undesired NFTs, a user must be first offered an NFT, followed by the user claiming the offered NFTs. Then only these NFTs will be deposited in the user's token store. This is the default token transfer behavior. For example:
+
+- If Alice wants to send Bob an NFT, she must first offer Bob this NFT. This NFT is still stored under Alice’s account. 
+- Only when Bob claims the NFT, this NFT will be removed from Alice’s account and stored in Bob’s token store. 
+
+:::tip Token transfer module
+The token transfer is implemented in the [`token_transfer`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token_transfers.move) module. 
+:::
+
+### Direct transfer
+
+On the other hand, if a user wants to receive direct transfer of the NFT, skipping the initial steps of offer and claim, then the user can call [`opt_in_direct_transfer`](https://github.com/aptos-labs/aptos-core/blob/283348c6ea4ce198fb27eb3ef1c1e471739aa1aa/aptos-move/framework/aptos-token/sources/token.move#L297) to allow other people to directly transfer the NFTs into the user's token store.  
+
+Note that in both the default token transfer and the direct transfer method, the user will receive the NFT into the user's token store. 
+
+:::tip Turning off direct transfer
+The user can also turn off this direct transfer behavior by calling the same `opt_in_direct_transfer` function to reset the behavior to the default behavior. 
+:::
+
