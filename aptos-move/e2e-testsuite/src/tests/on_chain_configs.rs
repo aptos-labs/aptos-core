@@ -11,7 +11,7 @@ use language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeEx
 #[test]
 fn initial_aptos_version() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let vm = AptosVM::new(executor.get_state_view());
+    let vm = AptosVM::new(executor.get_state_view(), false);
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
     assert_eq!(vm.internals().version().unwrap(), version,);
@@ -25,7 +25,7 @@ fn initial_aptos_version() {
     executor.new_block();
     executor.execute_and_apply(txn);
 
-    let new_vm = AptosVM::new(executor.get_state_view());
+    let new_vm = AptosVM::new(executor.get_state_view(), false);
     assert_eq!(
         new_vm.internals().version().unwrap(),
         Version {
@@ -37,7 +37,7 @@ fn initial_aptos_version() {
 #[test]
 fn drop_txn_after_reconfiguration() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let vm = AptosVM::new(executor.get_state_view());
+    let vm = AptosVM::new(executor.get_state_view(), false);
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
     assert_eq!(vm.internals().version().unwrap(), version);

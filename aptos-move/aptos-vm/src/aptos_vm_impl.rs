@@ -58,7 +58,7 @@ pub struct AptosVMImpl {
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new<S: StateView>(state: &S) -> Self {
+    pub fn new<S: StateView>(state: &S, include_test_natives: bool) -> Self {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters
