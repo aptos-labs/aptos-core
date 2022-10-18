@@ -30,7 +30,7 @@ The payload for instructing the blockchain to perform a transfer is:
 ```
 {
   "type": "entry_function_payload",
-  "function": "0x1::Coin::transfer",
+  "function": "0x1::coin::transfer",
   "type_arguments": ["0x1::aptos_coin::AptosCoin"],
   "arguments": [
     "0x737b36c96926043794ed3a0b3eaaceaf",
@@ -39,7 +39,7 @@ The payload for instructing the blockchain to perform a transfer is:
 }
 ```
 
-This instructs the VM to execute the `script` `0x1::Coin::transfer` with a type argument of 0x1::aptos_coin::AptosCoin. Type is required here as Coin is our standard module that can be used to create many types of Coins. See the [Your first coin tutorial][your-first-coin] for an example of creating a custom Coin. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`. The sender address is the account
+This instructs the VM to execute the `script` `0x1::coin::transfer` with a type argument of 0x1::aptos_coin::AptosCoin. Type is required here as Coin is our standard module that can be used to create many types of Coins. See the [Your first coin tutorial][your-first-coin] for an example of creating a custom Coin. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`. The sender address is the account
 address that sent the transaction querying this `script`.
 
 ## Creating a new account
@@ -49,7 +49,7 @@ The payload for instructing the blockchain to create a new account is:
 ```
 {
   "type": "entry_function_payload",
-  "function": "0x1::AptosAccount::create_account",
+  "function": "0x1::aptos_account::create_account",
   "type_arguments": [],
   "arguments": [
     "0x0c7e09cd9185a27104fa218a0b26ea88",
@@ -58,7 +58,7 @@ The payload for instructing the blockchain to create a new account is:
 }
 ```
 
-This instructs the Move virtual machine to execute the `script` `0x1::AptosAccount::create_account`. The first argument is the address of the account to create and the second is the authentication key pre-image (which is mentioned in [Accounts][accounts]). For single signer authentication, this is the public key concatenated with the `0` byte (or `pubkey_A | 0x00`). This is required to prevent account address land grabbing. The execution of this instruction verifies that the last 16-bytes of the authentication key are the same as the 16-byte account address. We are actively working on improving this API to support taking in a 32-byte account address that would eliminate concerns around land grabbing or account manipulation.
+This instructs the Move virtual machine to execute the `script` `0x1::aptos_account::create_account`. The first argument is the address of the account to create and the second is the authentication key pre-image (which is mentioned in [Accounts][accounts]). For single signer authentication, this is the public key concatenated with the `0` byte (or `pubkey_A | 0x00`). This is required to prevent account address land grabbing. The execution of this instruction verifies that the last 16-bytes of the authentication key are the same as the 16-byte account address. We are actively working on improving this API to support taking in a 32-byte account address that would eliminate concerns around land grabbing or account manipulation.
 
 ## Publishing a new Move module
 
