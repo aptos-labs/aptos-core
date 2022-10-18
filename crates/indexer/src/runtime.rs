@@ -112,7 +112,6 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let processor_tasks = config.processor_tasks.unwrap();
     let emit_every = config.emit_every.unwrap();
     let batch_size = config.batch_size.unwrap();
-    let lookback_versions = config.gap_lookback_versions.unwrap() as i64;
 
     info!(processor_name = processor_name, "Starting indexer...");
 
@@ -154,26 +153,28 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     info!(
         processor_name = processor_name,
-        lookback_versions = lookback_versions,
         "Fetching starting version from db..."
     );
+    let starting_version_from_db = tailer
+        .get_start_version(&processor_name)
+        .unwrap_or_else(|e| panic!("Failed to get starting version: {:?}", e))
+        .unwrap_or_else(|| {
+            info!(
+                processor_name = processor_name,
+                "No starting version from db so starting from version 0"
+            );
+            0
+        }) as u64;
     let start_version = match config.starting_version {
-        None => tailer
-            .get_start_version(&processor_name, lookback_versions)
-            .unwrap_or_else(|| {
-                info!(
-                    processor_name = processor_name,
-                    "Could not fetch version from db so starting from version 0"
-                );
-                0
-            }) as u64,
+        None => starting_version_from_db,
         Some(version) => version,
     };
 
     info!(
         processor_name = processor_name,
-        start_version = start_version,
+        final_start_version = start_version,
         start_version_from_config = config.starting_version,
+        starting_version_from_db = starting_version_from_db,
         "Setting starting version..."
     );
     tailer.set_fetcher_version(start_version as u64).await;
@@ -228,7 +229,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
                     processor_name = processor_name,
                     start_version = start_version,
                     end_version = end_version,
-                    error = format!("{:?}", err),
+                    error =? err,
                     "Error processing batch!"
                 );
                 panic!(
@@ -237,6 +238,18 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
                 );
             }
         };
+
+        tailer
+            .update_last_processed_version(&processor_name, processing_result.end_version)
+            .unwrap_or_else(|e| {
+                error!(
+                    processor_name = processor_name,
+                    end_version = processing_result.end_version,
+                    error = format!("{:?}", e),
+                    "Failed to update last processed version!"
+                );
+                panic!("Failed to update last processed version: {:?}", e);
+            });
 
         ma.tick_now(num_res);
 

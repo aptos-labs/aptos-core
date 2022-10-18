@@ -16,7 +16,10 @@ use crate::{
         token_claims::CurrentTokenPendingClaim,
         token_datas::{CurrentTokenData, TokenData},
         token_ownerships::{CurrentTokenOwnership, TokenOwnership},
-        tokens::{CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, Token, TokenDataIdHash},
+        tokens::{
+            CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, TableMetadataForToken, Token,
+            TokenDataIdHash,
+        },
     },
     schema,
 };
@@ -461,6 +464,11 @@ impl TransactionProcessor for TokenTransactionProcessor {
     ) -> Result<ProcessingResult, TransactionProcessingError> {
         let mut conn = self.get_conn();
 
+        // First get all token related table metadata from the batch of transactions. This is in case
+        // an earlier transaction has metadata (in resources) that's missing from a later transaction.
+        let table_handle_to_owner =
+            TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
+
         let mut all_tokens = vec![];
         let mut all_token_ownerships = vec![];
         let mut all_token_datas = vec![];
@@ -493,7 +501,7 @@ impl TransactionProcessor for TokenTransactionProcessor {
                 current_token_datas,
                 current_collection_datas,
                 current_token_claims,
-            ) = Token::from_transaction(&txn, &mut conn);
+            ) = Token::from_transaction(&txn, &table_handle_to_owner, &mut conn);
             all_tokens.append(&mut tokens);
             all_token_ownerships.append(&mut token_ownerships);
             all_token_datas.append(&mut token_datas);

@@ -5,11 +5,15 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::tokens::{TableHandleToOwner, TableMetadataForToken, Token};
+use super::{
+    token_utils::TokenWriteSet,
+    tokens::{TableHandleToOwner, TableMetadataForToken, Token},
+};
 use crate::schema::{current_token_ownerships, token_ownerships};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
@@ -53,18 +57,39 @@ pub struct CurrentTokenOwnership {
 }
 
 impl TokenOwnership {
+    /// We only want to track tokens in 0x1::token::TokenStore for now. This is because the table
+    /// schema doesn't have table type (i.e. token container) as primary key. TokenStore has token_id
+    /// as key and token as value.
     pub fn from_token(
         token: &Token,
+        table_item_key_type: &str,
+        table_item_key: &Value,
         amount: BigDecimal,
         table_handle: String,
         table_handle_to_owner: &TableHandleToOwner,
-        // Escrow tables somehow don't appear in resources so this is just a temporary workaround to record that it's an escrow table
-        value_type: Option<&str>,
-    ) -> (Self, Option<CurrentTokenOwnership>) {
-        let table_handle = TableMetadataForToken::standardize_handle(&table_handle);
+    ) -> anyhow::Result<Option<(Self, Option<CurrentTokenOwnership>)>> {
         let txn_version = token.transaction_version;
+        let maybe_token_id = match TokenWriteSet::from_table_item_type(
+            table_item_key_type,
+            table_item_key,
+            txn_version,
+        )? {
+            Some(TokenWriteSet::TokenId(inner)) => Some(inner),
+            _ => None,
+        };
+        // Return early if table key is not token id
+        if maybe_token_id.is_none() {
+            return Ok(None);
+        }
+        let table_handle = TableMetadataForToken::standardize_handle(&table_handle);
         let maybe_table_metadata = table_handle_to_owner.get(&table_handle);
-        let (curr_token_ownership, owner_address, mut table_type) = match maybe_table_metadata {
+        // Return early if table type is not tokenstore
+        if let Some(tm) = maybe_table_metadata {
+            if tm.table_type != "0x3::token::TokenStore" {
+                return Ok(None);
+            }
+        }
+        let (curr_token_ownership, owner_address, table_type) = match maybe_table_metadata {
             Some(tm) => (
                 Some(CurrentTokenOwnership {
                     collection_data_id_hash: token.collection_data_id_hash.clone(),
@@ -94,17 +119,7 @@ impl TokenOwnership {
             }
         };
 
-        // Hacky handling of escrow tables that are generally present as a resource
-        if let Some(val) = value_type {
-            if val == "0x3::token_coin_swap::TokenEscrow" {
-                table_type = Some(
-                    table_type
-                        .unwrap_or_else(|| "0x3::token_coin_swap::TokenStoreEscrow".to_string()),
-                )
-            }
-        }
-
-        (
+        Ok(Some((
             Self {
                 collection_data_id_hash: token.collection_data_id_hash.clone(),
                 token_data_id_hash: token.token_data_id_hash.clone(),
@@ -120,6 +135,6 @@ impl TokenOwnership {
                 transaction_timestamp: token.transaction_timestamp,
             },
             curr_token_ownership,
-        )
+        )))
     }
 }

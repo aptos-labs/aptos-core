@@ -58,7 +58,7 @@ static TELEMETRY_TOKEN: Lazy<String> = Lazy::new(|| {
 
 /// Returns true iff telemetry is disabled
 #[inline]
-fn telemetry_is_disabled() -> bool {
+pub fn telemetry_is_disabled() -> bool {
     env::var(ENV_APTOS_DISABLE_TELEMETRY).is_ok()
 }
 
