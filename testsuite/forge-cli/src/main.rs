@@ -179,11 +179,7 @@ struct Resize {
 
 fn main() -> Result<()> {
     let mut logger = aptos_logger::Logger::new();
-    logger
-        .channel_size(1000)
-        .is_async(false)
-        .level(Level::Info)
-        .read_env();
+    logger.channel_size(1000).is_async(false).level(Level::Info);
     logger.build();
 
     let args = Args::from_args();

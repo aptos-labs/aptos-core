@@ -349,10 +349,6 @@ pub async fn fund_account(
 
 pub fn start_logger() {
     let mut logger = aptos_logger::Logger::new();
-    logger
-        .channel_size(1000)
-        .is_async(false)
-        .level(Level::Warn)
-        .read_env();
+    logger.channel_size(1000).is_async(false).level(Level::Warn);
     logger.build();
 }
