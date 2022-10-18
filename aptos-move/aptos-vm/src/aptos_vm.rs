@@ -91,7 +91,7 @@ impl AptosVM {
         Self(AptosVMImpl::new(state, include_test_natives))
     }
 
-    pub fn new_for_validation<S: StateView>(state: &S) -> Self {
+    pub fn new_for_validation<S: StateView>(state: &S, include_test_natives: bool) -> Self {
         info!(
             AdapterLogSchema::new(state.id(), 0),
             "Adapter created for Validation"

@@ -841,6 +841,7 @@ pub fn test_genesis_module_publishing() {
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         false,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();
