@@ -312,7 +312,10 @@ Aptos provides several building blocks to support coin transfers:
 Aptos does not emit transfer events, but instead it leverages withdraw and deposit events.
 :::
 
-[typescript-sdk]: /sdks/ts-sdk/index
-[python-sdk]: /sdks/python-sdk
-[rust-sdk]: /sdks/rust-sdk
-[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli
+## Supporting documentation
+
+* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
+* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
