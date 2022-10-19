@@ -36,7 +36,9 @@ consensus-types = { path = "../../consensus/consensus-types", features = ["fuzzi
 executor = { path = "../../execution/executor", features = ["fuzzing"] }
 executor-types = { path = "../../execution/executor-types", features = ["fuzzing"] }
 language-e2e-tests = { path = "../../aptos-move/e2e-tests" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["fuzzing"] }
+move-binary-format = { workspace = true, features = ["fuzzing"] }
+move-core-types = { workspace = true, features = ["fuzzing"] }
+move-vm-types = { workspace = true }
 network = { path = "../../network", features = ["fuzzing"] }
 safety-rules = { path = "../../consensus/safety-rules", features = ["fuzzing", "testing"] }
 scratchpad = { path = "../../storage/scratchpad", features = ["fuzzing"] }

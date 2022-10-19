@@ -118,6 +118,7 @@ impl LocalFactory {
         version: &Version,
         genesis_framework: Option<ReleaseBundle>,
         init_config: Option<InitConfigFn>,
+        vfn_config: Option<NodeConfig>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         guard: ActiveNodesGuard,
     ) -> Result<LocalSwarm>
@@ -149,7 +150,9 @@ impl LocalFactory {
             let _ = swarm
                 .add_validator_fullnode(
                     version,
-                    NodeConfig::default_for_validator_full_node(),
+                    vfn_config
+                        .clone()
+                        .unwrap_or_else(NodeConfig::default_for_validator_full_node),
                     *validator_peer_id,
                 )
                 .unwrap();
@@ -198,6 +201,7 @@ impl Factory for LocalFactory {
                 num_fullnodes,
                 version,
                 framework,
+                None,
                 None,
                 None,
                 guard,

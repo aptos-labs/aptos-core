@@ -219,7 +219,7 @@ pub fn create_nft_token_request(
             u64::MAX,
             "uri".to_owned().into_bytes(),
             creation_account.address(),
-            0,
+            1,
             0,
             vec![false, false, false, false, false],
             vec![Vec::new()],

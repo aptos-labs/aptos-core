@@ -7,16 +7,14 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
 use language_e2e_tests::{current_function_name, executor::FakeExecutor};
-use move_deps::{
-    move_binary_format::file_format::{
-        empty_script, AbilitySet, AddressIdentifierIndex, Bytecode, FunctionHandle,
-        FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, SignatureIndex,
-    },
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{StructTag, TypeTag},
-        vm_status::{StatusCode, StatusCode::LINKER_ERROR},
-    },
+use move_binary_format::file_format::{
+    empty_script, AbilitySet, AddressIdentifierIndex, Bytecode, FunctionHandle,
+    FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, SignatureIndex,
+};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    vm_status::{StatusCode, StatusCode::LINKER_ERROR},
 };
 
 #[test]

@@ -28,7 +28,7 @@ The public IP address of the node and core metrics, including node type, synced 
 The commands and subcommands run by the Aptos CLI tool.
 
 - **CLI metrics**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/cli_metrics.rs#L12-L15](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/cli_metrics.rs#L12-L15).
-- **Build information**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26).
+- **Build information**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-build-info/src/lib.rs#L8-L20](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-build-info/src/lib.rs#L8-L20).
 
 ### Network metrics
 
@@ -38,7 +38,7 @@ The commands and subcommands run by the Aptos CLI tool.
 
 Rust build information including the versions of Rust, cargo, build target architecture and the build tag.
 
-- **Build information**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-telemetry/src/build_information.rs#L12-L26).
+- **Build information**: [https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-build-info/src/lib.rs#L8-L20](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-build-info/src/lib.rs#L8-L20)
 
 ### System information
 
@@ -77,5 +77,3 @@ All the below variables are set by default to `false`, i.e., sending of these te
 - `APTOS_DISBALE_TELEMETRY_PUSH_EVENTS`: This disables sending the custom events.
 - `APTOS_DISABLE_LOG_ENV_POLLING`: This disables the dynamic ability to send verbose logs.
 - `APTOS_DISABLE_PROMETHEUS_NODE_METRICS`: This disables sending the node resource metrics such as system CPU, memory, etc.
-
-

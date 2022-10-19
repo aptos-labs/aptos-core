@@ -6,7 +6,7 @@ use language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
     transaction_status_eq,
 };
-use move_deps::move_core_types::vm_status::StatusCode;
+use move_core_types::vm_status::StatusCode;
 
 // TODO: ignoring most tests for now as bundle publishing is no longer available. Want to resurrect
 // or rewrite for new publishin approach

@@ -18,6 +18,7 @@ xclippy = [
   "-Aclippy::needless-collect",
   "-Aclippy::enum-variant-names",
   "-Aclippy::self-named-constructors",
+  "-Aclippy::single-match"
 ]
 
 [build]

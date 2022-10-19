@@ -40,7 +40,7 @@ test(
         "https://aptos.dev/img/nyan.jpeg",
         1000,
         alice.address(),
-        0,
+        1,
         0,
         ["key"],
         ["2"],

@@ -5,8 +5,8 @@ use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveH
 use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_types::on_chain_config::FeatureFlag;
 use framework::natives::code::{PackageRegistry, UpgradePolicy};
-use move_deps::move_core_types::parser::parse_struct_tag;
-use move_deps::move_core_types::vm_status::StatusCode;
+use move_core_types::parser::parse_struct_tag;
+use move_core_types::vm_status::StatusCode;
 use package_builder::PackageBuilder;
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
