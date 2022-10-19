@@ -209,7 +209,20 @@ Using the API client we can create a `TokenClient`, which we use for common toke
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon.
+
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_1a
+```
+
+Using the API client we can create a `CoinClient`, which we use for common coin operations such as transferring coins and checking balances.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_1b
+```
+
+In the example we initialize the URL values as such:
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_1c
+```
   </TabItem>
 </Tabs>
 
@@ -242,7 +255,10 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon.
+
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_2
+```
   </TabItem>
 </Tabs>
 
