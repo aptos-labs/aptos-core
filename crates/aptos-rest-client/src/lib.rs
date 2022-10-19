@@ -556,7 +556,7 @@ impl Client {
                 }
                 WaitForTransactionResult::Pending(state) => {
                     if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
-                        return Err(anyhow!("Transaction expired, it is guaranteed it will not be committed on chain.").into());
+                        return Err(anyhow!("Transaction expired (pending), it is guaranteed it will not be committed on chain.").into());
                     }
                     chain_timestamp_usecs = Some(state.timestamp_usecs);
                 }
@@ -564,7 +564,7 @@ impl Client {
                     if let RestError::Api(aptos_error_response) = error {
                         if let Some(state) = aptos_error_response.state {
                             if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
-                                return Err(anyhow!("Transaction expired, it is guaranteed it will not be committed on chain.").into());
+                                return Err(anyhow!("Transaction expired (not found), it is guaranteed it will not be committed on chain.").into());
                             }
                             chain_timestamp_usecs = Some(state.timestamp_usecs);
                         }
@@ -573,7 +573,7 @@ impl Client {
                     }
                     sample!(
                         SampleRate::Duration(Duration::from_secs(30)),
-                        debug!(
+                        warn!(
                             "Cannot yet find transaction in mempool on {:?}, continuing to wait.",
                             self.path_prefix_string(),
                         )
