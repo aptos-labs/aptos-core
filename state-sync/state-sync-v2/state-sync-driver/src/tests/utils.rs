@@ -37,7 +37,7 @@ use event_notifications::EventNotificationListener;
 use futures::channel::mpsc;
 use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
-use move_deps::move_core_types::language_storage::TypeTag;
+use move_core_types::language_storage::TypeTag;
 use rand::rngs::OsRng;
 use rand::Rng;
 use storage_service_types::responses::CompleteDataRange;

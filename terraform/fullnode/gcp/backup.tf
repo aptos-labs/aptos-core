@@ -21,5 +21,5 @@ resource "google_storage_bucket_iam_member" "backup" {
 resource "google_service_account_iam_binding" "backup" {
   service_account_id = google_service_account.backup.name
   role               = "roles/iam.workloadIdentityUser"
-  members            = ["serviceAccount:${google_container_cluster.aptos.workload_identity_config[0].workload_pool}[aptos/${terraform.workspace}0-aptos-fullnode]"]
+  members            = [for i in range(var.num_fullnodes) : "serviceAccount:${google_container_cluster.aptos.workload_identity_config[0].workload_pool}[${var.k8s_namespace}/pfn${i}-aptos-fullnode]"]
 }

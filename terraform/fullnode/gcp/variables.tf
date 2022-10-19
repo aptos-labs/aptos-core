@@ -128,6 +128,11 @@ variable "enable_backup" {
   default     = false
 }
 
+variable "backup_fullnode_index" {
+  description = "index of fullnode to backup data from"
+  default     = 0
+}
+
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
   default     = false

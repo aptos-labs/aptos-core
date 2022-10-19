@@ -362,7 +362,8 @@ pub struct AdvertisedData {
 
 impl fmt::Debug for AdvertisedData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let synced_ledger_infos = (&self.synced_ledger_infos)
+        let synced_ledger_infos = self
+            .synced_ledger_infos
             .iter()
             .map(|LedgerInfoWithSignatures::V0(ledger)| {
                 let version = ledger.commit_info().version();

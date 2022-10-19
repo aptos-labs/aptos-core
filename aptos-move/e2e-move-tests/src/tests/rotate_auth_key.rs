@@ -12,7 +12,7 @@ use aptos_types::{
 };
 use cached_packages::aptos_stdlib;
 use language_e2e_tests::account::Account;
-use move_deps::move_core_types::parser::parse_struct_tag;
+use move_core_types::parser::parse_struct_tag;
 
 #[test]
 fn rotate_auth_key_ed25519_to_ed25519() {

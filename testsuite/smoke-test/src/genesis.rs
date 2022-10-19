@@ -13,7 +13,7 @@ use aptos_config::config::NodeConfig;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use forge::{get_highest_synced_version, LocalNode, Node, NodeExt, SwarmExt};
-use move_deps::move_core_types::language_storage::CORE_CODE_ADDRESS;
+use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
 use std::{fs, process::Command, str::FromStr, time::Duration};
 

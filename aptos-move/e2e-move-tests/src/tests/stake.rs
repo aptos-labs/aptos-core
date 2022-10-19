@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use cached_packages::aptos_stdlib;
-use move_deps::move_core_types::language_storage::CORE_CODE_ADDRESS;
+use move_core_types::language_storage::CORE_CODE_ADDRESS;
 
 #[test]
 fn test_staking_end_to_end() {
