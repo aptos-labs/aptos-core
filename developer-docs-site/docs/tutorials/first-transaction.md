@@ -414,8 +414,8 @@ The transaction hash can be used to query the status of a transaction:
 
 ## Supporting documentation
 
-* [account_basics](../concepts/basics-accounts.md)
+* [Account basics](../concepts/basics-accounts.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
-* [rest_spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
