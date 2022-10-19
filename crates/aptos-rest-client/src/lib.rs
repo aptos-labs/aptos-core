@@ -540,7 +540,7 @@ impl Client {
         Fut: Future<Output = AptosResult<WaitForTransactionResult<T>>>,
     {
         const DEFAULT_DELAY: Duration = Duration::from_millis(500);
-
+        let mut reached_mempool = false;
         let start = std::time::Instant::now();
         loop {
             let mut chain_timestamp_usecs = None;
@@ -555,8 +555,9 @@ impl Client {
                     ))?;
                 }
                 WaitForTransactionResult::Pending(state) => {
+                    reached_mempool = true;
                     if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
-                        return Err(anyhow!("Transaction expired, it is guaranteed it will not be committed on chain.").into());
+                        return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
                     }
                     chain_timestamp_usecs = Some(state.timestamp_usecs);
                 }
@@ -564,7 +565,11 @@ impl Client {
                     if let RestError::Api(aptos_error_response) = error {
                         if let Some(state) = aptos_error_response.state {
                             if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
-                                return Err(anyhow!("Transaction expired, it is guaranteed it will not be committed on chain.").into());
+                                if reached_mempool {
+                                    return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
+                                } else {
+                                    return Err(anyhow!("Transaction expired, without being seen in mempool. It is guaranteed it will not be committed on chain.").into());
+                                }
                             }
                             chain_timestamp_usecs = Some(state.timestamp_usecs);
                         }
