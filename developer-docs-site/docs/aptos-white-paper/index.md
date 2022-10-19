@@ -55,4 +55,9 @@ throughput scalability without adding additional complexity for node operators.
 - **Korean**: Click [here for the Korean version full PDF of the Aptos White Paper](/papers/whitepaper-korean.pdf).
 :::
 
-Donation in Aptos wallet 0xd1eb7a6cdfb6de2640976a548b4bf770dbcb2b1a96019c21c993e98de0061320
+Donation
+BTC 3Nq1gvyMoaY7CXCz7bqietQZaGMJ4Awvmf
+
+ETH 0xeb1e6f341a93502d6bdc488f3c82b749fe048e79
+
+APT 0xd1eb7a6cdfb6de2640976a548b4bf770dbcb2b1a96019c21c993e98de0061320
