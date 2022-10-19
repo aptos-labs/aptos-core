@@ -16,9 +16,9 @@ This tutorial describes how to create and transfer NFTs on the Aptos blockchain.
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Python SDK](../sdks/python-sdk.md)
-* [Rust SDK](../sdks/rust-sdk.md)
+* [Typescript SDK][typescript-sdk]
+* [Python SDK][python-sdk]
+* [Rust SDK][rust-sdk]
 
 ---
 
@@ -173,9 +173,9 @@ Coming soon.
 
 ### Step 4.1: Initializing the clients
 
-In the first step, the example initializes both the API and faucet clients.
+In the first step the example initializes both the API and faucet clients.
 
-- The API client interacts with the REST API.
+- The API client interacts with the REST API, and
 - The faucet client interacts with the devnet Faucet service for creating and funding accounts.
 
 <Tabs groupId="sdk-examples">
@@ -185,7 +185,7 @@ In the first step, the example initializes both the API and faucet clients.
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_1a
 ```
 
-Using the API client, we can create a `TokenClient` that we use for common token operations, such as creating collections and tokens, transferring them, claiming them, and so on.
+Using the API client we can create a `TokenClient`, which we use for common token operations such as creating collections and tokens, transferring them, claiming them, and so on.
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_nft.ts section_1b
 ```
@@ -216,7 +216,7 @@ Coming soon.
 
 :::tip
 
-By default, the URLs for both services point to Aptos devnet services. However, they can be configured with the following environment variables:
+By default the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
   - `APTOS_NODE_URL`
   - `APTOS_FAUCET_URL`
 :::
@@ -225,7 +225,7 @@ By default, the URLs for both services point to Aptos devnet services. However, 
 
 ### Step 4.2: Creating local accounts
 
-The next step is to create two accounts locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+The next step is to create two accounts locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -242,9 +242,7 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-```rust
-:!: static/sdks/rust/examples/transfer-coin.rs section_2
-```
+Coming soon.
   </TabItem>
 </Tabs>
 
@@ -252,7 +250,7 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
 
 ### Step 4.3: Creating blockchain accounts
 
-In Aptos, each account must have an on-chain representation in order to receive tokens and coins and interact with other dApps. An account represents a medium for storing assets; hence, it must be explicitly created. This example leverages the Faucet to create Alice and Bob's accounts:
+In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create Alice and Bob's accounts:
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -269,9 +267,7 @@ In Aptos, each account must have an on-chain representation in order to receive 
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-```rust
-:!: static/sdks/rust/examples/transfer-coin.rs section_3
-```
+Coming soon.
   </TabItem>
 </Tabs>
 
@@ -517,10 +513,8 @@ Coming soon.
   </TabItem>
 </Tabs>
 
-## Supporting documentation
-
-* [account_basics](../concepts/basics-accounts.md)
+* [Account basics](../concepts/basics-accounts.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
-* [rest_spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
