@@ -32,6 +32,7 @@ After you install it:
 
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
 2. Copy the private key. You will need it to set up the Aptos CLI in the next section.
+3. Strip the `0x` from the beginning of your private key in preparation for inclusion in the Aptos CLI.
 3. See the [user instructions](https://petra.app/docs/use) on petra.app for help.
 
 :::tip
@@ -42,9 +43,23 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 1. Install the [Aptos CLI][install_cli].
 
-2. Run `aptos init`, and when it asks for your private key, paste the private key from the Aptos Wallet that you copied earlier. This will initialize the Aptos CLI to use the same account as used by the Aptos Wallet.
+2. Run `aptos init`.
 
-3. Run `aptos account list` to verify that it is working.
+3. Select your REST and faucet endpoint as you did in the [Move module](first-move-module.md#step-2-create-an-account-and-fund-it) tutorial.
+
+4. When prompted for your private key, paste the private key from the Aptos Wallet that you copied earlier (minus the  `0x` prefix if included) and press **Return**.
+
+You will see output resembling:
+
+```text
+Aptos is now set up for account <private key>!  Run `aptos help` for more information about commands
+{
+  "Result": "Success"
+}
+```
+This initializes the Aptos CLI to use the same account as used by the Aptos Wallet.
+
+3. Run `aptos account list` to verify that it is working. You should see your private key listed in the `addr` field for all events.
 
 ## Step 1: Set up a single page app
 
