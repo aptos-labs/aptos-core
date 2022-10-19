@@ -14,9 +14,9 @@ This tutorial describes how to generate and submit transactions to the Aptos blo
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK][typescript-sdk]
-* [Python SDK][python-sdk]
-* [Rust SDK][rust-sdk]
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
 
 ---
 
@@ -415,7 +415,7 @@ The transaction hash can be used to query the status of a transaction:
 ## Supporting documentation
 
 * [account_basics](../concepts/basics-accounts.md)
-* [typescript-sdk](../sdks/ts-sdk/index.md)
-* [python-sdk](../sdks/python-sdk.md)
-* [rust-sdk](../sdks/rust-sdk.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
 * [rest_spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
