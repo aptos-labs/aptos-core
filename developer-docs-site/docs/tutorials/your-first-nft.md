@@ -283,7 +283,9 @@ In Aptos, each account must have an on-chain representation in order to support 
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Coming soon.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_3
+```
   </TabItem>
 </Tabs>
 
