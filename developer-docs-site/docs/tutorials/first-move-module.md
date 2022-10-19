@@ -114,6 +114,8 @@ You will see output resembling:
 }
 ```
 
+The `compile` command must contain `--named-addresses` as above because the [`Move.toml`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/hello_blockchain/Move.toml) file leaves this as undefined (see below).
+
 To test the module run: 
 
 ```bash
@@ -136,7 +138,7 @@ Test result: OK. Total tests: 2; passed: 2; failed: 0
 }
 ```
 
-The `compile` command must contain `--named-addresses` as above because the [`Move.toml`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/hello_blockchain/Move.toml) file leaves this as undefined (see below). To prepare the module for the account created in the previous step, we specify that the named address `hello_blockchain` is set to our account address, using the `default` profile alias.
+To prepare the module for the account created in the previous step, we specify that the named address `hello_blockchain` is set to our account address, using the `default` profile alias.
 
 ```toml
 [addresses]
@@ -179,7 +181,7 @@ At this point, the module is now stored on the account in the Aptos blockchain.
 
 ## Step 5: Interact with the Move module
 
-Move modules expose access points, also referred as `entry functions`. These access points can be called via transactions. The CLI allows for seamless access to these access points. The example Move module `hello_blockchain` exposes a `set_message` entry function that takes in a `string`. This can be called via the CLI:
+Move modules expose access points, known as *entry functions*. These entry functions can be called via transactions. The Aptos CLI allows for seamless access to these entry functions. The example Move module `hello_blockchain` exposes a `set_message` entry function that takes in a `string`. This can be called via the CLI:
 
 ```bash
 aptos move run \
