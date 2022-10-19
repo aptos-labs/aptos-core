@@ -22,7 +22,7 @@ Install your preferred SDK from the below list:
 
 ## Step 2: Install the CLI
 
-[Install the precombiled binary for the Aptos CLI][install_cli].
+[Install the precompiled binary for the Aptos CLI][install_cli].
 
 ---
 
