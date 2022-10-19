@@ -79,7 +79,7 @@ Aptos is now set up for account 7100C5295ED4F9F39DCC28D309654E291845984518307D3E
 }
 ```
 
-From now on you should add `--profile local` to the commands to run them on the local testnet.
+Henceforth, you should add `--profile local` to the commands to run them on the local testnet.
 
 ## Creating and funding accounts
 
@@ -181,4 +181,4 @@ More CLI help can be found by running the command:
 aptos node run-local-testnet --help
 ```
 
-which will provide information about each of the flags for the command.
+The `--help` flag  will provide information about each of the command passed after node.
