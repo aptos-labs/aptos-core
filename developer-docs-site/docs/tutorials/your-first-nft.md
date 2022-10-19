@@ -16,9 +16,9 @@ This tutorial describes how to create and transfer NFTs on the Aptos blockchain.
 
 Install your preferred SDK from the below list:
 
-* [Typescript SDK][typescript-sdk]
-* [Python SDK][python-sdk]
-* [Rust SDK][rust-sdk]
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
 
 ---
 
