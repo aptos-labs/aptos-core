@@ -262,8 +262,7 @@ Other accounts can reuse the published module by calling the exact same function
 
 ## Supporting documentation
 
-* [account_basics](../concepts/basics-accounts.md)
-* [alice_account_rest](https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/)
-* [bob_account_explorer](https://explorer.aptoslabs.com/account/ec6ec14e4abe10aaa6ad53b0b63a1806)
-* [install_cli](../cli-tools/aptos-cli-tool/install-aptos-cli.md#download-precompiled-binary)
-* [rest_spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
+* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
