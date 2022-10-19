@@ -172,7 +172,7 @@ If your node cannot state sync, and the logs are showing "NoAvailablePeers", it'
 
 #### Workaround
 
-You can try add some extra upstream peers for your fullnode to state sync from. See the guide [Add upstream seed peers](nodes/full-node/fullnode-source-code-or-docker.md#add-upstream-seed-peers).
+You can try add some extra upstream peers for your fullnode to state sync from. See the section [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers).
 
 ### Starting a node throws a YAML-parsing error
 
@@ -199,7 +199,7 @@ The devnet validator fullnodes will accept only a maximum of connections. If Apt
 You can workaround this by:
 
 1. Checking your network configuration.
-2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Add upstream seed peers](nodes/full-node/fullnode-source-code-or-docker.md#add-upstream-seed-peers).
+2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers).
 
 For example, after you add a single peer to the `seeds` section in your `public_full_node.yaml` file like below, restart the `cargo run -p ...` command:
 
