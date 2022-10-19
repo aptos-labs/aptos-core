@@ -174,7 +174,7 @@ Using the API client we can create a `CoinClient` that we use for common coin op
 :!: static/sdks/python/examples/transfer-coin.py section_1
 ```
 
-The [`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/common.py) initializes these values as follows:
+[`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/common.py) initializes these values as follows:
 
 ```python
 :!: static/sdks/python/examples/common.py section_1
