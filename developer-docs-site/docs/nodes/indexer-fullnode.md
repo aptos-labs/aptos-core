@@ -16,7 +16,10 @@ The below installation steps are verified only on macOS with Apple silicon.
 To run an indexer fullnode, these are the steps in summary:
 
 1. Make sure that you have all the required tools and packages described below in this document.
-2. Follow the guide [Fullnode Using Aptos Source or Docker](full-node/fullnode-source-code-or-docker.md) and prepare the setup, but **do not run** the `cargo run -p aptos-node --release -- -f ./fullnode.yaml` command yet. 
+2. Follow the [method #1 of setting up a public fullnode by using the source code](full-node/fullnode-source-code-or-docker/#method-1-building-and-running-from-source) and prepare the setup, but **do not run** the `cargo run -p aptos-node --release -- -f ./fullnode.yaml` command yet. 
+:::danger Docker not supported
+Docker is not yet supported for indexer fullnode. In the above step 2, use only the source code method.
+:::
 3. Edit the `fullnode.yaml` as described below in this document.
 4. Run the indexer fullnode by executing the command described below in this document.
 
@@ -59,7 +62,7 @@ To run an indexer fullnode, these are the steps in summary:
     This will create a database schema with the subdirectory `migrations` located in this `aptos-core/crates/indexer` directory.
     - If for some reason this database is already being used, try a different database. For example: `DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 diesel database reset`
 
-8. Follow the guide [Fullnode Using Aptos Source or Docker](full-node/fullnode-source-code-or-docker.md) and prepare the setup, but **do not run** the `cargo run -p aptos-node --release -- -f ./fullnode.yaml` command yet. 
+8. Follow the [method #1 of setting up a public fullnode by using the source code](full-node/fullnode-source-code-or-docker/#method-1-building-and-running-from-source) and prepare the setup, but **do not run** the `cargo run -p aptos-node --release -- -f ./fullnode.yaml` command yet. **Docker is not yet supported for the indexer fullnode.**
 9. Edit the `./fullnode.yaml` and add the following configuration:
     ```yaml
     storage:
