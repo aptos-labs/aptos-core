@@ -164,7 +164,7 @@ pub fn make_all_test() -> impl Iterator<Item = (String, NativeFunction)> {
 fn native_test_only_generate_keys(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     //TODO
     Ok(NativeResult::ok(
