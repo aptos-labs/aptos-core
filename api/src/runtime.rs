@@ -201,10 +201,7 @@ pub fn attach_poem_to_runtime(
             .map_err(anyhow::Error::msg)
     });
 
-    info!(
-        "Poem is running at {}, behind the reverse proxy at the API port",
-        actual_address
-    );
+    info!("API server is running at {}", actual_address);
 
     Ok(actual_address)
 }
