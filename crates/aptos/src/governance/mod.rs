@@ -596,8 +596,7 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
         with_abis: false,
         with_source_maps: false,
         with_error_map: false,
-        install_dir: None,
-        named_addresses: Default::default(),
+        ..BuildOptions::default()
     };
 
     let pack = BuiltPackage::build(package_dir.to_path_buf(), build_options)?;
