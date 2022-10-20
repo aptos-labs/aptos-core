@@ -48,15 +48,13 @@ use aptos_vm::{
     AptosVM, VMExecutor, VMValidator,
 };
 use framework::ReleaseBundle;
-use move_deps::{
-    move_core_types::{
-        account_address::AccountAddress,
-        identifier::Identifier,
-        language_storage::{ModuleId, ResourceKey, TypeTag},
-        move_resource::MoveResource,
-    },
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{ModuleId, ResourceKey, TypeTag},
+    move_resource::MoveResource,
 };
+use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 

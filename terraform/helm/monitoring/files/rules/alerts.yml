@@ -1,6 +1,7 @@
 groups:
 - name: "Aptos alerts"
   rules:
+{{- if .Values.validator.name }}
   # consensus
   - alert: Zero Block Commit Rate
     expr: rate(aptos_consensus_last_committed_round{role="validator"}[1m]) == 0 OR absent(aptos_consensus_last_committed_round{role="validator"})
@@ -23,7 +24,7 @@ groups:
       severity: warning
       summary: "Consensus error rate is high"
     annotations:
-
+{{- end }}
     # State sync alerts
   - alert: State sync is not making progress
     expr: rate(aptos_state_sync_version{type="synced"}[5m]) == 0 OR absent(aptos_state_sync_version{type="synced"})

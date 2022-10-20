@@ -130,7 +130,7 @@ For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](/
 ```bash
 aptos node get-stake-pool \
   --owner-address e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb \
-  --url https://fullnode.mainnet.aptoslabs.com/v1
+  --profile mainnet-operator
 ```
 
 Example output:
@@ -205,7 +205,8 @@ Either an owner or an operator can request commission. You can request commissio
 ```bash
 aptos stake request-commission \
   --operator-address 0x3bec5a529b023449dfc86e9a6b5b51bf75cec4a62bf21c15bbbef08a75f7038f \
-  --owner-address 0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb
+  --owner-address 0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb \
+  --profile mainnet-operator
 ```
 
 ## Frequently used staking operations commands
@@ -217,7 +218,7 @@ To see your validator performance in the current and past epochs and the rewards
 ```bash
 aptos node get-performance \ 
   --pool-address <pool address> \
-  --url https://fullnode.mainnet.aptoslabs.com/v1
+  --profile mainnet-operator
 ```
 
 Example output:
@@ -274,6 +275,6 @@ To check the performance of all the epochs since the genesis, run the below comm
 ```bash
 aptos node analyze-validator-performance \
   --analyze-mode detailed-epoch-table \
-  --url https://fullnode.mainnet.aptoslabs.com/v1 \
+  --profile mainnet-operator \
   --start-epoch 0 | grep <pool address>
 ```

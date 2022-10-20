@@ -51,6 +51,7 @@ pub struct AccountBalanceCommand {
 }
 
 impl AccountBalanceCommand {
+    #[allow(clippy::manual_retain)]
     pub async fn execute(self) -> anyhow::Result<AccountBalanceResponse> {
         let account_identifier = if self.stake_amount {
             AccountIdentifier::total_stake_account(self.account)

@@ -98,7 +98,7 @@ module mint_nft::minting {
             0,
             token_uri,
             resource_account_address,
-            0,
+            1,
             0,
             // we don't allow any mutation to the token
             token::create_token_mutability_config(

@@ -72,11 +72,11 @@ monitoring:
       pullPolicy: IfNotPresent
     resources:
       limits:
-        cpu: 0.2
-        memory: 128Mi
+        cpu: 1
+        memory: 256Mi
       requests:
-        cpu: 0.2
-        memory: 128Mi
+        cpu: 1
+        memory: 256Mi
     googleAuth:
     config:
     env:

@@ -22,10 +22,10 @@ use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
-use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
-use move_deps::move_core_types::move_resource::MoveStructType;
-use move_deps::move_core_types::value::MoveValue;
-use move_deps::move_package::package_hooks::register_package_hooks;
+use move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_core_types::move_resource::MoveStructType;
+use move_core_types::value::MoveValue;
+use move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use rand::{
     rngs::{OsRng, StdRng},

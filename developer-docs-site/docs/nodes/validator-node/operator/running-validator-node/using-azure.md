@@ -5,7 +5,7 @@ slug: "run-validator-node-using-azure"
 
 # On Azure
 
-This is a step-by-step guide to install an Aptos node on AWS. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
+This is a step-by-step guide to install an Aptos node on Azure. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
 
 :::danger Did you set up your Azure account?
 This guide assumes that you already have Azure account setup.

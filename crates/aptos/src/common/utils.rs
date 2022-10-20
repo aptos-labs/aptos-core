@@ -12,7 +12,7 @@ use aptos_rest_client::{Account, Client};
 use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use itertools::Itertools;
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
 #[cfg(unix)]

@@ -3,7 +3,7 @@
 
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_vm::natives;
-use move_deps::move_vm_runtime::native_functions::NativeFunctionTable;
+use move_vm_runtime::native_functions::NativeFunctionTable;
 
 // move_stdlib has the testing feature enabled to include debug native functions
 pub fn aptos_debug_natives(

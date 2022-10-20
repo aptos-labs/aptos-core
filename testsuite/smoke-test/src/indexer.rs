@@ -61,7 +61,7 @@ pub async fn execute_nft_txns<'t>(
                 4,
                 "uri".to_owned().into_bytes(),
                 creator.address(),
-                0,
+                1,
                 0,
                 vec![false, false, false, false, true],
                 vec!["age".as_bytes().to_vec()],

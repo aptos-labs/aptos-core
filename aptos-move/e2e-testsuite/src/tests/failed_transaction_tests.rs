@@ -16,7 +16,7 @@ use aptos_vm::{
     AptosVM,
 };
 use language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
-use move_deps::move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
+use move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]
 fn failed_transaction_cleanup_test() {
