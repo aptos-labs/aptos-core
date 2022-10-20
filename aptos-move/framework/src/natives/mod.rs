@@ -243,7 +243,6 @@ pub fn all_test_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
         };
     }
 
-    // Dummy natives.
     add_natives_from_module!("ed25519", cryptography::ed25519::make_all_test());
 
     make_table_from_iter(framework_addr, natives)

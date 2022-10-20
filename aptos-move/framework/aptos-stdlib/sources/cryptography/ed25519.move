@@ -171,7 +171,7 @@ module aptos_std::ed25519 {
     }
 
     #[test_only]
-    fun generate_keys(): (SecretKey, UnvalidatedPublicKey) {
+    public fun generate_keys(): (SecretKey, UnvalidatedPublicKey) {
         let (sk_bytes, pk_bytes) = generate_keys_internal();
         let sk = SecretKey {
             bytes: sk_bytes
@@ -183,14 +183,14 @@ module aptos_std::ed25519 {
     }
 
     #[test_only]
-    fun sign_arbitrary_bytes(sk: &SecretKey, msg: vector<u8>): Signature {
+    public fun sign_arbitrary_bytes(sk: &SecretKey, msg: vector<u8>): Signature {
         Signature {
             bytes: sign_internal(sk.bytes, msg)
         }
     }
 
     #[test_only]
-    fun sign_struct<T:drop>(sk: &SecretKey, data: T): Signature {
+    public fun sign_struct<T:drop>(sk: &SecretKey, data: T): Signature {
         let encoded = new_signed_message(data);
         Signature {
             bytes: sign_internal(sk.bytes, bcs::to_bytes(&encoded))
@@ -204,7 +204,7 @@ module aptos_std::ed25519 {
         let sig1 = sign_arbitrary_bytes(&sk, msg);
         assert!(signature_verify_strict(&sig1, &pk, msg), std::error::invalid_state(1));
         let sig2 = sign_struct(&sk, copy pk);
-        assert!(signature_verify_strict_t(&sig2, &pk, copy pk), std::error::invalid_state(1));
+        assert!(signature_verify_strict_t(&sig2, &pk, copy pk), std::error::invalid_state(2));
     }
 
     //
