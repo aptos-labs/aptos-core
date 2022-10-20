@@ -7,7 +7,6 @@
 //! This code, based on the `move-model` crate, is also a good example how the model can be
 //! leveraged to do whole program traversals and analysis.
 
-use crate::built_package::BuildOptions;
 use move_core_types::account_address::AccountAddress;
 use move_core_types::errmap::{ErrorDescription, ErrorMapping};
 use move_core_types::identifier::Identifier;
@@ -15,41 +14,14 @@ use move_core_types::language_storage::ModuleId;
 use move_model::ast::Value;
 use move_model::model::{GlobalEnv, ModuleEnv, NamedConstantEnv};
 use move_model::symbol::Symbol;
-use move_package::{BuildConfig, ModelConfig};
-use std::path::Path;
 use std::{convert::TryFrom, rc::Rc};
 
 const ERROR_PREFIX: &str = "E";
 
-pub(crate) fn generate_error_map(
-    package_path: &Path,
-    options: &BuildOptions,
-) -> Option<ErrorMapping> {
-    let build_config = BuildConfig {
-        dev_mode: false,
-        additional_named_addresses: options.named_addresses.clone(),
-        architecture: None,
-        generate_abis: false,
-        generate_docs: false,
-        install_dir: None,
-        test_mode: false,
-        force_recompilation: false,
-        fetch_deps_only: false,
-        fetch_latest_git_deps: false,
-    };
-    if let Ok(model) = build_config.move_model_for_package(
-        package_path,
-        ModelConfig {
-            target_filter: None,
-            all_files_as_targets: true,
-        },
-    ) {
-        let mut gen = ErrorMapGenerator::new(&model);
-        gen.gen();
-        Some(gen.finish())
-    } else {
-        None
-    }
+pub(crate) fn generate_error_map(model: &GlobalEnv) -> ErrorMapping {
+    let mut gen = ErrorMapGenerator::new(model);
+    gen.gen();
+    gen.finish()
 }
 
 struct ErrorMapGenerator<'env> {
