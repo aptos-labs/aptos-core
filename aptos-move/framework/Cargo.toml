@@ -36,7 +36,7 @@ tempfile = "3.3.0"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 
 aptos-aggregator = { path = "../../aptos-move/aptos-aggregator" }
-aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
 aptos-sdk-builder = { path = "../aptos-sdk-builder" }
 aptos-state-view = { path = "../../storage/state-view" }
