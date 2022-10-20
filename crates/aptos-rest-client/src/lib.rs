@@ -540,7 +540,7 @@ impl Client {
         Fut: Future<Output = AptosResult<WaitForTransactionResult<T>>>,
     {
         const DEFAULT_DELAY: Duration = Duration::from_millis(500);
-
+        let mut reached_mempool = false;
         let start = std::time::Instant::now();
         loop {
             let mut chain_timestamp_usecs = None;
@@ -555,8 +555,9 @@ impl Client {
                     ))?;
                 }
                 WaitForTransactionResult::Pending(state) => {
+                    reached_mempool = true;
                     if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
-                        return Err(anyhow!("Transaction expired, it is guaranteed it will not be committed on chain.").into());
+                        return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
                     }
                     chain_timestamp_usecs = Some(state.timestamp_usecs);
                 }
@@ -564,7 +565,21 @@ impl Client {
                     if let RestError::Api(aptos_error_response) = error {
                         if let Some(state) = aptos_error_response.state {
                             if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
-                                return Err(anyhow!("Transaction expired, it is guaranteed it will not be committed on chain.").into());
+                                if reached_mempool {
+                                    return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
+                                } else {
+                                    // We want to know whether we ever got Pending state from the mempool,
+                                    // to warn in case we didn't.
+                                    // Unless we are calling endpoint that is a very large load-balanced pool of nodes,
+                                    // we should always see pending after submitting a transaction.
+                                    // (i.e. if we hit the node we submitted a transaction to,
+                                    // it shouldn't return NotFound on the first call)
+                                    //
+                                    // At the end, when the expiration happens, we might get NotFound or Pending
+                                    // based on whether GC run on the full node to remove expired transaction,
+                                    // so that information is not useful. So we need to keep this variable as state.
+                                    return Err(anyhow!("Transaction expired, without being seen in mempool. It is guaranteed it will not be committed on chain.").into());
+                                }
                             }
                             chain_timestamp_usecs = Some(state.timestamp_usecs);
                         }

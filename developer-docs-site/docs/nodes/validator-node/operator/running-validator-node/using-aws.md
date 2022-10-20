@@ -78,8 +78,8 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
       source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/aws?ref=mainnet"
       region        = <aws region>  # Specify the region
       # zone_id     = "<Route53 zone id>"  # zone id for Route53 if you want to use DNS
-      era           = 1              # bump era number to wipe the chain
-      chain_id      = 43
+      era           = 1  # bump era number to wipe the chain
+      chain_id      = 1  # for mainnet. Use different value for testnet or devnet.
       image_tag     = "mainnet" # Specify the image tag to use
       validator_name = "<Name of your validator>"
     }
@@ -158,7 +158,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page:
+12. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
     - `genesis.blob`
     - `waypoint.txt`
 

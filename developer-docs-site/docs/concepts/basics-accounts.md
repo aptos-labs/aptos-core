@@ -10,10 +10,18 @@ An account on the Aptos blockchain contains blockchain assets. These assets, for
 Each account on the Aptos blockchain is identified by a 32-byte account address. An account can store data and it stores this data in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs are added after creating the account. 
 
 :::tip Account address example
-Account addresses are 32-bytes. They are usually shown as 64 hex characters, with each hex character a nibble. See the [Your First Transaction](/tutorials/first-transaction.md#output) for an example of how an address looks like, reproduced below:
+Account addresses are 32-bytes. They are usually shown as 64 hex characters, with each hex character a nibble.  Sometimes it's prefixed with a 0x See the [Your First Transaction](/tutorials/first-transaction.md#output) for an example of how an address looks like, reproduced below:
+
 ```text
-Alice: eeff357ea5c1a4e7bc11b2b17ff2dc2dcca69750bfef1e1ebcaccf8c8018175b
-Bob: 19aadeca9388e009d136245b9a67423f3eee242b03142849eb4f81a4a409e59c
+Alice: 0xeeff357ea5c1a4e7bc11b2b17ff2dc2dcca69750bfef1e1ebcaccf8c8018175b
+Bob: 0x19aadeca9388e009d136245b9a67423f3eee242b03142849eb4f81a4a409e59c
+```
+
+If there are leading 0s, they may be excluded:
+```text
+Dan: 0000357ea5c1a4e7bc11b2b17ff2dc2dcca69750bfef1e1ebcaccf8c8018175b 
+Dan: 0x0000357ea5c1a4e7bc11b2b17ff2dc2dcca69750bfef1e1ebcaccf8c8018175b
+Dan: 0x357ea5c1a4e7bc11b2b17ff2dc2dcca69750bfef1e1ebcaccf8c8018175b
 ```
 :::
 

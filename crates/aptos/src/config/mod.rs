@@ -47,7 +47,7 @@ impl ConfigTool {
     }
 }
 
-/// Generates shell completion files
+/// Generate shell completion files
 ///
 /// First generate the completion file, then follow the shell specific directions on how
 /// to install the completion file.
@@ -84,8 +84,8 @@ impl CliCommand<()> for GenerateShellCompletions {
 pub struct SetGlobalConfig {
     /// A configuration for where to place and use the config
     ///
-    /// Workspace allows for multiple configs based on location, where
-    /// Global allows for one config for every part of the code
+    /// `Workspace` will put the `.aptos/` folder in the current directory, where
+    /// `Global` will put the `.aptos/` folder in your home directory
     #[clap(long)]
     config_type: Option<ConfigType>,
 }
@@ -116,6 +116,8 @@ impl CliCommand<GlobalConfig> for SetGlobalConfig {
 /// private information
 #[derive(Parser, Debug)]
 pub struct ShowProfiles {
+    /// Which profile to show
+    ///
     /// If provided, show only this profile
     #[clap(long)]
     profile: Option<String>,

@@ -84,16 +84,16 @@ fn test_transaction_metrics() {
     );
 
     // Check timestamp returned as end-to-end for broadcast-able transaction
-    let (&_insertion_time, is_end_to_end) = mempool
+    let (&_insertion_time, is_end_to_end, _bucket) = mempool
         .get_transaction_store()
-        .get_insertion_time(&TestTransaction::get_address(0), 0)
+        .get_insertion_time_and_bucket(&TestTransaction::get_address(0), 0)
         .unwrap();
     assert!(is_end_to_end);
 
     // Check timestamp returned as not end-to-end for non-broadcast-able transaction
-    let (&_insertion_time, is_end_to_end) = mempool
+    let (&_insertion_time, is_end_to_end, _bucket) = mempool
         .get_transaction_store()
-        .get_insertion_time(&TestTransaction::get_address(1), 0)
+        .get_insertion_time_and_bucket(&TestTransaction::get_address(1), 0)
         .unwrap();
     assert!(!is_end_to_end);
 }

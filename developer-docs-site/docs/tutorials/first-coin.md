@@ -14,7 +14,7 @@ This tutorial introduces how you can compile, deploy, and mint your own coin, na
 
 Install your preferred SDK from the below list:
 
-* [Typescript SDK][typescript-sdk]
+* [TypeScript SDK][typescript-sdk]
 * [Python SDK][python-sdk]
 * [Rust SDK][rust-sdk]
 
@@ -37,7 +37,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
 <Tabs groupId="examples">
   <TabItem value="typescript" label="Typescript">
 
-Navigate to the Typescript SDK directory:
+Navigate to the TypeScript SDK directory:
 
 ```bash
 cd ~/aptos-core/ecosystem/typescript/sdk
@@ -49,7 +49,7 @@ Install the necessary dependencies:
 yarn
 ```
 
-Run the Typescript [`your_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/your_coin.ts) example:
+Run the TypeScript [`your_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/your_coin.ts) example:
 
 ```bash
 yarn your_coin ~/aptos-core/aptos-move/move-examples/moon_coin

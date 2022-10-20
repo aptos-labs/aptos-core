@@ -36,4 +36,4 @@ tokio = { version = "1.21.0", features = ["full", "time"] }
 url = "2.2.2"
 warp = "0.3.2"
 
-move-deps = { path = "../../aptos-move/move-deps" }
+move-core-types = { workspace = true }

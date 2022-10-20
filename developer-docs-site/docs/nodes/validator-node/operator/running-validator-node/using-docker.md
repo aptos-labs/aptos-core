@@ -27,7 +27,7 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
     cd ~/$WORKSPACE
     ```
 
-2. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page:
+2. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
     - `validator.yaml`
     - `docker-compose.yaml`
     - `docker-compose-fullnode.yaml`
@@ -87,7 +87,7 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-5. Download the following files by following the download commands on the [Node Files](/nodes/node-files.md) page:
+5. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
     - `genesis.blob`
     - `waypoint.txt`
 
@@ -109,7 +109,7 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
 
 **Now you have completed setting up your validator node. Next, setup a validator fullnode following the instructions below.**
 
-9. <span id="docker-vfn">Set up a validator fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine.</span> See [Node Files](/nodes/node-files.md) for a full list of files you should download and the download commands. 
+9. <span id="docker-vfn">Set up a validator fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine.</span> See [Node Files](/nodes/node-files-all-networks/node-files.md) for a full list of files you should download and the download commands. 
 
 10.  Edit `fullnode.yaml` file to update the IP address for validator node.
 

@@ -22,10 +22,10 @@ use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
-use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
-use move_deps::move_core_types::move_resource::MoveStructType;
-use move_deps::move_core_types::value::MoveValue;
-use move_deps::move_package::package_hooks::register_package_hooks;
+use move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_core_types::move_resource::MoveStructType;
+use move_core_types::value::MoveValue;
+use move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use rand::{
     rngs::{OsRng, StdRng},
@@ -122,6 +122,22 @@ impl MoveHarness {
         let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 10);
         self.executor.add_account_data(&data);
         self.txn_seq_no.insert(*acc.address(), 10);
+        data.account().clone()
+    }
+
+    pub fn new_account_with_balance_and_sequence_number(
+        &mut self,
+        balance: u64,
+        sequence_number: u64,
+    ) -> Account {
+        let mut rng = StdRng::from_seed(OsRng.gen());
+
+        let privkey = Ed25519PrivateKey::generate(&mut rng);
+        let pubkey = privkey.public_key();
+        let acc = Account::with_keypair(privkey, pubkey);
+        let data = AccountData::with_account(acc.clone(), balance, sequence_number);
+        self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(*acc.address(), sequence_number);
         data.account().clone()
     }
 

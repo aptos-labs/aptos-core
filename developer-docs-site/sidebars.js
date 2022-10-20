@@ -33,7 +33,6 @@ const sidebars = {
         "tutorials/first-coin",
       ],
     },
-
     {
       type: "category",
       label: "Concepts",
@@ -73,6 +72,7 @@ const sidebars = {
         "guides/interacting-with-the-blockchain",
         "guides/state-sync",
         "guides/data-pruning",
+        "guides/indexing",
         "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
@@ -95,9 +95,18 @@ const sidebars = {
       value: "Nodes",
       className: "sidebar-title",
     },
+    "nodes/nodes-landing",
     "nodes/aptos-deployments",
     "nodes/leaderboard-metrics",
-    "nodes/node-files",
+    {
+      type: "category",
+      label: "Node Files For Mainnet",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
+      items: ["nodes/node-files-all-networks/node-files-devnet", "nodes/node-files-all-networks/node-files-testnet"],
+    },
+    "nodes/identity-and-configuration",
     /** Delete during clean up
     {
       type: "category",
@@ -111,7 +120,6 @@ const sidebars = {
         
       ],
     },  */
-
     {
       type: "category",
       label: "Validators",
@@ -175,11 +183,12 @@ const sidebars = {
         "nodes/full-node/fullnode-source-code-or-docker",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
+        "nodes/full-node/fullnode-network-connections",
         "nodes/full-node/run-a-fullnode-on-gcp",
         "nodes/full-node/bootstrap-fullnode",
       ],
     },
-    "nodes/node-connections",
+    "nodes/indexer-fullnode",
     {
       type: "category",
       label: "Local Testnet",
@@ -196,113 +205,14 @@ const sidebars = {
       collapsed: true,
       items: ["nodes/node-health-checker/node-health-checker-faq"],
     },
+    "nodes/leaderboard-metrics",
     "reference/telemetry",
-
-    /** Delete this section while cleaning up 
-    {
-      type: "category",
-      label: "Nodes",
-      link: { type: "doc", id: "nodes/index" },
-      collapsible: true,
-      collapsed: true,
-      items: [
-        "nodes/aptos-deployments",
-        {
-          type: "category",
-          label: "AIT-3",
-          link: { type: "doc", id: "nodes/ait/index" },
-          collapsible: true,
-          collapsed: true,
-          items: [
-            "nodes/ait/whats-new-in-ait3",
-            "nodes/ait/steps-in-ait3",
-            "nodes/ait/ait3-leaderboard-metrics",
-          ],
-        },
-        {
-          type: "category",
-          label: "Validators",
-          link: { type: "doc", id: "nodes/validator-node/index" },
-          collapsible: true,
-          collapsed: true,
-          items: [
-            {
-              type: "category",
-              label: "Owner",
-              collapsible: true,
-              collapsed: true,
-              link: { type: "doc", id: "nodes/validator-node/owner/index" },
-              items: [
-              ],
-            },
-            {
-              type: "category",
-              label: "Operator",
-              collapsible: true,
-              collapsed: true,
-              link: { type: "doc", id: "nodes/validator-node/operator/index" },
-              items: ["nodes/validator-node/operator/using-aws", 
-              "nodes/validator-node/operator/using-azure", 
-              "nodes/validator-node/operator/using-gcp", 
-              "nodes/validator-node/operator/using-docker", 
-              "nodes/validator-node/operator/using-source-code", 
-              "nodes/validator-node/operator/node-requirements",
-              "nodes/validator-node/operator/node-liveness-criteria",
-              "nodes/validator-node/operator/connect-to-testnet",
-              "nodes/validator-node/operator/additional-doc",
-              ],
-            },
-            {
-              type: "category",
-              label: "Voter",
-              collapsible: true,
-              collapsed: true,
-              link: { type: "doc", id: "nodes/validator-node/voter/index" },
-              items: ["nodes/validator-node/voter/index", 
-              ],
-            },
-          ],
-        },
-        
-        {
-          type: "category",
-          label: "Public Fullnode",
-          link: { type: "doc", id: "nodes/full-node/index" },
-          collapsible: true,
-          collapsed: true,
-          items: [
-            "nodes/full-node/fullnode-source-code-or-docker",
-            "nodes/full-node/update-fullnode-with-new-releases",
-            "nodes/full-node/network-identity-fullnode",
-            "nodes/full-node/troubleshooting-fullnode",
-            "nodes/full-node/run-a-fullnode-on-gcp",
-            "nodes/full-node/bootstrap-fullnode",
-          ],
-        },
-        {
-          type: "category",
-          label: "Local Testnet",
-          link: { type: "doc", id: "nodes/local-testnet/index" },
-          collapsible: true,
-          collapsed: true,
-          items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "nodes/local-testnet/run-a-local-testnet"],
-        },
-        {
-          type: "category",
-          label: "Node Health Checker",
-          link: { type: "doc", id: "nodes/node-health-checker/index" },
-          collapsible: true,
-          collapsed: true,
-          items: ["nodes/node-health-checker/node-health-checker-faq"],
-        },
-      ],
-    },
-    */
     {
       type: "html",
       value: "Tools",
       className: "sidebar-title",
     },
+    "guides/use-aptos-explorer",
     {
       type: "category",
       label: "SDKs",
@@ -310,15 +220,15 @@ const sidebars = {
       collapsed: true,
       link: { type: "doc", id: "sdks/index" },
       items: [
-        "sdks/python-sdk",
         {
           type: "category",
-          label: "Typescript SDK",
+          label: "TypeScript SDK",
           link: { type: "doc", id: "sdks/ts-sdk/index" },
           collapsible: true,
           collapsed: true,
           items: ["sdks/ts-sdk/typescript-sdk", "sdks/ts-sdk/typescript-sdk-overview"],
         },
+        "sdks/python-sdk",
         "sdks/rust-sdk",
       ],
     },
@@ -335,7 +245,6 @@ const sidebars = {
       value: "White Paper",
       className: "sidebar-title",
     },
-
     {
       type: "category",
       label: "Aptos White Paper",

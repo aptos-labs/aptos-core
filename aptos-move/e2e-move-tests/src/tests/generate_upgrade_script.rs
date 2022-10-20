@@ -4,7 +4,7 @@
 use crate::{tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
+use move_package::compilation::package_layout::CompiledPackageLayout;
 use package_builder::PackageBuilder;
 
 #[test]

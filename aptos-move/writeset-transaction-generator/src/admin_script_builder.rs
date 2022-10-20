@@ -9,10 +9,8 @@ use aptos_types::{
 };
 use handlebars::Handlebars;
 
-use move_deps::{
-    move_command_line_common::env::get_bytecode_version_from_env,
-    move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags},
-};
+use move_command_line_common::env::get_bytecode_version_from_env;
+use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use serde::Serialize;
 use std::{collections::HashMap, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;

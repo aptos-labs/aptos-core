@@ -137,7 +137,7 @@ impl fmt::Display for UpgradePolicy {
 /// Abort code when code publishing is requested twice (0x03 == INVALID_STATE)
 const EALREADY_REQUESTED: u64 = 0x03_0000;
 
-const CHECK_COMPAT_POLICY: u8 = 1;
+const ARBITRARY_POLICY: u8 = 0;
 
 /// The native code context.
 #[derive(Tid, Default)]
@@ -280,7 +280,7 @@ fn native_request_publish(
         bundle: ModuleBundle::new(code),
         expected_modules,
         allowed_deps,
-        check_compat: policy == CHECK_COMPAT_POLICY,
+        check_compat: policy != ARBITRARY_POLICY,
     });
     // TODO(Gas): charge gas for requesting code load (charge for actual code loading done elsewhere)
     Ok(NativeResult::ok(cost, smallvec![]))
