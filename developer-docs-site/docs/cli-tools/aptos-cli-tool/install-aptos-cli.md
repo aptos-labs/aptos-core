@@ -36,8 +36,8 @@ These instructions have been tested on macOS Monterey (12.6)
 :::
 
 1. Make this `~/bin/aptos` an executable by running this command: 
-   - `chmod +x ~/bin/aptos`.
-   - On macOS when you attempt to run the `aptos` tool for the first time, you will be blocked by the macOS that this app is from an "unknown developer". This is normal. Follow the simple steps recommended by the Apple support in [Open a Mac app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) to remove this blocker.
+   `chmod +x ~/bin/aptos`
+1. Follow the simple steps recommended by the Apple support in [Open a Mac app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) to remove the "unknown developer" blocker.
 1. Type `~/bin/aptos help` to read help instructions.
 1. Add `~/bin` to your path in your `.bashrc` or `.zshrc` file for future use.
 
@@ -62,7 +62,7 @@ These instructions have been tested on Ubuntu 20.04.
    :::
 
 1. Make this `~/bin/aptos` an executable by running this command:
-    - `chmod +x ~/bin/aptos`.
+   `chmod +x ~/bin/aptos`
 1. Type `~/bin/aptos help` to read help instructions.
 1. Add `~/bin` to your path in your `.bashrc` or `.zshrc` file for future use.
 
