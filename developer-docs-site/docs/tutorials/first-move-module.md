@@ -38,22 +38,10 @@ You will see output asking for an endpoint:
 Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com/v1]
 ```
 
-Press **return** to accept the default fullnode in devnet or specify the endpoint of your choosing:
+Press **return** to accept the default devnet network or specify the network of your choosing:
 
 ```text
-No rest url given, using https://fullnode.devnet.aptoslabs.com/v1...
-```
-
-See and respond to the prompt for your faucet endpoint by accepting the default faucet in devnet, specifying one of your choosing, or entering `skip` to avoid configuring a faucet for now:
-
-```text
-Enter your faucet endpoint [Current: None | No input: https://faucet.devnet.aptoslabs.com | 'skip' to not use a faucet]
-````
-
-Assuming you selected the default, you will see:
-
-```text
-No faucet url given, using https://faucet.devnet.aptoslabs.com...
+No network given, using devnet...
 ```
 
 See and respond to the prompt for your private key by accepting the default to create anew or by entering an existing key:
