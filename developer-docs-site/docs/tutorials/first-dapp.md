@@ -45,21 +45,24 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 2. Run `aptos init`.
 
-3. Select your REST and faucet endpoint as you did in the [Move module](first-move-module.md#step-2-create-an-account-and-fund-it) tutorial.
+3. Select your network as you did in the [Move module](first-move-module.md#step-2-create-an-account-and-fund-it) tutorial.
 
 4. When prompted for your private key, paste the private key from the Aptos Wallet that you copied earlier (minus the  `0x` prefix if included) and press **Return**.
 
 You will see output resembling:
 
 ```text
-Aptos is now set up for account <private key>!  Run `aptos help` for more information about commands
+Account <account-number> has been already found onchain
+
+---
+Aptos CLI is now set up for account <account-number> as profile default!  Run `aptos --help` for more information about commands
 {
   "Result": "Success"
 }
 ```
 This initializes the Aptos CLI to use the same account as used by the Aptos Wallet.
 
-3. Run `aptos account list` to verify that it is working. You should see your private key listed in the `addr` field for all events.
+3. Run `aptos account list` to verify that it is working. You should see your account address listed in the `addr` field for all events.
 
 ## Step 1: Set up a single page app
 
