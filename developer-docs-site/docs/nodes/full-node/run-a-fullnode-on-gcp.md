@@ -97,7 +97,7 @@ You can deploy a public fullnode on GCP by using the Aptos fullnode Terraform mo
 
   ```rust
   terraform {
-    required_version = "~> 1.2.0"
+    required_version = "~> 1.3.0"
     backend "gcs" {
       bucket = "BUCKET_NAME" # bucket name created in step 2
       prefix = "state/fullnode"
