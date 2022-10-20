@@ -186,6 +186,7 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let duration = Duration::from_secs(1200);
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -551,9 +552,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             // Validators without VFN are proposing almost empty blocks,
             // as no useful transaction reach their mempool.
             // something to potentially improve upon.
-            .with_initial_fullnode_count(0)
+            .with_initial_fullnode_count(20)
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 15000 }))
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))
@@ -826,19 +827,19 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
-        .with_initial_fullnode_count(0)
-        .with_network_tests(vec![&ThreeRegionSimulationTest])
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(20)
+        .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .mode(EmitJobMode::ConstTps { tps: 15000 })
                 .transaction_mix(vec![
                     (TransactionType::P2P, 80),
-                    (TransactionType::AccountGeneration, 20),
+                    // (TransactionType::AccountGeneration, 20),
                 ]),
         )
         .with_success_criteria(SuccessCriteria::new(
