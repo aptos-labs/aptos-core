@@ -11,7 +11,7 @@ use aptos_config::config::{
     NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
-use aptos_crypto::{hash::HashValue, SigningKey};
+use aptos_crypto::hash::HashValue;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
