@@ -61,7 +61,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
     ```
     terraform {
-      required_version = "~> 1.2.0"
+      required_version = "~> 1.3.0"
       backend "s3" {
         bucket = "terraform.aptos-node"
         key    = "state/aptos-node"
