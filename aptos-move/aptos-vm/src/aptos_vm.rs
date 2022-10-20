@@ -96,7 +96,7 @@ impl AptosVM {
             AdapterLogSchema::new(state.id(), 0),
             "Adapter created for Validation"
         );
-        Self::new(state, false)
+        Self::new(state, include_test_natives)
     }
 
     /// Sets execution concurrency level when invoked the first time.
