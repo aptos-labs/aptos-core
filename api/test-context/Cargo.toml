@@ -14,7 +14,7 @@ anyhow = "1.0.57"
 aptos-api = { path = "../", package = "aptos-api" }
 aptos-api-types = { path = "../types", package = "aptos-api-types" }
 aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
 aptos-mempool = { path = "../../mempool", features = ["fuzzing"] }
 aptos-sdk = { path = "../../sdk" }
