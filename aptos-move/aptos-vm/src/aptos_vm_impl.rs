@@ -28,7 +28,6 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
-use dashmap::DashMap;
 use fail::fail_point;
 use framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use move_binary_format::{errors::VMResult, CompiledModule};
@@ -53,7 +52,6 @@ pub struct AptosVMImpl {
     storage_gas_params: Option<StorageGasParameters>,
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
-    metadata_cache: DashMap<ModuleId, Option<RuntimeModuleMetadata>>,
 }
 
 impl AptosVMImpl {
@@ -127,7 +125,6 @@ impl AptosVMImpl {
             storage_gas_params,
             version: None,
             transaction_validation: None,
-            metadata_cache: Default::default(),
         };
         vm.version = Version::fetch_config(&storage);
         vm.transaction_validation = Self::get_transaction_validation(&StorageAdapter::new(state));
@@ -498,23 +495,15 @@ impl AptosVMImpl {
         module: &ModuleId,
         abort_code: u64,
     ) -> Option<AbortInfo> {
-        let entry = self
-            .metadata_cache
-            .entry(module.clone())
-            .or_insert_with(|| {
-                if let Some(m) = self
-                    .move_vm
-                    .get_module_metadata(module.clone(), &APTOS_METADATA_KEY)
-                {
-                    bcs::from_bytes::<RuntimeModuleMetadata>(&m.value).ok()
-                } else {
-                    None
-                }
-            });
-        if let Some(m) = entry.value() {
-            m.extract_abort_info(abort_code)
-        } else {
-            None
+        match self
+            .move_vm
+            .get_module_metadata(module.clone(), &APTOS_METADATA_KEY)
+        {
+            Some(m) => match bcs::from_bytes::<RuntimeModuleMetadata>(&m.value).ok() {
+                Some(m) => m.extract_abort_info(abort_code),
+                None => None,
+            },
+            None => None,
         }
     }
 
