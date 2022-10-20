@@ -32,7 +32,6 @@ After you install it:
 
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
 2. Copy the private key. You will need it to set up the Aptos CLI in the next section.
-3. Strip the `0x` from the beginning of your private key in preparation for inclusion in the Aptos CLI.
 3. See the [user instructions](https://petra.app/docs/use) on petra.app for help.
 
 :::tip
@@ -47,7 +46,7 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 3. Select your network as you did in the [Move module](first-move-module.md#step-2-create-an-account-and-fund-it) tutorial.
 
-4. When prompted for your private key, paste the private key from the Aptos Wallet that you copied earlier (minus the  `0x` prefix if included) and press **Return**.
+4. When prompted for your private key, paste the private key from the Aptos Wallet that you copied earlier and press **Return**.
 
 You will see output resembling:
 
