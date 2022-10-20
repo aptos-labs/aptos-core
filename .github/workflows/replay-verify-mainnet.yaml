@@ -1,4 +1,4 @@
-name: "replay-LLT-transactions-nightly"
+name: "replay-mainnet-transactions-nightly"
 on:
   # Allow triggering manually
   workflow_dispatch:
