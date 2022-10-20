@@ -52,6 +52,7 @@ move-package ={ git = "https://github.com/move-language/move", rev = "6a32284d6e
 move-table-extension ={ git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
 move-vm-runtime ={ git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
 move-vm-types ={ git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+rand_core = "0.5.1"
 
 [dev-dependencies]
 claims = "0.7"

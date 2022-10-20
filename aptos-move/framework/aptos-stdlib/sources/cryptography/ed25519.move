@@ -35,6 +35,10 @@ module aptos_std::ed25519 {
     // Structs
     //
 
+    struct SecretKey has drop {
+        bytes: vector<u8>
+    }
+
     /// A BCS-serializable message, which one can verify signatures on via `verify_signature_t`
     struct SignedMessage<MessageType> has drop {
         type_info: TypeInfo,
@@ -166,6 +170,43 @@ module aptos_std::ed25519 {
         std::hash::sha3_256(pk_bytes)
     }
 
+    #[test_only]
+    fun generate_keys(): (SecretKey, UnvalidatedPublicKey) {
+        let (sk_bytes, pk_bytes) = generate_keys_internal();
+        let sk = SecretKey {
+            bytes: sk_bytes
+        };
+        let pk = UnvalidatedPublicKey {
+            bytes: pk_bytes
+        };
+        (sk,pk)
+    }
+
+    #[test_only]
+    fun sign_arbitrary_bytes(sk: &SecretKey, msg: vector<u8>): Signature {
+        Signature {
+            bytes: sign_internal(sk.bytes, msg)
+        }
+    }
+
+    #[test_only]
+    fun sign_struct<T:drop>(sk: &SecretKey, data: T): Signature {
+        let encoded = new_signed_message(data);
+        Signature {
+            bytes: sign_internal(sk.bytes, bcs::to_bytes(&encoded))
+        }
+    }
+
+    #[test]
+    fun test_gen_sign_verify_combo() {
+        let (sk, pk) = generate_keys();
+        let msg: vector<u8> = x"0123456789abcdef";
+        let sig1 = sign_arbitrary_bytes(&sk, msg);
+        assert!(signature_verify_strict(&sig1, &pk, msg), std::error::invalid_state(1));
+        let sig2 = sign_struct(&sk, copy pk);
+        assert!(signature_verify_strict_t(&sig2, &pk, copy pk), std::error::invalid_state(1));
+    }
+
     //
     // Native functions
     //
@@ -186,4 +227,11 @@ module aptos_std::ed25519 {
         public_key: vector<u8>,
         message: vector<u8>
     ): bool;
+
+    #[test_only]
+    /// Generates a key pair.
+    native fun generate_keys_internal(): (vector<u8>, vector<u8>);
+
+    #[test_only]
+    native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
 }
