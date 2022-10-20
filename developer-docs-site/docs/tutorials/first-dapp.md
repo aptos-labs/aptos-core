@@ -85,7 +85,7 @@ And start the app with:
 npm start
 ```
 
-You will now have a basic React app running in your browser.
+You will now have a basic React app running in your browser at: http://localhost:3000/
 
 ## Step 2: Integrate the Aptos Wallet Web3 API
 
@@ -96,6 +96,8 @@ Next we will update our app to use this API to display the Wallet account's addr
 ### Wait until `window.aptos` is defined
 
 The first step when integrating with the `window.aptos` API is to delay rendering the application until the `window.onload` event has fired.
+
+Quit the app by hitting Ctrl-C in the terminal running the `npm start` process.
 
 Still in the `first-dapp` directory, open the `src/index.tsx` file and change the following code snippet:
 
@@ -121,6 +123,8 @@ window.addEventListener('load', () => {
 
 This change will ensure that the `window.aptos` API has been initialized by the time we render the app. If we render too early, the Wallet extension may not have had a chance to initialize the API yet and thus `window.aptos` will be `undefined`.
 
+To see the change, once again run: `npm start`
+
 ### (Optional) TypeScript setup for `window.aptos`
 
 If you are using TypeScript, you may also want to inform the compiler of the existence of the `window.aptos` API. Add the following to `src/index.tsx`:
@@ -135,7 +139,7 @@ This lets us use the `window.aptos` API without having to do `(window as any).ap
 
 ### Display `window.aptos.account()` in the app
 
-Our app is now ready to use the `window.aptos` API. We will change `src/App.tsx` to retrieve the value of `window.aptos.account()` (the wallet account) on initial render, store it in state, and then display it:
+Our app is now ready to use the `window.aptos` API. We will change `src/App.tsx` to retrieve the value of `window.aptos.account()` (the wallet account) on initial render, store it in state, and then display it by replacing the contents in the file with:
 
 ```typescript
 import React from 'react';
