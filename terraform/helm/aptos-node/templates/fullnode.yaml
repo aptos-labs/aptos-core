@@ -114,6 +114,10 @@ spec:
           httpGet:
             path: /v1/-/healthy
             port: 8080
+        readinessProbe: # pod is ready when state sync is caught up
+          httpGet:
+            path: /v1/-/healthy?duration_secs=10
+            port: 8080
         securityContext:
           {{- if $.Values.enablePrivilegedMode }}
           runAsUser: 0

@@ -78,6 +78,11 @@ spec:
           httpGet:
             path: /v1/-/healthy
             port: 8080
+          initialDelaySeconds: 30
+        readinessProbe: # pod is ready when state sync is caught up
+          httpGet:
+            path: /v1/-/healthy?duration_secs=10
+            port: 8080
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
