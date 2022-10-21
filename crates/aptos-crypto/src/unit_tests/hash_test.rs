@@ -3,10 +3,12 @@
 
 use crate::hash::*;
 use bitvec::prelude::*;
+use digest::Digest;
 use proptest::{collection::vec, prelude::*};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::Serialize;
 use std::str::FromStr;
+use tiny_keccak::{Hasher, Sha3};
 
 #[derive(Serialize)]
 struct Foo(u32);
@@ -245,4 +247,49 @@ proptest! {
         let bits2 = vec![false; HashValue::LENGTH_IN_BITS + 10];
         prop_assert!(HashValue::from_bit_iter(bits2.into_iter()).is_err());
     }
+}
+
+/// Sha3 Buffer overflow tests: https://mouha.be/sha-3-buffer-overflow/
+#[test]
+fn test_sha3_overflow_v256_keccack() {
+    let buffer = b"\x00".repeat(4294967295);
+    let mut sha3 = Sha3::v256();
+    sha3.update(&buffer);
+
+    let buffer = b"\x00".repeat(4294967296);
+    let mut sha3 = Sha3::v256();
+    sha3.update(&buffer);
+}
+
+#[test]
+fn test_sha3_overflow_v224_keccack() {
+    let buffer = b"\x00".repeat(4294967295);
+    let mut sha3 = Sha3::v224();
+    sha3.update(&buffer);
+
+    let buffer = b"\x00".repeat(4294967296);
+    let mut sha3 = Sha3::v224();
+    sha3.update(&buffer);
+}
+
+#[test]
+fn test_sha3_overflow_v256_sha3() {
+    let buffer = b"\x00".repeat(4294967295);
+    let mut sha3 = sha3::Sha3_256::new();
+    sha3.update(&buffer);
+
+    let buffer = b"\x00".repeat(4294967296);
+    let mut sha3 = sha3::Sha3_256::new();
+    sha3.update(&buffer);
+}
+
+#[test]
+fn test_sha3_overflow_v224_sha3() {
+    let buffer = b"\x00".repeat(4294967295);
+    let mut sha3 = sha3::Sha3_224::new();
+    sha3.update(&buffer);
+
+    let buffer = b"\x00".repeat(4294967296);
+    let mut sha3 = sha3::Sha3_224::new();
+    sha3.update(&buffer);
 }
