@@ -18,8 +18,10 @@ mod error_map;
 pub mod natives;
 mod release_builder;
 pub use release_builder::*;
+pub mod docgen;
 mod release_bundle;
 mod released_framework;
+
 pub use released_framework::*;
 
 pub use release_bundle::*;

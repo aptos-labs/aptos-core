@@ -29,8 +29,7 @@ fn test_two_to_two_transfer() {
         with_abis: false,
         with_source_maps: false,
         with_error_map: false,
-        install_dir: None,
-        named_addresses: Default::default(),
+        ..framework::BuildOptions::default()
     };
 
     let package = framework::BuiltPackage::build(

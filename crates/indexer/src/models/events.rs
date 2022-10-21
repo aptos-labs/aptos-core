@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::transactions::Transaction, schema::events};
+use crate::{models::transactions::Transaction, schema::events, util::standardize_address};
 use aptos_api_types::Event as APIEvent;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,7 @@ impl Event {
         transaction_block_height: i64,
     ) -> Self {
         Event {
-            account_address: event.guid.account_address.to_string(),
+            account_address: standardize_address(&event.guid.account_address.to_string()),
             creation_number: event.guid.creation_number.0 as i64,
             sequence_number: event.sequence_number.0 as i64,
             transaction_version,

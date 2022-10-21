@@ -192,7 +192,7 @@ fn native_test_only_sign_internal(
     let msg_bytes = pop_arg!(args, Vec<u8>);
     let sk_bytes = pop_arg!(args, Vec<u8>);
     let sk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
-    let sig = SigningKey::sign_arbitrary_message(&sk, msg_bytes.as_slice());
+    let sig = sk.sign_arbitrary_message(msg_bytes.as_slice());
     Ok(NativeResult::ok(
         InternalGas::zero(),
         smallvec![Value::vector_u8(sig.to_bytes())],

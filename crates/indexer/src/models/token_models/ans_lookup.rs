@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use crate::{
     schema::current_ans_lookup,
-    util::{bigdecimal_to_u64, parse_timestamp_secs},
+    util::{bigdecimal_to_u64, parse_timestamp_secs, standardize_address},
 };
 use aptos_api_types::{deserialize_from_string, MoveType, Transaction as APITransaction};
 use bigdecimal::BigDecimal;
@@ -121,7 +121,10 @@ impl CurrentAnsLookup {
                                         .subdomain_name
                                         .get_string()
                                         .unwrap_or_default(),
-                                    registered_address: inner.new_address.get_string(),
+                                    registered_address: inner
+                                        .new_address
+                                        .get_string()
+                                        .map(|s| standardize_address(&s)),
                                     last_transaction_version: txn_version,
                                     expiration_timestamp,
                                 }
