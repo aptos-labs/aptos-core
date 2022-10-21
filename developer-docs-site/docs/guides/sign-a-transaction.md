@@ -57,7 +57,7 @@ Unsigned transactions are known as `RawTransaction`s. They contain all the infor
 
 In Aptos blockchain, all the data is encoded as [BCS (Binary Canonical Serialization)](#bcs).
 
-Aptos supports many different approaches to signing a transaction but defaults to a single signer using the [Ed25519](https://en.wikipedia.org/wiki/EdDSA) signature scheme.
+Aptos supports many different approaches to signing a transaction but defaults to a single signer using the [Ed25519](https://en.wikipedia.org/wiki/EdDSA#Ed25519) signature scheme.
 
 The `Authenticator` produced during the signing of the transaction gives authorization to the Aptos blockchain to execute the transaction on behalf of the account owner.
 
@@ -105,7 +105,7 @@ The prefixing step is not shown in the diagram in the [Overview](#overview) sect
 
 ### Signature
 
-A signature is the result of hashing the signing message with the client's private key. By default Aptos uses the [Ed25519]((https://en.wikipedia.org/wiki/EdDSA#Ed25519)) scheme to generate the signature of the raw transaction.
+A signature is the result of hashing the signing message with the client's private key. By default Aptos uses the [Ed25519](https://en.wikipedia.org/wiki/EdDSA#Ed25519) scheme to generate the signature of the raw transaction.
 
 - By signing a signing message with the private key, clients prove to the Aptos blockchain that they have authorized the transaction be executed.
 - Aptos blockchain will validate the signature with client account's public key to ensure that the transaction submitted is indeed signed by the client.
