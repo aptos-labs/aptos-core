@@ -117,6 +117,7 @@ members = [
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
     "testsuite/dos/http_test",
+    "testsuite/dos/http_loader",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
     "testsuite/forge",

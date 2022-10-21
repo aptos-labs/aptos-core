@@ -8,12 +8,13 @@ use tokio::net::TcpListener;
 #[tokio::main]
 async fn main() {
     // build our application with a single route
+
     let app = Router::new().route("/", get(|| async { "Hello, World!\n" }));
 
     let stats = Router::new().route("/", get(|| async { "Hello, World!\n" }));
 
     let h1 = tokio::spawn(async {
-        axum::Server::bind(&"0.0.0.0:80".parse().unwrap())
+        axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
             .serve(app.into_make_service())
             .await
             .unwrap();
