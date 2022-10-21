@@ -28,7 +28,8 @@ data "aws_iam_policy_document" "backup-assume-role" {
     condition {
       test     = "StringEquals"
       variable = "${local.oidc_provider}:sub"
-      values   = ["system:serviceaccount:default:pfn0-aptos-fullnode"]
+      # NOTE: assumes the deployment defaults: that namespace is default and helm release is pfn*
+      values = [for i in range(var.num_fullnodes) : "system:serviceaccount:default:pfn${i}-aptos-fullnode"]
     }
 
     condition {
