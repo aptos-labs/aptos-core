@@ -57,7 +57,7 @@ Unsigned transactions are known as `RawTransaction`s. They contain all the infor
 
 In Aptos blockchain, all the data is encoded as [BCS (Binary Canonical Serialization)](#bcs).
 
-Aptos supports many different approaches to signing a transaction but defaults to a single signer using [Ed25519](https://en.wikipedia.org/wiki/EdDSA).
+Aptos supports many different approaches to signing a transaction but defaults to a single signer using the [Ed25519](https://en.wikipedia.org/wiki/EdDSA) signature scheme.
 
 The `Authenticator` produced during the signing of the transaction gives authorization to the Aptos blockchain to execute the transaction on behalf of the account owner.
 
