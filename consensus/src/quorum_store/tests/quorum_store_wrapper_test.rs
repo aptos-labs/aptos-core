@@ -101,6 +101,7 @@ async fn test_batch_creation() {
         mempool_txn_pull_max_count: 100,
         mempool_txn_pull_max_bytes: 1000000,
         num_nodes_per_worker_handles: 2,
+        back_pressure_factor: 2,
     };
 
     let mut wrapper = QuorumStoreWrapper::new(
@@ -116,6 +117,7 @@ async fn test_batch_creation() {
         config.batch_expiry_round_gap_behind_latest_certified,
         config.batch_expiry_round_gap_beyond_latest_certified,
         config.end_batch_ms,
+        20,
     );
 
     let serialize = |signed_txns: &Vec<SignedTransaction>| -> Vec<SerializedTransaction> {
@@ -212,6 +214,7 @@ async fn test_block_request() {
         mempool_txn_pull_max_count: 100,
         mempool_txn_pull_max_bytes: 1000000,
         num_nodes_per_worker_handles: 2,
+        back_pressure_factor: 2,
     };
 
     let mut wrapper = QuorumStoreWrapper::new(
@@ -227,6 +230,7 @@ async fn test_block_request() {
         config.batch_expiry_round_gap_behind_latest_certified,
         config.batch_expiry_round_gap_beyond_latest_certified,
         config.end_batch_ms,
+        20,
     );
 
     let digest = HashValue::random();

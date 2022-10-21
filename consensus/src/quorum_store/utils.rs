@@ -234,13 +234,14 @@ impl ProofQueue {
     }
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
+    // return the vector of pulled PoS, and the size of the remaining PoS
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_proofs: &HashSet<HashValue>,
         current_time: LogicalTime,
         max_txns: u64,
         max_bytes: u64,
-    ) -> Vec<ProofOfStore> {
+    ) -> (Vec<ProofOfStore>, usize) {
         let num_expired = self
             .digest_queue
             .iter()
@@ -286,7 +287,7 @@ impl ProofQueue {
             }
             size = size - 1;
         }
-        ret
+        (ret, size)
     }
 
     //mark in the hashmap committed PoS, but keep them until they expire

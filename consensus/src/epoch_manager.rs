@@ -556,6 +556,7 @@ impl EpochManager {
         consensus_to_quorum_store_rx: Receiver<WrapperCommand>,
         wrapper_to_quorum_store_tx: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
         qs_config: &QuorumStoreConfig,
+        num_validators: usize,
     ) {
         // TODO: make this not use a ConsensusRequest
         let (wrapper_quorum_store_msg_tx, wrapper_quorum_store_msg_rx) =
@@ -582,6 +583,7 @@ impl EpochManager {
             qs_config.batch_expiry_round_gap_behind_latest_certified,
             qs_config.batch_expiry_round_gap_beyond_latest_certified,
             qs_config.end_batch_ms,
+            qs_config.back_pressure_factor * num_validators,
         );
         let metrics_monitor = tokio_metrics::TaskMonitor::new();
         {
@@ -817,6 +819,7 @@ impl EpochManager {
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
                 num_nodes_per_worker_handles: 2,
+                back_pressure_factor: 2, // back pressure limit for QS is back_pressure_factor * num_validator
             };
 
             // update the number of network_listener workers when start a new round_manager
@@ -842,6 +845,7 @@ impl EpochManager {
                 consensus_to_quorum_store_rx,
                 wrapper_quorum_store_tx,
                 &config,
+                epoch_state.verifier.len(),
             );
         } else {
             self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);

@@ -64,6 +64,8 @@ pub struct QuorumStoreWrapper {
     // temp variable for debug the txn seq number too new issue
     max_batch_id: u64,
     last_batch_id: u64,
+    remaining_proof_num: usize,
+    back_pressure_limit: usize,
 }
 
 impl QuorumStoreWrapper {
@@ -80,6 +82,7 @@ impl QuorumStoreWrapper {
         batch_expiry_round_gap_behind_latest_certified: Round,
         batch_expiry_round_gap_beyond_latest_certified: Round,
         end_batch_ms: u128,
+        back_pressure_limit: usize,
     ) -> Self {
         let batch_id = if let Some(id) = db
             .clean_and_get_batch_id(epoch)
@@ -111,7 +114,14 @@ impl QuorumStoreWrapper {
             db,
             max_batch_id: 0,
             last_batch_id: 0,
+            remaining_proof_num: 0,
+            back_pressure_limit,
         }
+    }
+
+    /// return true when quorum store is back pressured
+    pub(crate) fn back_pressure(&self) -> bool {
+        self.remaining_proof_num > self.back_pressure_limit
     }
 
     pub(crate) async fn handle_scheduled_pull(&mut self) -> Option<ProofReceiveChannel> {
@@ -310,12 +320,13 @@ impl QuorumStoreWrapper {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let proof_block = self.proofs_for_consensus.pull_proofs(
+                let (proof_block, remaining_proof_num) = self.proofs_for_consensus.pull_proofs(
                     &excluded_proofs,
                     LogicalTime::new(self.latest_logical_time.epoch(), round),
                     max_txns,
                     max_bytes,
                 );
+                self.remaining_proof_num = remaining_proof_num;
 
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
                     Payload::empty()
@@ -400,8 +411,10 @@ impl QuorumStoreWrapper {
                 },
 
                 _ = interval.tick() => {
-                    if let Some(proof_rx) = self.handle_scheduled_pull().await {
-                        proofs_in_progress.push(Box::pin(proof_rx));
+                    if self.back_pressure() {
+                        if let Some(proof_rx) = self.handle_scheduled_pull().await {
+                            proofs_in_progress.push(Box::pin(proof_rx));
+                        }
                     }
                 },
                 Some(next_proof) = proofs_in_progress.next() => {

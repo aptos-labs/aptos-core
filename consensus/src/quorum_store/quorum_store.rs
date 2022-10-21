@@ -81,6 +81,8 @@ pub struct QuorumStoreConfig {
     pub mempool_txn_pull_max_bytes: u64,
     // the number of network_listener workers = # validators/this number
     pub num_nodes_per_worker_handles: usize,
+    // when the remaining certified batches in the quorum store is > back_pressure_factor * num of validators, backpressure quorum store
+    pub back_pressure_factor: usize,
 }
 
 // use std::future::Future;
