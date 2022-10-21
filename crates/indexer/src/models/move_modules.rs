@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::transactions::Transaction, schema::move_modules};
+use crate::{models::transactions::Transaction, schema::move_modules, util::standardize_address};
 use aptos_api_types::{DeleteModule, MoveModule as APIMoveModule, MoveModuleBytecode, WriteModule};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ impl MoveModule {
                 .as_ref()
                 .map(|d| d.name.clone())
                 .unwrap_or_default(),
-            address: write_module.address.to_string(),
+            address: standardize_address(&write_module.address.to_string()),
             bytecode: parsed_data.as_ref().map(|d| d.bytecode.clone()),
             exposed_functions: parsed_data.as_ref().map(|d| d.exposed_functions.clone()),
             friends: parsed_data.as_ref().map(|d| d.friends.clone()),
@@ -70,7 +70,7 @@ impl MoveModule {
             transaction_block_height,
             write_set_change_index,
             name: delete_module.module.name.to_string(),
-            address: delete_module.address.to_string(),
+            address: standardize_address(&delete_module.address.to_string()),
             bytecode: None,
             exposed_functions: None,
             friends: None,
@@ -97,7 +97,7 @@ impl MoveModule {
         bytecode: Vec<u8>,
     ) -> MoveModuleByteCodeParsed {
         MoveModuleByteCodeParsed {
-            address: move_module.address.to_string(),
+            address: standardize_address(&move_module.address.to_string()),
             name: move_module.name.0.to_string(),
             bytecode,
             exposed_functions: move_module

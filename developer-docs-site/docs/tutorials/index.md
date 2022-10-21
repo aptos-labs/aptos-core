@@ -26,21 +26,21 @@ If running macOS, install the following packages in the order specified to take 
 
 How to [generate, submit and verify a transaction](first-transaction.md) to the Aptos blockchain. 
 
+### [Your First NFT](your-first-nft.md)
+
+Learn the Aptos `token` interface and how to use it to [generate your first NFT](your-first-nft.md). This interface is defined in the [`token.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
+
 ### [Your First Move Module](first-move-module.md)
 
 [Write your first Move module](first-move-module.md) for the Aptos blockchain. 
 
 :::tip
-Make sure to run the [Your First Transaction](first-transaction.md) tutorial before running this.
+Make sure to run the [Your First Transaction](first-transaction.md) tutorial before running your first Move module.
 :::
 
 ### [Your First Dapp](first-dapp.md)
 
 Learn how to [build your first dapp](first-dapp.md). Focuses on building the user interface for the dapp.
-
-### [Your First NFT](your-first-nft.md)
-
-Learn the Aptos `token` interface and how to use it to [generate your first NFT](your-first-nft.md). This interface is defined in the [`token.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
 
 ### [Your First Coin](first-coin.md)
 
