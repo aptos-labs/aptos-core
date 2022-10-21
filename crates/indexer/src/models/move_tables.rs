@@ -4,6 +4,7 @@
 use crate::{
     models::transactions::Transaction,
     schema::{table_items, table_metadatas},
+    util::standardize_address,
 };
 use aptos_api_types::{DeleteTableItem, WriteTableItem};
 use field_count::FieldCount;
@@ -47,7 +48,7 @@ impl TableItem {
             write_set_change_index,
             transaction_block_height,
             key: write_table_item.key.to_string(),
-            table_handle: write_table_item.handle.to_string(),
+            table_handle: standardize_address(&write_table_item.handle.to_string()),
             decoded_key: write_table_item.data.as_ref().unwrap().key.clone(),
             decoded_value: Some(write_table_item.data.as_ref().unwrap().value.clone()),
             is_deleted: false,
@@ -65,7 +66,7 @@ impl TableItem {
             write_set_change_index,
             transaction_block_height,
             key: delete_table_item.key.to_string(),
-            table_handle: delete_table_item.handle.to_string(),
+            table_handle: standardize_address(&delete_table_item.handle.to_string()),
             decoded_key: delete_table_item
                 .data
                 .as_ref()

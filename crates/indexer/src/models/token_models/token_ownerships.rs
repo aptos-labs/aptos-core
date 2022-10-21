@@ -7,9 +7,12 @@
 
 use super::{
     token_utils::TokenWriteSet,
-    tokens::{TableHandleToOwner, TableMetadataForToken, Token},
+    tokens::{TableHandleToOwner, Token},
 };
-use crate::schema::{current_token_ownerships, token_ownerships};
+use crate::{
+    schema::{current_token_ownerships, token_ownerships},
+    util::standardize_address,
+};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -81,7 +84,7 @@ impl TokenOwnership {
         if maybe_token_id.is_none() {
             return Ok(None);
         }
-        let table_handle = TableMetadataForToken::standardize_handle(&table_handle);
+        let table_handle = standardize_address(&table_handle);
         let maybe_table_metadata = table_handle_to_owner.get(&table_handle);
         // Return early if table type is not tokenstore
         if let Some(tm) = maybe_table_metadata {
@@ -95,8 +98,8 @@ impl TokenOwnership {
                     collection_data_id_hash: token.collection_data_id_hash.clone(),
                     token_data_id_hash: token.token_data_id_hash.clone(),
                     property_version: token.property_version.clone(),
-                    owner_address: tm.owner_address.clone(),
-                    creator_address: token.creator_address.clone(),
+                    owner_address: standardize_address(&tm.owner_address),
+                    creator_address: standardize_address(&token.creator_address.clone()),
                     collection_name: token.collection_name.clone(),
                     name: token.name.clone(),
                     amount: amount.clone(),
@@ -105,7 +108,7 @@ impl TokenOwnership {
                     table_type: tm.table_type.clone(),
                     last_transaction_timestamp: token.transaction_timestamp,
                 }),
-                Some(tm.owner_address.clone()),
+                Some(standardize_address(&tm.owner_address)),
                 Some(tm.table_type.clone()),
             ),
             None => {
@@ -124,8 +127,8 @@ impl TokenOwnership {
                 collection_data_id_hash: token.collection_data_id_hash.clone(),
                 token_data_id_hash: token.token_data_id_hash.clone(),
                 property_version: token.property_version.clone(),
-                owner_address,
-                creator_address: token.creator_address.clone(),
+                owner_address: owner_address.map(|s| standardize_address(&s)),
+                creator_address: standardize_address(&token.creator_address),
                 collection_name: token.collection_name.clone(),
                 name: token.name.clone(),
                 amount,

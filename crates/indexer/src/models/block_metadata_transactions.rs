@@ -6,7 +6,10 @@
 #![allow(clippy::unused_unit)]
 
 use super::transactions::{Transaction, TransactionQuery};
-use crate::{schema::block_metadata_transactions, util::parse_timestamp};
+use crate::{
+    schema::block_metadata_transactions,
+    util::{parse_timestamp, standardize_address},
+};
 use aptos_api_types::BlockMetadataTransaction as APIBlockMetadataTransaction;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -58,7 +61,7 @@ impl BlockMetadataTransaction {
             id: txn.id.to_string(),
             epoch: txn.epoch.0 as i64,
             round: txn.round.0 as i64,
-            proposer: txn.proposer.inner().to_hex_literal(),
+            proposer: standardize_address(&txn.proposer.inner().to_hex_literal()),
             failed_proposer_indices: serde_json::to_value(&txn.failed_proposer_indices).unwrap(),
             previous_block_votes_bitvec: serde_json::to_value(&txn.previous_block_votes_bitvec)
                 .unwrap(),

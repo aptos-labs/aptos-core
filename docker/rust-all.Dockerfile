@@ -10,6 +10,7 @@ ENTRYPOINT ["/tini", "--"]
 FROM rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300 AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
+RUN apt-get update && apt-get install binutils lld
 
 ### Build Rust code ###
 FROM rust-base as builder

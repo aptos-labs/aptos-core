@@ -9,7 +9,7 @@ use super::{
     coin_activities::EventToCoinType,
     coin_utils::{CoinInfoType, CoinResource},
 };
-use crate::{schema::coin_balances, schema::current_coin_balances};
+use crate::{schema::coin_balances, schema::current_coin_balances, util::standardize_address};
 use aptos_api_types::WriteResource as APIWriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -53,7 +53,7 @@ impl CoinBalance {
                     &write_resource.data.typ.generic_type_params[0],
                     txn_version,
                 )?;
-                let owner_address = write_resource.address.to_string();
+                let owner_address = standardize_address(&write_resource.address.to_string());
                 let coin_balance = Self {
                     transaction_version: txn_version,
                     owner_address: owner_address.clone(),

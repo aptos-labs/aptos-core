@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 // The maximum message size per state sync message
-pub const MAX_MESSAGE_SIZE: usize = 12 * 1024 * 1024; /* 12 MiB */
+pub const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; /* 16 MiB */
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -75,9 +75,9 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactions,
+            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
@@ -156,7 +156,7 @@ impl Default for DataStreamingServiceConfig {
             max_concurrent_requests: 3,
             max_concurrent_state_requests: 6,
             max_data_stream_channel_sizes: 300,
-            max_request_retry: 3,
+            max_request_retry: 5,
             max_notification_id_mappings: 300,
             progress_check_interval_ms: 100,
         }

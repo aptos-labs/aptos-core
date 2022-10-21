@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use crate::docgen::DocgenOptions;
 use crate::release_builder::RELEASE_BUNDLE_EXTENSION;
 use crate::release_bundle::ReleaseBundle;
 use crate::{path_in_crate, BuildOptions, ReleaseOptions};
@@ -103,6 +104,16 @@ impl ReleaseTarget {
                 with_error_map: true,
                 named_addresses: Default::default(),
                 install_dir: None,
+                with_docs: true,
+                docgen_options: Some(DocgenOptions {
+                    include_impl: true,
+                    include_specs: true,
+                    specs_inlined: false,
+                    include_dep_diagram: false,
+                    collapsed_sections: true,
+                    landing_page_template: Some("doc_template/overview.md".to_string()),
+                    references_file: Some("doc_template/references.md".to_string()),
+                }),
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages
