@@ -173,6 +173,7 @@ module aptos_std::ed25519 {
     }
 
     #[test_only]
+    /// Generates an Ed25519 key pair.
     public fun generate_keys(): (SecretKey, ValidatedPublicKey) {
         let (sk_bytes, pk_bytes) = generate_keys_internal();
         let sk = SecretKey {
@@ -185,6 +186,7 @@ module aptos_std::ed25519 {
     }
 
     #[test_only]
+    /// Generates an Ed25519 signature for a given byte array using a given signing key.
     public fun sign_arbitrary_bytes(sk: &SecretKey, msg: vector<u8>): Signature {
         Signature {
             bytes: sign_internal(sk.bytes, msg)
@@ -192,6 +194,7 @@ module aptos_std::ed25519 {
     }
 
     #[test_only]
+    /// Generates an Ed25519 signature for given structured data using a given signing key.
     public fun sign_struct<T:drop>(sk: &SecretKey, data: T): Signature {
         let encoded = new_signed_message(data);
         Signature {
@@ -232,9 +235,10 @@ module aptos_std::ed25519 {
     ): bool;
 
     #[test_only]
-    /// Generates a key pair.
+    /// Generates an Ed25519 key pair.
     native fun generate_keys_internal(): (vector<u8>, vector<u8>);
 
     #[test_only]
+    /// Generates an Ed25519 signature for a given byte array using a given signing key.
     native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
 }
