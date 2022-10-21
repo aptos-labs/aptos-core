@@ -17,14 +17,14 @@ runs:
         set -o nounset -o errexit -o pipefail
         target/release/db-backup one-shot query backup-storage-state \
         --metadata-cache-dir ./metadata-cache \
-        command-adapter --config terraform/helm/fullnode/files/backup/s3-public.yaml \
+        command-adapter --config terraform/helm/fullnode/files/backup/$CONFIG_TEMPLATE_NAME \
         | echo LATEST_VERSION=`grep -Po '(?<=latest_transaction_version: )\d+'` \
         | tee -a $GITHUB_ENV
     - name: run replay-verify in parallel
       shell: bash
       run: |
         set -o nounset -o errexit -o pipefail
-        N=8
+        N=16
         PER_PARTITION=$(( ($LATEST_VERSION - $HISTORY_START) / $N ))
 
         for n in `seq 1 $N`
@@ -39,8 +39,8 @@ runs:
 
           echo [main process] spawning $NAME
           unbuffer target/release/replay-verify \
-          --concurrent-downloads 1 \
-          --replay-concurrency-level 1 \
+          --concurrent-downloads 4 \
+          --replay-concurrency-level 4 \
           --metadata-cache-dir ./$NAME/metadata-cache \
           --target-db-dir ./$NAME/db \
           --start-version $START \
