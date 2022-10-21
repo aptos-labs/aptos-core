@@ -10,6 +10,7 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::sync::Arc;
 
 /// The native transaction context extension. This needs to be attached to the
@@ -18,13 +19,21 @@ use std::sync::Arc;
 #[derive(Tid)]
 pub struct NativeTransactionContext {
     script_hash: Vec<u8>,
+    chain_id: u8,
 }
 
 impl NativeTransactionContext {
     /// Create a new instance of a native transaction context. This must be passed in via an
     /// extension into VM session functions.
-    pub fn new(script_hash: Vec<u8>) -> Self {
-        Self { script_hash }
+    pub fn new(script_hash: Vec<u8>, chain_id: u8) -> Self {
+        Self {
+            script_hash,
+            chain_id,
+        }
+    }
+
+    pub fn chain_id(&self) -> u8 {
+        self.chain_id
     }
 }
 

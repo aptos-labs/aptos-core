@@ -19,9 +19,18 @@ module aptos_std::type_info {
         type_info.struct_name
     }
 
+    /// Returns the current chain ID, mirroring what `aptos_framework::chain_id::get()` would return, except in `#[test]`
+    /// functions, where this will always return `4u8` as the chain ID, whereas `aptos_framework::chain_id::get()` will
+    /// return whichever ID was passed to `aptos_framework::chain_id::initialize_for_test()`.
+    public fun chain_id(): u8 {
+        chain_id_internal()
+    }
+
     public native fun type_of<T>(): TypeInfo;
 
     public native fun type_name<T>(): string::String;
+
+    native fun chain_id_internal(): u8;
 
     #[test]
     fun test() {
@@ -29,6 +38,12 @@ module aptos_std::type_info {
         assert!(account_address(&type_info) == @aptos_std, 0);
         assert!(module_name(&type_info) == b"type_info", 1);
         assert!(struct_name(&type_info) == b"TypeInfo", 2);
+    }
+
+    #[test]
+    fun test_chain_id() {
+        // The testing environment chain ID is 4u8.
+        assert!(chain_id() == 4u8, 1);
     }
 
     #[test]
