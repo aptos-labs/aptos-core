@@ -524,6 +524,7 @@ impl AptosVMImpl {
         r: &'r R,
         session_id: SessionId,
     ) -> SessionExt<'r, '_, R> {
+        self.metadata_cache.clear();
         self.move_vm.new_session(r, session_id)
     }
 
