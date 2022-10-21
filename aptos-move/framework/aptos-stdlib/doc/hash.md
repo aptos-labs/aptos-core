@@ -13,6 +13,7 @@ Non-cryptograhic hashes:
 - SipHash: an add-rotate-xor (ARX) based family of pseudorandom functions created by Jean-Philippe Aumasson and Daniel J. Bernstein in 2012
 
 
+-  [Function `testing_smth`](#0x1_aptos_hash_testing_smth)
 -  [Function `sip_hash`](#0x1_aptos_hash_sip_hash)
 -  [Function `sip_hash_from_value`](#0x1_aptos_hash_sip_hash_from_value)
 -  [Function `keccak256`](#0x1_aptos_hash_keccak256)
@@ -25,6 +26,28 @@ Non-cryptograhic hashes:
 </code></pre>
 
 
+
+<a name="0x1_aptos_hash_testing_smth"></a>
+
+## Function `testing_smth`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_testing_smth">testing_smth</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_testing_smth">testing_smth</a>() {}
+</code></pre>
+
+
+
+</details>
 
 <a name="0x1_aptos_hash_sip_hash"></a>
 

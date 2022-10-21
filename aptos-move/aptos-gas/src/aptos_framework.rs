@@ -81,6 +81,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.type_info.type_name.base, "type_info.type_name.base", 300 * MUL],
     // TODO(Gas): the on-chain name is wrong...
     [.type_info.type_name.per_byte_in_str, "type_info.type_name.per_abstract_memory_unit", 5 * MUL],
+    [.type_info.chain_id.base, "type_info.chain_id.base", 150 * MUL],
 
     [.util.from_bytes.base, "util.from_bytes.base", 300 * MUL],
     [.util.from_bytes.per_byte, "util.from_bytes.per_byte", 5 * MUL],

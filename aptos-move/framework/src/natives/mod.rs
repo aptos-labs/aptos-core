@@ -128,6 +128,7 @@ impl GasParameters {
                     base: 0.into(),
                     per_byte_in_str: 0.into(),
                 },
+                chain_id: type_info::ChainIdGasParameters { base: 0.into() },
             },
             util: util::GasParameters {
                 from_bytes: util::FromBytesGasParameters {

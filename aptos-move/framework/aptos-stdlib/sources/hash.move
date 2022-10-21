@@ -9,6 +9,8 @@
 module aptos_std::aptos_hash {
     use std::bcs;
 
+    public fun testing_smth() {}
+
     native public fun sip_hash(bytes: vector<u8>): u64;
 
     public fun sip_hash_from_value<MoveValue>(v: &MoveValue): u64 {

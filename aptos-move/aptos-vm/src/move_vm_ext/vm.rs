@@ -6,6 +6,7 @@ use crate::{
     natives::aptos_natives,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_types::on_chain_config::{ChainId, OnChainConfig};
 use framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
@@ -13,6 +14,7 @@ use framework::natives::{
 };
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
+use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use move_table_extension::NativeTableContext;
 use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::ops::Deref;
@@ -55,6 +57,7 @@ impl MoveVmExt {
             .to_vec()
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
+
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
@@ -67,7 +70,19 @@ impl MoveVmExt {
             } => script_hash,
             _ => vec![],
         };
-        extensions.add(NativeTransactionContext::new(script_hash));
+
+        // Fetches the ChainId resource at <CORE_CODE_ADDRESS>::chain_id
+        let struct_tag = ChainId::struct_tag();
+        let chain_id_opt = match remote.get_resource(&CORE_CODE_ADDRESS, &struct_tag) {
+            Ok(opt) => opt.map(|bytes| {
+                bcs::from_bytes::<ChainId>(&bytes)
+                    .expect("Could not deserialize chain ID from storage")
+                    .id
+            }),
+            Err(e) => panic!("Internal error fetching chain ID from storage {:?}", e),
+        };
+
+        extensions.add(NativeTransactionContext::new(script_hash, chain_id_opt));
         extensions.add(NativeCodeContext::default());
         extensions.add(NativeStateStorageContext::new(remote));
 

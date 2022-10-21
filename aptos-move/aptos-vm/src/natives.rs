@@ -72,7 +72,7 @@ pub fn configure_for_unit_test() {
 #[cfg(feature = "testing")]
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeCodeContext::default());
-    exts.add(NativeTransactionContext::new(vec![1]));
+    exts.add(NativeTransactionContext::new(vec![1], None)); // we do not set a chain ID here, because it is unclear what to set it to
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
 }

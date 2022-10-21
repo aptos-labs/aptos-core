@@ -9,14 +9,18 @@
 -  [Function `account_address`](#0x1_type_info_account_address)
 -  [Function `module_name`](#0x1_type_info_module_name)
 -  [Function `struct_name`](#0x1_type_info_struct_name)
+-  [Function `chain_id`](#0x1_type_info_chain_id)
+-  [Function `chain_id_internal`](#0x1_type_info_chain_id_internal)
 -  [Function `type_of`](#0x1_type_info_type_of)
 -  [Function `type_name`](#0x1_type_info_type_name)
 -  [Specification](#@Specification_0)
+    -  [Function `chain_id_internal`](#@Specification_0_chain_id_internal)
     -  [Function `type_of`](#@Specification_0_type_of)
     -  [Function `type_name`](#@Specification_0_type_name)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -132,6 +136,58 @@
 
 </details>
 
+<a name="0x1_type_info_chain_id"></a>
+
+## Function `chain_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id">chain_id</a>(): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id">chain_id</a>(): Option&lt;u8&gt; {
+    <b>let</b> (id, is_set) = <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>();
+
+    <b>if</b> (is_set) {
+        <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(id)
+    } <b>else</b> {
+        <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_type_info_chain_id_internal"></a>
+
+## Function `chain_id_internal`
+
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): (u8, bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): (u8, bool);
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_type_info_type_of"></a>
 
 ## Function `type_of`
@@ -179,6 +235,22 @@
 <a name="@Specification_0"></a>
 
 ## Specification
+
+
+<a name="@Specification_0_chain_id_internal"></a>
+
+### Function `chain_id_internal`
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): (u8, bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
 
 
 <a name="@Specification_0_type_of"></a>

@@ -1,5 +1,6 @@
 module aptos_std::type_info {
     use std::string;
+    use std::option::{Self, Option};
 
     struct TypeInfo has copy, drop, store {
         account_address: address,
@@ -19,6 +20,18 @@ module aptos_std::type_info {
         type_info.struct_name
     }
 
+    public fun chain_id(): Option<u8> {
+        let (id, is_set) = chain_id_internal();
+
+        if (is_set) {
+            option::some(id)
+        } else {
+            option::none<u8>()
+        }
+    }
+
+    native fun chain_id_internal(): (u8, bool);
+
     public native fun type_of<T>(): TypeInfo;
 
     public native fun type_name<T>(): string::String;
@@ -29,6 +42,10 @@ module aptos_std::type_info {
         assert!(account_address(&type_info) == @aptos_std, 0);
         assert!(module_name(&type_info) == b"type_info", 1);
         assert!(struct_name(&type_info) == b"TypeInfo", 2);
+
+        // Because the testing environment doesn't set it.
+        let opt = chain_id();
+        assert!(option::is_none(&opt), 1);
     }
 
     #[test]

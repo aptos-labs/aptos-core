@@ -19,6 +19,7 @@ use std::{collections::HashMap, fmt, sync::Arc};
 mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
+mod chain_id;
 mod consensus_config;
 mod gas_schedule;
 mod validator_set;
@@ -29,6 +30,7 @@ pub use self::{
     aptos_version::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
+    chain_id::ChainId,
     consensus_config::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
     },
@@ -65,6 +67,7 @@ pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     ValidatorSet::CONFIG_ID,
     Version::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
+    ChainId::CONFIG_ID,
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
