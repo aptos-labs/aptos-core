@@ -8,10 +8,10 @@ resource "aws_s3_bucket" "backup" {
 
 resource "aws_s3_bucket_public_access_block" "backup" {
   bucket                  = aws_s3_bucket.backup.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  block_public_acls       = !var.enable_public_backup
+  block_public_policy     = !var.enable_public_backup
+  ignore_public_acls      = !var.enable_public_backup
+  restrict_public_buckets = !var.enable_public_backup
 }
 
 data "aws_iam_policy_document" "backup-assume-role" {
