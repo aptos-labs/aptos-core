@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{
     schema::coin_activities,
-    util::{parse_timestamp, truncate_str},
+    util::{parse_timestamp, standardize_address, truncate_str},
 };
 use aptos_api_types::{
     Event as APIEvent, Transaction as APITransaction, TransactionInfo as APITransactionInfo,
@@ -228,10 +228,10 @@ impl CoinActivity {
 
         Self {
             transaction_version: txn_version,
-            event_account_address: event.guid.account_address.to_string(),
+            event_account_address: standardize_address(&event.guid.account_address.to_string()),
             event_creation_number: event.guid.creation_number.0 as i64,
             event_sequence_number: event.sequence_number.0 as i64,
-            owner_address: event.guid.account_address.to_string(),
+            owner_address: standardize_address(&event.guid.account_address.to_string()),
             coin_type,
             amount,
             activity_type: event_type.to_string(),
@@ -255,10 +255,12 @@ impl CoinActivity {
 
         Self {
             transaction_version: txn_info.version.0 as i64,
-            event_account_address: user_transaction_request.sender.to_string(),
+            event_account_address: standardize_address(
+                &user_transaction_request.sender.to_string(),
+            ),
             event_creation_number: BURN_GAS_EVENT_CREATION_NUM,
             event_sequence_number: user_transaction_request.sequence_number.0 as i64,
-            owner_address: user_transaction_request.sender.to_string(),
+            owner_address: standardize_address(&user_transaction_request.sender.to_string()),
             coin_type: APTOS_COIN_TYPE.to_string(),
             amount: aptos_coin_burned,
             activity_type: GAS_FEE_EVENT.to_string(),

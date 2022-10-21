@@ -7,11 +7,12 @@
 
 use super::{
     token_utils::{CollectionDataIdType, TokenWriteSet},
-    tokens::{TableHandleToOwner, TableMetadataForToken},
+    tokens::TableHandleToOwner,
 };
 use crate::{
     database::PgPoolConnection,
     schema::{collection_datas, current_collection_datas},
+    util::standardize_address,
 };
 use anyhow::Context;
 use aptos_api_types::WriteTableItem as APIWriteTableItem;
@@ -102,15 +103,16 @@ impl CollectionData {
         if let Some(collection_data) = maybe_collection_data {
             let table_handle = table_item.handle.to_string();
             let maybe_creator_address = table_handle_to_owner
-                .get(&TableMetadataForToken::standardize_handle(&table_handle))
+                .get(&standardize_address(&table_handle))
                 .map(|table_metadata| table_metadata.owner_address.clone());
-            let creator_address = match maybe_creator_address {
+            let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
                 None => Self::get_collection_creator(conn, &table_handle).context(format!(
                     "Failed to get collection creator for table handle {}, txn version {}",
                     table_handle, txn_version
                 ))?,
             };
+            creator_address = standardize_address(&creator_address);
             let collection_data_id =
                 CollectionDataIdType::new(creator_address, collection_data.get_name().to_string());
             let collection_data_id_hash = collection_data_id.to_hash();
