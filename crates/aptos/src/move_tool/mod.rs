@@ -37,6 +37,7 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use framework::docgen::DocgenOptions;
 use framework::natives::code::UpgradePolicy;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
@@ -80,6 +81,7 @@ pub enum MoveTool {
     RunScript(RunScript),
     Test(TestPackage),
     Prove(ProvePackage),
+    Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
 }
 
@@ -97,6 +99,7 @@ impl MoveTool {
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
         }
     }
@@ -426,6 +429,44 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 }
 
+/// Documents a Move package
+///
+/// This converts the content of the package into markdown for documentation.
+#[derive(Parser)]
+pub struct DocumentPackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    docgen_options: DocgenOptions,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for DocumentPackage {
+    fn command_name(&self) -> &'static str {
+        "DocumentPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let DocumentPackage {
+            move_options,
+            docgen_options,
+        } = self;
+        let build_options = BuildOptions {
+            with_srcs: false,
+            with_abis: false,
+            with_source_maps: false,
+            with_error_map: false,
+            with_docs: true,
+            install_dir: None,
+            named_addresses: move_options.named_addresses(),
+            docgen_options: Some(docgen_options),
+        };
+        BuiltPackage::build(move_options.get_package_path()?, build_options)?;
+        Ok("succeeded")
+    }
+}
+
 #[derive(Parser)]
 pub struct IncludedArtifactsArgs {
     /// Artifacts to be generated when building the package
@@ -502,7 +543,7 @@ impl IncludedArtifacts {
                 // Always enable error map bytecode injection
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
             Sparse => BuildOptions {
                 with_srcs: true,
@@ -510,7 +551,7 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
             All => BuildOptions {
                 with_srcs: true,
@@ -518,7 +559,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
         }
     }
