@@ -41,12 +41,6 @@ module aptos_std::ed25519 {
         bytes: vector<u8>
     }
 
-    #[test_only]
-    struct TestMessage has copy, drop {
-        title: vector<u8>,
-        content: vector<u8>,
-    }
-
     /// A BCS-serializable message, which one can verify signatures on via `verify_signature_t`
     struct SignedMessage<MessageType> has drop {
         type_info: TypeInfo,
@@ -208,23 +202,6 @@ module aptos_std::ed25519 {
         }
     }
 
-    #[test]
-    fun test_gen_sign_verify_combo() {
-        let (sk, vpk) = generate_keys();
-        let pk = public_key_into_unvalidated(vpk);
-
-        let msg1: vector<u8> = x"0123456789abcdef";
-        let sig1 = sign_arbitrary_bytes(&sk, msg1);
-        assert!(signature_verify_strict(&sig1, &pk, msg1), std::error::invalid_state(1));
-
-        let msg2 = TestMessage {
-            title: b"Some Title",
-            content: b"That is it.",
-        };
-        let sig2 = sign_struct(&sk, copy msg2);
-        assert!(signature_verify_strict_t(&sig2, &pk, copy msg2), std::error::invalid_state(2));
-    }
-
     //
     // Native functions
     //
@@ -253,4 +230,33 @@ module aptos_std::ed25519 {
     #[test_only]
     /// Generates an Ed25519 signature for a given byte array using a given signing key.
     native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
+
+    //
+    // Tests
+    //
+
+    #[test_only]
+    struct TestMessage has copy, drop {
+        title: vector<u8>,
+        content: vector<u8>,
+    }
+
+    #[test]
+    fun test_gen_sign_verify_combo() {
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
+
+        let msg1: vector<u8> = x"0123456789abcdef";
+        let sig1 = sign_arbitrary_bytes(&sk, msg1);
+        assert!(signature_verify_strict(&sig1, &pk, msg1), std::error::invalid_state(1));
+
+        let msg2 = TestMessage {
+            title: b"Some Title",
+            content: b"That is it.",
+        };
+        let sig2 = sign_struct(&sk, copy msg2);
+        assert!(signature_verify_strict_t(&sig2, &pk, copy msg2), std::error::invalid_state(2));
+    }
+
+
 }
