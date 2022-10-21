@@ -171,12 +171,12 @@ module aptos_std::ed25519 {
     }
 
     #[test_only]
-    public fun generate_keys(): (SecretKey, UnvalidatedPublicKey) {
+    public fun generate_keys(): (SecretKey, ValidatedPublicKey) {
         let (sk_bytes, pk_bytes) = generate_keys_internal();
         let sk = SecretKey {
             bytes: sk_bytes
         };
-        let pk = UnvalidatedPublicKey {
+        let pk = ValidatedPublicKey {
             bytes: pk_bytes
         };
         (sk,pk)
@@ -199,7 +199,8 @@ module aptos_std::ed25519 {
 
     #[test]
     fun test_gen_sign_verify_combo() {
-        let (sk, pk) = generate_keys();
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
         let msg: vector<u8> = x"0123456789abcdef";
         let sig1 = sign_arbitrary_bytes(&sk, msg);
         assert!(signature_verify_strict(&sig1, &pk, msg), std::error::invalid_state(1));
