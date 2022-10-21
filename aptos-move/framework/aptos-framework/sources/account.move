@@ -417,7 +417,7 @@ module aptos_framework::account {
     /// transition ownership of the account over to the resource account. This is done by validating that the account has
     /// yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a
     /// collision where someone has legitimately produced a private key that maps to a resource account address is less
-    /// than `(1/2)^(256).
+    /// than `(1/2)^(256)`.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {
         let resource_addr = create_resource_address(&signer::address_of(source), seed);
         let resource = if (exists_at(resource_addr)) {

@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     schema::user_transactions,
-    util::{parse_timestamp, parse_timestamp_secs, u64_to_bigdecimal},
+    util::{parse_timestamp, parse_timestamp_secs, standardize_address, u64_to_bigdecimal},
 };
 use aptos_api_types::{TransactionPayload, UserTransaction as APIUserTransaction};
 use bigdecimal::BigDecimal;
@@ -75,7 +75,7 @@ impl UserTransaction {
                     .as_ref()
                     .map(Signature::get_signature_type)
                     .unwrap_or_default(),
-                sender: txn.request.sender.inner().to_hex_literal(),
+                sender: standardize_address(&txn.request.sender.inner().to_hex_literal()),
                 sequence_number: txn.request.sequence_number.0 as i64,
                 max_gas_amount: u64_to_bigdecimal(txn.request.max_gas_amount.0),
                 expiration_timestamp_secs: parse_timestamp_secs(

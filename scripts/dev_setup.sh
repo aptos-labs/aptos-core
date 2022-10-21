@@ -642,6 +642,13 @@ function install_postgres {
   fi
 }
 
+function install_lld {
+  # Right now, only install lld for linux
+  if [[ "$(uname)" == "Linux" ]]; then
+    install_pkg lld "$PACKAGE_MANAGER"
+  fi
+}
+
 function welcome_message {
 cat <<EOF
 Welcome to Aptos!
@@ -664,6 +671,7 @@ Build tools (since -t or no option was provided):
   * libssl-dev
   * NodeJS / NPM
   * protoc (and related tools)
+  * lld (only for Linux)
 EOF
   fi
 
@@ -866,6 +874,8 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
 
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
+
+  install_lld
 
   install_rustup "$BATCH_MODE"
   install_toolchain "$(cat ./rust-toolchain)"
