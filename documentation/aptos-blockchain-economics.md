@@ -7,9 +7,10 @@ underlying technology. The Aptos blockchain [@aptos_blockchain] is
 designed to be safe, scalable, and upgradeable infrastructure for web3
 applications. To build a people-first, secure, fair, and sustainable
 ecosystem, Aptos defines a set of core principles and a corresponding
-set of incentive and governance mechanisms to achieve them. In addition
-to building the safest and most scalable blockchain, Aptos coordinates
-major changes through on-chain configurability without no downtime.
+set of incentive and governance mechanisms to achieve that goal. In
+addition to building the safest and most scalable blockchain, Aptos
+coordinates major changes through on-chain configurability without no
+downtime.
 
 With a community-first philosophy and principle of rapid iteration
 combined with ever-evolving best practices in economics and governance,
@@ -18,27 +19,28 @@ and parameters over time.[^1]
 
 # Principles {#sec:principles}
 
-Below are the principles that underlie the community mechanisms of
-incentives and governance in the Aptos economy.
+Here are the principles that underlie the community mechanisms of
+incentives and governance in the Aptos economy:
 
--   People-first - The Aptos blockchain intends to be a community-driven
-    project in every dimension. From an open source codebase, a diverse
-    set of node operators, open policies and decision making, the
-    network will evolve according to the will of the participants.
+-   People-first - The Aptos blockchain is a community-driven project in
+    every dimension. From an open source codebase, a diverse set of node
+    operators, and open policies and decision making, the network will
+    evolve according to the will of the participants.
 
 -   Transparency - The initial distribution, genesis construction,
-    economic mechanisms and their goals are designed to be openly shared
-    with everyone and open to feedback from the community. All changes
-    will be made publicly through well-defined and open governance
-    processes.
+    economic mechanisms, and their goals are designed to be openly
+    shared with everyone and open to feedback from the community. All
+    changes will be made publicly through well-defined and open
+    governance processes.
 
--   Equality - Provide the same terms among groups of participants, for
-    example, uniform lockup terms across investors and core
-    contributors. All validator operators are subject to the same rules.
+-   Equality - Aptos provides the same terms among groups of
+    participants, for example, uniform lockup terms across investors and
+    core contributors. All validator operators are subject to the same
+    rules.
 
 -   Simplicity - Each participant should be able to understand the
-    incentive mechanisms in order to be able to reason about how to
-    optimize best for their own usage of the network. Simplicity is
+    incentive mechanisms in order to be able to determine how to
+    optimize for their own usage of the network. Simplicity is
     prioritized over more complex mechanisms in order to promote
     participant fairness and increase overall network security. While
     additional complexity can potentially enable more flexible
@@ -47,21 +49,20 @@ incentives and governance in the Aptos economy.
     understand and remediate.
 
 -   Decentralization - Blockchains can be considered decentralized
-    databases that can support different safety and liveness guarantees.
+    databases that support different safety and liveness guarantees.
     While the Aptos blockchain supports safety and liveness with up to
     $f$ malicious stake (see Section
     [4](#proof-of-stake){reference-type="ref"
-    reference="proof-of-stake"}, it is up to society to determine the
+    reference="proof-of-stake"}, our community will help determine the
     ultimate security of the network. Validators can fork the mainnet,
-    and participants can choose which fork to follow. Adding support for
-    more participants to join in the security of the network is a
-    priority.
+    and participants can choose which fork to follow. Adding more
+    participants to join in the security of the network is a priority.
 
 -   Stability - Large and frequent changes in economic policy can lead
     to demand volatility. Economic policies that lead to substantial
     changes in supply can also lead to demand volatility. Significant
-    changes must capture the voice of all participants while leaving
-    flexibility to quickly handle critical situations such as a
+    changes must capture the voices of all participants while leaving
+    flexibility to quickly handle critical situations, such as a
     correctness bug or a safety attack.
 
 -   Sustainability - The Aptos ecosystem is built to last. The
@@ -72,11 +73,11 @@ incentives and governance in the Aptos economy.
 # Token supply
 
 As a result of the selected incentive mechanisms and implementations,
-APT will have a variable token supply. Additionally, the ability of
-on-chain governance to change these economic and governance rules
-necessitates the lack of constraints. The Aptos blockchain requires a
-variable token supply, rather than a fixed token supply, to have more
-flexibility with respect to the economic levers to ensure that validator
+Aptos will have a variable supply of tokens, or APT. Additionally, the
+ability of on-chain governance to change these economic and governance
+rules necessitates the lack of constraints. The Aptos blockchain
+requires a variable token supply, rather than a fixed token supply, to
+have more flexibility in its economic levers to ensure that validator
 operators, token holders, and users can be incentivized to achieve the
 principles of the Aptos network.
 
@@ -99,9 +100,9 @@ separated out into its own Move module to ensure that:
 
 The coin standard can be used to create a token with an emphasis on
 simplicity and performance and with minimal metadata. The coin module
-remains a part of the Aptos core framework and be used for currencies,
-for example the gas currency, thereby enhancing the core functionality
-of the Aptos framework. See Aptos Coin \>
+remains a part of the Aptos core framework and can be used for
+currencies, for example the gas currency, thereby enhancing the core
+functionality of the Aptos framework. See Aptos Coin \>
 
 Aptos Token - The token.move Move module, on the other hand:
 
@@ -109,8 +110,9 @@ Encapsulates rich, flexible assets, fungible and nonfungible, and
 collectibles. The token standard is deployed as a separate package at
 the Aptos blockchain address 0x3. The token standard is designed to
 create an NFT or a semi-fungible or a fungible non-decimal token, with
-rich metadata and functionalities. A token definition of this type can
-be iterated rapidly to respond to the platform and user requirements.
+rich metadata and advanced functionality. A token definition of this
+type can be iterated rapidly to respond to the platform and user
+requirements.
 
 ## Initial token distribution totals
 
@@ -140,8 +142,8 @@ This distribution reflects the goals of the network.
     development of Aptos infrastructure (e.g. explorers, wallets, API
     services, blockchain services, etc.).
 
--   Core contributors - World class research and development of the
-    network and its infrastructure is paramount to the mission of the
+-   Core contributors - World-class research and development of the
+    network and its infrastructure are paramount to the mission of the
     Aptos blockchain to provide a safe, scalable, and upgradeable web3
     infrastructure for billions of people worldwide.
 
@@ -155,10 +157,10 @@ This distribution reflects the goals of the network.
     distribution.
 
 In recent history, this distribution represents the largest initial
-distribution toward community and ecosystem development for a layer 1
+distribution toward community and ecosystem development for a Layer 1
 blockchain. Additionally, the investor bucket is the smallest category.
 In terms of private and public sales, the investor category is the
-lowest among layer 1 blockchains.
+lowest among Layer 1 blockchains.
 
 ## Initial token distribution schedule
 
