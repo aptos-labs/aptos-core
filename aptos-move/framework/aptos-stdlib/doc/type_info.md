@@ -9,11 +9,14 @@
 -  [Function `account_address`](#0x1_type_info_account_address)
 -  [Function `module_name`](#0x1_type_info_module_name)
 -  [Function `struct_name`](#0x1_type_info_struct_name)
+-  [Function `chain_id`](#0x1_type_info_chain_id)
 -  [Function `type_of`](#0x1_type_info_type_of)
 -  [Function `type_name`](#0x1_type_info_type_name)
+-  [Function `chain_id_internal`](#0x1_type_info_chain_id_internal)
 -  [Specification](#@Specification_0)
     -  [Function `type_of`](#@Specification_0_type_of)
     -  [Function `type_name`](#@Specification_0_type_name)
+    -  [Function `chain_id_internal`](#@Specification_0_chain_id_internal)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -132,6 +135,33 @@
 
 </details>
 
+<a name="0x1_type_info_chain_id"></a>
+
+## Function `chain_id`
+
+Returns the current chain ID, mirroring what <code>aptos_framework::chain_id::get()</code> would return, except in <code>#[test]</code>
+functions, where this will always return <code>4u8</code> as the chain ID, whereas <code>aptos_framework::chain_id::get()</code> will
+return whichever ID was passed to <code>aptos_framework::chain_id::initialize_for_test()</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id">chain_id</a>(): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id">chain_id</a>(): u8 {
+    <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_type_info_type_of"></a>
 
 ## Function `type_of`
@@ -176,6 +206,28 @@
 
 </details>
 
+<a name="0x1_type_info_chain_id_internal"></a>
+
+## Function `chain_id_internal`
+
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): u8;
+</code></pre>
+
+
+
+</details>
+
 <a name="@Specification_0"></a>
 
 ## Specification
@@ -203,6 +255,22 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_chain_id_internal"></a>
+
+### Function `chain_id_internal`
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): u8
 </code></pre>
 
 

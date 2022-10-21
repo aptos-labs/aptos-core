@@ -8,4 +8,9 @@ spec aptos_std::type_info {
         // TODO: temporary mockup.
         pragma opaque;
     }
+
+    spec chain_id_internal {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
 }

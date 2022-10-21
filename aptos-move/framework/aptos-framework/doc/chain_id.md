@@ -76,7 +76,7 @@ Publish the chain ID <code>id</code> of this instance under the SystemAddresses 
 
 ## Function `get`
 
-Return the chain ID of this instance
+Return the chain ID of this instance.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id_get">get</a>(): u8
