@@ -70,7 +70,13 @@ module mint_nft::minting {
     const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 6;
 
     /// Initialize this module: create a resource account, a collection, and a token data id
-    fun init_module(resource_account: &signer, pk_bytes: vector<u8>) {
+    fun init_module(resource_account: &signer) {
+        // NOTE: This is just an example PK; please replace this with your desired minting PK.
+        let hardcoded_pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
+        init_module_with_minter_public_key(resource_account, hardcoded_pk);
+    }
+
+    fun init_module_with_minter_public_key(resource_account: &signer, pk_bytes: vector<u8>) {
         let collection_name = string::utf8(b"Collection name");
         let description = string::utf8(b"Description");
         let collection_uri = string::utf8(b"Collection uri");
@@ -217,7 +223,7 @@ module mint_nft::minting {
         resource_account::create_resource_account(&origin_account, vector::empty<u8>(), vector::empty<u8>());
 
         let pk_bytes = ed25519::validated_public_key_to_bytes(collection_token_minter_public_key);
-        init_module(collection_token_minter, pk_bytes);
+        init_module_with_minter_public_key(collection_token_minter, pk_bytes);
 
         create_account_for_test(signer::address_of(nft_receiver));
     }
