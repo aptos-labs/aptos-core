@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::monitor;
-use crate::quorum_store::{types::{BatchId, SerializedTransaction}, counters};
+use crate::quorum_store::{
+    counters,
+    types::{BatchId, SerializedTransaction},
+};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -246,7 +249,8 @@ impl ProofQueue {
         for (digest, expiration_time) in self.digest_queue.drain(0..num_expired) {
             assert_some!(self.digest_proof.remove(&digest));
             if expiration_time < current_time && expiration_time.round() < current_time.round() {
-                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS.observe((current_time.round() - expiration_time.round()) as f64);
+                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                    .observe((current_time.round() - expiration_time.round()) as f64);
             }
         }
         debug!("QS: num_expired {}", num_expired);
@@ -254,6 +258,7 @@ impl ProofQueue {
         let mut ret = Vec::new();
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
+        let mut size = self.digest_queue.len();
         for (digest, expiration) in self.digest_queue.iter() {
             if *expiration >= current_time && !excluded_proofs.contains(digest) {
                 match self
@@ -265,6 +270,8 @@ impl ProofQueue {
                         cur_bytes = cur_bytes + proof.info().num_bytes;
                         cur_txns = cur_txns + proof.info().num_txns;
                         if cur_bytes > max_bytes || cur_txns > max_txns {
+                            counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(size as f64);
+
                             // Exceeded the limit for requested bytes or number of transactions.
                             break;
                         }
@@ -274,8 +281,10 @@ impl ProofQueue {
                 }
             }
             if *expiration < current_time && expiration.round() < current_time.round() {
-                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS.observe((current_time.round() - expiration.round()) as f64);
+                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                    .observe((current_time.round() - expiration.round()) as f64);
             }
+            size = size - 1;
         }
         ret
     }

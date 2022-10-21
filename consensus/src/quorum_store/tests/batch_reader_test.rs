@@ -31,9 +31,9 @@ async fn test_extend_expiration_vs_save() {
         0,
         0,
         2100,
-        0,                        // grace period rounds
-        0,                        // memory_quota
-        1000,                     // db quota
+        0,    // grace period rounds
+        0,    // memory_quota
+        1000, // db quota
     );
 
     let batch_reader_clone1 = batch_reader.clone();

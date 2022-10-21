@@ -192,7 +192,8 @@ impl QuorumStoreWrapper {
                 .expect("Could not save to db");
 
             let (proof_tx, proof_rx) = oneshot::channel();
-            let expiry_round = self.latest_logical_time.round() + self.batch_expiry_round_gap_when_init;
+            let expiry_round =
+                self.latest_logical_time.round() + self.batch_expiry_round_gap_when_init;
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
 
             self.quorum_store_sender

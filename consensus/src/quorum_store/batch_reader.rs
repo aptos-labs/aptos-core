@@ -226,14 +226,18 @@ impl BatchReader {
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
         if value.expiration.epoch() == self.epoch()
-        && value.expiration.round() + self.batch_expiry_round_gap_behind_latest_certified >= self.last_certified_round()
-        && value.expiration.round() <= self.last_certified_round() + self.batch_expiry_round_gap_beyond_latest_certified
+            && value.expiration.round() + self.batch_expiry_round_gap_behind_latest_certified
+                >= self.last_certified_round()
+            && value.expiration.round()
+                <= self.last_certified_round() + self.batch_expiry_round_gap_beyond_latest_certified
         {
             if value.expiration.round() > self.last_certified_round() {
-                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_HIGHER.observe((value.expiration.round() - self.last_certified_round()) as f64);
+                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_HIGHER
+                    .observe((value.expiration.round() - self.last_certified_round()) as f64);
             }
             if value.expiration.round() < self.last_certified_round() {
-                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_LOWER.observe((self.last_certified_round() - value.expiration.round()) as f64);
+                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_LOWER
+                    .observe((self.last_certified_round() - value.expiration.round()) as f64);
             }
             if let Some(entry) = self.db_cache.get(&digest) {
                 if entry.expiration.round() >= value.expiration.round() {
