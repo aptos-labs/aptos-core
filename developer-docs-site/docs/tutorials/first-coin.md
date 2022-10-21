@@ -14,15 +14,15 @@ This tutorial introduces how you can compile, deploy, and mint your own coin, na
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK][typescript-sdk]
-* [Python SDK][python-sdk]
-* [Rust SDK][rust-sdk]
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
 
 ---
 
 ## Step 2: Install the CLI
 
-[Install the precombiled binary for the Aptos CLI][install_cli].
+[Install the precompiled binary for the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
 
 ---
 
@@ -312,7 +312,8 @@ Aptos provides several building blocks to support coin transfers:
 Aptos does not emit transfer events, but instead it leverages withdraw and deposit events.
 :::
 
-[typescript-sdk]: /sdks/ts-sdk/index
-[python-sdk]: /sdks/python-sdk
-[rust-sdk]: /sdks/rust-sdk
-[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli
+* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
+* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
