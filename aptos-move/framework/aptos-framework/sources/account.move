@@ -666,14 +666,6 @@ module aptos_framework::account {
     // Tests for offering & revoking signer capabilities
     //
 
-    // NOTE: These test cases were generated using `cargo test -- offer_signer_capability_v2 --nocapture` in `aptos-move/e2e-move-tests/src/tests`
-    #[test_only]
-    const ALICE_PK: vector<u8> = x"550e7e166e01047c9134d7a1c540b865bd984a326e9304e7d4a04d89f0aee747";
-    #[test_only]
-    const ALICE_ADDRESS: vector<u8> = x"47e56cf3958e4c93c72fc0ceccef12c0e05f2fe2b91014eaaa798026b8df754f";
-    #[test_only]
-    const ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE: vector<u8> = x"6591c10ca8485e700d1288a16f8555fdbe0c7dd52c12542dbabb9bd3eb12a27ffe981f2b7516d02cc4a78eee7e9f44490f93aa08100c06c55fb7615bcc66c805";
-
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 65544)]
     public entry fun test_invalid_offer_signer_capability(bob: signer) acquires Account {
@@ -756,11 +748,24 @@ module aptos_framework::account {
 
     #[test(bob = @0x345)]
     public entry fun test_valid_revoke_signer_capability(bob: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
-        revoke_signer_capability(&alice, signer::address_of(&bob));
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+        revoke_signer_capability(&alice, bob_addr);
     }
 
     #[test(bob = @0x345, charlie = @0x567)]
@@ -770,12 +775,13 @@ module aptos_framework::account {
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
         let alice_addr = signer::address_of(&alice);
-        let alice_account_resource = borrow_global_mut<Account>(alice_addr);
+        let alice_account_resource = borrow_global<Account>(alice_addr);
 
-        create_account(signer::address_of(&bob));
         let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
 
-        create_account(signer::address_of(&charlie));
+        let charlie_addr = signer::address_of(&charlie);
+        create_account(charlie_addr);
 
         let challenge = SignerCapabilityOfferProofChallengeV2 {
             sequence_number: alice_account_resource.sequence_number,
@@ -783,8 +789,8 @@ module aptos_framework::account {
             recipient_address: bob_addr,
         };
         let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
-        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, signer::address_of(&bob));
-        revoke_signer_capability(&alice, signer::address_of(&charlie));
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+        revoke_signer_capability(&alice, charlie_addr);
     }
 
     //
