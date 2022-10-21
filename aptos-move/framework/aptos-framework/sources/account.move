@@ -677,7 +677,9 @@ module aptos_framework::account {
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 65544)]
     public entry fun test_invalid_offer_signer_capability(bob: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
+        let (_alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
         create_account(signer::address_of(&bob));
 
         // Maul the signature and make sure the call would fail
@@ -686,11 +688,12 @@ module aptos_framework::account {
         let first_sig_byte = vector::borrow_mut(&mut invalid_signature, 0);
         *first_sig_byte = *first_sig_byte + 1;
 
-        offer_signer_capability(&alice, invalid_signature, 0, ALICE_PK, signer::address_of(&bob));
+        offer_signer_capability(&alice, invalid_signature, 0, alice_pk_bytes, signer::address_of(&bob));
     }
 
     #[test(bob = @0x345)]
     public entry fun test_valid_check_signer_capability_and_create_authorized_signer(bob: signer) acquires Account {
+//        let alice_pk_bytes = ;
         let alice = create_account_from_ed25519_public_key(ALICE_PK);
         assert!(signer::address_of(&alice) == from_bcs::to_address(ALICE_ADDRESS), 0);
 
