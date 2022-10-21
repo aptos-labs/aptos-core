@@ -3963,6 +3963,8 @@ dependencies = [
  "move-model",
  "move-package",
  "move-prover",
+ "move-prover-boogie-backend",
+ "move-stackless-bytecode",
  "move-table-extension",
  "move-unit-test",
  "move-vm-runtime",
