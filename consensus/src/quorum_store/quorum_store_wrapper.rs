@@ -121,6 +121,10 @@ impl QuorumStoreWrapper {
 
     /// return true when quorum store is back pressured
     pub(crate) fn back_pressure(&self) -> bool {
+        debug!(
+            "QS: back pressure check remaining_proof_num {} back_pressure_limit {}",
+            self.remaining_proof_num, self.back_pressure_limit
+        );
         self.remaining_proof_num > self.back_pressure_limit
     }
 
@@ -411,7 +415,7 @@ impl QuorumStoreWrapper {
                 },
 
                 _ = interval.tick() => {
-                    if self.back_pressure() {
+                    if !self.back_pressure() {
                         if let Some(proof_rx) = self.handle_scheduled_pull().await {
                             proofs_in_progress.push(Box::pin(proof_rx));
                         }
