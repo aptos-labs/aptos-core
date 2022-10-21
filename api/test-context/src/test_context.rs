@@ -510,7 +510,9 @@ impl TestContext {
             .api_specific_config
             .unwrap_signing_message_response(resp);
 
-        let sig = SigningKey::sign_arbitrary_message(account.private_key(), signing_msg.inner());
+        let sig = account
+            .private_key()
+            .sign_arbitrary_message(signing_msg.inner());
 
         request["signature"] = json!({
             "type": "ed25519_signature",

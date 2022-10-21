@@ -122,9 +122,9 @@ impl CliCommand<RotateSummary> for RotateKey {
 
         // Signs the struct using both the current private key and the next private key
         let rotation_proof_signed_by_current_private_key =
-            SigningKey::sign_arbitrary_message(&current_private_key, &rotation_msg.clone());
+            current_private_key.sign_arbitrary_message(&rotation_msg.clone());
         let rotation_proof_signed_by_new_private_key =
-            SigningKey::sign_arbitrary_message(&new_private_key, &rotation_msg);
+            new_private_key.sign_arbitrary_message(&rotation_msg);
 
         let txn_summary = self
             .txn_options
