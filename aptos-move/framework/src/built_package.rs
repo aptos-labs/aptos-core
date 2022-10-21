@@ -80,11 +80,12 @@ pub struct BuiltPackage {
 
 pub(crate) fn build_model(
     package_path: &Path,
-    options: &BuildOptions,
+    additional_named_addresses: BTreeMap<String, AccountAddress>,
+    target_filter: Option<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let build_config = BuildConfig {
         dev_mode: false,
-        additional_named_addresses: options.named_addresses.clone(),
+        additional_named_addresses,
         architecture: None,
         generate_abis: false,
         generate_docs: false,
@@ -97,7 +98,7 @@ pub(crate) fn build_model(
     build_config.move_model_for_package(
         package_path,
         ModelConfig {
-            target_filter: None,
+            target_filter,
             all_files_as_targets: false,
         },
     )
@@ -129,7 +130,11 @@ impl BuiltPackage {
         }
 
         let error_map = if options.with_error_map || options.with_docs {
-            let model = build_model(package_path.as_path(), &options)?;
+            let model = build_model(
+                package_path.as_path(),
+                options.named_addresses.clone(),
+                None,
+            )?;
             if options.with_docs {
                 let docgen = if let Some(opts) = options.docgen_options.clone() {
                     opts

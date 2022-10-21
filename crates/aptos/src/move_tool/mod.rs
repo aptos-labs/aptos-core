@@ -39,6 +39,7 @@ use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
 use framework::docgen::DocgenOptions;
 use framework::natives::code::UpgradePolicy;
+use framework::prover::ProverOptions;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_cli::base::test::UnitTestResult;
@@ -59,7 +60,6 @@ use {
         language_storage::{ModuleId, TypeTag},
     },
     move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
-    move_prover, move_prover_boogie_backend,
     move_unit_test::UnitTestingConfig,
 };
 
@@ -379,12 +379,11 @@ impl CliCommand<()> for TransactionalTestOpts {
 /// the Move prover
 #[derive(Parser)]
 pub struct ProvePackage {
-    /// A filter string to determine which files to verify
-    #[clap(long)]
-    pub filter: Option<String>,
-
     #[clap(flatten)]
     move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    prover_options: ProverOptions,
 }
 
 #[async_trait]
@@ -394,34 +393,19 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            test_mode: true,
-            install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
-        };
-
-        const APTOS_NATIVE_TEMPLATE: &[u8] = include_bytes!("aptos-natives.bpl");
-
-        let mut options = move_prover::cli::Options::default();
-        options.backend.custom_natives =
-            Some(move_prover_boogie_backend::options::CustomNativeOptions {
-                template_bytes: APTOS_NATIVE_TEMPLATE.to_vec(),
-                module_instance_names: vec![],
-            });
+        let ProvePackage {
+            move_options,
+            prover_options,
+        } = self;
 
         let result = task::spawn_blocking(move || {
-            move_cli::base::prove::run_move_prover(
-                config,
-                self.move_options.get_package_path()?.as_path(),
-                &self.filter,
-                true,
-                move_prover::cli::Options::default(),
+            prover_options.prove(
+                move_options.get_package_path()?.as_path(),
+                move_options.named_addresses(),
             )
         })
         .await
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
-
         match result {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),

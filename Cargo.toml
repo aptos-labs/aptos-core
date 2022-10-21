@@ -169,6 +169,7 @@ move-model = { git = "https://github.com/move-language/move", rev = "b7f8071c836
 move-package = { git = "https://github.com/move-language/move", rev = "b7f8071c8368a493becedfc5cd0e8e6bacbf3d56" }
 move-prover = { git = "https://github.com/move-language/move", rev = "b7f8071c8368a493becedfc5cd0e8e6bacbf3d56" }
 move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "b7f8071c8368a493becedfc5cd0e8e6bacbf3d56" }
+move-stackless-bytecode = { git = "https://github.com/move-language/move", rev = "b7f8071c8368a493becedfc5cd0e8e6bacbf3d56" }
 move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "b7f8071c8368a493becedfc5cd0e8e6bacbf3d56" }
 move-resource-viewer = { git = "https://github.com/move-language/move", rev = "b7f8071c8368a493becedfc5cd0e8e6bacbf3d56" }
 move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "b7f8071c8368a493becedfc5cd0e8e6bacbf3d56" }
