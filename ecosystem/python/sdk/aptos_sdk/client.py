@@ -50,7 +50,7 @@ class RestClient:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
-    def account_balance(self, account_address: str) -> int:
+    def account_balance(self, account_address: str | AccountAddress) -> int:
         """Returns the test coin balance associated with the account"""
         return self.account_resource(
             account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
@@ -354,8 +354,8 @@ class RestClient:
     def offer_token(
         self,
         account: Account,
-        receiver: str,
-        creator: str,
+        receiver: str | AccountAddress,
+        creator: str | AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,
@@ -384,8 +384,8 @@ class RestClient:
     def claim_token(
         self,
         account: Account,
-        sender: str,
-        creator: str,
+        sender: str | AccountAddress,
+        creator: str | AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,
@@ -570,7 +570,7 @@ class FaucetClient:
     def close(self):
         self.rest_client.close()
 
-    def fund_account(self, address: str, amount: int):
+    def fund_account(self, address: str | AccountAddress, amount: int):
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
         response = self.rest_client.client.post(
