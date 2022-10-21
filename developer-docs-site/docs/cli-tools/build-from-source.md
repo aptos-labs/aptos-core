@@ -34,6 +34,7 @@ If the script above doesn't work for you, you can install these manually, but it
 1. [Git](https://git-scm.com/download)
 1. [CMake](https://cmake.org/download/)
 1. [LLVM](https://releases.llvm.org/)
+1. [LLD](https://lld.llvm.org/)
 
 #### Building the Aptos CLI
 
