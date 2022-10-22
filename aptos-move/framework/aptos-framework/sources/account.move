@@ -64,6 +64,12 @@ module aptos_framework::account {
         new_public_key: vector<u8>,
     }
 
+    /// This struct has the same structure as RotationProofChallenge, but with different type_info.
+    /// This structure do not requires signature of new publick key.
+    struct RotationProofChallengeSimplify has copy, drop {
+        challenge: RotationProofChallenge
+    }
+
     struct RotationCapabilityOfferProofChallenge has drop {
         sequence_number: u64,
         recipient_address: address,
@@ -228,7 +234,7 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    fun assert_valid_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
+    fun assert_valid_signature_and_get_auth_key<T: copy+drop>(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &T): vector<u8> {
         if (scheme == ED25519_SCHEME) {
             let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
             let sig = ed25519::new_signature_from_bytes(signature);
@@ -238,6 +244,18 @@ module aptos_framework::account {
             let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
             let sig = multi_ed25519::new_signature_from_bytes(signature);
             assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        }
+    }
+
+    fun get_auth_key(scheme: u8, public_key_bytes: vector<u8>): vector<u8> {
+        if (scheme == ED25519_SCHEME) {
+            let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        } else if (scheme == MULTI_ED25519_SCHEME) {
+            let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
             multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
         } else {
             abort error::invalid_argument(EINVALID_SCHEME)
@@ -310,6 +328,57 @@ module aptos_framework::account {
             assert!(addr == table::remove(address_map, curr_auth_key_as_address), error::not_found(EINVALID_ORIGINATING_ADDRESS));
         };
         table::add(address_map, new_auth_key_as_address, addr);
+
+        event::emit_event<KeyRotationEvent>(
+            &mut account_resource.key_rotation_events,
+            KeyRotationEvent {
+                old_authentication_key: curr_auth_key,
+                new_authentication_key: new_auth_key,
+            }
+        );
+
+        account_resource.authentication_key = new_auth_key;
+    }
+
+    public entry fun rotate_authentication_key_simplify(
+        account_address: address,
+        from_scheme: u8,
+        from_public_key_bytes: vector<u8>,
+        to_scheme: u8,
+        to_public_key_bytes: vector<u8>,
+        cap_rotate_key: vector<u8>,
+    ) acquires Account {
+        assert!(exists_at(account_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+
+        let account_resource = borrow_global_mut<Account>(account_address);
+
+        // Verify the given `from_public_key_bytes` matches this account's current authentication key.
+        if (from_scheme == ED25519_SCHEME) {
+            let from_pk = ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
+            let from_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+            assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
+        } else if (from_scheme == MULTI_ED25519_SCHEME) {
+            let from_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
+            let from_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+            assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        };
+
+        // Construct a valid `RotationProofChallenge` that `cap_rotate_key` and `cap_update_table` will validate against.
+        let curr_auth_key_as_address = from_bcs::to_address(account_resource.authentication_key);
+        let challenge_simplify = RotationProofChallengeSimplify {
+            challenge: RotationProofChallenge {
+                sequence_number: account_resource.sequence_number,
+                originator: account_address,
+                current_auth_key: curr_auth_key_as_address,
+                new_public_key: to_public_key_bytes,
+            }
+        };
+
+        // Assert the challenges signed by the current and new keys are valid
+        let curr_auth_key = assert_valid_signature_and_get_auth_key(from_scheme, from_public_key_bytes, cap_rotate_key, &challenge_simplify);
+        let new_auth_key = get_auth_key(to_scheme, to_public_key_bytes);
 
         event::emit_event<KeyRotationEvent>(
             &mut account_resource.key_rotation_events,
@@ -745,19 +814,24 @@ module aptos_framework::account {
 
     // TODO: Add command used to generate these test cases
     #[test_only]
-    const MULTI_ED25519_SRC_PK_BYTES: vector<u8> = x"26885bfb2e41746ffce3ab6ee9b5c9d15f4fbcba241362e814650a961daabb3464a19c23cf3b21ddda4b1370d2cf38aebd33732628049c7a00b97d4baf5b221d5ac38ef40f3fc7e8cd5c72229c0427b5fe68f580dbb9e297b544613e6948539e0328f304d79e0796c50344562a4b017019423b3dd6784495bada7e096cb9302f653e9618cf7b063de024db9adfb9d0b77dbb0048d312f167146f2807d991499fe21702f0df26ea83d418ccf8fd5fb6611c0cfb87c01e680e527a0b3fd7c0ac9b6e742db658fda20f93b446ac4b011430f8d455d71e29df2dca88a772bd598d5953f9fab64b9c5f7e0f424cd8659fb033aee099abeab7ce21463a8d4f84b803cd970ad8812196438311a72fc30720f42f863234ad30ba335d91281bf5c2c09e74e4c37b2f8d18781735e1301c0bd24d8b8e564a1e380cd862e4d058b99645efc98f27e1857f38ede528deb50f9310b2ee68756bac74279990de5dfd3557dbb0e631dc83e71e51abfa928bffff19b5e8ec751073fb371e3444272899cef16789a8812c21d54a4ae7fedd80623e2ed80f7652aa6a6ed97813d69c7f636b4a832088ed2d981e809dddf25566b926cb1677ba80793b4aa70087ef27c8b54d4c28f15ad2fe702293e628888fc548851063b89bcd1b0d8547a2856dbd9814bbff331e2e5a6ea7bb9cd6881ea498f46b3552d4815fed985b8c94c7800355f334b0e81fa7e3eb8ed19d83ac19d14d1bf0c4e978f339818514e36e9253172d8cb8ae4b194c2b507cb498e2c15fa567d17ef0be9d8cfd9eb17d46e71c0741bc81def63b6ff5559e83cd0a8f616ffa0b7c0f5b4c874d95ec92e97e7711b85cb2fef5a6f4fd4902";
+    const MULTI_ED25519_SRC_PK_BYTES: vector<u8> = x"2dfac52b88c70c98b2679959e5379af58e7907f23ca45e31873fee9b1adcbcc8179c572e0038769a35b3db83be05f288c6cc19393eb7455ea702a6ed87b01ed58b1550e3757ff1e927544f90bc2ea58cfcf9059956168c3012f71da09c242d6c4ff03de8a09ae3784774a6bead12f4ed9ad06d48555147a86c109016b4c21e5ab1eff5570df963c1d8b0ed6428602ce5ae06232e41af8eedb6a566b1f2f20df63206ece1de8530766c24e59ed6e4587e8d24829a1019860e0ec30bb0a9b7ea4f34d087247ab89f9538d6848f771468d5960c7c61bd72bc01cc1f1e2f43bb10a59c951b66f706a167ef516a7b3ccd742504032d0404257b7b7f6538763579353d45b982fa36d17b543b9136a0984e58b1abc019814d2d819e034fdb2cc5f727ad1d2cb4772af26385c745b55417efaacf745486ee5067982bea16c03620d215621038f3d8a266362f8ea913e7332e6738a09f44219908e2e4c76b791a24806692c385b4d31a47c49237eaa2abf93ce59a1b5ea20b0ae4b54911168aaecf61c4f74a18f60fa5364a2a3e04a508ed31d7426e2ffcfe54cfaa205c5e04d7ea6f174c6c090720e9fcb55f193dce4177e8d7b775a56667ae7c030e29cfbf710acb52c4de9920238fda835267d8166afab29594d74bed27d78d385be849a213ab4f1908c63317895e0da4d2963ca7ec0e06167f59aea9b6b5e007cd409a08f5329581579022f517920be5c16dfd3af7be3bfb48e07be9542237da8922bc8a38fec2d2f80b6b3ddbebfc43c98e841ed9e0e09588a1fc5d3faf815b02a8c19aebc76b175ea11c16eb7d492d3eaba92021858a8a22894adba3d069da5a7f61a3d00a72a5c402";
     #[test_only]
-    const MULTI_ED25519_TO_PK_BYTES: vector<u8> =  x"a63203808ff99ba9ea9133d4e1dafc42109c36ce4de07920ee6cae6136f97719cffa6ecd1582144a41c4388fa20a955339f96834c3901d98e7263ffe455266d1e14e07851e068243e3953bcc3ded766056f7a9586a1bd17fbaefc60c39c8e966a931455983b2b2004101bd7dabab7f5df17fd9281bee392cc7d65bff7f2b7730899c517c0035a971527f9e23d349c5e002e6208465b84a93bbdfb33f670ba4d69ac72f7bae9e577db6480ffef0559839c0317a00cb9cc7577fd18268dbf3b67f68b4f8a1cacd3fbd226e61fa2e849da1ed1f1d131a6b598957a022bdb462254871bd7dc490ac7675b638c1e750b1c7f6f035681abcca48b6b4f96367e4c75c8cd4da5321ec31899cb036469d478e028b5173b78336fc390be06b6a811d8d1022182fb3e8a4a94fd62267be02734b685beb24cf59bd1081216b11404a185df033aa8f546fd2fefd182dc364d48223d462dd8e4e1fa29889b526f67984b4862744ef7282cd606ff2aee79b05c4d366c7280dc92ade0415a3711a09d2d760a00e9f4960dcb1eb71fee22489f54cba68838816e6a0b3e83e85433ee836da1e4738229ec1ca8ad64c675fffbf0bc26022a39ddedae215286427a5bb1b84ca280d83dbe6ecef2dadceef0cd12347393f787e1e5e1b26f7a4fcfbae768e0e4f538141109ca98def3c85a8f7e54fc96e4547626a7a46536710a0c341ca4196676797a8590f";
+    const MULTI_ED25519_TO_PK_BYTES: vector<u8> = x"610352fe6f2e18dd80ecd4c5753f257cbdf773b814804ef923d566b20aea73e2259aad4da612d183eee6ad2b31f98e53e4372d6e7d7324e93dbeab8e9007fc49eaf8c3c85cc70d86a3f0f02b35a709f85a678918ac77344d4fb9ec25cf0fbc8fc65c581b15131d8e8d7c598f6c6f61b4b708a63fc885bb0662b54d7c24fab28e56992d9d837ecafa69a793dbd65311ea51939ca0e9186d172740cc3bbde80d1eb2c5687f2d083e15e298aff15d6fc79cf674200acaada18928454bace5231bcc0e7c2740e555ebda5ff8ee64d02fe803cb41b0080f7545f8a3f152fd0096494ac64e369366dccf268a8b9016fccae3e0c59e2b5a520aa987917d5c76ca6756d897c616f99590dfefe97bd0ddbb1506a7431f8ef54c0ef0e039e76fd740d0c6f490bf9e88c8ec4e6927dd17548a2f618499c5a08050129fce202b068621cf054123a0a4921d7aebb6a518f64654df247a24d86d040af0edf41619b0cdc5edf0d46ac3a3581fc381f1e69b06324a452022a6a4a3d3a225925b9f9ae1d8178b87fb347b551a1ce71ba91297862e3bdbccce3f8d3d6d1fa0706a6ee81d6148956202698eff98befebc472908eb293b2b6f5edb71da84adf5b08c84837942927ce1b4e30840d952427fd8c6bf9c4130e5de6886ee0982c9a1e17d68acd1ad4bc0a13fcdeebf65cb6257fd988c227e0324ccf505dee191f0422ffa256cb9d2a3b8b1eb0f";
     #[test_only]
-    const SIG_CAP_ROTATE_KEY_MULTI_TO_MULTI: vector<u8> = x"ddf094fd2039546fe229cc86b5c664aeaa7b40670aec18232e61eb591474ba33bccc63af9a5efe0563d03e11025b87bd820a5d8c72c0ac15ea1ff5632acb160808bb16b4088b9f985a3133c194bf67c2be4c34f788a857b26d5dd6c2ebb69bfcf959f44fbb2a96bd88da0091fe38eb029225ef3239e316372a35e08c5f10c70dc0000000";
+    const SIG_CAP_ROTATE_KEY_MULTI_TO_MULTI: vector<u8> = x"79dc94f409a80bd9a1fe8c5e39931a7550dc9c9fe34b074f846545a862cf5ea9a0115014eaa84ce815f7531c8a95e9a409fab0952708739d0bbe1505406e8e0c645698ba17f527acf26de74c7981ff2cb8f344c9b614c7bb19e8777aa229be48142d25b3b0a603afdafeef37d7b58b7fcbf584207bef1c863788a9d94f173209c0000000";
     #[test_only]
-    const SIG_CAP_UPDATE_TABLE_MULTI_TO_MULTI: vector<u8> = x"26dd17b80c92c5a1cbacf79edc1b46ff55dcba108559b14385dc3f91166d6194347ebcff7d1b1bf6864b342865c3a43e88b8203003b9a668b13921abbc6cad071479d0290c3639527d061b71596e0cbab07603f7cc69e6b1fd2ed7215d464c886e81e2bdf750a868180faea77b727b3f001b77b8cd8beb903a1b0a4228f01706870db6464656537e35a0a4584c9838cce37b14f97b81161239b48a1c596c2dc3e0177b3b9882b801a6cec5411346b4309f4ee6ab539ae0ffe0a40c678960f00c28c12fd8404e701115bcee7d07036cf8baae12869c4242a354836c82fa890c2bd396df231609e376d7faf0c31d5f6bb4d3b887a316f08a79b8e1054ed92a860b51c15b6bb53ffe515c22fff0638fc866320d0fce21a53776318b424a9dd2003efa3e8c3c142af50d556ae0c719cb0cca616128068b7b9671b53d7747ed4c870d76e00f8a32595fb04b31590271c34feac567596355ac13ce3bb784c34e81235fa021127e6395c35f3dd67134a1f78105982a923e259319114b04d060b2fdeb07d34bc50ec89f0ba7e749b164970449f95a5b865a3c6cd32e2bfc7f53ae02a3439f5f0259cdfa84eecba7f97302eca29ca33b89e4d8ba328017bbb6450ce1e70f426dcefec406ab7ad64f0ba6c0d8eeb273b1098ea2b2139b5828edfb847a68dadf43b956777c756152fca8d5c14cd66aa2a6e1c9d28d873a2bb118044e35c30cc9d21454821a516691cd301cedfc53a5ebb13310644dcd7ba1ac899cb8c895b8f9fdcd08b5b1096e338a5a92ff379a6395331a0629d97479231d186b418ed406e22974f3e0db1e4c8320427650f5048b7a2ffb6c9c168bf0e268e9915a42e15bb9c659f6fdf130fd2a5a8b841dde53920916b4c3fef07c692b583d41ea75a20cf7d77ab710816adf07a5773b3cd08ff6a95d5ef1ba036909e3c90801ec78b37bca8af036fd712684385a192e535aace4ea5871bfd32433184c48a51ea8491c05380ae41117d3a5b7e8480604087aa23c3f0fce2eda25da006c2ea181ff0efc0097d9bab5c95d6129c63fdb28faea20d76e7c52d74df81ac3009f1107d64dbc0406cc7d3fee03d9b77b06509d1be0a73cee18cbd0fbe9551de100e5eb8831c1e0b122f846de988076d9db22a600225454e877307692d0e8e9eea1341d48a5720163120187a2264d671299fd5a28f52a9bee534008fa4a0390238c9ae426507218f903acedd135708a33092c2e2bddb671237fd2b3cf434a1d08a8596ae215fe02b008fd2932940a2e925e923e04d20e8f8d9a6f40ce0eb550687885fcdecc98ddbd54d6b73217fc212a480841820e0d67894edb84538c2a0d4ae342868194d204fffe0000";
+    const SIG_CAP_UPDATE_TABLE_MULTI_TO_MULTI: vector<u8> = x"3e38df1bad449570ee8c6680bde7a59568797ec15e3f413b3c7d46903f07deea276b944e3cf37d27130e7de1fdbfb2dc240828224d83c4fb1480ba3573015404ce9ea4bfb05372da83dcd9926fb31a5dda89c61f6ae71b9f7f7cb96e2fd6a360aab999776e0f9a158755008676d3a9f64d343873722d285687280adaab3a5208e33e0ad98cf869a46fa6ad60ab1058098da1c45399047db492bc3638acd51bc1b37b8f4eecc969f48af2edd97e5ce46e7c9e430e6974ed630d7232e2ecddb104265379aac05c5397af7bf052359e7ba03744bbfe5ec6029a1992a115727deb3ad4b5b16b0182280b2709645ed21a208ac594dd2d49ee98b92f8ddff4b0e9760ad5461d05a20a8957cd7021369cc6de6553f1ab0ab272fa6da0ade46d5cb64e1015a16bc50f4ba25ac45fd9e5493b5b514c7abac4b5a19abeb8301c9ca0a548007ab9bd56c1a8284bd2e95652391cc86c760a717455d20339435008913b168b30af3958168787355c068ef48fd5e15b80b2ce17428297a85d927dbe1803e4990ab12e4bd64467c980bec84d6bfb05b3034f0171f292510f4ba49f285fe371b98985ce9cc4152d26d1e0be628e63f949c67d44fe9f667ef19a636106401b170e0463e1c54ec9eda985c59fcd76f1fc6733b389c2a98c112b10dcdecc93b4e5e65cec92ac8c0cd7cf1ee0ea2fdc3633a4c4b5e8035fc925854cdfa374940bc9270268eb9ef2bcbf7c0b4ed6818461468fd3914b256add96738ef932dc9487d5d59d5d70ec1a2227475446ba4cb28399f9875902492dab203e71cf47e1f605962608a02d032039ca11539fb9d883e26d0288f4e1a0b43fd33ddb5ee046c688a7854e88d57555a43d404b9d399832f964b8d029b7e2620fc4d9d1d96d6f40ee039f02e6390b0b18b08fb873886af680504ff4e07c548c1b7202566ec6412870446ce398929a1a64a658ff0dfc0225da3bbdb75f82a1a0288ff6cdde687ef3b66af20e3369d398460cb5b91c62388c713a31be1b4172a47506fd71629df175946dc5deaeb9bafa736463c82aa761effe54b4810f0db65b57e47ee7ca341e309bbcb305c53f66b1be09a1d7d6213eb7d065bb5a0995168de71905ab20c2c71ae540117a00a632ed92185a615988b766812246019c550a6ce43819faa01a9aba5274af06d4ed86c609c3cf21ac302558c0e7b480ee784c7a61d5c374a733d08956191b0d6df304a2e12831258e1b933d34327eb307a23182f21e16593231772edc9996053240d4a4a21763003b4fb56d5a5a2a28a29399c49b4f0baec8677447ca3059bdd62c08cb2efb76e484f831d665ab30a5acd3e55cbff220451b504e8c8d495a0dfffe0000";
     #[test_only]
-    const ED25519_TO_PK_BYTES : vector<u8> = x"20fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144";
+    const ED25519_TO_PK_BYTES: vector<u8> = x"610352fe6f2e18dd80ecd4c5753f257cbdf773b814804ef923d566b20aea73e2";
     #[test_only]
-    const SIG_CAP_ROTATE_KEY_MULTI_TO_SINGLE: vector<u8> = x"0bc503a99ee09a2bfaeb0039a092abda54cf7493608c01a2e0ac4a0c49958fcbf7eb0521e388ec73b03b978dce79ffda20194aca52cdd13f35c4776de8d27808f0d8c0dbeb14700b46e3c927d848aeba74e0749cdc6429fa1aba1d3e7ef57948bef0810125ccaa2de25a167d13f5725bbc85fcac1b03dff944275d4b4cad3c0ac0000000";
+    const SIG_CAP_ROTATE_KEY_MULTI_TO_SINGLE: vector<u8> = x"9bd379b45d6e46da926c3dface9f673877cdd527871dc71e7dd563a6cba9b59eb5df6bb14c7491bb71e31bf3ba04fb38cf92ec5219ea8010d525d567fa65e601d65362fe7a3ac2e63d60319538dbfc25e4f958940cd1f03054809ffbcb6de6ea6fb28b05aefe6fd4ff62d184dc204f1dcb9e3627b5928dca5d9a62114bb2a80cc0000000";
     #[test_only]
-    const SIG_CAP_UPDATE_TABLE_MULTI_TO_SINGLE: vector<u8> = x"dcb63645f22c9c3f9ff6b05293dc3c0e22e4bd6d6c4001d68869139e78a645d4c0745b61538916b0f6e42736f0dbba19dbd6d1eee5bdd5ef3e7c1d0617b72d01";
+    const SIG_CAP_UPDATE_TABLE_MULTI_TO_SINGLE: vector<u8> = x"ec0c10a20af0be64c01b3643373b9622ef9e572e1e6e3f1fa2d03ca23edb852b71c9dea225fc85442170680653709a31c7d21c2c0777ac31fd91fd0821c74e04";
+    #[test_only]
+    const SIG_CAP_ROTATE_KEY_MULTI_TO_MULTI_SIMPLIFY: vector<u8> = x"919f69fffacd3d41e2cd068e86dd1df167db9c6340a16ec86113d3e2228acc914ba58e73c1754c309a0d5926e2ebc9b5fa9227a480ffddb90377f34d8d75b10e71231129bf22c045fbd95df90e0c63f1439cff354be21599721b9c19d54f5204af07b1589486550a337a34e230ea435b9a41d31552a9805ce644156e4e602405c0000000";
+    #[test_only]
+    const SIG_CAP_ROTATE_KEY_MULTI_TO_SINGLE_SIMPLIFY: vector<u8> = x"1a33145cbbfb2e45820c6273b240b136f3caddfbb4eafda786dc861bfe848e761190c296aa0893da7fdd225839b4acf2d8fbf446e9d20087d11bc3ddb3c7050ea8d72d267275c5c220116b77dc11f252fd0f2985e8a37c713464219071baa6053f67130191659d579bd7cf0f940ee67a9b491c090c860a302b4710e936cc0c03c0000000";
+
 
     #[test(account = @aptos_framework)]
     public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_multi_ed25519(account: signer) acquires Account, OriginatingAddress {
@@ -796,6 +870,42 @@ module aptos_framework::account {
         let new_address = from_bcs::to_address(new_auth_key);
         let expected_originating_address = table::borrow(address_map, new_address);
         assert!(*expected_originating_address == alice_address, 0);
+
+        let account_resource = borrow_global_mut<Account>(alice_address);
+        assert!(account_resource.authentication_key == new_auth_key, 0);
+    }
+
+    #[test(account = @aptos_framework)]
+    public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_multi_ed25519_simplify(account: signer) acquires Account {
+        initialize(&account);
+
+        let curr_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(MULTI_ED25519_SRC_PK_BYTES);
+        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk);
+        let alice_address = from_bcs::to_address(curr_auth_key);
+        create_account_unchecked(alice_address);
+
+        rotate_authentication_key_simplify(alice_address, MULTI_ED25519_SCHEME, MULTI_ED25519_SRC_PK_BYTES, MULTI_ED25519_SCHEME, MULTI_ED25519_TO_PK_BYTES, SIG_CAP_ROTATE_KEY_MULTI_TO_MULTI_SIMPLIFY);
+
+        let new_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(MULTI_ED25519_TO_PK_BYTES);
+        let new_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&new_pk);
+
+        let account_resource = borrow_global_mut<Account>(alice_address);
+        assert!(account_resource.authentication_key == new_auth_key, 0);
+    }
+
+
+    #[test(account = @aptos_framework)]
+    public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_ed25519_simplify(account: signer) acquires Account {
+        initialize(&account);
+
+        let curr_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(MULTI_ED25519_SRC_PK_BYTES);
+        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk);
+        let alice_address = from_bcs::to_address(curr_auth_key);
+        create_account_unchecked(alice_address);
+        rotate_authentication_key_simplify(alice_address, MULTI_ED25519_SCHEME, MULTI_ED25519_SRC_PK_BYTES, ED25519_SCHEME, ED25519_TO_PK_BYTES, SIG_CAP_ROTATE_KEY_MULTI_TO_SINGLE_SIMPLIFY);
+
+        let new_pk = ed25519::new_unvalidated_public_key_from_bytes(ED25519_TO_PK_BYTES);
+        let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk);
 
         let account_resource = borrow_global_mut<Account>(alice_address);
         assert!(account_resource.authentication_key == new_auth_key, 0);
