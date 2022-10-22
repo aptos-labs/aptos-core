@@ -5,8 +5,9 @@ use aptos_api_types::{
     X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_OLDEST_VERSION,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION, X_APTOS_OLDEST_BLOCK_HEIGHT,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct State {
     pub chain_id: u8,
     pub epoch: u64,

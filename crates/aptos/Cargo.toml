@@ -80,6 +80,8 @@ fuzzing = []
 no-upload-proposal = []
 indexer = ["aptos-node/indexer"]
 cli-framework-test-move = []
+# Pre-release feature to run APIs with different outputs
+api = []
 
 [build-dependencies]
 shadow-rs = "0.16.2"

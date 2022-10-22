@@ -39,7 +39,7 @@ where
     parse_struct_tag(&s).map_err(D::Error::custom)
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Account {
     #[serde(deserialize_with = "deserialize_from_prefixed_hex_string")]
     pub authentication_key: AuthenticationKey,

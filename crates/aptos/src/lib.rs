@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 pub mod account;
+mod api;
 pub mod common;
 pub mod config;
 pub mod genesis;
@@ -28,6 +29,9 @@ pub enum Tool {
     #[clap(subcommand)]
     Account(account::AccountTool),
     #[clap(subcommand)]
+    #[cfg(feature = "api")]
+    Api(api::ApiTool),
+    #[clap(subcommand)]
     Config(config::ConfigTool),
     #[clap(subcommand)]
     Genesis(genesis::GenesisTool),
@@ -50,6 +54,8 @@ impl Tool {
         use Tool::*;
         match self {
             Account(tool) => tool.execute().await,
+            #[cfg(feature = "api")]
+            Api(tool) => tool.execute().await,
             Config(tool) => tool.execute().await,
             Genesis(tool) => tool.execute().await,
             Governance(tool) => tool.execute().await,
