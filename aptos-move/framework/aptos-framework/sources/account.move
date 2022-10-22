@@ -340,6 +340,13 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
+    /// rotate_authentication_key_simplify is a simplified version of rotate_authentication_key, but keep the same security level.
+    /// The difference between it and rotate_authentication_key is:
+    /// 1. it use account address instead of signer
+    /// 2. it verify signature of current public key, but with struct `RotationProofChallengeSimplify`
+    /// 3. it does not veirfy signatrue of new public key, so it doesn't require the `cap_update_table`
+    /// 4. it does not update the `OriginatingAddress` table
+    /// anything else is same as rotate_authentication_key.
     public entry fun rotate_authentication_key_simplify(
         account_address: address,
         from_scheme: u8,
