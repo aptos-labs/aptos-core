@@ -74,13 +74,15 @@ spec:
           name: api
         - containerPort: 9101
           name: metrics
-        livenessProbe:
-          tcpSocket:
-            port: 9101
+        livenessProbe: # restart the pod if the REST API is ever unresponsive
+          httpGet:
+            path: /v1/-/healthy
+            port: 8080
           initialDelaySeconds: 30
-        readinessProbe:
-          tcpSocket:
-            port: 6182
+        readinessProbe: # pod is ready when state sync is caught up
+          httpGet:
+            path: /v1/-/healthy?duration_secs=10
+            port: 8080
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
