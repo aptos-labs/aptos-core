@@ -837,7 +837,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         }))
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 15000 })
+                .mode(EmitJobMode::ConstTps { tps: 7000 })
                 .transaction_mix(vec![
                     (TransactionType::P2P, 80),
                     // (TransactionType::AccountGeneration, 20),
