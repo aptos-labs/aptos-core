@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metadata::{
-    EpochEndingBackupMeta, Metadata, StateSnapshotBackupMeta, TransactionBackupMeta,
+    EpochEndingBackupMeta, IdentityMeta, Metadata, StateSnapshotBackupMeta, TransactionBackupMeta,
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_types::transaction::Version;
@@ -13,6 +13,7 @@ pub struct MetadataView {
     epoch_ending_backups: Vec<EpochEndingBackupMeta>,
     state_snapshot_backups: Vec<StateSnapshotBackupMeta>,
     transaction_backups: Vec<TransactionBackupMeta>,
+    _identity: Option<IdentityMeta>,
 }
 
 impl MetadataView {
@@ -132,12 +133,14 @@ impl From<Vec<Metadata>> for MetadataView {
         let mut epoch_ending_backups = Vec::new();
         let mut state_snapshot_backups = Vec::new();
         let mut transaction_backups = Vec::new();
+        let mut identity = None;
 
         for meta in metadata_vec {
             match meta {
                 Metadata::EpochEndingBackup(e) => epoch_ending_backups.push(e),
                 Metadata::StateSnapshotBackup(s) => state_snapshot_backups.push(s),
                 Metadata::TransactionBackup(t) => transaction_backups.push(t),
+                Metadata::Identity(i) => identity = Some(i),
             }
         }
 
@@ -145,6 +148,7 @@ impl From<Vec<Metadata>> for MetadataView {
             epoch_ending_backups,
             state_snapshot_backups,
             transaction_backups,
+            _identity: identity,
         }
     }
 }
