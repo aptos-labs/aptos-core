@@ -1545,14 +1545,6 @@ impl DbWriter for AptosDB {
                latest_in_memory_state.current_version.expect("Must exist")
             );
 
-            // Persist.
-            {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit"])
-                    .start_timer();
-                self.commit(batch)?;
-            }
-
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 ensure!(
@@ -1562,6 +1554,34 @@ impl DbWriter for AptosDB {
                     buffered_state.current_state().base_version,
                     buffered_state.current_state().current_version,
                 );
+
+                // Ensure the incoming committing requests are always consecutive and the version in
+                // buffered state is consistent with that in db.
+                let next_version_in_buffered_state = buffered_state
+                    .current_state()
+                    .current_version
+                    .map(|version| version + 1)
+                    .unwrap_or(0);
+                let num_transactions_in_db = self
+                    .get_latest_transaction_info_option()?
+                    .map(|(version, _)| version + 1)
+                    .unwrap_or(0);
+                ensure!(
+                     num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
+                    "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
+                    first_version,
+                    next_version_in_buffered_state,
+                    num_transactions_in_db,
+                );
+
+                // Persist ledgerDB data first.
+                {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["save_transactions_commit"])
+                        .start_timer();
+                    self.commit(batch)?;
+                }
+
                 let mut end_with_reconfig = false;
                 let updates_until_latest_checkpoint_since_current = if let Some(
                     latest_checkpoint_version,
@@ -1575,7 +1595,7 @@ impl DbWriter for AptosDB {
                             "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                             latest_checkpoint_version,
                             first_version + idx as u64
-                    );
+                        );
                         end_with_reconfig = txns_to_commit[idx].is_reconfig();
                         Some(
                             txns_to_commit[..=idx]

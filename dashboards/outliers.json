@@ -212,15 +212,15 @@
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
-            "properties": [{ "id": "custom.width", "value": 389 }]
+            "properties": [{ "id": "custom.width", "value": 362 }]
           },
           {
             "matcher": { "id": "byName", "options": "Time (last)" },
-            "properties": [{ "id": "custom.width", "value": 179 }]
+            "properties": [{ "id": "custom.width", "value": 177 }]
           },
           {
             "matcher": { "id": "byName", "options": "role (last)" },
-            "properties": [{ "id": "custom.width", "value": 91 }]
+            "properties": [{ "id": "custom.width", "value": 127 }]
           },
           {
             "matcher": { "id": "byName", "options": "Value (last)" },
@@ -309,15 +309,15 @@
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
-            "properties": [{ "id": "custom.width", "value": 398 }]
+            "properties": [{ "id": "custom.width", "value": 366 }]
           },
           {
             "matcher": { "id": "byName", "options": "Time (last)" },
-            "properties": [{ "id": "custom.width", "value": 184 }]
+            "properties": [{ "id": "custom.width", "value": 179 }]
           },
           {
             "matcher": { "id": "byName", "options": "role (last)" },
-            "properties": [{ "id": "custom.width", "value": 81 }]
+            "properties": [{ "id": "custom.width", "value": 133 }]
           },
           {
             "matcher": { "id": "byName", "options": "Value (last)" },
@@ -386,12 +386,18 @@
           "color": { "mode": "thresholds" },
           "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
-            "properties": [{ "id": "custom.width", "value": 413 }]
+            "properties": [{ "id": "custom.width", "value": 371 }]
           },
           {
             "matcher": { "id": "byName", "options": "Time (last)" },
@@ -408,7 +414,13 @@
               { "id": "custom.displayMode", "value": "color-background" },
               {
                 "id": "thresholds",
-                "value": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 10000 }] }
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "red", "value": 10000 }
+                  ]
+                }
               }
             ]
           },
@@ -425,14 +437,14 @@
             "properties": [{ "id": "displayName", "value": "Total IOPS" }]
           },
           { "matcher": { "id": "byName", "options": "name" }, "properties": [{ "id": "custom.width", "value": 90 }] },
-          { "matcher": { "id": "byName", "options": "role" }, "properties": [{ "id": "custom.width", "value": 79 }] },
+          { "matcher": { "id": "byName", "options": "role" }, "properties": [{ "id": "custom.width", "value": 136 }] },
           {
             "matcher": { "id": "byName", "options": "Read IOPS" },
             "properties": [{ "id": "custom.width", "value": 88 }]
           },
           {
             "matcher": { "id": "byName", "options": "Write IOPS" },
-            "properties": [{ "id": "custom.width", "value": 91 }]
+            "properties": [{ "id": "custom.width", "value": 85 }]
           }
         ]
       },
@@ -510,12 +522,12 @@
           "color": { "mode": "fixed" },
           "custom": { "align": "auto", "displayMode": "auto", "filterable": false, "inspect": false },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69" }] }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] }
         },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
-            "properties": [{ "id": "custom.width", "value": 656 }]
+            "properties": [{ "id": "custom.width", "value": 509 }]
           },
           {
             "matcher": { "id": "byName", "options": "Value (last)" },
@@ -523,13 +535,19 @@
               { "id": "custom.displayMode", "value": "color-background" },
               {
                 "id": "thresholds",
-                "value": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 100000 }] }
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "red", "value": 100000 }
+                  ]
+                }
               },
               { "id": "color" },
               { "id": "displayName", "value": "# of versions lagging" }
             ]
           },
-          { "matcher": { "id": "byName", "options": "role" }, "properties": [{ "id": "custom.width", "value": 80 }] }
+          { "matcher": { "id": "byName", "options": "role" }, "properties": [{ "id": "custom.width", "value": 223 }] }
         ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
@@ -604,7 +622,8 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": null,
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -618,6 +637,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "type": "query"
       },
@@ -626,6 +646,7 @@
         "allValue": "",
         "current": { "text": ["mainnet"], "value": "mainnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -639,6 +660,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -646,7 +668,8 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
-        "datasource": null,
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -660,6 +683,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "type": "query"
       },
@@ -668,6 +692,7 @@
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -681,6 +706,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -689,6 +715,7 @@
         "allValue": ".*",
         "current": { "text": ["All"], "value": ["$__all"] },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -702,6 +729,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -728,6 +756,6 @@
   "timezone": "",
   "title": "Outliers",
   "uid": "2tR-VnS4z",
-  "version": 44,
+  "version": 45,
   "weekStart": ""
 }

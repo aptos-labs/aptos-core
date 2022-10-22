@@ -9,7 +9,7 @@ use aptos_types::{
     account_address::create_resource_address, account_address::AccountAddress, event::EventHandle,
     state_store::state_key::StateKey,
 };
-use move_deps::move_core_types::parser::parse_struct_tag;
+use move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]

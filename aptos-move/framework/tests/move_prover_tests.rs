@@ -1,9 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_cli::base::prove::run_move_prover;
+use framework::prover::ProverOptions;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
-use tempfile::tempdir;
+
+// Note: to run these tests, use:
+//
+//   cargo test -- --include-ignored prover
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
 where
@@ -16,19 +20,10 @@ where
 
 pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    let config = move_package::BuildConfig {
-        test_mode: true,
-        install_dir: Some(tempdir().unwrap().path().to_path_buf()),
-        ..Default::default()
-    };
-    run_move_prover(
-        config,
-        &pkg_path,
-        &None,
-        true,
-        move_prover::cli::Options::default(),
-    )
-    .unwrap();
+    let options = ProverOptions::default_for_test();
+    options
+        .prove(pkg_path.as_path(), BTreeMap::default())
+        .unwrap()
 }
 
 #[ignore]

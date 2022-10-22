@@ -5,11 +5,8 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::{
-    token_utils::TokenWriteSet,
-    tokens::{TableHandleToOwner, TableMetadataForToken},
-};
-use crate::schema::current_token_pending_claims;
+use super::{token_utils::TokenWriteSet, tokens::TableHandleToOwner};
+use crate::{schema::current_token_pending_claims, util::standardize_address};
 use aptos_api_types::{DeleteTableItem as APIDeleteTableItem, WriteTableItem as APIWriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
@@ -62,8 +59,7 @@ impl CurrentTokenPendingClaim {
                 _ => None,
             };
             if let Some(token) = maybe_token {
-                let table_handle =
-                    TableMetadataForToken::standardize_handle(&table_item.handle.to_string());
+                let table_handle = standardize_address(&table_item.handle.to_string());
 
                 let maybe_table_metadata = table_handle_to_owner.get(&table_handle);
 
@@ -78,10 +74,10 @@ impl CurrentTokenPendingClaim {
                     return Ok(Some(Self {
                         token_data_id_hash,
                         property_version: token_id.property_version,
-                        from_address: table_metadata.owner_address.clone(),
-                        to_address: offer.to_addr,
+                        from_address: standardize_address(&table_metadata.owner_address),
+                        to_address: standardize_address(&offer.to_addr),
                         collection_data_id_hash,
-                        creator_address: token_data_id.creator,
+                        creator_address: standardize_address(&token_data_id.creator),
                         collection_name,
                         name,
                         amount: token.amount,
@@ -126,8 +122,7 @@ impl CurrentTokenPendingClaim {
             _ => None,
         };
         if let Some(offer) = maybe_offer {
-            let table_handle =
-                TableMetadataForToken::standardize_handle(&table_item.handle.to_string());
+            let table_handle = standardize_address(&table_item.handle.to_string());
 
             let table_metadata = table_handle_to_owner.get(&table_handle).unwrap_or_else(|| {
                 panic!(
@@ -147,10 +142,10 @@ impl CurrentTokenPendingClaim {
             return Ok(Some(Self {
                 token_data_id_hash,
                 property_version: token_id.property_version,
-                from_address: table_metadata.owner_address.clone(),
-                to_address: offer.to_addr,
+                from_address: standardize_address(&table_metadata.owner_address),
+                to_address: standardize_address(&offer.to_addr),
                 collection_data_id_hash,
-                creator_address: token_data_id.creator,
+                creator_address: standardize_address(&token_data_id.creator),
                 collection_name,
                 name,
                 amount: BigDecimal::zero(),
