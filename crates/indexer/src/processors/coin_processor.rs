@@ -162,6 +162,7 @@ fn insert_coin_infos(
                     transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
                     supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
                     supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
         )?;
@@ -207,6 +208,7 @@ fn insert_current_coin_balances(
                     amount.eq(excluded(amount)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(" WHERE current_coin_balances.last_transaction_version <= excluded.last_transaction_version "),
             )?;
@@ -227,8 +229,7 @@ fn insert_coin_supply(
             diesel::insert_into(schema::coin_supply::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, coin_type_hash))
-                .do_update()
-                .set((transaction_epoch.eq(excluded(transaction_epoch)),)),
+                .do_nothing(),
             None,
         )?;
     }
