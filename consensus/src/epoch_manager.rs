@@ -808,7 +808,7 @@ impl EpochManager {
                 proof_timeout_ms: 10000,
                 batch_request_num_peers: 2,
                 end_batch_ms: 500,
-                max_batch_bytes: 100000,
+                max_batch_bytes: 1000000,
                 batch_request_timeout_ms: 10000,
                 batch_expiry_round_gap_when_init: 100,
                 batch_expiry_round_gap_behind_latest_certified: 50,
