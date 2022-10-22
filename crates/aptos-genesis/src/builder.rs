@@ -202,7 +202,7 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
                 "0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb",
             )
             .unwrap(),
-            voter_account_address: private_identity.account_address.into(),
+            //voter_account_address: private_identity.account_address.into(),
             voter_account_public_key: private_identity.account_private_key.public_key(),
             consensus_public_key: Some(private_identity.consensus_private_key.public_key()),
             proof_of_possession: Some(bls12381::ProofOfPossession::create(
@@ -436,7 +436,7 @@ impl Builder {
         Ok(Self {
             config_dir,
             framework,
-            num_validators: NonZeroUsize::new(5).unwrap(),
+            num_validators: NonZeroUsize::new(1).unwrap(),
             randomize_first_validator_ports: true,
             init_config: None,
             init_genesis_config: None,

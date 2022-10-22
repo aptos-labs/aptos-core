@@ -214,15 +214,15 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             )));
         }
 
-        let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
-        let derived_address = auth_key.derived_address();
-        let voter_address = AccountAddress::from(config.voter_account_address);
-        if voter_address != derived_address {
-            return Err(anyhow::Error::msg(format!(
-                "voter_account_address {} does not match account key derived one {}",
-                voter_address, derived_address
-            )));
-        }
+         let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
+         let derived_address = auth_key.derived_address();
+         let voter_address = AccountAddress::from(config.voter_account_address);
+        // if voter_address != derived_address {
+        //     return Err(anyhow::Error::msg(format!(
+        //         "voter_account_address {} does not match account key derived one {}",
+        //         voter_address, derived_address
+        //     )));
+        // }
 
         let consensus_pubkey = if let Some(consensus_public_key) = config.consensus_public_key {
             consensus_public_key.to_bytes().to_vec()
