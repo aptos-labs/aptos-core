@@ -169,8 +169,8 @@ async fn test_critical_timeout() {
         .await
         .unwrap();
 
-    // Drive progress twice and verify we get non-critical timeouts
-    for _ in 0..2 {
+    // Drive progress and verify we get non-critical timeouts
+    for _ in 0..5 {
         let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
             .await
             .unwrap_err();
