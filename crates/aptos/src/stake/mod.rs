@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 
-/// Tool for manipulating stake
+/// Tool for manipulating stake and stake pools
 ///
 #[derive(Parser)]
 pub enum StakeTool {
@@ -50,9 +50,9 @@ impl StakeTool {
     }
 }
 
-/// Stake APT coins to the stake pool
+/// Add APT to a stake pool
 ///
-/// This command allows stake pool owners to add APT coins to their stake.
+/// This command allows stake pool owners to add APT to their stake.
 #[derive(Parser)]
 pub struct AddStake {
     /// Amount of Octas (10^-8 APT) to add to stake
@@ -111,7 +111,7 @@ impl CliCommand<Vec<TransactionSummary>> for AddStake {
     }
 }
 
-/// Unlock staked APT coins
+/// Unlock staked APT in a stake pool
 ///
 /// APT coins can only be unlocked if they no longer have an applied lockup period
 #[derive(Parser)]
@@ -172,7 +172,7 @@ impl CliCommand<Vec<TransactionSummary>> for UnlockStake {
     }
 }
 
-/// Withdraw unlocked staked APT coins
+/// Withdraw unlocked staked APT from a stake pool
 ///
 /// This allows users to withdraw stake back into their CoinStore.
 /// Before calling `WithdrawStake`, `UnlockStake` must be called first.
@@ -200,7 +200,7 @@ impl CliCommand<TransactionSummary> for WithdrawStake {
     }
 }
 
-/// Increase lockup of all staked APT coins in the stake pool
+/// Increase lockup of all staked APT in a stake pool
 ///
 /// Lockup may need to be increased in order to vote on a proposal.
 #[derive(Parser)]
@@ -260,7 +260,7 @@ impl CliCommand<Vec<TransactionSummary>> for IncreaseLockup {
     }
 }
 
-/// Initialize stake owner
+/// Initialize a stake pool owner
 ///
 /// Initializing stake owner adds the capability to delegate the
 /// stake pool to an operator, or delegate voting to a different account.
@@ -301,7 +301,9 @@ impl CliCommand<TransactionSummary> for InitializeStakeOwner {
     }
 }
 
-/// Delegate operator capability from the stake owner to another account
+/// Delegate operator capability from the current operator to another account
+///
+/// By default, the operator of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetOperator {
     /// Account Address of delegated operator
@@ -374,7 +376,9 @@ impl CliCommand<Vec<TransactionSummary>> for SetOperator {
     }
 }
 
-/// Delegate voting capability from the stake owner to another account
+/// Delegate voting capability from the current voter to another account
+///
+/// By default, the voter of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetDelegatedVoter {
     /// Account Address of delegated voter
@@ -443,6 +447,9 @@ impl CliCommand<Vec<TransactionSummary>> for SetDelegatedVoter {
     }
 }
 
+/// Create a staking contract stake pool
+///
+///
 #[derive(Parser)]
 pub struct CreateStakingContract {
     /// Account Address of operator
@@ -555,13 +562,18 @@ impl CliCommand<TransactionSummary> for UnlockVestedCoins {
     }
 }
 
-/// Allows operators to request commission from running a stake pool (only if there's a staking
-/// contract set up with the staker).
+/// Request commission from running a stake pool
+///
+/// Allows operators or owners to request commission from running a stake pool (only if there's a
+/// staking contract set up with the staker).  The commission will be withdrawable at the end of the
+/// stake pool's current lockup period.
 #[derive(Parser)]
 pub struct RequestCommission {
+    /// Address of the owner of the stake pool
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub owner_address: AccountAddress,
 
+    /// Address of the operator of the stake pool
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub operator_address: AccountAddress,
 
@@ -580,12 +592,17 @@ impl CliCommand<TransactionSummary> for RequestCommission {
             .txn_options
             .rest_options
             .client(&self.txn_options.profile_options)?;
+
+        // If this is a vesting stake pool, retrieve the associated vesting contract
         let vesting_admin_store = client
             .get_account_resource_bcs::<VestingAdminStore>(
                 self.owner_address,
                 "0x1::vesting::AdminStore",
             )
             .await;
+
+        // Note: this only works if the vesting contract has exactly one staking contract
+        // associated
         let staker_address = if let Ok(vesting_admin_store) = vesting_admin_store {
             vesting_admin_store.into_inner().vesting_contracts[0]
         } else {

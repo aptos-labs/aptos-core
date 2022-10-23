@@ -16,15 +16,13 @@ use language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
     compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
 };
-use move_deps::{
-    move_binary_format::file_format::CompiledModule,
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{StructTag, TypeTag},
-        vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
-    },
-    move_ir_compiler::Compiler,
+use move_binary_format::file_format::CompiledModule;
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
 };
+use move_ir_compiler::Compiler;
 
 pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 

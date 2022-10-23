@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use crate::{
     schema::current_ans_lookup,
-    util::{bigdecimal_to_u64, parse_timestamp_secs},
+    util::{bigdecimal_to_u64, parse_timestamp_secs, standardize_address},
 };
 use aptos_api_types::{deserialize_from_string, MoveType, Transaction as APITransaction};
 use bigdecimal::BigDecimal;
@@ -24,6 +24,7 @@ pub type CurrentAnsLookupPK = (Domain, Subdomain);
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(domain, subdomain))]
 #[diesel(table_name = current_ans_lookup)]
+#[diesel(treat_none_as_null = true)]
 pub struct CurrentAnsLookup {
     pub domain: String,
     pub subdomain: String,
@@ -120,7 +121,10 @@ impl CurrentAnsLookup {
                                         .subdomain_name
                                         .get_string()
                                         .unwrap_or_default(),
-                                    registered_address: inner.new_address.get_string(),
+                                    registered_address: inner
+                                        .new_address
+                                        .get_string()
+                                        .map(|s| standardize_address(&s)),
                                     last_transaction_version: txn_version,
                                     expiration_timestamp,
                                 }

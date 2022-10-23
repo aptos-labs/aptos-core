@@ -27,18 +27,18 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
     # For most PRs run workflows from main, not the PR commit for security
     paths-ignore:
-      - 'documentation/**'
-      - 'developer-docs-site/**'
-      - '.github/**'
+      - "documentation/**"
+      - "developer-docs-site/**"
+      - ".github/**"
   # For PR that modify .github, run from that PR
   # This will fail to get secrets if you are not from aptos
   pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
     paths:
-      - '.github/workflows/docker-build-test.yaml'
-      - '.github/workflows/run-forge.yaml'
-      - '.github/workflows/docker-rust-build.yaml'
-      - '.github/workflows/sdk-release.yaml'
+      - ".github/workflows/docker-build-test.yaml"
+      - ".github/workflows/run-forge.yaml"
+      - ".github/workflows/docker-rust-build.yaml"
+      - ".github/workflows/sdk-release.yaml"
   push:
     branches:
       - main
@@ -102,7 +102,7 @@ jobs:
   # for the subsequent docker builds. Reusable workflows do not currently have the "env" context: https://github.com/orgs/community/discussions/26671
   determine-docker-build-metadata:
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       - name: collect metadata
         run: |
           echo "GIT_SHA: ${{ env.GIT_SHA }}"
@@ -200,7 +200,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: 843b204dce971d98449b82624f4f684c7a18b991 # test against the latest build on testnet branch
+      IMAGE_TAG: 2d8b1b57553d869190f61df1aaf7f31a8fc19a7b # test against the latest build on testnet branch
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge

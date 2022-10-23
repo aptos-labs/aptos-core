@@ -42,5 +42,4 @@ aptos-bitvec = { path = "../../../crates/aptos-bitvec" }
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }
 aptos-types = { path = "../../../types" }
-move-deps = { path = "../../../aptos-move/move-deps", features = ["address32"] }
 storage-interface = { path = "../../../storage/storage-interface" }

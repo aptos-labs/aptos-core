@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
     // Create the accounts on chain, but only fund Alice.
     // :!:>section_3
     faucet_client
-        .fund(alice.address(), 600_000)
+        .fund(alice.address(), 100_000_000)
         .await
         .context("Failed to fund Alice's account")?;
     faucet_client

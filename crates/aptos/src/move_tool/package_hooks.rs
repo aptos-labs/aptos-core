@@ -5,14 +5,14 @@ use crate::common::types::load_account_arg;
 use crate::move_tool::CachedPackageRegistry;
 use framework::UPGRADE_POLICY_CUSTOM_FIELD;
 use futures::executor::block_on;
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
-use move_deps::move_package::package_hooks::PackageHooks;
-use move_deps::move_package::source_package::parsed_manifest::CustomDepInfo;
-use move_deps::move_symbol_pool::Symbol;
+use move_package::compilation::package_layout::CompiledPackageLayout;
+use move_package::package_hooks::PackageHooks;
+use move_package::source_package::parsed_manifest::CustomDepInfo;
+use move_symbol_pool::Symbol;
 use reqwest::Url;
 
 pub fn register_package_hooks() {
-    move_deps::move_package::package_hooks::register_package_hooks(Box::new(AptosPackageHooks {}))
+    move_package::package_hooks::register_package_hooks(Box::new(AptosPackageHooks {}))
 }
 
 struct AptosPackageHooks {}

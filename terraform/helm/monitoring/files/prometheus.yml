@@ -3,6 +3,13 @@ global:
   evaluation_interval: 15s
   external_labels:
     chain_name: {{ .Values.chain.name }}
+    {{- if .Values.validator.name }}
+    owner: {{ .Values.validator.name }}
+    {{- else if .Values.fullnode.name  }}
+    owner: {{ .Values.fullnode.name }}
+    {{- else }}
+    owner: release:{{ .Release.Name }}
+    {{- end }}
 
 # Alertmanager configuration
 alerting:
@@ -39,7 +46,13 @@ scrape_configs:
     action: drop
     regex: '(.+)_request_duration_seconds_bucket'
   - target_label: owner
+    {{- if .Values.validator.name }}
     replacement: {{ .Values.validator.name }}
+    {{- else if .Values.fullnode.name  }}
+    replacement: {{ .Values.fullnode.name }}
+    {{- else }}
+    replacement: {{ .Release.Name }}
+    {{- end }}
 {{ end }}
 
 - job_name: 'kubernetes-nodes'

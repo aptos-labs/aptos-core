@@ -56,6 +56,7 @@ impl Mempool {
             counters::core_mempool_txn_ranking_score(
                 REMOVE_LABEL,
                 counters::COMMIT_ACCEPTED_LABEL,
+                self.transactions.get_bucket(ranking_score),
                 ranking_score,
             );
         }
@@ -79,6 +80,7 @@ impl Mempool {
             counters::core_mempool_txn_ranking_score(
                 REMOVE_LABEL,
                 counters::COMMIT_REJECTED_LABEL,
+                self.transactions.get_bucket(ranking_score),
                 ranking_score,
             );
         }
@@ -88,9 +90,9 @@ impl Mempool {
     }
 
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
-        if let Some((&insertion_time, is_end_to_end)) = self
+        if let Some((&insertion_time, is_end_to_end, bucket)) = self
             .transactions
-            .get_insertion_time(&account, sequence_number)
+            .get_insertion_time_and_bucket(&account, sequence_number)
         {
             if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
                 let scope = if is_end_to_end {
@@ -98,7 +100,7 @@ impl Mempool {
                 } else {
                     LOCAL_LABEL
                 };
-                counters::core_mempool_txn_commit_latency(stage, scope, time_delta);
+                counters::core_mempool_txn_commit_latency(stage, scope, bucket, time_delta);
             }
         }
     }
@@ -149,6 +151,7 @@ impl Mempool {
         counters::core_mempool_txn_ranking_score(
             INSERT_LABEL,
             status.code.to_string().as_str(),
+            self.transactions.get_bucket(ranking_score),
             ranking_score,
         );
         status
@@ -225,6 +228,7 @@ impl Mempool {
                 counters::core_mempool_txn_ranking_score(
                     CONSENSUS_PULLED_LABEL,
                     CONSENSUS_PULLED_LABEL,
+                    self.transactions.get_bucket(ranking_score),
                     ranking_score,
                 );
             }

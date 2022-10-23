@@ -37,9 +37,9 @@ You can find out when the next epoch starts in multiple ways:
 
 **Use the CLI**
 ```bash
-aptos node show-epoch-info --url https://fullnode.premainnet.aptoslabs.com/v1
+aptos node show-epoch-info --url https://fullnode.mainnet.aptoslabs.com/v1
 ```
-which produces an output like below (example output for premainnet):
+which produces an output like below (example output for mainnet):
 ```json
 {
   "Result": {
@@ -130,7 +130,7 @@ Follow these steps on the Aptos Explorer:
 
 ### How to see previous epoch rewards
 
-To see the previous epoch rewards for a given pool address, click on a URL of the below format. This example is for Premainnet and for the pool address `0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4`. Use the network and pool address of your choice in this place:
+To see the previous epoch rewards for a given pool address, click on a URL of the below format. This example is for mainnet and for the pool address `0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4`. Use the network and pool address of your choice in this place:
 
 ```html
 https://fullnode.mainnet.aptoslabs.com/v1/accounts/0x2b32ede8ef4805487eff7b283571789e0f4d10766d5cb5691fe880b76f21e7e4/events/10
@@ -172,7 +172,7 @@ If your node cannot state sync, and the logs are showing "NoAvailablePeers", it'
 
 #### Workaround
 
-You can try add some extra upstream peers for your fullnode to state sync from. See the guide [Add upstream seed peers](nodes/full-node/fullnode-source-code-or-docker.md#add-upstream-seed-peers).
+You can try add some extra upstream peers for your fullnode to state sync from. See the section [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers).
 
 ### Starting a node throws a YAML-parsing error
 
@@ -199,7 +199,7 @@ The devnet validator fullnodes will accept only a maximum of connections. If Apt
 You can workaround this by:
 
 1. Checking your network configuration.
-2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Add upstream seed peers](nodes/full-node/fullnode-source-code-or-docker.md#add-upstream-seed-peers).
+2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers).
 
 For example, after you add a single peer to the `seeds` section in your `public_full_node.yaml` file like below, restart the `cargo run -p ...` command:
 

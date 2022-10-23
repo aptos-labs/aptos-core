@@ -3,7 +3,7 @@ title: "Events"
 slug: "basics-events"
 ---
 
-Events are emitted during the execution of a transaction. Each Move module can define its own events and choose when to emit the events upon execution of the module. For example, during a [coin transfer][coin_transfer], both the sender and receiver's accounts will emit `SentEvent` and `ReceivedEvent`, respectively. This data is stored within the ledger and can be queried via the REST interface's [Get events by event handle][get_events].
+Events are emitted during the execution of a transaction. Each Move module can define its own events and choose when to emit the events upon execution of the module. For example, during a [coin transfer](https://aptos.dev/tutorials/your-first-transaction/), both the sender and receiver's accounts will emit `SentEvent` and `ReceivedEvent`, respectively. This data is stored within the ledger and can be queried via the REST interface's [Get events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle).
 
 Assuming that an account `0xc40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd` had sent coins to another account, the following query could be made to the REST interface: `https://fullnode.devnet.aptoslabs.com/v1/accounts/c40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`. The output would be all `WithdrawEvent`s stored on that account, it would look like 
 
