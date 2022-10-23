@@ -101,6 +101,19 @@ class RestClient:
     # Transactions
     #
 
+    def simulate_submit_bcs_transaction(self, signed_transaction: SignedTransaction) -> bool:
+        signed_transaction.authenticator.authenticator.signature.signature = bytes.fromhex('0' * 128)
+        headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        response = self.client.post(
+            f"{self.base_url}/transactions/simulate",
+            headers=headers,
+            content=signed_transaction.bytes(),
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+        response = response.json()[0]
+        return response['success']
+
     def submit_bcs_transaction(self, signed_transaction: SignedTransaction) -> str:
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
         response = self.client.post(
