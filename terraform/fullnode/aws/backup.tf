@@ -14,6 +14,12 @@ resource "aws_s3_bucket_public_access_block" "backup" {
   restrict_public_buckets = !var.enable_public_backup
 }
 
+resource "aws_s3_bucket_acl" "public-backup" {
+  count  = var.enable_public_backup ? 1 : 0
+  bucket = aws_s3_bucket.backup.id
+  acl    = "public-read"
+}
+
 data "aws_iam_policy_document" "backup-assume-role" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
