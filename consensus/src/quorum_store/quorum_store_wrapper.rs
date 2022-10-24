@@ -128,7 +128,10 @@ impl QuorumStoreWrapper {
         self.remaining_proof_num > self.back_pressure_limit
     }
 
-    pub(crate) async fn handle_scheduled_pull(&mut self) -> Option<ProofReceiveChannel> {
+    pub(crate) async fn handle_scheduled_pull(
+        &mut self,
+        end_batch_when_back_pressure: bool,
+    ) -> Option<ProofReceiveChannel> {
         let mut exclude_txns: Vec<_> = self
             .batches_in_progress
             .values()
@@ -167,6 +170,10 @@ impl QuorumStoreWrapper {
         let serialized_txns = self.batch_builder.take_serialized_txns();
 
         if self.last_end_batch_time.elapsed().as_millis() > self.end_batch_ms {
+            end_batch = true;
+        }
+
+        if end_batch_when_back_pressure {
             end_batch = true;
         }
 
@@ -393,6 +400,9 @@ impl QuorumStoreWrapper {
             100, // 50 is currently the end batch timer
         ));
 
+        // this is the flag that records whether there is backpressure during last txn pulling from the mempool
+        let mut back_pressure_in_last_pull = false;
+
         loop {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
 
@@ -415,10 +425,21 @@ impl QuorumStoreWrapper {
                 },
 
                 _ = interval.tick() => {
-                    if !self.back_pressure() {
-                        if let Some(proof_rx) = self.handle_scheduled_pull().await {
+                    if self.back_pressure() {
+                        // quorum store needs to be back pressured
+                        // if last txn pull is not back pressured, there may be unfinished batch so we need to end the batch
+                        if !back_pressure_in_last_pull {
+                            if let Some(proof_rx) = self.handle_scheduled_pull(true).await {
+                                proofs_in_progress.push(Box::pin(proof_rx));
+                            }
+                        }
+                        back_pressure_in_last_pull = true;
+                    } else {
+                        // no back pressure
+                        if let Some(proof_rx) = self.handle_scheduled_pull(false).await {
                             proofs_in_progress.push(Box::pin(proof_rx));
                         }
+                        back_pressure_in_last_pull = false;
                     }
                 },
                 Some(next_proof) = proofs_in_progress.next() => {
