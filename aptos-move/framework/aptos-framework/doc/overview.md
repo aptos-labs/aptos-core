@@ -33,6 +33,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::error`](../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error)
 -  [`0x1::event`](event.md#0x1_event)
 -  [`0x1::features`](../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features)
+-  [`0x1::fee_destribution`](fee_distribution.md#0x1_fee_destribution)
 -  [`0x1::fixed_point32`](../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32)
 -  [`0x1::from_bcs`](../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs)
 -  [`0x1::gas_schedule`](gas_schedule.md#0x1_gas_schedule)

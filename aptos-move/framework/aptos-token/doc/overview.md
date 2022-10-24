@@ -33,6 +33,7 @@ This is the reference documentation of the Aptos Token framework.
 -  [`0x1::error`](../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error)
 -  [`0x1::event`](../../aptos-framework/doc/event.md#0x1_event)
 -  [`0x1::features`](../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features)
+-  [`0x1::fee_destribution`](../../aptos-framework/doc/fee_distribution.md#0x1_fee_destribution)
 -  [`0x1::fixed_point32`](../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32)
 -  [`0x1::from_bcs`](../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs)
 -  [`0x1::gas_schedule`](../../aptos-framework/doc/gas_schedule.md#0x1_gas_schedule)

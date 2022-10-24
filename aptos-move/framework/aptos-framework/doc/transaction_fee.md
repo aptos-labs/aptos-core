@@ -7,6 +7,7 @@
 
 -  [Resource `AptosCoinCapabilities`](#0x1_transaction_fee_AptosCoinCapabilities)
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
+-  [Function `burn_collected_fee`](#0x1_transaction_fee_burn_collected_fee)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_transaction_fee_store_aptos_coin_burn_cap)
 
 
@@ -64,6 +65,34 @@ Burn transaction fees in epilogue.
     <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>&lt;AptosCoin&gt;(
         <a href="account.md#0x1_account">account</a>,
         fee,
+        &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_fee_burn_collected_fee"></a>
+
+## Function `burn_collected_fee`
+
+Burn collected transaction fees if fee distribution fails.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_collected_fee">burn_collected_fee</a>(<a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_collected_fee">burn_collected_fee</a>(<a href="coin.md#0x1_coin">coin</a>: Coin&lt;AptosCoin&gt;) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    <a href="coin.md#0x1_coin_burn">coin::burn</a>&lt;AptosCoin&gt;(
+        <a href="coin.md#0x1_coin">coin</a>,
         &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
     );
 }

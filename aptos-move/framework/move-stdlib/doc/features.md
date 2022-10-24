@@ -11,6 +11,7 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Constants](#@Constants_0)
 -  [Function `code_dependency_check_enabled`](#0x1_features_code_dependency_check_enabled)
 -  [Function `treat_friend_as_private`](#0x1_features_treat_friend_as_private)
+-  [Function `collect_gas_fees`](#0x1_features_collect_gas_fees)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -67,6 +68,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_CODE_DEPENDENCY_CHECK">CODE_DEPENDENCY_CHECK</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_features_COLLECT_GAS_FEES"></a>
+
+Whether gas fees are collected and distributed to block proposer.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_COLLECT_GAS_FEES">COLLECT_GAS_FEES</a>: u64 = 3;
 </code></pre>
 
 
@@ -134,6 +146,30 @@ Lifetime: ephemeral
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_treat_friend_as_private">treat_friend_as_private</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_TREAT_FRIEND_AS_PRIVATE">TREAT_FRIEND_AS_PRIVATE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_collect_gas_fees"></a>
+
+## Function `collect_gas_fees`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_gas_fees">collect_gas_fees</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_gas_fees">collect_gas_fees</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECT_GAS_FEES">COLLECT_GAS_FEES</a>)
 }
 </code></pre>
 
