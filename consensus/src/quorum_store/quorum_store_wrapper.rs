@@ -415,11 +415,11 @@ impl QuorumStoreWrapper {
                 },
 
                 _ = interval.tick() => {
-                    if !self.back_pressure() {
+                    // if !self.back_pressure() {
                         if let Some(proof_rx) = self.handle_scheduled_pull().await {
                             proofs_in_progress.push(Box::pin(proof_rx));
                         }
-                    }
+                    // }
                 },
                 Some(next_proof) = proofs_in_progress.next() => {
             match next_proof {
