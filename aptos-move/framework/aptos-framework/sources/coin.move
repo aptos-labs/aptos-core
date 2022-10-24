@@ -76,7 +76,7 @@ module aptos_framework::coin {
     }
 
     /// Structure representing aggregatable coin.
-    struct AggregatorCoin<phantom CoinType> has store {
+    struct AggregatableCoin<phantom CoinType> has store {
         /// Amount of aggregator coin this address has.
         value: Aggregator,
     }
@@ -159,21 +159,21 @@ module aptos_framework::coin {
 
     /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
     /// only be called by Aptos Framework (0x1) account for now becuase of `create_aggregator`.
-    public fun initialize_aggregator_coin<CoinType>(aptos_framework: &signer): AggregatorCoin<CoinType> {
+    public fun initialize_aggregator_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
         let aggregator = aggregator_factory::create_aggregator(aptos_framework, MAX_U64);
-        AggregatorCoin<CoinType> {
+        AggregatableCoin<CoinType> {
             value: aggregator,
         }
     }
 
     /// Returns true if the value of aggregatable coin is zero.
-    public fun is_zero<CoinType>(coin: &AggregatorCoin<CoinType>): bool {
+    public fun is_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
         let amount = aggregator::read(&coin.value);
         amount == 0
     }
 
     /// Drains the aggregatable coin, setting it to zero and returning a standard coin.
-    public fun drain<CoinType>(coin: &mut AggregatorCoin<CoinType>): Coin<CoinType> {
+    public fun drain<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
         let amount = aggregator::read(&coin.value);
         assert!(amount <= MAX_U64, error::out_of_range(EAGGREGATOR_COIN_VALUE_TOO_LARGE));
 
@@ -184,7 +184,7 @@ module aptos_framework::coin {
     }
 
     /// Aggregates `coin` into aggregatable coin (`dst_coin`).
-    public fun aggregate<CoinType>(dst_coin: &mut AggregatorCoin<CoinType>, coin: Coin<CoinType>) {
+    public fun aggregate<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
         let Coin { value } = coin;
         let amount = (value as u128);
         aggregator::add(&mut dst_coin.value, amount);
@@ -194,7 +194,7 @@ module aptos_framework::coin {
     public fun collect_from<CoinType>(
         account_addr: address,
         amount: u64,
-        dst_coin: &mut AggregatorCoin<CoinType>,
+        dst_coin: &mut AggregatableCoin<CoinType>,
     ) acquires CoinStore {
         // Skip collecting if amount is zero.
         if (amount == 0) {

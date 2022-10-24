@@ -3,7 +3,7 @@ module aptos_framework::fee_destribution {
     use std::option::{Self, Option};
 
     use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::coin::{Self, AggregatorCoin};
+    use aptos_framework::coin::{Self, AggregatableCoin};
     use aptos_framework::system_addresses;
     use aptos_framework::transaction_fee;
 
@@ -14,7 +14,7 @@ module aptos_framework::fee_destribution {
 
     /// Resource which holds the collected transaction fees and their receiver.
     struct DistributionInfo has key {
-        balance: AggregatorCoin<AptosCoin>,
+        balance: AggregatableCoin<AptosCoin>,
         receiver: Option<address>,
     }
 
