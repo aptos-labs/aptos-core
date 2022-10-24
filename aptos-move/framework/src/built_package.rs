@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::docgen::DocgenOptions;
 use crate::error_map::generate_error_map;
 use crate::natives::code::{
     ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
@@ -10,17 +11,19 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::EntryABI;
 use clap::Parser;
-use move_deps::move_binary_format::CompiledModule;
-use move_deps::move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_deps::move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_deps::move_core_types::errmap::ErrorMapping;
-use move_deps::move_core_types::metadata::Metadata;
-use move_deps::move_package::compilation::compiled_package::CompiledPackage;
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
-use move_deps::move_package::source_package::manifest_parser::{
+use itertools::Itertools;
+use move_binary_format::CompiledModule;
+use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
+use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use move_core_types::errmap::ErrorMapping;
+use move_core_types::metadata::Metadata;
+use move_model::model::GlobalEnv;
+use move_package::compilation::compiled_package::CompiledPackage;
+use move_package::compilation::package_layout::CompiledPackageLayout;
+use move_package::source_package::manifest_parser::{
     parse_move_manifest_string, parse_source_manifest,
 };
-use move_deps::move_package::BuildConfig;
+use move_package::{BuildConfig, ModelConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -39,14 +42,18 @@ pub struct BuildOptions {
     pub with_source_maps: bool,
     #[clap(long, default_value = "true")]
     pub with_error_map: bool,
+    #[clap(long)]
+    pub with_docs: bool,
     /// Installation directory for compiled artifacts. Defaults to <package>/build.
     #[clap(long, parse(from_os_str))]
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
+    #[clap(skip)]
+    pub docgen_options: Option<DocgenOptions>,
 }
 
-// Because named_addresses as no parser, we can't use clap's default impl. This must be aligned
+// Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
 // with defaults above.
 impl Default for BuildOptions {
     fn default() -> Self {
@@ -55,18 +62,46 @@ impl Default for BuildOptions {
             with_abis: false,
             with_source_maps: false,
             with_error_map: true,
+            with_docs: false,
             install_dir: None,
             named_addresses: Default::default(),
+            docgen_options: None,
         }
     }
 }
 
 /// Represents a built package.  It allows to extract `PackageMetadata`. Can also be used to
-/// just build Move code.
+/// just build Move code and related artifacts.
 pub struct BuiltPackage {
     options: BuildOptions,
     package_path: PathBuf,
     package: CompiledPackage,
+}
+
+pub(crate) fn build_model(
+    package_path: &Path,
+    additional_named_addresses: BTreeMap<String, AccountAddress>,
+    target_filter: Option<String>,
+) -> anyhow::Result<GlobalEnv> {
+    let build_config = BuildConfig {
+        dev_mode: false,
+        additional_named_addresses,
+        architecture: None,
+        generate_abis: false,
+        generate_docs: false,
+        install_dir: None,
+        test_mode: false,
+        force_recompilation: false,
+        fetch_deps_only: false,
+        fetch_latest_git_deps: false,
+    };
+    build_config.move_model_for_package(
+        package_path,
+        ModelConfig {
+            target_filter,
+            all_files_as_targets: false,
+        },
+    )
 }
 
 impl BuiltPackage {
@@ -85,16 +120,49 @@ impl BuiltPackage {
             test_mode: false,
             force_recompilation: false,
             fetch_deps_only: false,
+            fetch_latest_git_deps: false,
         };
-        let mut package = build_config.compile_package_no_exit(&package_path, &mut Vec::new())?;
+        eprintln!("Compiling, may take a little while to download git dependencies...");
+        let mut package =
+            build_config.compile_package_no_exit(&package_path, &mut std::io::stderr())?;
         for module in package.root_modules_map().iter_modules().iter() {
             verify_module_init_function(module)?;
         }
-        let error_map = if options.with_error_map {
-            generate_error_map(&package_path, &options)
+
+        let error_map = if options.with_error_map || options.with_docs {
+            let model = build_model(
+                package_path.as_path(),
+                options.named_addresses.clone(),
+                None,
+            )?;
+            if options.with_docs {
+                let docgen = if let Some(opts) = options.docgen_options.clone() {
+                    opts
+                } else {
+                    DocgenOptions::default()
+                };
+                let dep_paths = package
+                    .deps_compiled_units
+                    .iter()
+                    .map(|(_, u)| {
+                        u.source_path
+                            .parent()
+                            .unwrap()
+                            .parent()
+                            .unwrap()
+                            .join("doc")
+                            .display()
+                            .to_string()
+                    })
+                    .unique()
+                    .collect::<Vec<_>>();
+                docgen.run(package_path.display().to_string(), dep_paths, &model)?
+            }
+            Some(generate_error_map(&model))
         } else {
             None
         };
+
         if let Some(map) = &error_map {
             inject_module_metadata(
                 package_path

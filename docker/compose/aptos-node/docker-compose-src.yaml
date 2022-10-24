@@ -1,0 +1,84 @@
+# This compose file defines an Aptos Validator deployment.
+# Read the README.md files for instruction on how to install aptos-node
+
+version: "3.8"
+services:
+  haproxy:
+    image: haproxytech/haproxy-debian:2.2
+    volumes:
+      - type: bind
+        source: ./haproxy.cfg
+        target: /usr/local/etc/haproxy/haproxy.cfg
+      - type: bind
+        source: ./blocked.ips
+        target: /usr/local/etc/haproxy/blocked.ips
+    networks:
+      - shared
+    expose:
+      # Validator network
+      - 6180
+      # Fullnode access to validators
+      - 6181
+      # Validator Metrics
+      - 9101
+      # Haproxy internal stats
+      - 9102
+      # Disable access to rest API port 80 for validator by default
+      # - 8180
+    ports:
+      # Expose these to the outside
+      - "6180:6180"
+      - "6181:6181"
+      # Preface these with 127 to only expose them locally
+      - "127.0.0.1:9101:9101"
+      - "127.0.0.1:9102:9102"
+      # Disable access to rest API port 80 for validator by default
+      # - 8180:8180
+
+
+  validator:
+    image: debian:latest
+    networks:
+      shared:
+    volumes:
+      - type: bind
+        source: aptos-node
+        target: /usr/local/bin/aptos-node
+      - type: volume
+        source: aptos-validator
+        target: /opt/aptos/data
+      - type: bind
+        source: ./validator.yaml
+        target: /opt/aptos/etc/validator.yaml
+      - type: bind
+        source: ./genesis.blob
+        target: /opt/aptos/genesis/genesis.blob
+      - type: bind
+        source: ./waypoint.txt
+        target: /opt/aptos/genesis/waypoint.txt
+      - type: bind
+        source: ./keys/validator-identity.yaml
+        target: /opt/aptos/genesis/validator-identity.yaml
+    command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
+    restart: unless-stopped
+    expose:
+      # These are only exposed on the docker internal network
+      # Validator network
+      - 6180
+      # Fullnode access to validators
+      - 6181
+      # Validator Metrics
+      - 9101
+      # Disable access to rest API port 80 for validator by default
+      # - 8080
+
+networks:
+  shared:
+    name: "aptos-docker-compose-shared"
+    ipam:
+      config:
+        - subnet: 172.16.1.0/24
+
+volumes:
+  aptos-validator:
+    name: aptos-validator

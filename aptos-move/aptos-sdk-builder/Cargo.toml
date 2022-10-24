@@ -11,7 +11,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.57"
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 heck = "0.3.2"
 once_cell = "1.10.0"
 regex = "1.5.5"
@@ -22,7 +22,8 @@ structopt = "0.3.21"
 textwrap = "0.15.0"
 
 aptos-types = { path = "../../types" }
-move-deps = { path = "../move-deps", features = ["address32"] }
+
+move-core-types = { workspace = true }
 
 [dev-dependencies]
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }

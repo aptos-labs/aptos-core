@@ -10,10 +10,12 @@ use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
 
 use again::RetryPolicy;
 use aptos_logger::info;
+use json_patch::{Patch as JsonPatch, PatchOperation, ReplaceOperation};
 use kube::{
     api::{Api, Meta, Patch, PatchParams},
     client::Client as K8sClient,
 };
+use serde_json::{json, Value};
 use thiserror::Error;
 
 use crate::create_k8s_client;
@@ -119,7 +121,7 @@ async fn check_stateful_set_status(
                 .map_err(|e| WorkloadScalingError::RetryableError(e.to_string()))?
                 .status
             {
-                if let Some(container_statuses) = status.container_statuses {
+                if let Some(ref container_statuses) = status.container_statuses {
                     if let Some(container_status) = container_statuses.last() {
                         if let Some(state) = &container_status.state {
                             if let Some(waiting) = &state.waiting {
@@ -159,8 +161,8 @@ async fn check_stateful_set_status(
                     info!("Pod {} at phase {}", &pod_name, phase)
                 }
                 Err(WorkloadScalingError::RetryableError(format!(
-                    "Retry due to pod {} status",
-                    &pod_name
+                    "Retry due to pod {} status {:?}",
+                    &pod_name, status
                 )))
             } else {
                 Err(WorkloadScalingError::FinalError(format!(
@@ -247,6 +249,38 @@ pub async fn scale_stateful_set_replicas(
     Ok(())
 }
 
+pub async fn set_identity(
+    sts_name: &str,
+    kube_namespace: &str,
+    k8s_secret_name: &str,
+) -> Result<()> {
+    let kube_client = create_k8s_client().await;
+    let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
+    let patch_op = PatchOperation::Replace(ReplaceOperation {
+        // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.
+        path: "/spec/template/spec/volumes/1/secret/secretName".to_string(),
+        value: json!(k8s_secret_name),
+    });
+    let patch: Patch<Value> = Patch::Json(JsonPatch(vec![patch_op]));
+    let pp = PatchParams::apply("forge");
+    stateful_set_api.patch(sts_name, &pp, &patch).await?;
+    Ok(())
+}
+
+pub async fn get_identity(sts_name: &str, kube_namespace: &str) -> Result<String> {
+    let kube_client = create_k8s_client().await;
+    let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
+    let sts = stateful_set_api.get(sts_name).await?;
+    // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.
+    let secret_name = sts.spec.unwrap().template.spec.unwrap().volumes.unwrap()[1]
+        .secret
+        .clone()
+        .unwrap()
+        .secret_name
+        .unwrap();
+    Ok(secret_name)
+}
+
 pub async fn check_for_container_restart(
     kube_client: &K8sClient,
     kube_namespace: &str,
@@ -258,17 +292,15 @@ pub async fn check_for_container_restart(
             let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
             Box::pin(async move {
                 // Get the StatefulSet's Pod status
-                if let Some(status) = pod_api
-                    .get_status(format!("{}-0", sts_name).as_str())
-                    .await?
-                    .status
-                {
+                let pod_name = format!("{}-0", sts_name);
+                if let Some(status) = pod_api.get_status(&pod_name).await?.status {
                     if let Some(container_statuses) = status.container_statuses {
                         for container_status in container_statuses {
                             if container_status.restart_count > 0 {
                                 bail!(
-                                    "Container {} restarted {} times ",
+                                    "Container {} in pod {} restarted {} times ",
                                     container_status.name,
+                                    &pod_name,
                                     container_status.restart_count
                                 );
                             }

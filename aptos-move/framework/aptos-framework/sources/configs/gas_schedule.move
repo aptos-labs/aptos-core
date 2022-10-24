@@ -50,7 +50,7 @@ module aptos_framework::gas_schedule {
             let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
             let new_gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
             assert!(new_gas_schedule.feature_version >= gas_schedule.feature_version,
-                    error::invalid_argument(EINVALID_GAS_FEATURE_VERSION));
+                error::invalid_argument(EINVALID_GAS_FEATURE_VERSION));
             // TODO(Gas): check if gas schedule is consistent
             *gas_schedule = new_gas_schedule;
         }

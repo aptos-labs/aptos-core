@@ -16,7 +16,7 @@ Events:
     key:     0500000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
     seq_num: 0
     type:    0x3::token::CreateTokenDataEvent
-    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00640000000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6000000000000000000000000000000000a6765656b5f746f6b656e0000000000000000"
+    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00640000000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6010000000000000000000000000000000a6765656b5f746f6b656e0000000000000000"
 }
 {
     key:     0700000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
@@ -84,7 +84,7 @@ Events:
     key:     0b00000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
     seq_num: 0
     type:    0x3::token_transfers::TokenOfferEvent
-    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
+    data:    "9c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aaf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
 
@@ -105,4 +105,4 @@ Events:
 return values: 0
 
 task 7 'view_table'. lines 21-21:
-{"default_properties":{"map":{"data":[]}},"description":"","largest_property_version":"0","maximum":"100","mutability_config":{"description":false,"maximum":false,"properties":false,"royalty":false,"uri":false},"name":"geek_token","royalty":{"payee_address":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","royalty_points_denominator":"0","royalty_points_numerator":"0"},"supply":"10","uri":""}
+{"default_properties":{"map":{"data":[]}},"description":"","largest_property_version":"0","maximum":"100","mutability_config":{"description":false,"maximum":false,"properties":false,"royalty":false,"uri":false},"name":"geek_token","royalty":{"payee_address":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","royalty_points_denominator":"1","royalty_points_numerator":"0"},"supply":"10","uri":""}

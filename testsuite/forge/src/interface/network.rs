@@ -61,10 +61,18 @@ impl<'t> NetworkContext<'t> {
         window: &Duration,
         start_time: i64,
         end_time: i64,
+        start_version: u64,
+        end_version: u64,
     ) -> Result<()> {
-        self.runtime.block_on(
-            self.success_criteria
-                .check_for_success(stats, window, self.swarm, start_time, end_time),
-        )
+        self.runtime
+            .block_on(self.success_criteria.check_for_success(
+                stats,
+                window,
+                self.swarm,
+                start_time,
+                end_time,
+                start_version,
+                end_version,
+            ))
     }
 }

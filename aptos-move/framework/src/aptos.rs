@@ -3,11 +3,12 @@
 
 #![forbid(unsafe_code)]
 
+use crate::docgen::DocgenOptions;
 use crate::release_builder::RELEASE_BUNDLE_EXTENSION;
 use crate::release_bundle::ReleaseBundle;
 use crate::{path_in_crate, BuildOptions, ReleaseOptions};
 use clap::ArgEnum;
-use move_deps::move_command_line_common::address::NumericalAddress;
+use move_command_line_common::address::NumericalAddress;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -86,7 +87,7 @@ impl ReleaseTarget {
         ReleaseBundle::read(path)
     }
 
-    pub fn create_release(self, out: Option<PathBuf>) -> anyhow::Result<()> {
+    pub fn create_release(self, with_srcs: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
         let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let packages = self
             .packages()
@@ -97,12 +98,22 @@ impl ReleaseTarget {
             .collect::<Vec<_>>();
         let options = ReleaseOptions {
             build_options: BuildOptions {
-                with_srcs: true,
+                with_srcs,
                 with_abis: true,
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses: Default::default(),
                 install_dir: None,
+                with_docs: true,
+                docgen_options: Some(DocgenOptions {
+                    include_impl: true,
+                    include_specs: true,
+                    specs_inlined: false,
+                    include_dep_diagram: false,
+                    collapsed_sections: true,
+                    landing_page_template: Some("doc_template/overview.md".to_string()),
+                    references_file: Some("doc_template/references.md".to_string()),
+                }),
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages

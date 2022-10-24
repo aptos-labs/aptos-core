@@ -22,6 +22,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
+use aptos_types::write_set::WriteSet;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -97,7 +98,8 @@ impl LoadedChunk {
         let mut event_vecs = Vec::new();
 
         while let Some(record_bytes) = file.read_record_bytes().await? {
-            let (txn, txn_info, events) = bcs::from_bytes(&record_bytes)?;
+            let (txn, txn_info, events, _write_set): (_, _, _, WriteSet) =
+                bcs::from_bytes(&record_bytes)?;
             txns.push(txn);
             txn_infos.push(txn_info);
             event_vecs.push(events);

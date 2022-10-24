@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared_mempool::types::{BatchId, QuorumStoreRequest};
+use crate::shared_mempool::types::{MultiBatchId, QuorumStoreRequest};
 use anyhow::Error;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::Schema;
@@ -57,13 +57,17 @@ impl TxnsLog {
         account: AccountAddress,
         seq_num: u64,
         status: &str,
-        timestamp: Option<SystemTime>,
+        timestamp: SystemTime,
     ) {
         if self.txns.len() < self.max_displayed {
             self.txns
-                .push((account, seq_num, Some(status.to_string()), timestamp));
+                .push((account, seq_num, Some(status.to_string()), Some(timestamp)));
         }
         self.len += 1;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 }
 
@@ -108,7 +112,7 @@ pub struct LogSchema<'a> {
     network_level: Option<usize>,
     upstream_network: Option<&'a NetworkId>,
     #[schema(debug)]
-    batch_id: Option<&'a BatchId>,
+    batch_id: Option<&'a MultiBatchId>,
     backpressure: Option<bool>,
 }
 

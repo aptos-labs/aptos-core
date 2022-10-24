@@ -38,7 +38,7 @@ pub async fn generate_traffic(
         .transaction_mix(vec![
             (TransactionType::P2P, 70),
             (TransactionType::AccountGeneration, 20),
-            (TransactionType::NftMint, 10),
+            (TransactionType::NftMintAndTransfer, 10),
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter

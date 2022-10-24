@@ -1,15 +1,15 @@
 ---
-title: "Use Aptos CLI"
+title: "Using Aptos CLI"
 id: "use-aptos-cli"
 ---
 
-# Use Aptos CLI
+# Using Aptos CLI
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To install the CLI, see [Install Aptos CLI](install-aptos-cli).
 
 ## Command line help
 
-Command line help is available.  Type `aptos help` or `aptos --help` to see the available command options. See below the usage output from `aptos --help`: 
+Command line help is available.  Type `aptos help` or `aptos --help` to see the available command options. See below the usage output from `aptos --help`:
 
 ```bash
 USAGE:
@@ -85,16 +85,16 @@ OPTIONS:
 
         --named-addresses <NAMED_ADDRESSES>
             Named addresses for the move binary
-            
+
             Example: alice=0x1234, bob=0x5678
-            
+
             Note: This will fail if there are duplicates in the Move.toml file remove those first.
-            
+
             [default: ]
 
         --output-dir <OUTPUT_DIR>
             Path to save the compiled move package
-            
+
             Defaults to `<package_dir>/build`
 
         --package-dir <PACKAGE_DIR>
@@ -130,8 +130,8 @@ Configuration for the CLI works like this:
 
 ### In the current working directory for local runs
 
-1. Your configurations are in a **local** YAML configuration file `.aptos/config.yaml`, i.e., located in the current working directory where you run the CLI. In this case you must run your CLI commands from this current working directory for this configuration to be used. 
-2. You can verify that the CLI is set to use this local configuration YAML file by running the command: 
+1. Your configurations are in a **local** YAML configuration file `.aptos/config.yaml`, i.e., located in the current working directory where you run the CLI. In this case you must run your CLI commands from this current working directory for this configuration to be used.
+2. You can verify that the CLI is set to use this local configuration YAML file by running the command:
 
   ```bash
   aptos config show-global-config
@@ -172,7 +172,7 @@ Configuration for the CLI works like this:
   ```
 
 :::tip Default configuration
-If you did not set any global configuration, then the `./.aptos/config.yaml` in the current working dorectory is used for configuration.
+If you did not set any global configuration, then the `./.aptos/config.yaml` in the current working directory is used for configuration.
 :::
 
 ### Setting up shell completion
@@ -242,7 +242,7 @@ Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A0
 
 ### Fund an account with the faucet
 
-You can fund an account with the faucet via the CLI by using either an account address or with `default` (which defaults to the account address created with `aptos init`). 
+You can fund an account with the faucet via the CLI by using either an account address or with `default` (which defaults to the account address created with `aptos init`).
 
 For example, to fund the account `00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696` that was created above with the `aptos init` command:
 
@@ -391,7 +391,7 @@ Both the above commands will generate the following resource list information on
 
 You can also list the default profile from configuration with no account specified.
 
-:::tip 
+:::tip
 Account addresses may differ from example to example in this section.
 :::
 
@@ -504,7 +504,7 @@ $ aptos account list --query resources --account superuser
 You can pass different types of queries to view different items under an account. Currently, 'resources' and
 'modules' are supported but more query types are coming. For example, to fetch modules:
 ```bash
-$ aptos account list --query modules                   
+$ aptos account list --query modules
 {
   "Result": [
     {
@@ -818,6 +818,10 @@ You can additionally use named profiles for the addresses.  The first placeholde
 $ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
 ```
 
+:::tip
+When publishing Move modules, if multiple modules are in one package, then all the modules in this package must have the same account. If they have different accounts, then the publishing will fail at the transaction level.
+:::
+
 ### Running a Move function
 
 Now that you've published the function above, you can run it.
@@ -899,7 +903,7 @@ $ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3
     "version": 3488,
     "vm_status": "Executed successfully"
   }
-} 
+}
 ```
 
 Additionally, profiles can replace addresses in the function id.

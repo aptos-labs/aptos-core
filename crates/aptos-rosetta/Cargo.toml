@@ -13,13 +13,14 @@ publish = false
 anyhow = "1.0.57"
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-node = { path = "../../aptos-node" }
 aptos-rest-client = { path = "../aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 aptos-types = { path = "../../types" }
 aptos-warp-webserver = { path = "../aptos-warp-webserver" }
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 clap = "3.1.18"
 futures = "0.3.17"
@@ -30,8 +31,9 @@ percent-encoding = "2.1.0"
 reqwest = { version = "0.11.10", features = ["json", "cookies"] }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
+serde_yaml = "0.8.24"
 tokio = { version = "1.21.0", features = ["full", "time"] }
 url = "2.2.2"
 warp = "0.3.2"
 
-move-deps = { path = "../../aptos-move/move-deps" }
+move-core-types = { workspace = true }

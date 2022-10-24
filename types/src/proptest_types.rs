@@ -36,7 +36,7 @@ use aptos_crypto::{
     traits::*,
     HashValue,
 };
-use move_deps::move_core_types::language_storage::TypeTag;
+use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
     option,
@@ -104,7 +104,10 @@ impl Arbitrary for ChangeSet {
     type Parameters = ();
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         (any::<WriteSet>(), vec(any::<ContractEvent>(), 0..10))
-            .prop_map(|(ws, events)| ChangeSet::new(ws, events))
+            .prop_map(|(ws, events)| {
+                // TODO(gas): probably move LATEST_GAS_FEATURE_VERSION to global-constants
+                ChangeSet::new(ws, events, 3).unwrap()
+            })
             .boxed()
     }
 
@@ -565,7 +568,7 @@ prop_compose! {
         account_keypair in ed25519::keypair_strategy(),
         consensus_keypair in bls12381_keys::keypair_strategy(),
     ) -> (AccountAddress, ValidatorConsensusInfo,  bls12381::Signature) {
-        let signature = consensus_keypair.private_key.sign(&ledger_info);
+        let signature = consensus_keypair.private_key.sign(&ledger_info).unwrap();
         let address = account_address::from_public_key(&account_keypair.public_key);
         (address, ValidatorConsensusInfo::new(address, consensus_keypair.public_key, 1), signature)
     }

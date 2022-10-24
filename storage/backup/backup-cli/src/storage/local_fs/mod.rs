@@ -105,6 +105,7 @@ impl BackupStorage for LocalFs {
         file.write_all(content.as_ref().as_bytes())
             .await
             .err_notes(&path)?;
+        file.shutdown().await.err_notes(&path)?;
 
         Ok(())
     }

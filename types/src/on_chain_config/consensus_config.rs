@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::{block_info::Round, on_chain_config::OnChainConfig};
 use anyhow::{format_err, Result};
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
 /// The on-chain consensus config, in order to be able to add fields, we use enum to wrap the actual struct.

@@ -23,6 +23,10 @@ impl BlocksApi {
     /// This endpoint allows you to get the transactions in a block
     /// and the corresponding block information.
     ///
+    /// Transactions are limited by max default transactions size.  If not all transactions
+    /// are present, the user will need to query for the rest of the transactions via the
+    /// get transactions API.
+    ///
     /// If the block is pruned, it will return a 410
     #[oai(
         path = "/blocks/by_height/:block_height",
@@ -54,6 +58,10 @@ impl BlocksApi {
     ///
     /// This endpoint allows you to get the transactions in a block
     /// and the corresponding block information given a version in the block.
+    ///
+    /// Transactions are limited by max default transactions size.  If not all transactions
+    /// are present, the user will need to query for the rest of the transactions via the
+    /// get transactions API.
     ///
     /// If the block has been pruned, it will return a 410
     #[oai(

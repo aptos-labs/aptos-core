@@ -27,6 +27,7 @@ mod pruner;
 mod state_merkle_db;
 mod state_store;
 mod transaction_store;
+mod utils;
 mod versioned_node_cache;
 
 #[cfg(test)]
@@ -47,7 +48,7 @@ use crate::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::{pruner_manager::PrunerManager, utils},
+    pruner::{pruner_manager::PrunerManager, pruner_utils},
     schema::*,
     state_store::StateStore,
     transaction_store::TransactionStore,
@@ -56,7 +57,8 @@ use anyhow::{bail, ensure, Result};
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_config::config::{
-    PrunerConfig, RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    PrunerConfig, RocksdbConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 
 use aptos_crypto::hash::HashValue;
@@ -89,12 +91,11 @@ use aptos_types::{
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
         TransactionWithProof, Version,
     },
-    write_set::WriteSet,
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
-use move_deps::move_resource_viewer::MoveValueAnnotator;
+use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use schemadb::{SchemaBatch, DB};
 use std::{
@@ -121,6 +122,8 @@ use storage_interface::{
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 
+// This is last line of defense against large queries slipping through external facing interfaces,
+// like the API and State Sync, etc.
 const MAX_LIMIT: u64 = 10000;
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
@@ -260,7 +263,7 @@ impl AptosDB {
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
         pruner_config: PrunerConfig,
-        target_snapshot_size: usize,
+        buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
@@ -279,7 +282,7 @@ impl AptosDB {
             Arc::clone(&arc_state_merkle_rocksdb),
             state_pruner,
             epoch_snapshot_pruner,
-            target_snapshot_size,
+            buffered_state_target_items,
             max_nodes_per_lru_cache_shard,
             hack_for_tests,
         ));
@@ -312,7 +315,7 @@ impl AptosDB {
         pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
         enable_indexer: bool,
-        target_snapshot_size: usize,
+        buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
         ensure!(
@@ -329,13 +332,13 @@ impl AptosDB {
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
                     ledger_db_path.clone(),
-                    "ledger_db_ro",
+                    LEDGER_DB_NAME,
                     ledger_db_column_families(),
                 )?,
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, true),
                     state_merkle_db_path.clone(),
-                    "state_merkle_db_ro",
+                    STATE_MERKLE_DB_NAME,
                     state_merkle_db_column_families(),
                 )?,
             )
@@ -344,13 +347,13 @@ impl AptosDB {
                 DB::open_cf(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
                     ledger_db_path.clone(),
-                    "ledger_db",
+                    LEDGER_DB_NAME,
                     gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
                 )?,
                 DB::open_cf(
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
                     state_merkle_db_path.clone(),
-                    "state_merkle_db",
+                    STATE_MERKLE_DB_NAME,
                     gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
                 )?,
             )
@@ -360,7 +363,7 @@ impl AptosDB {
             ledger_db,
             state_merkle_db,
             pruner_config,
-            target_snapshot_size,
+            buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             readonly,
         );
@@ -432,7 +435,8 @@ impl AptosDB {
         let state_merkle_db_secondary_path =
             secondary_db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
 
-        // Secondary needs `max_open_files = -1` per https://github.com/facebook/rocksdb/wiki/Secondary-instance
+        // Secondary needs `max_open_files = -1` per
+        // https://github.com/facebook/rocksdb/wiki/Read-only-and-Secondary-instances
         rocksdb_configs.ledger_db_config.max_open_files = -1;
         rocksdb_configs.state_merkle_db_config.max_open_files = -1;
 
@@ -452,7 +456,7 @@ impl AptosDB {
                 state_merkle_db_column_families(),
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
-            TARGET_SNAPSHOT_SIZE,
+            BUFFERED_STATE_TARGET_ITEMS,
             0,
             true,
         ))
@@ -462,7 +466,7 @@ impl AptosDB {
     fn new_without_pruner<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
-        target_snapshot_size: usize,
+        buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
     ) -> Self {
@@ -472,7 +476,7 @@ impl AptosDB {
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfigs::default(),
             enable_indexer,
-            target_snapshot_size,
+            buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
         )
         .expect("Unable to open AptosDB")
@@ -484,7 +488,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             false,
-            TARGET_SNAPSHOT_SIZE,
+            BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false,
         )
@@ -493,7 +497,7 @@ impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner and cache.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, 0, false)
+        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS, 0, false)
     }
 
     /// This opens db in non-readonly mode, without the pruner, and with the indexer
@@ -502,7 +506,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             false,
-            TARGET_SNAPSHOT_SIZE,
+            BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             true,
         )
@@ -510,14 +514,14 @@ impl AptosDB {
 
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_for_test_with_target_snapshot_size<P: AsRef<Path> + Clone>(
+    pub fn new_for_test_with_buffered_state_target_items<P: AsRef<Path> + Clone>(
         db_root_path: P,
-        target_snapshot_size: usize,
+        buffered_state_target_items: usize,
     ) -> Self {
         Self::new_without_pruner(
             db_root_path,
             false,
-            target_snapshot_size,
+            buffered_state_target_items,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false,
         )
@@ -529,7 +533,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             true,
-            TARGET_SNAPSHOT_SIZE,
+            BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false,
         )
@@ -932,7 +936,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// This API is best-effort in that it CANNOT provide absense proof.
+    /// This API is best-effort in that it CANNOT provide absence proof.
     fn get_transaction_by_hash(
         &self,
         hash: HashValue,
@@ -1125,23 +1129,6 @@ impl DbReader for AptosDB {
                 Some(start_version),
                 proof,
             ))
-        })
-    }
-
-    /// Returns write sets for range [begin_version, end_version).
-    ///
-    /// Used by the executor to build in memory state after a state checkpoint.
-    /// Any missing write set in the entire range results in an error.
-    fn get_write_sets(
-        &self,
-        begin_version: Version,
-        end_version: Version,
-    ) -> Result<Vec<WriteSet>> {
-        gauged_api("get_write_sets", || {
-            self.error_if_ledger_pruned("Write set", begin_version)?;
-
-            self.transaction_store
-                .get_write_sets(begin_version, end_version)
         })
     }
 
@@ -1488,7 +1475,7 @@ impl DbWriter for AptosDB {
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
-    /// Note that even if `txns_to_commit` is empty, `frist_version` is checked to be
+    /// Note that even if `txns_to_commit` is empty, `first_version` is checked to be
     /// `ledger_info_with_sigs.ledger_info.version + 1` if `ledger_info_with_sigs` is not `None`.
     fn save_transactions(
         &self,
@@ -1503,7 +1490,10 @@ impl DbWriter for AptosDB {
             // Executing and committing from more than one threads not allowed -- consensus and
             // state sync must hand over to each other after all pending execution and committing
             // complete.
-            let _lock = self.ledger_commit_lock.lock();
+            let _lock = self
+                .ledger_commit_lock
+                .try_lock()
+                .expect("Concurrent committing detected.");
 
             let num_txns = txns_to_commit.len() as u64;
             // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
@@ -1555,14 +1545,6 @@ impl DbWriter for AptosDB {
                latest_in_memory_state.current_version.expect("Must exist")
             );
 
-            // Persist.
-            {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit"])
-                    .start_timer();
-                self.commit(batch)?;
-            }
-
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 ensure!(
@@ -1572,6 +1554,34 @@ impl DbWriter for AptosDB {
                     buffered_state.current_state().base_version,
                     buffered_state.current_state().current_version,
                 );
+
+                // Ensure the incoming committing requests are always consecutive and the version in
+                // buffered state is consistent with that in db.
+                let next_version_in_buffered_state = buffered_state
+                    .current_state()
+                    .current_version
+                    .map(|version| version + 1)
+                    .unwrap_or(0);
+                let num_transactions_in_db = self
+                    .get_latest_transaction_info_option()?
+                    .map(|(version, _)| version + 1)
+                    .unwrap_or(0);
+                ensure!(
+                     num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
+                    "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
+                    first_version,
+                    next_version_in_buffered_state,
+                    num_transactions_in_db,
+                );
+
+                // Persist ledgerDB data first.
+                {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["save_transactions_commit"])
+                        .start_timer();
+                    self.commit(batch)?;
+                }
+
                 let mut end_with_reconfig = false;
                 let updates_until_latest_checkpoint_since_current = if let Some(
                     latest_checkpoint_version,
@@ -1585,7 +1595,7 @@ impl DbWriter for AptosDB {
                             "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                             latest_checkpoint_version,
                             first_version + idx as u64
-                    );
+                        );
                         end_with_reconfig = txns_to_commit[idx].is_reconfig();
                         Some(
                             txns_to_commit[..=idx]
@@ -1621,6 +1631,9 @@ impl DbWriter for AptosDB {
             // Note: this must happen after txns have been saved to db because types can be newly
             // created in this same chunk of transactions.
             if let Some(indexer) = &self.indexer {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["indexer_index"])
+                    .start_timer();
                 let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
                 indexer.index(self.state_store.clone(), first_version, &write_sets)?;
             }

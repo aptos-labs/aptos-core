@@ -14,7 +14,7 @@ anyhow = "1.0.57"
 aptos-api-types = { path = "../../api/types" }
 aptos-config = { path = "../../config" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 hyper = "0.14.18"
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }

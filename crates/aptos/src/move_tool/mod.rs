@@ -34,24 +34,16 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{EntryFunction, ModuleBundle, Script, TransactionPayload};
+use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use framework::docgen::DocgenOptions;
 use framework::natives::code::UpgradePolicy;
+use framework::prover::ProverOptions;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
-use move_deps::move_cli::base::test::UnitTestResult;
-use move_deps::move_command_line_common::env::MOVE_HOME;
-use move_deps::{
-    move_cli,
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-    },
-    move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
-    move_prover, move_prover_boogie_backend,
-    move_unit_test::UnitTestingConfig,
-};
+use move_cli::base::test::UnitTestResult;
+use move_command_line_common::env::MOVE_HOME;
 use std::fmt::{Display, Formatter};
 use std::{
     collections::BTreeMap,
@@ -61,6 +53,15 @@ use std::{
 };
 use tokio::task;
 use transactional_tests_runner::TransactionalTestOpts;
+use {
+    move_cli,
+    move_core_types::{
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
+    },
+    move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
+    move_unit_test::UnitTestingConfig,
+};
 
 /// Tool for Move related operations
 ///
@@ -75,10 +76,12 @@ pub enum MoveTool {
     Download(DownloadPackage),
     List(ListPackage),
     Clean(CleanPackage),
+    VerifyPackage(VerifyPackage),
     Run(RunFunction),
     RunScript(RunScript),
     Test(TestPackage),
     Prove(ProvePackage),
+    Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
 }
 
@@ -91,29 +94,121 @@ impl MoveTool {
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::List(tool) => tool.execute_serialized().await,
             MoveTool::Clean(tool) => tool.execute_serialized().await,
+            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
         }
     }
 }
 
+#[derive(Parser)]
+pub struct FrameworkPackageArgs {
+    /// Git revision or branch for the Aptos framework
+    ///
+    /// This is mutually exclusive with `--framework-local-dir`
+    #[clap(long, group = "framework_package_args")]
+    pub(crate) framework_git_rev: Option<String>,
+
+    /// Local framework directory for the Aptos framework
+    ///
+    /// This is mutually exclusive with `--framework-git-rev`
+    #[clap(long, parse(from_os_str), group = "framework_package_args")]
+    pub(crate) framework_local_dir: Option<PathBuf>,
+}
+
+impl FrameworkPackageArgs {
+    pub fn init_move_dir(
+        &self,
+        package_dir: &Path,
+        name: &str,
+        addresses: BTreeMap<String, ManifestNamedAddress>,
+        prompt_options: PromptOptions,
+    ) -> CliTypedResult<()> {
+        const APTOS_FRAMEWORK: &str = "AptosFramework";
+        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
+        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
+        const DEFAULT_BRANCH: &str = "main";
+
+        let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
+        check_if_file_exists(move_toml.as_path(), prompt_options)?;
+        create_dir_if_not_exist(
+            package_dir
+                .join(SourcePackageLayout::Sources.path())
+                .as_path(),
+        )?;
+
+        // Add the framework dependency if it's provided
+        let mut dependencies = BTreeMap::new();
+        if let Some(ref path) = self.framework_local_dir {
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: Some(path.display().to_string()),
+                    git: None,
+                    rev: None,
+                    subdir: None,
+                    aptos: None,
+                    address: None,
+                },
+            );
+        } else {
+            let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: None,
+                    git: Some(APTOS_GIT_PATH.to_string()),
+                    rev: Some(git_rev.to_string()),
+                    subdir: Some(SUBDIR_PATH.to_string()),
+                    aptos: None,
+                    address: None,
+                },
+            );
+        }
+
+        let manifest = MovePackageManifest {
+            package: PackageInfo {
+                name: name.to_string(),
+                version: "1.0.0".to_string(),
+                author: None,
+            },
+            addresses,
+            dependencies,
+        };
+
+        write_to_file(
+            move_toml.as_path(),
+            SourcePackageLayout::Manifest.location_str(),
+            toml::to_string_pretty(&manifest)
+                .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+                .as_bytes(),
+        )
+    }
+}
+
 /// Creates a new Move package at the given location
+///
+/// This will create a directory for a Move package and a corresponding
+/// `Move.toml` file.
 #[derive(Parser)]
 pub struct InitPackage {
-    /// Name of the new move package
+    /// Name of the new Move package
     #[clap(long)]
     pub(crate) name: String,
 
-    /// Path to create the new move package
+    /// Directory to create the new Move package
     #[clap(long, parse(from_os_str))]
     pub(crate) package_dir: Option<PathBuf>,
 
     /// Named addresses for the move binary
     ///
-    /// Example: alice=0x1234,bob=0x5678
+    /// Allows for an address to be put into the Move.toml, or a placeholder `_`
+    ///
+    /// Example: alice=0x1234,bob=0x5678,greg=_
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
@@ -122,9 +217,8 @@ pub struct InitPackage {
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 
-    /// For test: use the given local reference to the aptos framework
-    #[clap(skip)]
-    pub(crate) for_test_framework: Option<PathBuf>,
+    #[clap(flatten)]
+    pub(crate) framework_package_args: FrameworkPackageArgs,
 }
 
 #[async_trait]
@@ -141,92 +235,29 @@ impl CliCommand<()> for InitPackage {
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
 
-        init_move_dir(
+        self.framework_package_args.init_move_dir(
             package_dir.as_path(),
             &self.name,
-            Some("main".to_string()),
             addresses,
             self.prompt_options,
-            self.for_test_framework,
         )
     }
 }
 
-pub fn init_move_dir(
-    package_dir: &Path,
-    name: &str,
-    rev: Option<String>,
-    addresses: BTreeMap<String, ManifestNamedAddress>,
-    prompt_options: PromptOptions,
-    for_test_framework: Option<PathBuf>,
-) -> CliTypedResult<()> {
-    let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
-    check_if_file_exists(move_toml.as_path(), prompt_options)?;
-    create_dir_if_not_exist(
-        package_dir
-            .join(SourcePackageLayout::Sources.path())
-            .as_path(),
-    )?;
-
-    // Add the framework dependency if it's provided
-    let mut dependencies = BTreeMap::new();
-    if let Some(path) = for_test_framework {
-        dependencies.insert(
-            "AptosFramework".to_string(),
-            Dependency {
-                local: Some(path.display().to_string()),
-                git: None,
-                rev: None,
-                subdir: None,
-                aptos: None,
-                address: None,
-            },
-        );
-    } else if let Some(rev) = rev {
-        dependencies.insert(
-            "AptosFramework".to_string(),
-            Dependency {
-                local: None,
-                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-                rev: Some(rev),
-                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-                aptos: None,
-                address: None,
-            },
-        );
-    }
-
-    let manifest = MovePackageManifest {
-        package: PackageInfo {
-            name: name.to_string(),
-            version: "1.0.0".to_string(),
-            author: None,
-        },
-        addresses,
-        dependencies,
-    };
-
-    write_to_file(
-        move_toml.as_path(),
-        SourcePackageLayout::Manifest.location_str(),
-        toml::to_string_pretty(&manifest)
-            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
-            .as_bytes(),
-    )
-}
-
-/// Compiles a package and returns the [`ModuleId`]s
+/// Compiles a package and returns the associated ModuleIds
 #[derive(Parser)]
 pub struct CompilePackage {
-    #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
-    /// Artifacts to be generated when building this package.
-    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
-    pub(crate) included_artifacts: IncludedArtifacts,
-    /// Whether package metadata should be generated and stored in the package's build directory.
+    /// Save the package metadata in the package's build directory
+    ///
+    /// If set, package metadata should be generated and stored in the package's build directory.
     /// This metadata can be used to construct a transaction to publish a package.
     #[clap(long)]
     pub(crate) save_metadata: bool,
+
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
 }
 
 #[async_trait]
@@ -239,6 +270,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..self
+                .included_artifacts_args
                 .included_artifacts
                 .build_options(self.move_options.named_addresses())
         };
@@ -270,7 +302,10 @@ pub struct TestPackage {
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 
-    /// Bound the number of instructions that can be executed by any one test.
+    /// The maximum number of instructions that can be executed by a test
+    ///
+    /// If set, the number of instructions executed by one test will be bounded
+    // TODO: Remove short, it's against the style guidelines, and update the name here
     #[clap(
         name = "instructions",
         default_value = "100000",
@@ -338,18 +373,17 @@ impl CliCommand<()> for TransactionalTestOpts {
     }
 }
 
-/// Proves the Move package
+/// Proves a Move package
 ///
 /// This is a tool for formal verification of a Move package using
 /// the Move prover
 #[derive(Parser)]
 pub struct ProvePackage {
-    /// A filter string to determine which files to verify
-    #[clap(long)]
-    pub filter: Option<String>,
-
     #[clap(flatten)]
     move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    prover_options: ProverOptions,
 }
 
 #[async_trait]
@@ -359,34 +393,19 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            test_mode: true,
-            install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
-        };
-
-        const APTOS_NATIVE_TEMPLATE: &[u8] = include_bytes!("aptos-natives.bpl");
-
-        let mut options = move_prover::cli::Options::default();
-        options.backend.custom_natives =
-            Some(move_prover_boogie_backend::options::CustomNativeOptions {
-                template_bytes: APTOS_NATIVE_TEMPLATE.to_vec(),
-                module_instance_names: vec![],
-            });
+        let ProvePackage {
+            move_options,
+            prover_options,
+        } = self;
 
         let result = task::spawn_blocking(move || {
-            move_cli::base::prove::run_move_prover(
-                config,
-                self.move_options.get_package_path()?.as_path(),
-                &self.filter,
-                true,
-                move_prover::cli::Options::default(),
+            prover_options.prove(
+                move_options.get_package_path()?.as_path(),
+                move_options.named_addresses(),
             )
         })
         .await
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
-
         match result {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
@@ -394,18 +413,49 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 }
 
-/// Publishes the modules in a Move package to the Aptos blockchain
+/// Documents a Move package
+///
+/// This converts the content of the package into markdown for documentation.
 #[derive(Parser)]
-pub struct PublishPackage {
-    /// Whether to use the legacy publishing flow. This will be soon removed.
-    #[clap(long)]
-    pub(crate) legacy_flow: bool,
+pub struct DocumentPackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
 
-    /// Whether to override the check for maximal size of published data.
-    #[clap(long)]
-    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    docgen_options: DocgenOptions,
+}
 
-    /// What artifacts to include in the package. This can be one of `none`, `sparse`, and
+#[async_trait]
+impl CliCommand<&'static str> for DocumentPackage {
+    fn command_name(&self) -> &'static str {
+        "DocumentPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let DocumentPackage {
+            move_options,
+            docgen_options,
+        } = self;
+        let build_options = BuildOptions {
+            with_srcs: false,
+            with_abis: false,
+            with_source_maps: false,
+            with_error_map: false,
+            with_docs: true,
+            install_dir: None,
+            named_addresses: move_options.named_addresses(),
+            docgen_options: Some(docgen_options),
+        };
+        BuiltPackage::build(move_options.get_package_path()?, build_options)?;
+        Ok("succeeded")
+    }
+}
+
+#[derive(Parser)]
+pub struct IncludedArtifactsArgs {
+    /// Artifacts to be generated when building the package
+    ///
+    /// Which artifacts to include in the package. This can be one of `none`, `sparse`, and
     /// `all`. `none` is the most compact form and does not allow to reconstruct a source
     /// package from chain; `sparse` is the minimal set of artifacts needed to reconstruct
     /// a source package; `all` includes all available artifacts. The choice of included
@@ -414,7 +464,17 @@ pub struct PublishPackage {
     /// as much.
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
     pub(crate) included_artifacts: IncludedArtifacts,
+}
 
+/// Publishes the modules in a Move package to the Aptos blockchain
+#[derive(Parser)]
+pub struct PublishPackage {
+    /// Whether to override the check for maximal size of published data
+    #[clap(long)]
+    pub(crate) override_size_check: bool,
+
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
     #[clap(flatten)]
@@ -467,7 +527,7 @@ impl IncludedArtifacts {
                 // Always enable error map bytecode injection
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
             Sparse => BuildOptions {
                 with_srcs: true,
@@ -475,7 +535,7 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
             All => BuildOptions {
                 with_srcs: true,
@@ -483,7 +543,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
         }
     }
@@ -501,44 +561,36 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let PublishPackage {
             move_options,
             txn_options,
-            legacy_flow,
             override_size_check,
-            included_artifacts,
+            included_artifacts_args,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts.build_options(move_options.named_addresses());
+        let options = included_artifacts_args
+            .included_artifacts
+            .build_options(move_options.named_addresses());
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
-        if legacy_flow {
-            // Send the compiled module using a module bundle
-            txn_options
-                .submit_transaction(TransactionPayload::ModuleBundle(ModuleBundle::new(
-                    compiled_units,
-                )))
-                .await
-                .map(TransactionSummary::from)
-        } else {
-            // Send the compiled module and metadata using the code::publish_package_txn.
-            let metadata = package.extract_metadata()?;
-            let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
-                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
-                compiled_units,
-            );
-            let size = bcs::serialized_size(&payload)?;
-            println!("package size {} bytes", size);
-            if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-                return Err(CliError::UnexpectedError(format!(
-                    "The package is larger than {} bytes ({} bytes)! To lower the size \
+
+        // Send the compiled module and metadata using the code::publish_package_txn.
+        let metadata = package.extract_metadata()?;
+        let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
+            bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+            compiled_units,
+        );
+        let size = bcs::serialized_size(&payload)?;
+        println!("package size {} bytes", size);
+        if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+            return Err(CliError::UnexpectedError(format!(
+                "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included_artifacts`. \
                 You can also override this check with `--override-size-check",
-                    MAX_PUBLISH_PACKAGE_SIZE, size
-                )));
-            }
-            txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
+                MAX_PUBLISH_PACKAGE_SIZE, size
+            )));
         }
+        txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from)
     }
 }
 
@@ -573,7 +625,7 @@ impl CliCommand<&'static str> for DownloadPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let url = self.rest_options.url(&self.profile_options.profile)?;
+        let url = self.rest_options.url(&self.profile_options)?;
         let registry = CachedPackageRegistry::create(url, self.account).await?;
         let output_dir = dir_default_to_current(self.output_dir)?;
 
@@ -601,16 +653,79 @@ impl CliCommand<&'static str> for DownloadPackage {
     }
 }
 
-/// Lists information about packages and modules on-chain
+/// Downloads a package and verifies that the bytecode matches a local compilation of the Move code
+#[derive(Parser)]
+pub struct VerifyPackage {
+    /// Address of the account containing the package
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) account: AccountAddress,
+
+    /// Artifacts to be generated when building this package.
+    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
+    pub(crate) included_artifacts: IncludedArtifacts,
+
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for VerifyPackage {
+    fn command_name(&self) -> &'static str {
+        "DownloadPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        // First build the package locally to get the package metadata
+        let build_options = BuildOptions {
+            install_dir: self.move_options.output_dir.clone(),
+            ..self
+                .included_artifacts
+                .build_options(self.move_options.named_addresses())
+        };
+        let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+        let compiled_metadata = pack.extract_metadata()?;
+
+        // Now pull the compiled package
+        let url = self.rest_options.url(&self.profile_options)?;
+        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let package = registry
+            .get_package(pack.name())
+            .await
+            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+
+        // We can't check the arbitrary, because it could change on us
+        if package.upgrade_policy() == UpgradePolicy::arbitrary() {
+            return Err(CliError::CommandArgumentError(
+                "A package with upgrade policy `arbitrary` cannot be downloaded \
+                since it is not safe to depend on such packages."
+                    .to_owned(),
+            ));
+        }
+
+        // Verify that the source digest matches
+        package.verify(&compiled_metadata)?;
+
+        Ok("Successfully verified source of package")
+    }
+}
+
+/// Lists information about packages and modules on-chain for an account
 #[derive(Parser)]
 pub struct ListPackage {
     /// Address of the account for which to list packages.
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
-    /// Type of resources to query
-    #[clap(long, default_value_t = ListQuery::Packages)]
-    query: ListQuery,
+    /// Type of items to query
+    ///
+    /// Current supported types [packages]
+    #[clap(long, default_value_t = MoveListQuery::Packages)]
+    query: MoveListQuery,
 
     #[clap(flatten)]
     rest_options: RestOptions,
@@ -619,24 +734,24 @@ pub struct ListPackage {
 }
 
 #[derive(ArgEnum, Clone, Copy, Debug)]
-pub enum ListQuery {
+pub enum MoveListQuery {
     Packages,
 }
 
-impl Display for ListQuery {
+impl Display for MoveListQuery {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            ListQuery::Packages => "packages",
+            MoveListQuery::Packages => "packages",
         })
     }
 }
 
-impl FromStr for ListQuery {
+impl FromStr for MoveListQuery {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "packages" => Ok(ListQuery::Packages),
+            "packages" => Ok(MoveListQuery::Packages),
             _ => Err("Invalid query. Valid values are modules, packages"),
         }
     }
@@ -649,10 +764,10 @@ impl CliCommand<&'static str> for ListPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let url = self.rest_options.url(&self.profile_options.profile)?;
+        let url = self.rest_options.url(&self.profile_options)?;
         let registry = CachedPackageRegistry::create(url, self.account).await?;
         match self.query {
-            ListQuery::Packages => {
+            MoveListQuery::Packages => {
                 for name in registry.package_names() {
                     let data = registry.get_package(name).await?;
                     println!("package {}", data.name());
@@ -679,8 +794,9 @@ pub struct CleanPackage {
 #[async_trait]
 impl CliCommand<&'static str> for CleanPackage {
     fn command_name(&self) -> &'static str {
-        "Clean"
+        "CleanPackage"
     }
+
     async fn execute(self) -> CliTypedResult<&'static str> {
         let path = self.move_options.get_package_path()?;
         let build_dir = path.join("build");
@@ -771,6 +887,18 @@ pub struct RunScript {
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) compile_proposal_args: CompileScriptFunction,
+    /// Arguments combined with their type separated by spaces.
+    ///
+    /// Supported types [u8, u64, u128, bool, hex, string, address, raw]
+    ///
+    /// Example: `address:0x1 bool:true u8:0`
+    #[clap(long, multiple_values = true)]
+    pub(crate) args: Vec<ArgWithType>,
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u64 u128 bool address vector signer`
+    #[clap(long, multiple_values = true)]
+    pub(crate) type_args: Vec<MoveType>,
 }
 
 #[async_trait]
@@ -782,14 +910,26 @@ impl CliCommand<TransactionSummary> for RunScript {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let (bytecode, _script_hash) = self
             .compile_proposal_args
-            .compile(self.txn_options.prompt_options)?;
+            .compile("RunScript", self.txn_options.prompt_options)?;
+
+        let mut args: Vec<TransactionArgument> = vec![];
+        for arg in self.args {
+            args.push(arg.try_into()?);
+        }
+
+        let mut type_args: Vec<TypeTag> = Vec::new();
+
+        // These TypeArgs are used for generics
+        for type_arg in self.type_args.into_iter() {
+            let type_tag = TypeTag::try_from(type_arg)
+                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
+            type_args.push(type_tag)
+        }
 
         let txn = self
             .txn_options
             .submit_transaction(TransactionPayload::Script(Script::new(
-                bytecode,
-                vec![],
-                vec![],
+                bytecode, type_args, args,
             )))
             .await?;
         Ok(TransactionSummary::from(&txn))
@@ -801,6 +941,7 @@ pub(crate) enum FunctionArgType {
     Address,
     Bool,
     Hex,
+    HexArray,
     String,
     U8,
     U64,
@@ -822,6 +963,18 @@ impl FunctionArgType {
             FunctionArgType::Hex => bcs::to_bytes(
                 &hex::decode(arg).map_err(|err| CliError::UnableToParse("hex", err.to_string()))?,
             ),
+            FunctionArgType::HexArray => {
+                let mut encoded = vec![];
+                for sub_arg in arg.split(',') {
+                    encoded.push(hex::decode(sub_arg).map_err(|err| {
+                        CliError::UnableToParse(
+                            "hex_array",
+                            format!("Failed to parse hex array: {:?}", err.to_string()),
+                        )
+                    })?);
+                }
+                bcs::to_bytes(&encoded)
+            }
             FunctionArgType::String => bcs::to_bytes(arg),
             FunctionArgType::U8 => bcs::to_bytes(
                 &u8::from_str(arg).map_err(|err| CliError::UnableToParse("u8", err.to_string()))?,
@@ -855,8 +1008,9 @@ impl FromStr for FunctionArgType {
             "u8" => Ok(FunctionArgType::U8),
             "u64" => Ok(FunctionArgType::U64),
             "u128" => Ok(FunctionArgType::U128),
+            "hex_array" => Ok(FunctionArgType::HexArray),
             "raw" => Ok(FunctionArgType::Raw),
-            str => Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','string','u8','u64','u128','raw']", str))),
+            str => Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','hex_array','string','u8','u64','u128','raw']", str))),
         }
     }
 }
@@ -867,11 +1021,42 @@ pub struct ArgWithType {
     pub(crate) arg: Vec<u8>,
 }
 
+impl ArgWithType {
+    pub fn address(account_address: AccountAddress) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Address,
+            arg: bcs::to_bytes(&account_address).unwrap(),
+        }
+    }
+
+    pub fn u64(arg: u64) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::U64,
+            arg: bcs::to_bytes(&arg).unwrap(),
+        }
+    }
+
+    pub fn bytes(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Raw,
+            arg: bcs::to_bytes(&arg).unwrap(),
+        }
+    }
+    pub fn raw(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Raw,
+            arg,
+        }
+    }
+}
+
 impl FromStr for ArgWithType {
     type Err = CliError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<_> = s.split(':').collect();
+        // Splits on the first colon, returning at most `2` elements
+        // This is required to support args that contain a colon
+        let parts: Vec<_> = s.splitn(2, ':').collect();
         if parts.len() != 2 {
             return Err(CliError::CommandArgumentError(
                 "Arguments must be pairs of <type>:<arg> e.g. bool:true".to_string(),
@@ -884,6 +1069,46 @@ impl FromStr for ArgWithType {
 
         Ok(ArgWithType { _ty: ty, arg })
     }
+}
+
+impl TryInto<TransactionArgument> for ArgWithType {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<TransactionArgument, Self::Error> {
+        match self._ty {
+            FunctionArgType::Address => Ok(TransactionArgument::Address(txn_arg_parser(
+                &self.arg, "address",
+            )?)),
+            FunctionArgType::Bool => Ok(TransactionArgument::Bool(txn_arg_parser(
+                &self.arg, "bool",
+            )?)),
+            FunctionArgType::Hex => Ok(TransactionArgument::U8Vector(txn_arg_parser(
+                &self.arg, "hex",
+            )?)),
+            FunctionArgType::HexArray => Ok(TransactionArgument::U8Vector(txn_arg_parser(
+                &self.arg,
+                "hex_array",
+            )?)),
+            FunctionArgType::String => Ok(TransactionArgument::U8Vector(txn_arg_parser(
+                &self.arg, "string",
+            )?)),
+            FunctionArgType::U8 => Ok(TransactionArgument::U8(txn_arg_parser(&self.arg, "u8")?)),
+            FunctionArgType::U64 => Ok(TransactionArgument::U64(txn_arg_parser(&self.arg, "u64")?)),
+            FunctionArgType::U128 => Ok(TransactionArgument::U128(txn_arg_parser(
+                &self.arg, "u128",
+            )?)),
+            FunctionArgType::Raw => Ok(TransactionArgument::U8Vector(txn_arg_parser(
+                &self.arg, "raw",
+            )?)),
+        }
+    }
+}
+
+fn txn_arg_parser<T: serde::de::DeserializeOwned>(
+    data: &[u8],
+    label: &'static str,
+) -> Result<T, CliError> {
+    bcs::from_bytes(data).map_err(|err| CliError::UnableToParse(label, err.to_string()))
 }
 
 /// Identifier of a module member (function or struct).

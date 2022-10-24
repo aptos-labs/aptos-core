@@ -8,8 +8,8 @@ use aptos_api_types::{
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
 use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
@@ -113,7 +113,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
                 RocksdbConfigs::default(),
                 false, /* indexer */
-                TARGET_SNAPSHOT_SIZE,
+                BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )
             .unwrap(),
@@ -213,6 +213,14 @@ impl TestContext {
         self.golden_output.as_ref().unwrap().log(&msg);
     }
 
+    pub fn last_updated_gas_schedule(&self) -> Option<u64> {
+        self.context.last_updated_gas_schedule()
+    }
+
+    pub fn last_updated_gas_estimation(&self) -> Option<u64> {
+        self.context.last_updated_gas_estimation()
+    }
+
     /// Prune well-known excessively large entries from a resource array response.
     /// TODO: we can't dump all resources of an account as golden output. As functionality
     /// grows this becomes too much. Need a way to filter only the resources which folks want.
@@ -248,17 +256,27 @@ impl TestContext {
     // Resource may appear in many different places, so make a convenient stripper
     fn resource_replacer(val: &Value) -> Value {
         let mut nval = val.clone();
-        nval["data"] = match val["type"].as_str().unwrap() {
-            "0x1::code::PackageRegistry" => Value::String("package registry omitted".to_string()),
+
+        // Skip things that change, plus bytecode and others that don't have a type
+        nval["data"] = match val["type"].as_str() {
+            Some("0x1::code::PackageRegistry") => {
+                Value::String("package registry omitted".to_string())
+            }
             // Ideally this wouldn't be stripped, but it changes by minor changes to the
             // Move modules, which leads to a bad devx.
-            "0x1::state_storage::StateStorageUsage" => {
+            Some("0x1::state_storage::StateStorageUsage") => {
                 Value::String("state storage omitted".to_string())
             }
-            "0x1::state_storage::GasParameter" => {
+            Some("0x1::state_storage::GasParameter") => {
                 Value::String("state storage gas parameter omitted".to_string())
             }
-            _ => val["data"].clone(),
+            _ => {
+                if val["bytecode"].as_str().is_some() {
+                    Value::String("bytecode omitted".to_string())
+                } else {
+                    val["data"].clone()
+                }
+            }
         };
         nval
     }
@@ -288,6 +306,30 @@ impl TestContext {
     pub fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
         let mut tc = self.root_account();
         self.create_user_account_by(&mut tc, account)
+    }
+
+    pub fn mint_user_account(&self, account: &LocalAccount) -> SignedTransaction {
+        let mut tc = self.root_account();
+        let factory = self.transaction_factory();
+        tc.sign_with_transaction_builder(
+            factory
+                .account_transfer(account.address(), 10_000_000)
+                .expiration_timestamp_secs(u64::MAX),
+        )
+    }
+
+    pub fn account_transfer(
+        &self,
+        sender: &mut LocalAccount,
+        receiver: &LocalAccount,
+        amount: u64,
+    ) -> SignedTransaction {
+        let factory = self.transaction_factory();
+        sender.sign_with_transaction_builder(
+            factory
+                .account_transfer(receiver.address(), amount)
+                .expiration_timestamp_secs(u64::MAX),
+        )
     }
 
     pub fn create_user_account_by(

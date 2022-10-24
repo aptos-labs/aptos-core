@@ -284,7 +284,7 @@ mod tests {
     };
     use claims::{assert_err, assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
-    use move_deps::move_core_types::language_storage::TypeTag;
+    use move_core_types::language_storage::TypeTag;
     use std::time::Duration;
     use tokio::runtime::{Builder, Runtime};
 
@@ -431,7 +431,7 @@ mod tests {
         let signed_transaction = SignedTransaction::new(
             raw_transaction.clone(),
             public_key,
-            private_key.sign(&raw_transaction),
+            private_key.sign(&raw_transaction).unwrap(),
         );
 
         Transaction::UserTransaction(signed_transaction)

@@ -9,15 +9,14 @@
 ///
 /// add(value: u128)
 ///   Speculatively adds a `value` to aggregator. This is a cheap operation
-///   which is easly parallelizable. If the result of addition overflows a
-///   `limit` (one of aggregator's fields), an error is produced and the
-///   execution aborts.
+///   which is parallelizable. If the result of addition overflows a `limit`
+///   (one of aggregator's fields), an error is produced and the execution
+///   aborts.
 ///
 /// sub(value: u128)
-///   Subtracts a `value` from aggregator. This is an expensive operation
-///   which is non-parallelizable. It reads the value of the aggregator, and
-///   the tries to subtract. If the result goes below zero, an error is produced
-///   and the execution aborts.
+///   Speculatively subtracts a `value` from aggregator. This is a cheap
+///   operation which is parallelizable. If the result goes below zero, an
+///   error is produced and the execution aborts.
 ///
 /// read(): u128
 ///   Reads (materializes) the value of an aggregator. This is an expensive

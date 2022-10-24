@@ -7,7 +7,7 @@ use crate::{
     storage::{BackupStorage, FileHandle},
     utils::{error_notes::ErrorNotes, stream::StreamX},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
 use async_trait::async_trait;
@@ -38,9 +38,10 @@ pub struct MetadataCacheOpt {
     #[clap(
         long = "metadata-cache-dir",
         parse(from_os_str),
-        help = "[Defaults to temporary dir] Metadata cache dir. If specified and shared across runs, \
+        help = "Metadata cache dir. If specified and shared across runs, \
         metadata files in cache won't be downloaded again from backup source, speeding up tool \
-        boot up significantly."
+        boot up significantly. Cache content can be messed up if used across the devnet, \
+        the testnet and the mainnet, hence it [Defaults to temporary dir]."
     )]
     dir: Option<PathBuf>,
 }
@@ -55,6 +56,14 @@ impl MetadataCacheOpt {
             .unwrap_or_else(|| TEMP_METADATA_CACHE_DIR.path().to_path_buf())
             .join(Self::SUB_DIR)
     }
+}
+
+/// Try to load the identity metadata, if not present, try to write one in.
+pub async fn initialize_identity(storage: &Arc<dyn BackupStorage>) -> Result<()> {
+    let metadata = Metadata::new_random_identity();
+    storage
+        .save_metadata_line(&metadata.name(), &metadata.to_text_line()?)
+        .await
 }
 
 /// Sync local cache folder with remote storage, and load all metadata entries from the cache.
@@ -88,7 +97,16 @@ pub async fn sync_and_load(
         .collect::<Result<HashSet<_>>>()?;
 
     // List remote metadata files.
-    let remote_file_handles = storage.list_metadata_files().await?;
+    let mut remote_file_handles = storage.list_metadata_files().await?;
+    if remote_file_handles.is_empty() {
+        initialize_identity(&storage).await.context(
+            "\
+            Backup storage appears empty and failed to put in identity metadata, \
+            no point to go on. If you believe there is content in the backup, check authentication.\
+            ",
+        )?;
+        remote_file_handles = storage.list_metadata_files().await?;
+    }
     let remote_file_handle_by_hash: HashMap<_, _> = remote_file_handles
         .into_iter()
         .map(|file_handle| (file_handle.file_handle_hash(), file_handle))
@@ -105,8 +123,8 @@ pub async fn sync_and_load(
     for h in stale_local_hashes {
         let file = cache_dir.join(h);
         remove_file(&file).await.err_notes(&file)?;
+        info!("Deleted stale metadata files in cache.");
     }
-    info!("Deleted stale metadata files in cache.");
 
     let num_new_files = new_remote_hashes.len();
     NUM_META_MISS.set(num_new_files as i64);

@@ -54,7 +54,7 @@ fn get_build_profile_name() -> String {
 }
 
 /// This method returns the build information as visible during build-time.
-/// Note that it is recommended to use the the `build_information` macro since
+/// Note that it is recommended to use the `build_information` macro since
 /// this method does not return the build package version.
 pub fn get_build_information() -> BTreeMap<String, String> {
     shadow!(build);
@@ -101,6 +101,17 @@ pub fn get_build_information() -> BTreeMap<String, String> {
     }
 
     build_information
+}
+
+pub fn get_git_hash() -> String {
+    // Docker builds don't have the git directory so it has to be provided by this variable
+    // Otherwise, shadow will have the right commit hash
+    if let Ok(git_sha) = std::env::var("GIT_SHA") {
+        git_sha
+    } else {
+        shadow!(build);
+        build::COMMIT_HASH.into()
+    }
 }
 
 #[cfg(test)]

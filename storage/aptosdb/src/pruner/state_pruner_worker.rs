@@ -8,7 +8,6 @@ use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::{
     error,
     prelude::{sample, SampleRate},
-    sample::Sampling,
 };
 use aptos_types::transaction::Version;
 use schemadb::schema::KeyCodec;

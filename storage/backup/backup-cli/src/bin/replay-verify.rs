@@ -3,11 +3,13 @@
 
 use anyhow::Result;
 use aptos_config::config::{
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
 use aptosdb::{AptosDB, GetRestoreHandler};
+use backup_cli::utils::ReplayConcurrencyLevelOpt;
 use backup_cli::{
     coordinators::replay_verify::ReplayVerifyCoordinator,
     metadata::cache::MetadataCacheOpt,
@@ -27,19 +29,21 @@ struct Opt {
     storage: StorageOpt,
     #[clap(flatten)]
     concurrent_downloads: ConcurrentDownloadsOpt,
+    #[clap(flatten)]
+    replay_concurrency_level: ReplayConcurrencyLevelOpt,
     #[clap(long = "target-db-dir", parse(from_os_str))]
     pub db_dir: PathBuf,
     #[clap(flatten)]
     pub rocksdb_opt: RocksdbOpt,
     #[clap(
         long,
-        help = "[Defaults to 0] The first transaction version required to be replayed and verified."
+        help = "The first transaction version required to be replayed and verified. [Defaults to 0]"
     )]
     start_version: Option<Version>,
     #[clap(
         long,
-        help = "[Defaults to the latest version available] The last transaction version required \
-                to be replayed and verified (if present in the backup)."
+        help = "The last transaction version required to be replayed and verified (if present \
+        in the backup). [Defaults to the latest version available] "
     )]
     end_version: Option<Version>,
 }
@@ -62,7 +66,7 @@ async fn main_impl() -> Result<()> {
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
         opt.rocksdb_opt.into(),
         false,
-        TARGET_SNAPSHOT_SIZE,
+        BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )?)
     .get_restore_handler();
@@ -71,6 +75,7 @@ async fn main_impl() -> Result<()> {
         opt.metadata_cache_opt,
         opt.trusted_waypoints_opt,
         opt.concurrent_downloads.get(),
+        opt.replay_concurrency_level.get(),
         restore_handler,
         opt.start_version.unwrap_or(0),
         opt.end_version.unwrap_or(Version::MAX),

@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics;
-use crate::metrics::{increment_log_ingest_failures_by, increment_log_ingest_successes_by};
-use anyhow::{anyhow, Error};
+use crate::metrics::{self, increment_log_ingest_failures_by, increment_log_ingest_successes_by};
+
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::{
     noise::{self, NoiseConfig},
@@ -13,13 +12,17 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::debug;
 use aptos_telemetry_service::types::{
     auth::{AuthRequest, AuthResponse},
+    index::IndexResponse,
     telemetry::TelemetryDump,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
+
+use anyhow::{anyhow, Error};
 use flate2::{write::GzEncoder, Compression};
 use prometheus::{default_registry, Registry};
-use reqwest::header::CONTENT_ENCODING;
-use reqwest::{RequestBuilder, Response, StatusCode};
+use reqwest::{header::CONTENT_ENCODING, RequestBuilder, Response, StatusCode};
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use std::{io::Write, sync::Arc};
 
 struct AuthContext {
@@ -44,18 +47,29 @@ pub(crate) struct TelemetrySender {
     chain_id: ChainId,
     peer_id: PeerId,
     role_type: RoleType,
-    client: reqwest::Client,
+    inner_client: reqwest::Client,
+    client: ClientWithMiddleware,
     auth_context: Arc<AuthContext>,
 }
 
 impl TelemetrySender {
     pub fn new(base_url: String, chain_id: ChainId, node_config: &NodeConfig) -> Self {
+        let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+        // This is a workaround to enable us to clone RequestBuilder for retries.
+        // reqwest_middleware::RequestBuilder's try_clone moves self and returns a new Self, which defeats
+        // the purpose of cloning. We will use the reqwest::Client to create a reqwest::RequestBuilder,
+        // which is clonable and use the ClientWithMiddleware to actually send requests.
+        let inner_client = reqwest::Client::new();
+        let client = ClientBuilder::new(inner_client.clone())
+            .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+            .build();
         Self {
             base_url,
             chain_id,
             peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
             role_type: node_config.base.role,
-            client: reqwest::Client::new(),
+            inner_client,
+            client,
             auth_context: Arc::new(AuthContext::new(node_config)),
         }
     }
@@ -68,18 +82,21 @@ impl TelemetrySender {
     ) -> Result<Response, anyhow::Error> {
         let token = self.get_auth_token().await?;
 
-        let mut response = request_builder
+        let request = request_builder
             .try_clone()
             .expect("Could not clone request_builder")
             .bearer_auth(token)
-            .send()
-            .await?;
+            .build()?;
+
+        let mut response = self.client.execute(request).await?;
+
         // do 1 retry if the first attempt failed
         if response.status() == StatusCode::UNAUTHORIZED {
             // looks like request failed due to auth error. Let's get a new a fresh token. If this fails again we'll just return the error.
             self.reset_token();
             let token = self.get_auth_token().await?;
-            response = request_builder.bearer_auth(token).send().await?;
+            let request = request_builder.bearer_auth(token).build()?;
+            response = self.client.execute(request).await?;
         }
         Ok(response)
     }
@@ -99,8 +116,8 @@ impl TelemetrySender {
 
         let response = self
             .send_authenticated_request(
-                self.client
-                    .post(format!("{}/push-metrics", self.base_url))
+                self.inner_client
+                    .post(format!("{}/api/v1/ingest/metrics", self.base_url))
                     .header(CONTENT_ENCODING, "gzip")
                     .body(compressed_bytes),
             )
@@ -163,8 +180,8 @@ impl TelemetrySender {
         // Send the request and wait for a response
         let response = self
             .send_authenticated_request(
-                self.client
-                    .post(format!("{}/log_ingest", self.base_url))
+                self.inner_client
+                    .post(format!("{}/api/v1/ingest/logs", self.base_url))
                     .header(CONTENT_ENCODING, "gzip")
                     .body(compressed_bytes),
             )
@@ -194,8 +211,8 @@ impl TelemetrySender {
         // Send the request and wait for a response
         let response = self
             .send_authenticated_request(
-                self.client
-                    .post(format!("{}/custom_event", self.base_url))
+                self.inner_client
+                    .post(format!("{}/api/v1/ingest/custom-event", self.base_url))
                     .json::<TelemetryDump>(telemetry_dump),
             )
             .await?;
@@ -217,12 +234,16 @@ impl TelemetrySender {
     }
 
     async fn get_public_key_from_server(&self) -> Result<x25519::PublicKey, anyhow::Error> {
-        let response = self.client.get(self.base_url.to_string()).send().await?;
+        let response = self
+            .client
+            .get(format!("{}/api/v1/", self.base_url))
+            .send()
+            .await?;
 
         match error_for_status_with_body(response).await {
             Ok(response) => {
-                let public_key = response.json::<x25519::PublicKey>().await?;
-                Ok(public_key)
+                let response_payload = response.json::<IndexResponse>().await?;
+                Ok(response_payload.public_key)
             }
             Err(err) => Err(anyhow!("Error getting server public key. {}", err)),
         }
@@ -287,7 +308,7 @@ impl TelemetrySender {
 
         let response = self
             .client
-            .post(format!("{}/auth", self.base_url))
+            .post(format!("{}/api/v1/auth", self.base_url))
             .json::<AuthRequest>(&auth_request)
             .send()
             .await?;
@@ -316,7 +337,10 @@ impl TelemetrySender {
         debug!("checking chain access for chain id {}", chain_id);
         let response = self
             .client
-            .get(format!("{}/chain-access/{}", self.base_url, chain_id))
+            .get(format!(
+                "{}/api/v1/chain-access/{}",
+                self.base_url, chain_id
+            ))
             .send()
             .await;
 
@@ -331,6 +355,29 @@ impl TelemetrySender {
             Err(e) => {
                 debug!("Unable to check chain access {}", e);
                 true
+            }
+        }
+    }
+
+    pub(crate) async fn get_telemetry_log_env(&self) -> Option<String> {
+        let response = self
+            .send_authenticated_request(
+                self.inner_client
+                    .get(format!("{}/api/v1/config/env/telemetry-log", self.base_url)),
+            )
+            .await;
+
+        match response {
+            Ok(response) => match error_for_status_with_body(response).await {
+                Ok(response) => response.json::<Option<String>>().await.unwrap_or_default(),
+                Err(e) => {
+                    debug!("Unable to get telemetry log env: {}", e);
+                    None
+                }
+            },
+            Err(e) => {
+                debug!("Unable to check chain access {}", e);
+                None
             }
         }
     }
@@ -359,8 +406,10 @@ mod tests {
 
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method("GET").path("/");
-            then.status(200).json_body_obj(&private_key.public_key());
+            when.method("GET").path("/api/v1/");
+            then.status(200).json_body_obj(&IndexResponse {
+                public_key: private_key.public_key(),
+            });
         });
 
         let node_config = NodeConfig::default();
@@ -408,7 +457,7 @@ mod tests {
         let mock = server.mock(|when, then| {
             when.method("POST")
                 .header("Authorization", "Bearer SECRET_JWT_TOKEN")
-                .path("/custom_event")
+                .path("/api/v1/ingest/custom-event")
                 .json_body_obj(&telemetry_dump);
             then.status(200);
         });
@@ -448,7 +497,7 @@ mod tests {
 
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method("POST").path("/custom_event");
+            when.method("POST").path("/api/v1/ingest/custom-event");
             then.status(401);
         });
 
@@ -505,7 +554,7 @@ mod tests {
         let mock = server.mock(|when, then| {
             when.method("POST")
                 .header("Authorization", "Bearer SECRET_JWT_TOKEN")
-                .path("/push-metrics")
+                .path("/api/v1/ingest/metrics")
                 .body(String::from_utf8_lossy(&expected_compressed_bytes));
             then.status(200);
         });
@@ -536,7 +585,7 @@ mod tests {
         let mock = server.mock(|when, then| {
             when.method("POST")
                 .header("Authorization", "Bearer SECRET_JWT_TOKEN")
-                .path("/log_ingest")
+                .path("/api/v1/ingest/logs")
                 .body(String::from_utf8_lossy(&expected_compressed_bytes));
             then.status(200);
         });
@@ -556,7 +605,7 @@ mod tests {
     async fn test_check_chain_access() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method("GET").path("/chain-access/24");
+            when.method("GET").path("/api/v1/chain-access/24");
             then.status(200).json_body(true);
         });
 

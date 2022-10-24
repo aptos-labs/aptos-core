@@ -23,7 +23,7 @@ on:
       GIT_SHA:
         required: true
         type: string
-        description:
+        description: Use this to override the git SHA1, branch name (e.g. devnet) or tag to release the SDK from
 
 jobs:
   # Confirm that the generated client within the TS SDK has been re-generated
@@ -37,8 +37,9 @@ jobs:
     env:
       APTOS_NODE_URL: http://127.0.0.1:8080/v1
       APTOS_FAUCET_URL: http://127.0.0.1:8081
+      FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
 
@@ -47,10 +48,10 @@ jobs:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
         with:
           node-version-file: .node-version
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       # Self hosted runners don't have yarn preinstalled.
       # https://github.com/actions/setup-node/issues/182
@@ -64,13 +65,13 @@ jobs:
       - run: mkdir -p ${{ runner.temp }}/specs
 
       # Build the API specs.
-      - uses: nick-fields/retry@v2
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: generate-yaml-spec
         with:
           max_attempts: 3
           timeout_minutes: 20
           command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
-      - uses: nick-fields/retry@v2
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: generate-json-spec
         with:
           max_attempts: 3
@@ -87,6 +88,7 @@ jobs:
       # Set up dotenv file for tests (jest doesn't read env vars properly).
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
       - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
+      - run: echo "FAUCET_AUTH_TOKEN=$FAUCET_AUTH_TOKEN" >> ./ecosystem/typescript/sdk/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 
@@ -109,7 +111,7 @@ jobs:
       - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081/health
 
       # Test and build.
-      - uses: nick-fields/retry@v2
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: sdk-yarn-test
         with:
           max_attempts: 3

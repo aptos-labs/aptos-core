@@ -22,13 +22,15 @@ resource "google_compute_router" "nat" {
 }
 
 resource "google_compute_address" "nat" {
-  name = "aptos-${terraform.workspace}-nat"
+  count = var.gke_enable_private_nodes ? 1 : 0
+  name  = "aptos-${terraform.workspace}-nat"
 }
 
 resource "google_compute_router_nat" "nat" {
+  count                              = var.gke_enable_private_nodes ? 1 : 0
   name                               = "aptos-${terraform.workspace}-nat"
   router                             = google_compute_router.nat.name
   nat_ip_allocate_option             = "MANUAL_ONLY"
-  nat_ips                            = [google_compute_address.nat.self_link]
+  nat_ips                            = [google_compute_address.nat[0].self_link]
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES"
 }

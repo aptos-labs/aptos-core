@@ -4,39 +4,47 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::accounts::Account;
-use crate::bcs_payload::Bcs;
-use crate::context::Context;
-use crate::failpoint::fail_point_poem;
-use crate::page::Page;
-use crate::response::{
-    api_disabled, transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError,
-    BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult,
-    BasicResultWith404, InsufficientStorageError, InternalError,
+use crate::{
+    accept_type::AcceptType,
+    accounts::Account,
+    bcs_payload::Bcs,
+    context::Context,
+    failpoint::fail_point_poem,
+    generate_error_response, generate_success_response,
+    page::Page,
+    response::{
+        api_disabled, transaction_not_found_by_hash, transaction_not_found_by_version,
+        BadRequestError, BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
+        BasicResult, BasicResultWith404, InsufficientStorageError, InternalError,
+    },
+    ApiTags,
 };
-use crate::ApiTags;
-use crate::{generate_error_response, generate_success_response};
 use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_api_types::{
-    Address, AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
-    HashValue, HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest,
+    verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
+    AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
+    HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest,
     Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserTransaction, U64,
+    TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion,
+    MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
-use aptos_crypto::hash::CryptoHash;
-use aptos_crypto::signing_message;
-use aptos_types::account_config::CoinStoreResource;
-use aptos_types::account_view::AccountView;
-use aptos_types::mempool_status::MempoolStatusCode;
-use aptos_types::transaction::{
-    ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
+use aptos_crypto::{hash::CryptoHash, signing_message};
+use aptos_types::{
+    account_config::CoinStoreResource,
+    account_view::AccountView,
+    mempool_status::MempoolStatusCode,
+    transaction::{
+        ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction,
+        TransactionPayload, TransactionStatus,
+    },
+    vm_status::StatusCode,
 };
-use aptos_types::vm_status::StatusCode;
 use aptos_vm::AptosVM;
-use poem_openapi::param::{Path, Query};
-use poem_openapi::payload::Json;
-use poem_openapi::{ApiRequest, OpenApi};
+use poem_openapi::{
+    param::{Path, Query},
+    payload::Json,
+    ApiRequest, OpenApi,
+};
 use std::sync::Arc;
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
@@ -83,6 +91,15 @@ pub enum SubmitTransactionPost {
     Bcs(Bcs),
 }
 
+impl VerifyInput for SubmitTransactionPost {
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            SubmitTransactionPost::Json(inner) => inner.0.verify(),
+            SubmitTransactionPost::Bcs(_) => Ok(()),
+        }
+    }
+}
+
 // We need a custom type here because we use different types for each of the
 // content types possible for the POST data.
 #[derive(ApiRequest, Debug)]
@@ -95,6 +112,20 @@ pub enum SubmitTransactionsBatchPost {
     // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
     #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
     Bcs(Bcs),
+}
+
+impl VerifyInput for SubmitTransactionsBatchPost {
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            SubmitTransactionsBatchPost::Json(inner) => {
+                for request in inner.0.iter() {
+                    request.verify()?;
+                }
+            }
+            SubmitTransactionsBatchPost::Bcs(_) => {}
+        }
+        Ok(())
+    }
 }
 
 /// API for interacting with transactions
@@ -263,6 +294,14 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        data.verify()
+            .context("Submitted transaction invalid'")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code_no_info(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                )
+            })?;
         fail_point_poem("endpoint_submit_transaction")?;
         self.context
             .check_api_output_enabled("Submit transaction", &accept_type)?;
@@ -308,6 +347,14 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionsBatchPost,
     ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
+        data.verify()
+            .context("Submitted transactions invalid")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code_no_info(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                )
+            })?;
         fail_point_poem("endpoint_submit_batch_transactions")?;
         self.context
             .check_api_output_enabled("Submit batch transactions", &accept_type)?;
@@ -359,8 +406,19 @@ impl TransactionsApi {
         /// If set to true, the gas unit price in the transaction will be ignored
         /// and the estimated value will be used
         estimate_gas_unit_price: Query<Option<bool>>,
+        /// If set to true, the transaction will use a higher price than the original
+        /// estimate.
+        estimate_prioritized_gas_unit_price: Query<Option<bool>>,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
+        data.verify()
+            .context("Simulated transaction invalid")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code_no_info(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                )
+            })?;
         fail_point_poem("endpoint_simulate_transaction")?;
         self.context
             .check_api_output_enabled("Simulate transaction", &accept_type)?;
@@ -370,16 +428,29 @@ impl TransactionsApi {
         let ledger_info = self.context.get_latest_ledger_info()?;
         let mut signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
 
-        let estimated_gas_unit_price = if estimate_gas_unit_price.0.unwrap_or_default() {
-            Some(self.context.estimate_gas_price(&ledger_info)?)
-        } else {
-            None
+        let estimated_gas_unit_price = match (
+            estimate_gas_unit_price.0.unwrap_or_default(),
+            estimate_prioritized_gas_unit_price.0.unwrap_or_default(),
+        ) {
+            (_, true) => {
+                let gas_estimation = self.context.estimate_gas_price(&ledger_info)?;
+                // The prioritized gas estimate should always be set, but if it's not use the gas estimate
+                Some(
+                    gas_estimation
+                        .prioritized_gas_estimate
+                        .unwrap_or(gas_estimation.gas_estimate),
+                )
+            }
+            (true, false) => Some(self.context.estimate_gas_price(&ledger_info)?.gas_estimate),
+            (false, false) => None,
         };
 
         // If estimate max gas amount is provided, we will just make it the maximum value
         let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
             // Retrieve max possible gas units
-            let gas_params = self.context.get_gas_schedule(&ledger_info)?;
+            let (_, gas_params) = self.context.get_gas_schedule(&ledger_info)?;
+            let min_number_of_gas_units = u64::from(gas_params.txn.min_transaction_gas_units)
+                / u64::from(gas_params.txn.gas_unit_scaling_factor);
             let max_number_of_gas_units = u64::from(gas_params.txn.maximum_number_of_gas_units);
 
             // Retrieve account balance to determine max gas available
@@ -424,6 +495,10 @@ impl TransactionsApi {
             } else {
                 coin_store.coin() / gas_unit_price
             };
+
+            // To give better error messaging, we should not go below the minimum number of gas units
+            let max_account_gas_units =
+                std::cmp::max(min_number_of_gas_units, max_account_gas_units);
 
             // Minimum of the max account and the max total needs to be used for estimation
             Some(std::cmp::min(
@@ -479,6 +554,12 @@ impl TransactionsApi {
         data: Json<EncodeSubmissionRequest>,
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
+        data.0
+            .verify()
+            .context("'UserTransactionRequest' invalid")
+            .map_err(|err| {
+                BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+            })?;
         fail_point_poem("endpoint_encode_submission")?;
         self.context
             .check_api_output_enabled("Encode submission", &accept_type)?;
@@ -507,12 +588,7 @@ impl TransactionsApi {
         self.context
             .check_api_output_enabled("Estimate gas price", &accept_type)?;
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let estimated_gas_price = self.context.estimate_gas_price(&latest_ledger_info)?;
-
-        // TODO: Do we want to give more than just a single gas price?  Percentiles?
-        let gas_estimation = GasEstimation {
-            gas_estimate: estimated_gas_price,
-        };
+        let gas_estimation = self.context.estimate_gas_price(&latest_ledger_info)?;
 
         match accept_type {
             AcceptType::Json => BasicResponse::try_from_json((
@@ -520,11 +596,16 @@ impl TransactionsApi {
                 &latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),
-            AcceptType::Bcs => BasicResponse::try_from_bcs((
-                gas_estimation,
-                &latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
+            AcceptType::Bcs => {
+                let gas_estimation_bcs = GasEstimationBcs {
+                    gas_estimate: gas_estimation.gas_estimate,
+                };
+                BasicResponse::try_from_bcs((
+                    gas_estimation_bcs,
+                    &latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
         }
     }
 }
@@ -722,7 +803,7 @@ impl TransactionsApi {
         // TODO: Return more specific errors from within this function.
         let data = self.context.get_account_transactions(
             address.into(),
-            page.start(0, u64::MAX, &latest_ledger_info)?,
+            page.start_option(),
             page.limit(&latest_ledger_info)?,
             latest_ledger_info.version(),
             &latest_ledger_info,
@@ -748,15 +829,77 @@ impl TransactionsApi {
     ) -> Result<SignedTransaction, SubmitTransactionError> {
         match data {
             SubmitTransactionPost::Bcs(data) => {
-                let signed_transaction = bcs::from_bytes(&data.0)
-                    .context("Failed to deserialize input into SignedTransaction")
-                    .map_err(|err| {
-                        SubmitTransactionError::bad_request_with_code(
-                            err,
-                            AptosErrorCode::InvalidInput,
-                            ledger_info,
-                        )
-                    })?;
+                let signed_transaction: SignedTransaction =
+                    bcs::from_bytes_with_limit(&data.0, MAX_RECURSIVE_TYPES_ALLOWED as usize)
+                        .context("Failed to deserialize input into SignedTransaction")
+                        .map_err(|err| {
+                            SubmitTransactionError::bad_request_with_code(
+                                err,
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            )
+                        })?;
+                // Verify the signed transaction
+                match signed_transaction.payload() {
+                    TransactionPayload::EntryFunction(entry_function) => {
+                        verify_module_identifier(entry_function.module().name().as_str())
+                            .context("Transaction entry function module invalid")
+                            .map_err(|err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            })?;
+
+                        verify_function_identifier(entry_function.function().as_str())
+                            .context("Transaction entry function name invalid")
+                            .map_err(|err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            })?;
+                        for arg in entry_function.ty_args() {
+                            let arg: MoveType = arg.into();
+                            arg.verify(0)
+                                .context("Transaction entry function type arg invalid")
+                                .map_err(|err| {
+                                    SubmitTransactionError::bad_request_with_code(
+                                        err,
+                                        AptosErrorCode::InvalidInput,
+                                        ledger_info,
+                                    )
+                                })?;
+                        }
+                    }
+                    TransactionPayload::Script(script) => {
+                        if script.code().is_empty() {
+                            return Err(SubmitTransactionError::bad_request_with_code(
+                                "Script payload bytecode must not be empty",
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            ));
+                        }
+
+                        for arg in script.ty_args() {
+                            let arg = MoveType::from(arg);
+                            arg.verify(0)
+                                .context("Transaction script function type arg invalid")
+                                .map_err(|err| {
+                                    SubmitTransactionError::bad_request_with_code(
+                                        err,
+                                        AptosErrorCode::InvalidInput,
+                                        ledger_info,
+                                    )
+                                })?;
+                        }
+                    }
+                    TransactionPayload::ModuleBundle(_) => {}
+                }
+                // TODO: Verify script args?
+
                 Ok(signed_transaction)
             }
             SubmitTransactionPost::Json(data) => self
@@ -998,7 +1141,7 @@ impl TransactionsApi {
 
         // Simulate transaction
         let move_resolver = self.context.move_resolver_poem(&ledger_info)?;
-        let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (_, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
 
         // Apply transaction outputs to build up a transaction
@@ -1008,7 +1151,7 @@ impl TransactionsApi {
         let output = output_ext.into_transaction_output(&move_resolver);
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
-        let exe_status = match status.into() {
+        let exe_status = match output.status().clone() {
             TransactionStatus::Keep(exec_status) => exec_status,
             TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
@@ -1093,16 +1236,29 @@ impl TransactionsApi {
             })?;
 
         let raw_message = match request.secondary_signers {
-            Some(secondary_signer_addresses) => {
-                signing_message(&RawTransactionWithData::new_multi_agent(
+            Some(secondary_signer_addresses) => signing_message(
+                &RawTransactionWithData::new_multi_agent(
                     raw_txn,
                     secondary_signer_addresses
                         .into_iter()
                         .map(|v| v.into())
                         .collect(),
-                ))
-            }
-            None => raw_txn.signing_message(),
+                ),
+            )
+            .context("Invalid transaction to generate signing message")
+            .map_err(|err| {
+                BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
+            })?,
+            None => raw_txn
+                .signing_message()
+                .context("Invalid transaction to generate signing message")
+                .map_err(|err| {
+                    BasicError::bad_request_with_code(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                        &ledger_info,
+                    )
+                })?,
         };
 
         BasicResponse::try_from_json((

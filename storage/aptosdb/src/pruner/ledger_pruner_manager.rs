@@ -10,7 +10,7 @@ use crate::pruner::db_pruner::DBPruner;
 use crate::pruner::ledger_pruner_worker::LedgerPrunerWorker;
 use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
 use crate::pruner::pruner_manager::PrunerManager;
-use crate::{utils, StateStore};
+use crate::{pruner_utils, StateStore};
 use aptos_types::transaction::Version;
 use schemadb::DB;
 use std::{sync::Arc, thread::JoinHandle};
@@ -105,7 +105,7 @@ impl LedgerPrunerManager {
         state_store: Arc<StateStore>,
         ledger_pruner_config: LedgerPrunerConfig,
     ) -> Self {
-        let ledger_pruner = utils::create_ledger_pruner(ledger_rocksdb, state_store);
+        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_rocksdb, state_store);
 
         if ledger_pruner_config.enable {
             PRUNER_WINDOW

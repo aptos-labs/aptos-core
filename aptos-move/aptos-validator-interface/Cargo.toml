@@ -17,5 +17,5 @@ aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 
 aptosdb = { path = "../../storage/aptosdb" }
-move-deps = { path = "../move-deps" }
+move-binary-format = { workspace = true }
 storage-interface = { path = "../../storage/storage-interface" }

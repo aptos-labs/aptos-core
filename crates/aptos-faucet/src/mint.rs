@@ -1,21 +1,25 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+// README: The aptos-faucet is deprecated in favor of the tap. Do not add new code
+// to this until you've spoken with the Ecosystem Platform team + dport.
+
 use crate::Service;
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};
 use aptos_logger::{error, info, warn};
-use aptos_sdk::{
-    transaction_builder::aptos_stdlib,
-    types::{
-        account_address::AccountAddress,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+use aptos_sdk::types::{
+    account_address::AccountAddress,
+    transaction::{
+        authenticator::AuthenticationKey, Script, SignedTransaction, TransactionArgument,
     },
 };
 use reqwest::StatusCode;
 use serde::Deserialize;
 use std::{convert::Infallible, fmt, sync::Arc};
 use warp::{Filter, Rejection, Reply};
+
+static MINTER_SCRIPT: &[u8] = include_bytes!("minter.mv");
 
 pub fn mint_routes(
     service: Arc<Service>,
@@ -62,7 +66,7 @@ impl std::fmt::Display for Response {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct MintParams {
     pub amount: u64,
     pub auth_key: Option<String>,
@@ -113,6 +117,10 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     })?;
 
     let (mut faucet_seq, mut receiver_seq) = sequences(service, receiver_address).await?;
+    if receiver_seq.is_some() && amount == 0 {
+        anyhow::bail!("Account is already created and amount asked for is 0");
+    }
+
     let our_faucet_seq = {
         let mut faucet_account = service.faucet_account.lock().await;
 
@@ -124,10 +132,30 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         faucet_account.sequence_number()
     };
 
+    let mut set_outstanding = false;
     // We shouldn't have too many outstanding txns
     for _ in 0..60 {
         if our_faucet_seq < faucet_seq + 50 {
-            break;
+            // Enforce a stronger ordering of priorities based upon the MintParams that arrived
+            // first. Then put the other folks to sleep to try again until the queue fills up.
+            if !set_outstanding {
+                let mut requests = service.outstanding_requests.write().unwrap();
+                requests.push(params.clone());
+                set_outstanding = true;
+            }
+
+            if service.outstanding_requests.read().unwrap().first() == Some(&params) {
+                // There might have been two requests with the same parameters, so we ensure that
+                // we only pop off one of them. We do a read lock first since that is cheap,
+                // followed by a write lock.
+                let mut requests = service.outstanding_requests.write().unwrap();
+                if requests.first() == Some(&params) {
+                    requests.remove(0);
+                    break;
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+            continue;
         }
         warn!(
             "We have too many outstanding transactions: {}. Sleeping to let the system catchup.",
@@ -138,6 +166,10 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         let (lhs, rhs) = sequences(service, receiver_address).await?;
         faucet_seq = lhs;
         receiver_seq = rhs;
+
+        if receiver_seq.is_some() && amount == 0 {
+            anyhow::bail!("Account is already created and amount asked for is 0");
+        }
     }
 
     // After 30 seconds, we still have not caught up, we are likely unhealthy
@@ -152,53 +184,33 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         }
     }
 
-    let mut txns = vec![];
-
-    {
+    let txn = {
         let mut faucet_account = service.faucet_account.lock().await;
+        faucet_account.sign_with_transaction_builder(service.transaction_factory.script(
+            Script::new(
+                MINTER_SCRIPT.to_vec(),
+                vec![],
+                vec![
+                    TransactionArgument::Address(receiver_address),
+                    TransactionArgument::U64(amount),
+                ],
+            ),
+        ))
+    };
 
-        if receiver_seq.is_none() {
-            let builder = service
-                .transaction_factory
-                .payload(aptos_stdlib::aptos_account_create_account(receiver_address));
-
-            let txn = faucet_account.sign_with_transaction_builder(builder);
-            txns.push(txn)
-        }
-
-        if amount != 0 {
-            txns.push(
-                faucet_account.sign_with_transaction_builder(
-                    service
-                        .transaction_factory
-                        .payload(aptos_stdlib::aptos_coin_mint(receiver_address, amount)),
-                ),
-            );
-        }
-    }
-
-    let requests = txns.iter().map(|txn| service.client.submit(txn));
-    let mut responses = futures::future::join_all(requests).await;
+    let response = service.client.submit(&txn).await;
 
     // If there was an issue submitting a transaction we should just reset our sequence_numbers
     // to what was on chain
-    if responses.iter().any(Result::is_err) {
+    if response.is_err() {
         *service.faucet_account.lock().await.sequence_number_mut() = faucet_seq;
-    }
-
-    while !responses.is_empty() {
-        let response = responses.swap_remove(0);
         response?;
     }
 
     if params.return_txns.unwrap_or(false) {
-        Ok(Response::SubmittedTxns(txns))
+        Ok(Response::SubmittedTxns(vec![txn]))
     } else {
-        let hashes = txns
-            .iter()
-            .map(|txn| txn.clone().committed_hash())
-            .collect();
-        Ok(Response::SubmittedTxnsHashes(hashes))
+        Ok(Response::SubmittedTxnsHashes(vec![txn.committed_hash()]))
     }
 }
 

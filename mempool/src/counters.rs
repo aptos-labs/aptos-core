@@ -3,9 +3,9 @@
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
-    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    histogram_opts, op_counters::DurationHistogram, register_histogram, register_histogram_vec,
+    register_int_counter, register_int_counter_vec, register_int_gauge_vec, Histogram,
+    HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 use short_hex_str::AsShortHexStr;
@@ -20,10 +20,13 @@ pub const PARKING_LOT_INDEX_LABEL: &str = "parking_lot";
 pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
 pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 
-// Core mempool commit stages labels
-pub const GET_BLOCK_STAGE_LABEL: &str = "get_block";
+// Core mempool stages labels
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
+pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
+pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
+pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
+pub const BROADCAST_BATCHED_LABEL: &str = "broadcast_batched";
 
 // Core mempool GC type labels
 pub const GC_SYSTEM_TTL_LABEL: &str = "system_ttl";
@@ -35,6 +38,9 @@ pub const GC_PARKED_TXN_LABEL: &str = "parked";
 
 // Mempool service request type labels
 pub const GET_BLOCK_LABEL: &str = "get_block";
+pub const GET_BLOCK_LOCK_LABEL: &str = "get_block_lock";
+pub const GET_BLOCK_GC_LABEL: &str = "get_block_gc";
+pub const GET_BLOCK_GET_BATCH_LABEL: &str = "get_block_get_batch";
 pub const COMMIT_STATE_SYNC_LABEL: &str = "commit_accepted";
 pub const COMMIT_CONSENSUS_LABEL: &str = "commit_rejected";
 
@@ -76,6 +82,39 @@ pub const SENT_LABEL: &str = "sent";
 // invalid ACK type labels
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
+// Inserted transaction scope labels
+pub const LOCAL_LABEL: &str = "local";
+pub const E2E_LABEL: &str = "e2e";
+
+// Event types for ranking_score
+pub const INSERT_LABEL: &str = "insert";
+pub const REMOVE_LABEL: &str = "remove";
+
+// Histogram buckets that make more sense at larger timescales than DEFAULT_BUCKETS
+const LARGER_LATENCY_BUCKETS: &[f64; 11] = &[
+    0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 40.0, 80.0, 160.0, 320.0,
+];
+
+// Histogram buckets for tracking ranking score (see below test for the formula)
+const RANKING_SCORE_BUCKETS: &[f64] = &[
+    100.0, 147.0, 215.0, 316.0, 464.0, 681.0, 1000.0, 1468.0, 2154.0, 3162.0, 4642.0, 6813.0,
+    10000.0, 14678.0, 21544.0, 31623.0, 46416.0, 68129.0, 100000.0, 146780.0, 215443.0,
+];
+
+#[cfg(test)]
+mod test {
+    use crate::counters::RANKING_SCORE_BUCKETS;
+
+    #[test]
+    fn generate_ranking_score_buckets() {
+        let buckets: Vec<f64> = (0..21)
+            .map(|n| 100.0 * (10.0_f64.powf(n as f64 / 6.0)))
+            .map(|f| f.round())
+            .collect();
+        assert_eq!(RANKING_SCORE_BUCKETS, &buckets);
+    }
+}
+
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -90,6 +129,24 @@ pub fn core_mempool_index_size(label: &'static str, size: usize) {
     CORE_MEMPOOL_INDEX_SIZE
         .with_label_values(&[label])
         .set(size as i64)
+}
+
+/// Counter tracking size of each bucket in timeline index
+static CORE_MEMPOOL_TIMELINE_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_core_mempool_timeline_index_size",
+        "Size of each bucket in core mempool timeline index",
+        &["bucket"]
+    )
+    .unwrap()
+});
+
+pub fn core_mempool_timeline_index_size(bucket_min_size_pairs: &Vec<(&str, usize)>) {
+    for &(bucket_min, size) in bucket_min_size_pairs {
+        CORE_MEMPOOL_TIMELINE_INDEX_SIZE
+            .with_label_values(&[bucket_min])
+            .set(size as i64)
+    }
 }
 
 /// Counter tracking number of txns removed from core mempool
@@ -110,15 +167,58 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub fn core_mempool_txn_commit_latency(
+    stage: &'static str,
+    scope: &'static str,
+    bucket: &str,
+    latency: Duration,
+) {
+    CORE_MEMPOOL_TXN_COMMIT_LATENCY
+        .with_label_values(&[stage, scope, bucket])
+        .observe(latency.as_secs_f64());
+}
+
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
-pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
+static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
-        &["stage"]
+        LARGER_LATENCY_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["stage", "scope", "bucket"]).unwrap()
+});
+
+pub fn core_mempool_txn_ranking_score(
+    stage: &'static str,
+    status: &str,
+    bucket: &str,
+    ranking_score: u64,
+) {
+    CORE_MEMPOOL_TXN_RANKING_BUCKET
+        .with_label_values(&[stage, status, bucket])
+        .inc();
+    CORE_MEMPOOL_TXN_RANKING_SCORE
+        .with_label_values(&[stage, status])
+        .observe(ranking_score as f64);
+}
+
+static CORE_MEMPOOL_TXN_RANKING_BUCKET: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_core_mempool_txn_ranking_bucket",
+        "Ranking bucket of txn reaching various stages in core mempool",
+        &["stage", "status", "bucket"]
     )
     .unwrap()
+});
+
+static CORE_MEMPOOL_TXN_RANKING_SCORE: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
+        "aptos_core_mempool_txn_ranking_score",
+        "Ranking score of txn reaching various stages in core mempool",
+        RANKING_SCORE_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["stage", "status"]).unwrap()
 });
 
 /// Counter for number of periodic garbage-collection (=GC) events that happen, regardless of
@@ -168,6 +268,15 @@ pub fn mempool_service_transactions(label: &'static str, num: usize) {
         .observe(num as f64)
 }
 
+/// Histogram for the byte size of transactions processed in get_block
+pub static MEMPOOL_SERVICE_BYTES_GET_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_service_bytes_get_block",
+        "Histogram for the number of txns per (mempool returned for proposal) blocks."
+    )
+    .unwrap()
+});
+
 /// Counter for tracking latency of mempool processing requests from consensus/state sync
 /// A 'fail' result means the mempool's callback response to consensus/state sync failed.
 static MEMPOOL_SERVICE_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
@@ -183,6 +292,12 @@ pub fn mempool_service_latency(label: &'static str, result: &str, duration: Dura
     MEMPOOL_SERVICE_LATENCY
         .with_label_values(&[label, result])
         .observe(duration.as_secs_f64());
+}
+
+pub fn mempool_service_start_latency_timer(label: &'static str, result: &str) -> HistogramTimer {
+    MEMPOOL_SERVICE_LATENCY
+        .with_label_values(&[label, result])
+        .start_timer()
 }
 
 /// Counter for types of network messages received by shared mempool

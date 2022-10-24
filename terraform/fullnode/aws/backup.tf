@@ -8,10 +8,10 @@ resource "aws_s3_bucket" "backup" {
 
 resource "aws_s3_bucket_public_access_block" "backup" {
   bucket                  = aws_s3_bucket.backup.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  block_public_acls       = !var.enable_public_backup
+  block_public_policy     = !var.enable_public_backup
+  ignore_public_acls      = !var.enable_public_backup
+  restrict_public_buckets = !var.enable_public_backup
 }
 
 data "aws_iam_policy_document" "backup-assume-role" {
@@ -28,7 +28,8 @@ data "aws_iam_policy_document" "backup-assume-role" {
     condition {
       test     = "StringEquals"
       variable = "${local.oidc_provider}:sub"
-      values   = ["system:serviceaccount:default:pfn0-aptos-fullnode"]
+      # NOTE: assumes the deployment defaults: that namespace is default and helm release is pfn*
+      values = [for i in range(var.num_fullnodes) : "system:serviceaccount:default:pfn${i}-aptos-fullnode"]
     }
 
     condition {

@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     identifier::IdentStr,
     move_resource::{MoveResource, MoveStructType},
@@ -27,6 +27,7 @@ pub struct NewBlockEvent {
     previous_block_votes_bitvec: Vec<u8>,
     proposer: AccountAddress,
     failed_proposer_indices: Vec<u64>,
+    // usecs (microseconds)
     timestamp: u64,
 }
 
@@ -126,6 +127,10 @@ impl BlockResource {
 
     pub fn height(&self) -> u64 {
         self.height
+    }
+
+    pub fn epoch_interval(&self) -> u64 {
+        self.epoch_interval
     }
 }
 

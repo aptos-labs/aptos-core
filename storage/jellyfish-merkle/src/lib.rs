@@ -6,7 +6,7 @@
 //! This module implements [`JellyfishMerkleTree`] backed by storage module. The tree itself doesn't
 //! persist anything, but realizes the logic of R/W only. The write path will produce all the
 //! intermediate results in a batch for storage layer to commit and the read path will return
-//! results directly. The public APIs are only [`new`], [`put_value_sets`], [`put_value_set`] and
+//! results directly. The public APIs are only [`new`], [`batch_put_value_set`], and
 //! [`get_with_proof`]. After each put with a `value_set` based on a known version, the tree will
 //! return a new root hash with a [`TreeUpdateBatch`] containing all the new nodes and indices of
 //! stale nodes.
@@ -79,7 +79,7 @@ pub mod restore;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
 
-use crate::metrics::APTOS_JELLYFISH_LEAF_COUNT;
+use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT};
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -136,9 +136,9 @@ pub trait TreeReader<K> {
     /// Gets node given a node key. Returns `None` if the node does not exist.
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>>;
 
-    /// Gets the rightmost leaf. Note that this assumes we are in the process of restoring the tree
-    /// and all nodes are at the same version.
-    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<K>)>>;
+    /// Gets the rightmost leaf at a version. Note that this assumes we are in the process of
+    /// restoring the tree and all nodes are at the same version.
+    fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode<K>)>>;
 }
 
 pub trait TreeWriter<K>: Send + Sync {
@@ -281,7 +281,8 @@ where
 }
 
 /// An iterator that iterates the index range (inclusive) of each different nibble at given
-/// `nibble_idx` of all the keys in a sorted key-value pairs.
+/// `nibble_idx` of all the keys in a sorted key-value pairs which have the identical HashValue
+/// prefix (up to nibble_idx).
 struct NibbleRangeIterator<'a, K> {
     sorted_kvs: &'a [(HashValue, K)],
     nibble_idx: usize,
@@ -343,7 +344,7 @@ where
         }
     }
 
-    /// Get the node hash from the cache if exists, otherwise compute it.
+    /// Get the node hash from the cache if cache is provided, otherwise (for test only) compute it.
     fn get_hash(
         node_key: &NodeKey,
         node: &Node<K>,
@@ -626,11 +627,11 @@ where
         let existing_leaf_key = existing_leaf_node.account_key();
 
         if kvs.len() == 1 && kvs[0].0 == existing_leaf_key {
-            // TODO(lightmark): Add the purge logic the value here.
             if let (key, Some((value_hash, state_key))) = kvs[0] {
                 let new_leaf_node = Node::new_leaf(key, *value_hash, (state_key.clone(), version));
                 Ok(Some(new_leaf_node))
             } else {
+                APTOS_JELLYFISH_LEAF_DELETION_COUNT.inc();
                 Ok(None)
             }
         } else {

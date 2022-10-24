@@ -313,7 +313,7 @@ proptest! {
         keypairs in proptest::array::uniform10(uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>())
     ) {
         let mut signatures: Vec<(Ed25519PublicKey, Ed25519Signature)> = keypairs.iter().map(|keypair| {
-            (keypair.public_key.clone(), keypair.private_key.sign(&message))
+            (keypair.public_key.clone(), keypair.private_key.sign(&message).unwrap())
         }).collect();
         prop_assert!(Ed25519Signature::batch_verify(&message, signatures.clone()).is_ok());
         // We swap message and signature for the last element,
@@ -347,7 +347,7 @@ proptest! {
         message in random_serializable_struct(),
         keypair in uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>()
     ) {
-        let signature = keypair.private_key.sign(&message);
+        let signature = keypair.private_key.sign(&message).unwrap();
         let serialized: &[u8] = &(signature.to_bytes());
         prop_assert_eq!(ED25519_SIGNATURE_LENGTH, serialized.len());
         let deserialized = Ed25519Signature::try_from(serialized).unwrap();
@@ -373,7 +373,7 @@ proptest! {
         keypair in uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>()
     ) {
         let hashable = CryptoHashable(x);
-        let signature = keypair.private_key.sign(&hashable);
+        let signature = keypair.private_key.sign(&hashable).unwrap();
         let serialized: &[u8] = &(signature.to_bytes());
         prop_assert_eq!(ED25519_SIGNATURE_LENGTH, serialized.len());
         let deserialized = Ed25519Signature::try_from(serialized).unwrap();
@@ -387,7 +387,7 @@ proptest! {
         message in random_serializable_struct(),
         keypair in uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>()
     ) {
-        let signature = keypair.private_key.sign(&message);
+        let signature = keypair.private_key.sign(&message).unwrap();
         let mut serialized = signature.to_bytes();
         let serialized_old = serialized; // implements Copy trait
         prop_assert_eq!(serialized_old, serialized);
@@ -486,10 +486,10 @@ proptest! {
         let sig_dalek = ed25519_dalek::Signature::from_bytes(&sig_bytes).unwrap();
 
         // We expect ed25519-dalek verify to succeed
-        prop_assert!(pk_dalek.verify(signing_message(&m).as_ref(), &sig_dalek).is_ok());
+        prop_assert!(pk_dalek.verify(signing_message(&m).unwrap().as_ref(), &sig_dalek).is_ok());
 
         // We expect ed25519-dalek verify_strict to fail
-        prop_assert!(pk_dalek.verify_strict(signing_message(&m).as_ref(), &sig_dalek).is_err());
+        prop_assert!(pk_dalek.verify_strict(signing_message(&m).unwrap().as_ref(), &sig_dalek).is_err());
 
         // We expect our own validation to fail in Ed25519Signature::verify_arbitrary_msg, since it
         // calls ed25519-dalek's verify_strict

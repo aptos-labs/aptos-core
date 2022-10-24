@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import nacl from "tweetnacl";
-import sha3 from "js-sha3";
+import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import * as bip39 from "@scure/bip39";
 import { bytesToHex } from "@noble/hashes/utils";
 import { derivePath } from "./utils/hd-key";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
 import { Memoize } from "./utils";
-
-const { sha3_256: sha3Hash } = sha3;
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -107,7 +105,7 @@ export class AptosAccount {
     const hash = sha3Hash.create();
     hash.update(this.signingKey.publicKey);
     hash.update("\x00");
-    return new HexString(hash.hex());
+    return HexString.fromUint8Array(hash.digest());
   }
 
   /**

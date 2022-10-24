@@ -1,16 +1,16 @@
 ---
-title: "Bootstrap a new Fullnode"
+title: "Bootstrap a New Fullnode"
 slug: "bootstrap-fullnode"
 sidebar_position: 14
 ---
 
-# Bootstrap a new Fullnode
+# Bootstrap a New Fullnode
 
-Bootstrapping a new fullnode using state-sync might not work well after the network is running for a while, it can either take super long time, or won't be able to fetch required data because most of nodes pruned the ledge history. The most effective way for boostrapping a new fullnode is to use data restore.
+Bootstrapping a new fullnode using state-sync might not work well after the network is running for a while, it can either take super long time, or won't be able to fetch required data because most of nodes pruned the ledge history. The most effective way for bootstrapping a new fullnode is to use data restore.
 
 ## Restore data from a backup
 
-We're hosting the **AIT3 blockchain** (other network coming soon) backup data on AWS S3 and Google Cloud GCS. Following the guide below to build your aptos DB, then you can point your fullnode binary to start with this restored data directory.
+We're hosting the **AIT3 blockchain** (other network coming soon) backup data on AWS S3 and Google Cloud GCS. Following the guide below to build your Aptos DB, then you can point your fullnode binary to start with this restored data directory.
 
 ### Using source code or docker
 

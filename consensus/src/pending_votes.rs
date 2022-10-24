@@ -60,8 +60,8 @@ pub struct PendingVotes {
         HashMap<HashValue /* LedgerInfo digest */, LedgerInfoWithPartialSignatures>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
     maybe_partial_2chain_tc: Option<TwoChainTimeoutWithPartialSignatures>,
-    /// Map of Author to vote. This is useful to discard multiple votes.
-    author_to_vote: HashMap<Author, Vote>,
+    /// Map of Author to (vote, li_digest). This is useful to discard multiple votes.
+    author_to_vote: HashMap<Author, (Vote, HashValue)>,
     /// Whether we have echoed timeout for this round.
     echo_timeout: bool,
 }
@@ -91,9 +91,11 @@ impl PendingVotes {
         // 1. Has the author already voted for this round?
         //
 
-        if let Some(previously_seen_vote) = self.author_to_vote.get(&vote.author()) {
+        if let Some((previously_seen_vote, previous_li_digest)) =
+            self.author_to_vote.get(&vote.author())
+        {
             // is it the same vote?
-            if li_digest == previously_seen_vote.ledger_info().hash() {
+            if &li_digest == previous_li_digest {
                 // we've already seen an equivalent vote before
                 let new_timeout_vote = vote.is_timeout() && !previously_seen_vote.is_timeout();
                 if !new_timeout_vote {
@@ -117,7 +119,8 @@ impl PendingVotes {
         // 2. Store new vote (or update, in case it's a new timeout vote)
         //
 
-        self.author_to_vote.insert(vote.author(), vote.clone());
+        self.author_to_vote
+            .insert(vote.author(), (vote.clone(), li_digest));
 
         //
         // 3. Let's check if we can create a QC
@@ -211,6 +214,18 @@ impl PendingVotes {
 
         VoteReceptionResult::VoteAdded(voting_power)
     }
+
+    pub fn drain_votes(
+        &mut self,
+    ) -> (
+        Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
+        Option<TwoChainTimeoutWithPartialSignatures>,
+    ) {
+        (
+            self.li_digest_to_votes.drain().collect(),
+            self.maybe_partial_2chain_tc.take(),
+        )
+    }
 }
 
 //
@@ -290,7 +305,8 @@ mod tests {
         // create random vote from validator[0]
         let li1 = random_ledger_info();
         let vote_data_1 = random_vote_data();
-        let vote_data_1_author_0 = Vote::new(vote_data_1, signers[0].author(), li1, &signers[0]);
+        let vote_data_1_author_0 =
+            Vote::new(vote_data_1, signers[0].author(), li1, &signers[0]).unwrap();
 
         // first time a new vote is added -> VoteAdded
         assert_eq!(
@@ -312,7 +328,8 @@ mod tests {
             signers[0].author(),
             li2.clone(),
             &signers[0],
-        );
+        )
+        .unwrap();
         assert_eq!(
             pending_votes.insert_vote(&vote_data_2_author_0, &validator),
             VoteReceptionResult::EquivocateVote
@@ -324,14 +341,16 @@ mod tests {
             signers[1].author(),
             li2.clone(),
             &signers[1],
-        );
+        )
+        .unwrap();
         assert_eq!(
             pending_votes.insert_vote(&vote_data_2_author_1, &validator),
             VoteReceptionResult::VoteAdded(1)
         );
 
         // two votes for the ledger info -> NewQuorumCertificate
-        let vote_data_2_author_2 = Vote::new(vote_data_2, signers[2].author(), li2, &signers[2]);
+        let vote_data_2_author_2 =
+            Vote::new(vote_data_2, signers[2].author(), li2, &signers[2]).unwrap();
         match pending_votes.insert_vote(&vote_data_2_author_2, &validator) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc.ledger_info().check_voting_power(&validator).is_ok());
@@ -353,7 +372,7 @@ mod tests {
         // submit a new vote from validator[0] -> VoteAdded
         let li0 = random_ledger_info();
         let vote0 = random_vote_data();
-        let mut vote0_author_0 = Vote::new(vote0, signers[0].author(), li0, &signers[0]);
+        let mut vote0_author_0 = Vote::new(vote0, signers[0].author(), li0, &signers[0]).unwrap();
 
         assert_eq!(
             pending_votes.insert_vote(&vote0_author_0, &validator),
@@ -362,7 +381,7 @@ mod tests {
 
         // submit the same vote but enhanced with a timeout -> VoteAdded
         let timeout = vote0_author_0.generate_2chain_timeout(certificate_for_genesis());
-        let signature = timeout.sign(&signers[0]);
+        let signature = timeout.sign(&signers[0]).unwrap();
         vote0_author_0.add_2chain_timeout(timeout, signature);
 
         assert_eq!(
@@ -373,7 +392,7 @@ mod tests {
         // another vote for a different block cannot form a TC if it doesn't have a timeout signature
         let li1 = random_ledger_info();
         let vote1 = random_vote_data();
-        let mut vote1_author_1 = Vote::new(vote1, signers[1].author(), li1, &signers[1]);
+        let mut vote1_author_1 = Vote::new(vote1, signers[1].author(), li1, &signers[1]).unwrap();
         assert_eq!(
             pending_votes.insert_vote(&vote1_author_1, &validator),
             VoteReceptionResult::VoteAdded(1)
@@ -381,7 +400,7 @@ mod tests {
 
         // if that vote is now enhanced with a timeout signature -> EchoTimeout.
         let timeout = vote1_author_1.generate_2chain_timeout(certificate_for_genesis());
-        let signature = timeout.sign(&signers[1]);
+        let signature = timeout.sign(&signers[1]).unwrap();
         vote1_author_1.add_2chain_timeout(timeout, signature);
         match pending_votes.insert_vote(&vote1_author_1, &validator) {
             VoteReceptionResult::EchoTimeout(voting_power) => {
@@ -394,11 +413,11 @@ mod tests {
 
         let li2 = random_ledger_info();
         let vote2 = random_vote_data();
-        let mut vote2_author_2 = Vote::new(vote2, signers[2].author(), li2, &signers[2]);
+        let mut vote2_author_2 = Vote::new(vote2, signers[2].author(), li2, &signers[2]).unwrap();
 
         // if that vote is now enhanced with a timeout signature -> NewTimeoutCertificate.
         let timeout = vote2_author_2.generate_2chain_timeout(certificate_for_genesis());
-        let signature = timeout.sign(&signers[2]);
+        let signature = timeout.sign(&signers[2]).unwrap();
         vote2_author_2.add_2chain_timeout(timeout, signature);
 
         match pending_votes.insert_vote(&vote2_author_2, &validator) {

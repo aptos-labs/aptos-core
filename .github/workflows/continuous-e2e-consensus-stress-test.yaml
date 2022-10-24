@@ -17,7 +17,6 @@ jobs:
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-consensus-stress-test
-      FORGE_CLUSTER_NAME: aptos-forge-big-1
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: consensus_stress_test
       POST_TO_SLACK: true

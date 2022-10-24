@@ -1,16 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
-    AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
+    interface::system_metrics::SystemMetricsThreshold, AptosPublicInfo, ChainInfo, FullNode,
+    NodeExt, Result, SwarmChaos, Validator, Version,
 };
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 use prometheus_http_query::response::PromqlResult;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
@@ -79,6 +79,7 @@ pub trait Swarm: Sync {
     /// Injects all types of chaos
     fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
     fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+    fn remove_all_chaos(&mut self) -> Result<()>;
 
     async fn ensure_no_validator_restart(&self) -> Result<()>;
     async fn ensure_no_fullnode_restart(&self) -> Result<()>;
@@ -100,6 +101,12 @@ pub trait Swarm: Sync {
 
     fn aptos_public_info(&mut self) -> AptosPublicInfo<'_> {
         self.chain_info().into_aptos_public_info()
+    }
+
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_>;
+
+    fn aptos_public_info_for_node(&mut self, idx: usize) -> AptosPublicInfo<'_> {
+        self.chain_info_for_node(idx).into_aptos_public_info()
     }
 }
 
@@ -252,6 +259,13 @@ pub trait SwarmExt: Swarm {
         wait_for_all_nodes_to_catchup(&self.get_all_nodes_clients_with_names(), timeout).await
     }
 
+    async fn wait_for_all_nodes_to_catchup_to_next(&self, timeout: Duration) -> Result<()> {
+        let clients = self.get_all_nodes_clients_with_names();
+        let highest_synced_version = get_highest_synced_version(&clients).await?;
+        wait_for_all_nodes_to_catchup_to_version(&clients, highest_synced_version + 1, timeout)
+            .await
+    }
+
     fn get_validator_clients_with_names(&self) -> Vec<(String, RestClient)> {
         self.validators()
             .map(|node| (node.name().to_string(), node.rest_client()))
@@ -281,6 +295,31 @@ pub trait SwarmExt: Swarm {
                     })
             })
             .collect()
+    }
+
+    async fn get_client_with_newest_ledger_version(&self) -> Option<(u64, RestClient)> {
+        let clients = self.get_all_nodes_clients_with_names();
+        let ledger_infos = join_all(clients.iter().map(|(_name, client)| async {
+            let start = Instant::now();
+            let result = client.get_ledger_information().await;
+
+            info!(
+                "Fetch from {:?} took {}ms, at version: {}",
+                client.path_prefix_string(),
+                start.elapsed().as_millis(),
+                result
+                    .as_ref()
+                    .map(|r| r.inner().version as i64)
+                    .unwrap_or(-1)
+            );
+            result
+        }))
+        .await;
+        ledger_infos
+            .into_iter()
+            .zip(clients.into_iter())
+            .flat_map(|(resp, (_, client))| resp.map(|r| (r.into_inner().version, client)))
+            .max_by_key(|(v, _c)| *v)
     }
 }
 
@@ -316,8 +355,9 @@ pub async fn wait_for_all_nodes_to_catchup_to_version(
 
         if start_time.elapsed() > timeout {
             return Err(anyhow!(
-                "Waiting for nodes to catch up to version {} timed out, current status: {:?}",
+                "Waiting for nodes to catch up to version {} timed out after {}s, current status: {:?}",
                 version,
+                start_time.elapsed().as_secs(),
                 versions.unwrap_or_default()
             ));
         }

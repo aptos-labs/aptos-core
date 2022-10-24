@@ -1,0 +1,83 @@
+{
+  "version": "2",
+  "hash": "",
+  "state_change_hash": "",
+  "event_root_hash": "",
+  "state_checkpoint_hash": null,
+  "gas_used": "1",
+  "success": false,
+  "vm_status": "Execution failed in script at code offset 2",
+  "accumulator_root_hash": "",
+  "changes": [
+    {
+      "address": "0xa550c18",
+      "state_key_hash": "",
+      "data": {
+        "type": "0x1::account::Account",
+        "data": {
+          "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
+          "coin_register_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "0"
+              }
+            }
+          },
+          "guid_creation_num": "4",
+          "key_rotation_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "1"
+              }
+            }
+          },
+          "rotation_capability_offer": {
+            "for": {
+              "vec": []
+            }
+          },
+          "sequence_number": "1",
+          "signer_capability_offer": {
+            "for": {
+              "vec": []
+            }
+          }
+        }
+      },
+      "type": "write_resource"
+    }
+  ],
+  "sender": "0xa550c18",
+  "sequence_number": "0",
+  "max_gas_amount": "2000",
+  "gas_unit_price": "0",
+  "expiration_timestamp_secs": "1662878338",
+  "payload": {
+    "code": {
+      "bytecode": "0xa11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102",
+      "abi": {
+        "name": "main",
+        "visibility": "public",
+        "is_entry": true,
+        "generic_type_params": [],
+        "params": [],
+        "return": []
+      }
+    },
+    "type_arguments": [],
+    "arguments": [],
+    "type": "script_payload"
+  },
+  "signature": {
+    "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
+    "signature": "0xaeb62c1c5445d4de1f8a9b9d43b8f7fb3dad84bb6b532e15c4edcf582f5b7bc2b1e2f51cf7ffb45215d912276855b5e31ed2f85280a1d51d28e414621a8d0604",
+    "type": "ed25519_signature"
+  },
+  "events": [],
+  "timestamp": "500000",
+  "type": "user_transaction"
+}

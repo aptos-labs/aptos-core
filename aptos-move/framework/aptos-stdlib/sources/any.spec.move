@@ -1,2 +1,1 @@
-spec aptos_std::any {
-}
+spec aptos_std::any {}

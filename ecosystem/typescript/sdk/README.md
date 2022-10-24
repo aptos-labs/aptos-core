@@ -5,11 +5,20 @@
 [![NPM Package Downloads][npm-image-downloads]][npm-url]
 
 ## Quickstart
+
 The public SDK downloaded from [npmjs](https://www.npmjs.com/package/aptos) is compatible with the [Aptos devnet](https://fullnode.devnet.aptoslabs.com). To start building, run below command in your project directory:
 
 ```bash
 yarn add aptos
 ```
+
+or use the browser bundle
+
+```
+<script src="https://unpkg.com/aptos@latest/dist/index.global.js" />
+```
+
+Then, the SDK can be accessed through `window.aptosSDK`.
 
 Learn the basics of how to use the SDK by following [this tutorial](https://aptos.dev/tutorials/your-first-transaction-sdk) in the Aptos developer site.
 
@@ -51,6 +60,7 @@ yarn generate-client
 ```
 
 ### Working with devnet
+
 See the quickstart above.
 
 ### Working with local node
@@ -71,7 +81,7 @@ Run the SDK tests and make sure they pass. Go to the SDK directory, and setup an
 ```
 rm .env
 echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> .env
-echo 'APTOS_FAUCET_URL="http://127.0.01:8081"' >> .env
+echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> .env
 ```
 
 Run the tests:

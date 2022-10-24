@@ -33,7 +33,7 @@ use short_hex_str::AsShortHexStr;
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
 
 // Re-exposed for aptos-network-checker
-pub use netcore::transport::tcp::{resolve_and_connect, TcpSocket};
+pub use netcore::transport::tcp::{resolve_and_connect, TCPBufferCfg, TcpSocket};
 
 #[cfg(test)]
 mod test;
@@ -54,6 +54,8 @@ pub const APTOS_TCP_TRANSPORT: tcp::TcpTransport = tcp::TcpTransport {
     ttl: None,
     // Use TCP_NODELAY for Aptos tcp connections.
     nodelay: Some(true),
+    // Use default TCP setting, overridden by Network config
+    tcp_buff_cfg: tcp::TCPBufferCfg::new(),
 };
 
 /// A trait alias for "socket-like" things.

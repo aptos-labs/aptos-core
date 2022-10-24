@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_gas::LATEST_GAS_FEATURE_VERSION;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -36,7 +37,7 @@ use executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use executor_types::BlockExecutorTrait;
-use move_deps::move_core_types::{
+use move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };
@@ -202,11 +203,11 @@ fn test_new_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
-    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
+    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 200_000_000);
+    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 200_000_000);
     execute_and_commit(block(vec![txn1, txn2, txn3, txn4]), &db, &signer);
-    assert_eq!(get_balance(&account1, &db), 2_000_000);
-    assert_eq!(get_balance(&account2, &db), 2_000_000);
+    assert_eq!(get_balance(&account1, &db), 200_000_000);
+    assert_eq!(get_balance(&account2, &db), 200_000_000);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
@@ -215,52 +216,58 @@ fn test_new_genesis() {
 
     // New genesis transaction: set validator set, bump epoch and overwrite account1 balance.
     let configuration = get_configuration(&db);
-    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
-        WriteSetMut::new(vec![
-            (
-                StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
-                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
-            ),
-            (
-                StateKey::AccessPath(AccessPath::new(
-                    CORE_CODE_ADDRESS,
-                    ConfigurationResource::resource_path(),
-                )),
-                WriteOp::Modification(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
-            ),
-            (
-                StateKey::AccessPath(AccessPath::new(
-                    account1,
-                    CoinStoreResource::resource_path(),
-                )),
-                WriteOp::Modification(
-                    bcs::to_bytes(&CoinStoreResource::new(
-                        1_000_000,
-                        false,
-                        EventHandle::random(0),
-                        EventHandle::random(0),
-                    ))
-                    .unwrap(),
+    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(
+        ChangeSet::new(
+            WriteSetMut::new(vec![
+                (
+                    StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
+                    WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
                 ),
-            ),
-        ])
-        .freeze()
+                (
+                    StateKey::AccessPath(AccessPath::new(
+                        CORE_CODE_ADDRESS,
+                        ConfigurationResource::resource_path(),
+                    )),
+                    WriteOp::Modification(
+                        bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap(),
+                    ),
+                ),
+                (
+                    StateKey::AccessPath(AccessPath::new(
+                        account1,
+                        CoinStoreResource::resource_path(),
+                    )),
+                    WriteOp::Modification(
+                        bcs::to_bytes(&CoinStoreResource::new(
+                            100_000_000,
+                            false,
+                            EventHandle::random(0),
+                            EventHandle::random(0),
+                        ))
+                        .unwrap(),
+                    ),
+                ),
+            ])
+            .freeze()
+            .unwrap(),
+            vec![
+                ContractEvent::new(
+                    *configuration.events().key(),
+                    0,
+                    TypeTag::Struct(Box::new(ConfigurationResource::struct_tag())),
+                    vec![],
+                ),
+                ContractEvent::new(
+                    new_block_event_key(),
+                    0,
+                    TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
+                    vec![],
+                ),
+            ],
+            LATEST_GAS_FEATURE_VERSION,
+        )
         .unwrap(),
-        vec![
-            ContractEvent::new(
-                *configuration.events().key(),
-                0,
-                TypeTag::Struct(ConfigurationResource::struct_tag()),
-                vec![],
-            ),
-            ContractEvent::new(
-                new_block_event_key(),
-                0,
-                TypeTag::Struct(NewBlockEvent::struct_tag()),
-                vec![],
-            ),
-        ],
-    )));
+    ));
 
     // Bootstrap DB into new genesis.
     let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();
@@ -276,14 +283,15 @@ fn test_new_genesis() {
     assert_eq!(trusted_state.version(), 6);
 
     // Effect of bootstrapping reflected.
-    assert_eq!(get_balance(&account1, &db), 1_000_000);
+    assert_eq!(get_balance(&account1, &db), 100_000_000);
     // State before new genesis accessible.
-    assert_eq!(get_balance(&account2, &db), 2_000_000);
+    assert_eq!(get_balance(&account2, &db), 200_000_000);
 
+    println!("FINAL TRANSFER");
     // Transfer some money.
-    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
+    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 50_000_000);
     execute_and_commit(block(vec![txn]), &db, &signer);
 
     // And verify.
-    assert_eq!(get_balance(&account2, &db), 2_500_000);
+    assert_eq!(get_balance(&account2, &db), 250_000_000);
 }

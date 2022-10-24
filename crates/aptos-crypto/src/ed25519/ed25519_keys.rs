@@ -137,8 +137,14 @@ impl SigningKey for Ed25519PrivateKey {
     type VerifyingKeyMaterial = Ed25519PublicKey;
     type SignatureMaterial = Ed25519Signature;
 
-    fn sign<T: CryptoHash + Serialize>(&self, message: &T) -> Ed25519Signature {
-        Ed25519PrivateKey::sign_arbitrary_message(self, signing_message(message).as_ref())
+    fn sign<T: CryptoHash + Serialize>(
+        &self,
+        message: &T,
+    ) -> Result<Ed25519Signature, CryptoMaterialError> {
+        Ok(Ed25519PrivateKey::sign_arbitrary_message(
+            self,
+            signing_message(message)?.as_ref(),
+        ))
     }
 
     #[cfg(any(test, feature = "fuzzing"))]

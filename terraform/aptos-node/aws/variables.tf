@@ -152,7 +152,7 @@ variable "helm_enable_validator" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
-  default     = "t3.medium"
+  default     = "t3.2xlarge"
 }
 
 variable "utility_instance_num" {
@@ -177,7 +177,7 @@ variable "utility_instance_enable_taint" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c6i.4xlarge"
+  default     = "c6i.8xlarge"
 }
 
 variable "validator_instance_num" {
@@ -246,4 +246,22 @@ variable "enable_kube_state_metrics" {
 variable "helm_release_name_override" {
   description = "If set, overrides the name of the aptos-node helm chart"
   default     = ""
+}
+
+variable "validator_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default     = "io1"
+  validation {
+    condition     = contains(["gp3", "io1", "io2"], var.validator_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
+  }
+}
+
+variable "fullnode_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default     = "io1"
+  validation {
+    condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
+  }
 }

@@ -10,5 +10,5 @@ publish = false
 edition = "2021"
 
 [dependencies]
-
-move-deps = { path = "../move-deps", features = ["address32"] }
+move-core-types = { workspace = true }
+move-binary-format = { workspace = true }

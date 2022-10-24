@@ -10,12 +10,10 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt},
     VMStatus,
 };
-use move_deps::{
-    move_binary_format::file_format_common::read_uleb128_as_u64,
-    move_core_types::{account_address::AccountAddress, value::MoveValue, vm_status::StatusCode},
-    move_vm_runtime::session::LoadedFunctionInstantiation,
-    move_vm_types::loaded_data::runtime_types::Type,
-};
+use move_binary_format::file_format_common::read_uleb128_as_u64;
+use move_core_types::{account_address::AccountAddress, value::MoveValue, vm_status::StatusCode};
+use move_vm_runtime::session::LoadedFunctionInstantiation;
+use move_vm_types::loaded_data::runtime_types::Type;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read};
@@ -64,12 +62,14 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
         }
     }
     // validate all non_signer params
-    let mut needs_validation = false;
-    for ty in func.parameters[signer_param_cnt..].iter() {
+    let mut needs_validation = vec![];
+    for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
         let (valid, validation) = is_valid_txn_arg(session, ty);
-        needs_validation = needs_validation || validation;
         if !valid {
             return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE));
+        }
+        if validation {
+            needs_validation.push(idx + signer_param_cnt);
         }
     }
 
@@ -94,8 +94,8 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
             .chain(args)
             .collect()
     };
-    if needs_validation {
-        validate_args(session, &combined_args, func)?;
+    if !needs_validation.is_empty() {
+        validate_args(session, &needs_validation, &combined_args, func)?;
     }
     Ok(combined_args)
 }
@@ -103,7 +103,8 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
 // Return whether the argument is valid/allowed and whether it needs validation.
 // Validation is only needed for String arguments at the moment and vectors of them.
 fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> (bool, bool) {
-    use move_deps::move_vm_types::loaded_data::runtime_types::Type::*;
+    use move_vm_types::loaded_data::runtime_types::Type::*;
+
     match typ {
         Bool | U8 | U64 | U128 | Address => (true, false),
         Vector(inner) => is_valid_txn_arg(session, inner),
@@ -130,29 +131,37 @@ fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> 
 // This is obviously brittle and something to change at some point soon.
 fn validate_args<S: MoveResolverExt>(
     session: &SessionExt<S>,
+    idxs: &[usize],
     args: &[Vec<u8>],
     func: &LoadedFunctionInstantiation,
 ) -> Result<(), VMStatus> {
-    for (ty, arg) in func.parameters.iter().zip(args.iter()) {
+    for (idx, (ty, arg)) in func.parameters.iter().zip(args.iter()).enumerate() {
+        if !idxs.contains(&idx) {
+            continue;
+        }
+        let arg_len = arg.len();
         let mut cursor = Cursor::new(&arg[..]);
-        validate_arg(session, ty, &mut cursor)?;
+        validate_arg(session, ty, &mut cursor, arg_len)?;
     }
     Ok(())
 }
 
 // Validate a single arg. A Cursor is used to walk the serialized arg manually and correctly.
+// Only Strings and nested vector of them are validated.
 fn validate_arg<S: MoveResolverExt>(
     session: &SessionExt<S>,
     ty: &Type,
     cursor: &mut Cursor<&[u8]>,
+    arg_len: usize,
 ) -> Result<(), VMStatus> {
-    use move_deps::move_vm_types::loaded_data::runtime_types::Type::*;
+    use move_vm_types::loaded_data::runtime_types::Type::*;
+
     Ok(match ty {
         Vector(inner) => {
             // get the vector length and iterate over each element
             let mut len = get_len(cursor)?;
             while len > 0 {
-                validate_arg(session, inner, cursor)?;
+                validate_arg(session, inner, cursor, arg_len)?;
                 len -= 1;
             }
         }
@@ -161,18 +170,27 @@ fn validate_arg<S: MoveResolverExt>(
         Struct(idx) | StructInstantiation(idx, _) => {
             // load the struct name, we use `expect()` because that check was already
             // performed in `is_valid_txn_arg`
-            let st = session
-                .get_struct_type(*idx)
-                .expect("unreachable, type must exist");
-            let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-            // load the serialized string
             let len = get_len(cursor)?;
+            let current_pos = cursor.position() as usize;
+            match current_pos.checked_add(len) {
+                Some(size) => {
+                    if size > arg_len {
+                        return Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT));
+                    }
+                }
+                None => return Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)),
+            }
+            // load the serialized string
             let mut s = vec![0u8; len];
             cursor
                 .read_exact(&mut s)
                 .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT))?;
             // validate the struct value, we use `expect()` because that check was already
             // performed in `is_valid_txn_arg`
+            let st = session
+                .get_struct_type(*idx)
+                .expect("unreachable, type must exist");
+            let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
             let option_validator = ALLOWED_STRUCTS
                 .get(&full_name)
                 .expect("unreachable: struct must be allowed");
@@ -180,9 +198,11 @@ fn validate_arg<S: MoveResolverExt>(
                 validator(&s)?;
             }
         }
-        // nothing to validate
+        // this is unreachable given the check in `is_valid_txn_arg` and the
+        // fact we collect all arguments that involve strings and we validate
+        // them and them only
         Bool | U8 | U64 | U128 | Address | Signer | Reference(_) | MutableReference(_)
-        | TyParam(_) => (),
+        | TyParam(_) => unreachable!("Validation is only for arguments with String"),
     })
 }
 

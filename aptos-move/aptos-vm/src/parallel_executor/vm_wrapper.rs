@@ -15,7 +15,7 @@ use aptos_parallel_executor::{
 };
 use aptos_state_view::StateView;
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::VMStatus,

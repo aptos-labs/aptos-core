@@ -23,17 +23,15 @@ use framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
 };
-use move_deps::{
-    move_binary_format::errors::{Location, VMResult},
-    move_core_types::{
-        account_address::AccountAddress,
-        effects::{ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp},
-        language_storage::ModuleId,
-        vm_status::{StatusCode, VMStatus},
-    },
-    move_table_extension::{NativeTableContext, TableChange, TableChangeSet},
-    move_vm_runtime::session::Session,
+use move_binary_format::errors::{Location, VMResult};
+use move_core_types::{
+    account_address::AccountAddress,
+    effects::{ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp},
+    language_storage::ModuleId,
+    vm_status::{StatusCode, VMStatus},
 };
+use move_table_extension::{NativeTableContext, TableChange, TableChangeSet};
+use move_vm_runtime::session::Session;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
@@ -172,6 +170,7 @@ impl SessionOutput {
     pub fn into_change_set<C: AccessPathCache>(
         self,
         ap_cache: &mut C,
+        gas_feature_version: u64,
     ) -> Result<ChangeSetExt, VMStatus> {
         use MoveStorageOp::*;
         let Self {
@@ -190,7 +189,14 @@ impl SessionOutput {
                 let ap = ap_cache.get_resource_path(addr, struct_tag);
                 let op = match blob_op {
                     Delete => WriteOp::Deletion,
-                    New(blob) | Modify(blob) => WriteOp::Modification(blob),
+                    New(blob) => {
+                        if gas_feature_version < 3 {
+                            WriteOp::Modification(blob)
+                        } else {
+                            WriteOp::Creation(blob)
+                        }
+                    }
+                    Modify(blob) => WriteOp::Modification(blob),
                 };
                 write_set_mut.insert((StateKey::AccessPath(ap), op))
             }
@@ -251,8 +257,12 @@ impl SessionOutput {
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        let change_set = ChangeSet::new(write_set, events);
-        Ok(ChangeSetExt::new(delta_change_set, change_set))
+        let change_set = ChangeSet::new(write_set, events, gas_feature_version)?;
+        Ok(ChangeSetExt::new(
+            delta_change_set,
+            change_set,
+            gas_feature_version,
+        ))
     }
 
     pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {

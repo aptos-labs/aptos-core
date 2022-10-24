@@ -11,50 +11,50 @@ use std::{
     cmp::min,
     time::{Duration, Instant},
 };
-use transaction_emitter_lib::{query_sequence_numbers, Cluster, TxnEmitter};
+use transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 
 pub async fn diag(cluster: &Cluster) -> Result<()> {
     let client = cluster.random_instance().rest_client();
-    let mut faucet_account = cluster.load_aptos_root_account(&client).await?;
+    let mut coin_source_account = cluster.load_coin_source_account(&client).await?;
     let emitter = TxnEmitter::new(
-        TransactionFactory::new(cluster.chain_id).with_gas_unit_price(1),
+        TransactionFactory::new(cluster.chain_id)
+            .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
         StdRng::from_seed(OsRng.gen()),
     );
-    let faucet_account_address = faucet_account.address();
+    let coin_source_account_address = coin_source_account.address();
     let instances: Vec<_> = cluster.all_instances().collect();
     for instance in &instances {
         print!("Submitting txn through {}...", instance);
         let deadline = emitter
             .submit_single_transaction(
                 &instance.rest_client(),
-                &mut faucet_account,
-                &faucet_account_address,
+                &mut coin_source_account,
+                &coin_source_account_address,
                 10,
             )
             .await
             .map_err(|e| format_err!("Failed to submit txn through {}: {:?}", instance, e))?;
-        println!("seq={}", faucet_account.sequence_number());
+        println!("seq={}", coin_source_account.sequence_number());
         println!(
             "Waiting all full nodes to get to seq {}",
-            faucet_account.sequence_number()
+            coin_source_account.sequence_number()
         );
         loop {
-            let addresses = &[faucet_account_address];
             let clients = instances
                 .iter()
                 .map(|instance| instance.rest_client())
                 .collect::<Vec<_>>();
             let futures = clients
                 .iter()
-                .map(|client| query_sequence_numbers(client, addresses.iter()));
+                .map(|client| query_sequence_number(client, coin_source_account_address));
             let results = join_all(futures).await;
             let mut all_good = true;
             for (instance, result) in zip(instances.iter(), results) {
                 let seq = result.map_err(|e| {
                     format_err!("Failed to query sequence number from {}: {:?}", instance, e)
-                })?[0];
+                })?;
                 let host = instance.api_url().host().unwrap().to_string();
-                let status = if seq != faucet_account.sequence_number() {
+                let status = if seq != coin_source_account.sequence_number() {
                     all_good = false;
                     "good"
                 } else {

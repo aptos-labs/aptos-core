@@ -60,10 +60,12 @@ pub trait Node: Send + Sync {
     /// This should be a noop if the Node isn't running.
     async fn stop(&mut self) -> Result<()>;
 
+    async fn get_identity(&mut self) -> Result<String>;
+
+    async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()>;
     /// Clears this Node's Storage. This stops the node as well
     async fn clear_storage(&mut self) -> Result<()>;
 
-    /// Performs a Health Check on the Node
     async fn health_check(&mut self) -> Result<(), HealthCheckError>;
 
     fn counter(&self, counter: &str, port: u64) -> Result<f64>;

@@ -29,10 +29,9 @@ use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
-use aptos_types::account_config::new_block_event_key;
-use aptos_types::vm_status::AbortLocation;
 use aptos_types::{
     account_config,
+    account_config::new_block_event_key,
     block_metadata::BlockMetadata,
     on_chain_config::new_epoch_event_key,
     transaction::{
@@ -40,39 +39,41 @@ use aptos_types::{
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    vm_status::{StatusCode, VMStatus},
+    vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
     write_set::WriteSet,
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
-use move_deps::move_binary_format::errors::VMError;
-use move_deps::move_core_types::language_storage::ModuleId;
-use move_deps::{
-    move_binary_format::{
-        access::ModuleAccess,
-        errors::{verification_error, Location, PartialVMError, VMResult},
-        CompiledModule, IndexKind,
-    },
-    move_core_types::{
-        account_address::AccountAddress,
-        ident_str,
-        transaction_argument::convert_txn_args,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_binary_format::{
+    access::ModuleAccess,
+    errors::{verification_error, Location, PartialVMError, VMError, VMResult},
+    CompiledModule, IndexKind,
 };
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::ModuleId,
+    transaction_argument::convert_txn_args,
+    value::{serialize_values, MoveValue},
+};
+use move_vm_runtime::move_vm::RuntimeConfig;
+use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     cmp::min,
+    collections::{BTreeMap, BTreeSet},
     convert::{AsMut, AsRef},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
+static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
+static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 
 /// Remove this once the bundle is removed from the code.
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
@@ -114,6 +115,29 @@ impl AptosVM {
         }
     }
 
+    /// Sets runtime config when invoked the first time.
+    pub fn set_runtime_config(paranoid_type_checks: bool, paranoid_hot_potato_checks: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        RUNTIME_CHECKS
+            .set(RuntimeConfig {
+                paranoid_type_checks,
+                paranoid_hot_potato_checks,
+            })
+            .ok();
+    }
+
+    /// Get the concurrency level if already set, otherwise return default true
+    /// (paranoid execution mode).
+    pub fn get_runtime_config() -> RuntimeConfig {
+        match RUNTIME_CHECKS.get() {
+            Some(config) => *config,
+            None => RuntimeConfig {
+                paranoid_type_checks: true,
+                paranoid_hot_potato_checks: true,
+            },
+        }
+    }
+
     /// Sets the # of async proof reading threads.
     pub fn set_num_proof_reading_threads_once(mut num_threads: usize) {
         // TODO(grao): Do more analysis to tune this magic number.
@@ -128,6 +152,20 @@ impl AptosVM {
         match NUM_PROOF_READING_THREADS.get() {
             Some(num_threads) => *num_threads,
             None => 32,
+        }
+    }
+
+    /// Sets addigional details in counters when invoked the first time.
+    pub fn set_processed_transactions_detailed_counters() {
+        // Only the first call succeeds, due to OnceCell semantics.
+        PROCESSED_TRANSACTIONS_DETAILED_COUNTERS.set(true).ok();
+    }
+
+    /// Get whether we should capture additional details in counters
+    pub fn get_processed_transactions_detailed_counters() -> bool {
+        match PROCESSED_TRANSACTIONS_DETAILED_COUNTERS.get() {
+            Some(value) => *value,
+            None => false,
         }
     }
 
@@ -206,9 +244,15 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
-                let txn_output =
-                    get_transaction_output(&mut (), session, gas_meter.balance(), txn_data, status)
-                        .unwrap_or_else(|e| discard_error_vm_status(e).1);
+                let txn_output = get_transaction_output(
+                    &mut (),
+                    session,
+                    gas_meter.balance(),
+                    txn_data,
+                    status,
+                    gas_meter.feature_version(),
+                )
+                .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
             }
             TransactionStatus::Discard(status) => {
@@ -257,7 +301,7 @@ impl AptosVM {
         let epilogue_change_set_ext = session
             .finish()
             .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut ())?;
+            .into_change_set(&mut (), gas_meter.feature_version())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
@@ -356,7 +400,8 @@ impl AptosVM {
             self.resolve_pending_code_publish(&mut session, gas_meter)?;
 
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-            let change_set_ext = session_output.into_change_set(&mut ())?;
+            let change_set_ext =
+                session_output.into_change_set(&mut (), gas_meter.feature_version())?;
 
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -496,7 +541,8 @@ impl AptosVM {
         )?;
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-        let change_set_ext = session_output.into_change_set(&mut ())?;
+        let change_set_ext =
+            session_output.into_change_set(&mut (), gas_meter.feature_version())?;
 
         // Charge gas for write set
         gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -516,7 +562,7 @@ impl AptosVM {
             bundle,
             expected_modules,
             allowed_deps,
-            check_compat,
+            check_compat: _,
         }) = session.extract_publish_request()
         {
             // TODO: unfortunately we need to deserialize the entire bundle here to handle
@@ -537,19 +583,25 @@ impl AptosVM {
                 }
             }
 
-            // Publish the bundle
-            if check_compat {
-                session.publish_module_bundle(bundle.into_inner(), destination, gas_meter)?
-            } else {
-                session.publish_module_bundle_relax_compatibility(
-                    bundle.into_inner(),
-                    destination,
-                    gas_meter,
-                )?
-            }
-
-            // Execute initializers
-            self.execute_module_initialization(session, gas_meter, &modules, exists, &[destination])
+            // Publish the bundle and execute initializers
+            session
+                .publish_module_bundle(bundle.into_inner(), destination, gas_meter)
+                .and_then(|_| {
+                    self.execute_module_initialization(
+                        session,
+                        gas_meter,
+                        &modules,
+                        exists,
+                        &[destination],
+                    )
+                })
+                .map_err(|e| {
+                    // Be sure to flash the loader cache to align storage with the cache.
+                    // None of the modules in the bundle will be committed to storage,
+                    // but some of them may have ended up in the cache.
+                    self.0.mark_loader_cache_as_invalid();
+                    e
+                })
         } else {
             Ok(())
         }
@@ -698,9 +750,11 @@ impl AptosVM {
         let mut gas_meter = UnmeteredGasMeter;
 
         Ok(match writeset_payload {
-            WriteSetPayload::Direct(change_set) => {
-                ChangeSetExt::new(DeltaChangeSet::empty(), change_set.clone())
-            }
+            WriteSetPayload::Direct(change_set) => ChangeSetExt::new(
+                DeltaChangeSet::empty(),
+                change_set.clone(),
+                self.0.get_gas_feature_version(),
+            ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
                 let senders = match txn_sender {
@@ -730,7 +784,9 @@ impl AptosVM {
                     .map_err(|e| e.into_vm_status());
 
                 match execution_result {
-                    Ok(session_out) => session_out.into_change_set(&mut ()).map_err(Err)?,
+                    Ok(session_out) => session_out
+                        .into_change_set(&mut (), self.0.get_gas_feature_version())
+                        .map_err(Err)?,
                     Err(e) => {
                         return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
                     }
@@ -788,7 +844,7 @@ impl AptosVM {
         let change_set_ext = match self.execute_writeset(
             storage,
             &writeset_payload,
-            None,
+            Some(aptos_types::account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
         ) {
             Ok(cse) => cse,
@@ -851,6 +907,7 @@ impl AptosVM {
             0.into(),
             &txn_data,
             ExecutionStatus::Success,
+            self.0.get_gas_feature_version(),
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -1040,6 +1097,17 @@ impl VMAdapter for AptosVM {
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) =
                     self.execute_user_transaction(data_cache, txn, log_context);
+
+                if let Err(DiscardedVMStatus::UNKNOWN_INVARIANT_VIOLATION_ERROR) =
+                    vm_status.clone().keep_or_discard()
+                {
+                    error!(
+                        *log_context,
+                        "[aptos_vm] Transaction breaking invariant violation. txn: {:?}",
+                        bcs::to_bytes::<SignedTransaction>(&**txn),
+                    );
+                    TRANSACTIONS_INVARIANT_VIOLATION.inc();
+                }
 
                 // Increment the counter for user transactions executed.
                 let counter_label = match output.txn_output().status() {

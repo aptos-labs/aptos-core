@@ -25,7 +25,13 @@ transforms:
       del(.k8s.node_labels."kubernetes.io/os")
       del(.k8s.node_labels."kubernetes.io/hostname")
       del(.k8s.node_labels."topology.kubernetes.io/region")
-
+      del(.k8s.node_labels."topology.kubernetes.io/zone")
+      del(.k8s.node_labels."k8s.io/cloud-provider-aws")
+      del(.k8s.node_labels."eks.amazonaws.com/nodegroup")
+      del(.k8s.labels."statefulset.kubernetes.io/pod-name")
+      del(.k8s.pod_owner)
+      del(.k8s.labels."forge-image-tag")
+      del(.k8s.labels."controller-uid")
 
       del(.k8s.annotations."kubectl.kubernetes.io/last-applied-configuration")
       del(.k8s.annotations."seccomp.security.alpha.kubernetes.io/pod")

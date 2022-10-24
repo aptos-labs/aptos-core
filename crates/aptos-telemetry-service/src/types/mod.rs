@@ -6,12 +6,17 @@ pub mod telemetry;
 
 pub mod common {
 
-    use std::fmt;
+    use std::{collections::HashMap, fmt};
 
     use crate::types::auth::Claims;
+    use aptos_config::config::PeerSet;
     use aptos_types::chain_id::ChainId;
     use aptos_types::PeerId;
     use serde::{Deserialize, Serialize};
+
+    pub type EpochNum = u64;
+    pub type EpochedPeerStore = HashMap<ChainId, (EpochNum, PeerSet)>;
+    pub type PeerStore = HashMap<ChainId, PeerSet>;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct EventIdentity {
@@ -61,6 +66,16 @@ pub mod common {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{}", self.as_str())
         }
+    }
+}
+
+pub mod index {
+    use aptos_crypto::x25519;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    pub struct IndexResponse {
+        pub public_key: x25519::PublicKey,
     }
 }
 

@@ -164,12 +164,12 @@ variable "validator_instance_max_num" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
-  default     = "t3.medium"
+  default     = "t3.2xlarge"
 }
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c5.xlarge"
+  default     = "c6i.4xlarge"
 }
 
 ### Forge
@@ -183,4 +183,22 @@ variable "forge_helm_values" {
   description = "Map of values to pass to Forge Helm"
   type        = any
   default     = {}
+}
+
+variable "validator_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default     = "io1"
+  validation {
+    condition     = contains(["gp3", "io1", "io2"], var.validator_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
+  }
+}
+
+variable "fullnode_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default     = "io1"
+  validation {
+    condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
+  }
 }

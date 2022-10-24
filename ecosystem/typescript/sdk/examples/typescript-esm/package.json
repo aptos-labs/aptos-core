@@ -1,0 +1,20 @@
+{
+  "name": "ts-test-esm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "rm -rf dist/* && tsc -p .",
+    "test": "yarn build && node ./dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aptos": "latest"
+  },
+  "devDependencies": {
+    "typescript": "4.8.2"
+  }
+}

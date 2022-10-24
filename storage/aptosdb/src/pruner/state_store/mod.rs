@@ -6,7 +6,8 @@ use crate::pruner::state_store::generics::StaleNodeIndexSchemaTrait;
 use crate::schema::db_metadata::DbMetadataValue;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
-    pruner::db_pruner::DBPruner, utils, StaleNodeIndexCrossEpochSchema, OTHER_TIMERS_SECONDS,
+    pruner::db_pruner::DBPruner, pruner_utils, StaleNodeIndexCrossEpochSchema,
+    OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_infallible::Mutex;
@@ -219,7 +220,7 @@ impl StateMerklePruner<StaleNodeIndexCrossEpochSchema> {
         let max_version = 1; // We should only be pruning a single version
 
         let state_pruner =
-            utils::create_state_pruner::<StaleNodeIndexCrossEpochSchema>(state_merkle_db);
+            pruner_utils::create_state_pruner::<StaleNodeIndexCrossEpochSchema>(state_merkle_db);
         state_pruner.set_target_version(target_version);
 
         let min_readable_version = state_pruner.min_readable_version();

@@ -11,34 +11,35 @@ For this tutorial, we will use the Move module `HelloBlockchain` described in [Y
 
 We will use:
 
-- The [Aptos Typescript SDK][ts_sdk],
-- The [Aptos Wallet][building_wallet], and
-- The [Aptos CLI][installing_cli] to interact with blockchain.
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Aptos Wallet Extension](../guides/building-your-own-wallet.md)
+* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 
 The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 
-The full source code for this tutorial is available [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript/dapp-example).
+:::tip Full source code
+
+The full source code for this tutorial is being updated. Meanwhile, the older one is available [here](https://github.com/aptos-labs/aptos-core/tree/53e240003e95c9b865441ea792ab4e1e8134a267/developer-docs-site/static/examples/typescript/dapp-example).
+:::
 
 ## Prerequisites
 
 ### Aptos Wallet
 
-Before starting this tutorial, you should install the [Aptos Wallet extension](../guides/building-wallet-extension.md).
+Before starting this tutorial, install the [Aptos Wallet extension](../guides/building-wallet-extension.md).
 
 After you install it:
 
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
 2. Copy the private key. You will need it to set up the Aptos CLI in the next section.
 
-:::note
-
+:::tip
 Ensure that your account has sufficient funds to perform transactions by clicking the **Faucet** button.
-
 :::
 
 ### Aptos CLI
 
-1. Install the [Aptos CLI][install_cli].
+1. Install the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
 
 2. Run `aptos init`, and when it asks for your private key, paste the private key from the Aptos Wallet that you copied earlier. This will initialize the Aptos CLI to use the same account as used by the Aptos Wallet.
 
@@ -48,13 +49,13 @@ Ensure that your account has sufficient funds to perform transactions by clickin
 
 We will now set up the frontend user interface for our dapp. We will use [`create-react-app`](https://create-react-app.dev/) to set up the app in this tutorial, but neither React nor `create-react-app` are required. You can use your preferred JavaScript framework.
 
-```console
-$ npx create-react-app first-dapp --template typescript
-$ cd first-dapp
-$ npm start
+```bash
+npx create-react-app first-dapp --template typescript
+cd first-dapp
+npm start
 ```
 
-You will now have a basic React app up and running in your browser.
+You will now have a basic React app running in your browser.
 
 ## Step 2: Integrate the Aptos Wallet Web3 API
 
@@ -155,8 +156,8 @@ The Wallet is now integrated with our dapp. Next, we will integrate the Aptos SD
 
 First, add the SDK to the project's dependencies:
 
-```console
-$ npm install --save aptos
+```bash
+npm install --save aptos
 ```
 
 You will now see `"aptos": "^0.0.20"` (or similar) in your `package.json`.
@@ -194,7 +195,7 @@ function App() {
 
 Now, in addition to displaying the account address, the app will also display the account's `sequence_number`. This `sequence_number` represents the next transaction sequence number to prevent replay attacks of transactions. You will see this number increasing as you make transactions with the account.
 
-## Step 4: Publish a Move Module
+## Step 4: Publish a Move module
 
 Our dapp is now set up to read from the blockchain. The next step is to write to the blockchain. To do so, we will publish a Move module to our account.
 
@@ -208,25 +209,25 @@ We will use the Aptos CLI to compile and publish the `HelloBlockchain` module.
 
 2. Next, use the `aptos move publish` command (replacing `/path/to/hello_blockchain/` and `<address>`):
 
-```console
-$ aptos move publish --package-dir /path/to/hello_blockchain/ --named-addresses HelloBlockchain=<address>
+```bash
+aptos move publish --package-dir /path/to/hello_blockchain/ --named-addresses HelloBlockchain=<address>
 ```
 
 For example:
 
-```console
-$ aptos move publish --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
+```bash
+aptos move publish --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
 ```
 
 The `--named-addresses` replaces the named address `HelloBlockchain` in `HelloBlockchain.move` with the specified address. For example, if we specify `--named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
 
-```move
+```rust
 module HelloBlockchain::message {
 ```
 
 becomes:
 
-```move
+```rust
 module 0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message {
 ```
 
@@ -234,7 +235,7 @@ This makes it possible to publish the module for the given account (in this case
 
 Assuming that your account has enough funds to execute the transaction, you can now publish the `HelloBlockchain` module in your account. If you refresh the app, you will see that the account sequence number has increased from 0 to 1.
 
-You can also verify that the module was published by going to the [Aptos Explorer](https://explorer.devnet.aptos.dev/) and looking up your account. If you scroll down to the Account Modules section, you should see something like the following:
+You can also verify that the module was published by going to the [Aptos Explorer](https://explorer.aptoslabs.com/) and looking up your account. If you scroll down to the Account Modules section, you should see something like the following:
 
 ```json
 {
@@ -449,7 +450,7 @@ function App() {
 To test it:
 
 - Type something in the `<textarea>` and submit the form.
-- Find your account in the [Aptos Explorer](https://explorer.devnet.aptos.dev/) and you will now see a `MessageHolder` resource under Account Resources with the `message` you wrote.
+- Find your account in the [Aptos Explorer](https://explorer.aptoslabs.com/) and you will now see a `MessageHolder` resource under Account Resources with the `message` you wrote.
 
 If you don't see it, try a shorter message. Long messages may cause the transaction to fail because longer messages take more gas.
 
@@ -549,6 +550,8 @@ function App() {
 
 That concludes this tutorial.
 
-[building_wallet]: /guides/building-wallet-extension
-[installing_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli
-[ts_sdk]: /sdks/typescript-sdk
+## Supporting documentation
+
+* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Building Wallet Extension](../guides/building-your-own-wallet.md)

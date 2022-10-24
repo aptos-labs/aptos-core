@@ -14,6 +14,7 @@ spec:
     app.kubernetes.io/name: fullnode
     app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
+  type: {{ $.Values.service.fullnode.internal.type }}
   ports:
   - name: aptosnet
     port: 6182
@@ -63,6 +64,8 @@ spec:
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/fullnode.yaml: {{ tpl ($.Files.Get "files/configs/fullnode.yaml") $ | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
       containers:
@@ -78,10 +81,13 @@ spec:
           value: {{ .rust_log }}
         - name: RUST_LOG_REMOTE
           value: {{ .rust_log_remote }}
-      {{- end }}
         {{- if $.Values.validator.remoteLogAddress }}
         - name: STRUCT_LOG_TCP_ADDR
           value: {{ $.Values.validator.remoteLogAddress }}
+        {{- end }}
+        {{- if .force_enable_telemetry }}
+        - name: APTOS_FORCE_ENABLE_TELEMETRY
+          value: "true"
         {{- end }}
         - name: KUBERNETES_NAMESPACE
           valueFrom:
@@ -89,6 +95,7 @@ spec:
               fieldPath: metadata.namespace
         - name: RUST_BACKTRACE
           value: "0"
+      {{- end }}
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc
@@ -100,14 +107,17 @@ spec:
         - containerPort: 6181
         - containerPort: 6182
         - containerPort: 8080
+          name: api
         - containerPort: 9101
-        livenessProbe:
-          tcpSocket:
-            port: 9101
-          initialDelaySeconds: 30
-        readinessProbe:
-          tcpSocket:
-            port: 6182
+          name: metrics
+        livenessProbe: # restart the pod if the REST API is ever unresponsive
+          httpGet:
+            path: /v1/-/healthy
+            port: 8080
+        readinessProbe: # pod is ready when state sync is caught up
+          httpGet:
+            path: /v1/-/healthy?duration_secs=10
+            port: 8080
         securityContext:
           {{- if $.Values.enablePrivilegedMode }}
           runAsUser: 0

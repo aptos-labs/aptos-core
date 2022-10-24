@@ -38,7 +38,7 @@ impl IngestClient {
         let compressed_bytes = gzip_encoder.finish()?;
 
         self.inner
-            .post(format!("{}api/v1/ingest/humio-unstructured", self.base_url))
+            .post(self.base_url.join("api/v1/ingest/humio-unstructured")?)
             .bearer_auth(self.auth_token.clone())
             .header("Content-Encoding", "gzip")
             .body(compressed_bytes)

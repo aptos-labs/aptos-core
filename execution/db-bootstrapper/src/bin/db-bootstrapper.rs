@@ -3,8 +3,8 @@
 
 use anyhow::{ensure, format_err, Context, Result};
 use aptos_config::config::{
-    RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
-    TARGET_SNAPSHOT_SIZE,
+    RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
@@ -55,16 +55,17 @@ fn main() -> Result<()> {
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
         RocksdbConfigs::default(),
         false, /* indexer */
-        TARGET_SNAPSHOT_SIZE,
+        BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )
-    .with_context(|| format_err!("Failed to open DB."))?;
+    .expect("Failed to open DB.");
     let db = DbReaderWriter::new(db);
 
     let executed_trees = db
         .reader
         .get_latest_executed_trees()
         .with_context(|| format_err!("Failed to get latest tree state."))?;
+    println!("Db has {} transactions", executed_trees.num_transactions());
     if let Some(waypoint) = opt.waypoint_to_verify {
         ensure!(
             waypoint.version() == executed_trees.num_transactions(),

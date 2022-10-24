@@ -51,7 +51,7 @@ module aptos_framework::optional_aggregator {
     }
 
     fun destroy_integer(integer: Integer) {
-        let Integer {value: _, limit: _ } = integer;
+        let Integer { value: _, limit: _ } = integer;
     }
 
     /// Struct that contains either an aggregator or a normal integer, both

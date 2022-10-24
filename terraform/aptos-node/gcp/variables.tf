@@ -82,7 +82,7 @@ variable "node_pool_sizes" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
-  default     = "e2-custom-4-4096"
+  default     = "n2-standard-8"
 }
 
 variable "utility_instance_num" {
@@ -97,7 +97,7 @@ variable "utility_instance_enable_taint" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c2-standard-16"
+  default     = "c2-standard-30"
 }
 
 variable "validator_instance_num" {

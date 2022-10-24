@@ -9,7 +9,7 @@ import TabItem from '@theme/TabItem';
 
 In order to allow for Aptos' wallet interoperability, the following is required:
 1. Mnemonics - a set of words that can derive account private keys
-2. Dapp API - entry points into the wallet to support access to identity managed by the wallet
+2. dApp API - entry points into the wallet to support access to identity managed by the wallet
 3. Key rotation - handling both the relationship around mnemonics and the recovery of accounts in different wallets
 
 ## Mnemonics
@@ -19,7 +19,7 @@ While [Petra wallet](../guides/install-petra-wallet.md) recommends 1 mnemonic <-
 1. Generate mnemonic using something like BIP39
 2. Get a master seed from that mnemonic using BIP39
 3. Use the BIP44 derive path to retrieve an account address (e.g. `m/44'/637'/0'/0'/0'`)
-    - See Aptos' [typescript sdk's implementation for the derive path](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_account.ts#L49-L69))
+    - See Aptos' [typescript SDK implementation for the derive path](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_account.ts#L49-L69))
     - In the case of Petra, we will always use the path `m/44'/637'/0'/0'/0'` since we have 1 mnemonic <-> 1 account
 
 
@@ -75,9 +75,9 @@ for (let i = 0; currentGap < gapLimit; i += 1) {
 }
 ```
 
-## Dapp API
+## dApp API
 **[Forum post with discussion](https://forum.aptoslabs.com/t/wallet-dapp-api-standards/11765/33)**
-There will be some apis that certain wallets may add but there should be a few apis that are standard across wallets. This will make mass adoption easier and will make dapp developers' lives easier.
+There will be some APIs that certain wallets may add but there should be a few apis that are standard across wallets. This will make mass adoption easier and will make dApp developers' lives easier.
 
 - `connect()`, `disconnect()`, and `isConnected()`
 - `account()`
@@ -88,12 +88,15 @@ There will be some apis that certain wallets may add but there should be a few a
 ```typescript
 // Common Args and Responses
 
+// For single-signer account, there is one publicKey and minKeysRequired is null.
+// For multi-signer account, there are multiple publicKeys and minKeysRequired value.
 interface PublicAccount {
-    string address;
-    string publicKey;
+    address: string;
+    publicKey: string | string[];
+    minKeysRequired?: number; // for multi-signer account
 }
 
-// The important thing to return here is the transaction hash the dapp can wait for it
+// The important thing to return here is the transaction hash the dApp can wait for it
 type [PendingTransaction](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/generated/models/PendingTransaction.ts)
 
 type [EntryFunctionPayload](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/generated/models/EntryFunctionPayload.ts)
@@ -102,11 +105,11 @@ type [EntryFunctionPayload](https://github.com/aptos-labs/aptos-core/blob/1bc5fd
 ```
 
 ### connect(), disconnect(), isConnected()
-It is important that dapps, aren't allow to send requests to the wallet until the user acknowledges that they want to see these requests.
+It is important that dApps, aren't allow to send requests to the wallet until the user acknowledges that they want to see these requests.
 
 - `connect()` will prompt the user 
     - return `Promise<PublicAccount>`
-- `disconnect()` allows the user to stop giving access to a dapp and also helps the dapp with state management
+- `disconnect()` allows the user to stop giving access to a dApp and also helps the dApp with state management
     - return `Promise<void>`
 - `isConnected()` able to make requests to the wallet to get current state of connection
     - return `Promise<boolean>`
@@ -114,13 +117,13 @@ It is important that dapps, aren't allow to send requests to the wallet until th
 
 ### account()
 **Needs to be connected**
-The dapp may want to query for the current connected account to get the address or public key.
+The dApp may want to query for the current connected account to get the address or public key.
 
 - `account()` no prompt to the user
     - returns `Promise<PublicAccount>`
 
 ### signAndSubmitTransaction(transaction: EntryFunctionPayload)
-We will be generate a transaction from payload(simple JSON) using the [sdk](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_client.ts#L217-L221) and then sign and submit it to the wallet's node.
+We will be generate a transaction from payload(simple JSON) using the [SDK](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_client.ts#L217-L221) and then sign and submit it to the wallet's node.
 
 - `signAndSubmitTransaction(transaction: EntryFunctionPayload)` will prompt the user with the transaction they are signing
     - returns `Promise<PendingTransaction>`
@@ -132,21 +135,22 @@ Types:
 ```typescript
 export interface SignMessagePayload {
   address?: boolean; // Should we include the address of the account in the message
-  application?: boolean; // Should we include the domain of the dapp
+  application?: boolean; // Should we include the domain of the dApp
   chainId?: boolean; // Should we include the current chain id the wallet is connected to
   message: string; // The message to be signed and displayed to the user
-  nonce: string; // A nonce the dapp should generate
+  nonce: string; // A nonce the dApp should generate
 }
 
 export interface SignMessageResponse {
-  address: string;
-  application: string;
-  chainId: number;
+  address?: string;
+  application?: string;
+  chainId?: number;
   fullMessage: string; // The message that was generated to sign
   message: string; // The message passed in by the user
   nonce: string,
   prefix: string, // Should always be APTOS
-  signature: string; // The signed full message
+  signature: string | string[]; // The signed full message
+  bitmap?: Uint8Array; // a 4-byte (32 bits) bit-vector of length N
 }
 ```
 
@@ -154,7 +158,7 @@ export interface SignMessageResponse {
     - returns `Promise<SignMessageResponse>`
 
 An example:
-`signMessage({nonce: 1234034, message: "Welcome to dapp!", address: true, application: true, chainId: true })`
+`signMessage({nonce: 1234034, message: "Welcome to dApp!", address: true, application: true, chainId: true })`
 
 This would generate the `fullMessage` to be signed and returned as the `signature`:
 ```yaml
@@ -163,11 +167,15 @@ address: 0x000001
 chain_id: 7
 application: badsite.firebase.google.com
 nonce: 1234034
-message: Welcome to dapp!
+message: Welcome to dApp!
 ```
+
+If the wallet is single-signer account, there is one signature and `bitmap` is null.
+
+If the wallet is multi-signers account, there are multiple `signature` and `bitmap` value. `bitmap` masks which public key has signed message.
 
 ### Event listening (In progress)
 
 ## Key Rotation (In Progress)
 
-Mapping has been [implemented](https://github.com/aptos-labs/aptos-core/pull/2972) but sdk integration is in progess. This will be updated soon.
+Mapping has been [implemented](https://github.com/aptos-labs/aptos-core/pull/2972) but SDK integration is in progress. This will be updated soon.

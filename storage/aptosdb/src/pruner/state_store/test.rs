@@ -344,7 +344,7 @@ fn test_worker_quit_eagerly() {
     );
 
     {
-        let state_pruner = utils::create_state_pruner::<StaleNodeIndexSchema>(Arc::clone(
+        let state_pruner = pruner_utils::create_state_pruner::<StaleNodeIndexSchema>(Arc::clone(
             &aptos_db.state_merkle_db,
         ));
         let worker = StatePrunerWorker::new(

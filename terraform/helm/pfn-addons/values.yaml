@@ -1,0 +1,20 @@
+service:
+  enableOnchainDiscovery: false
+
+  # AWS
+  loadBalancerSourceRanges:
+  sessionAffinity:
+  domain:
+  aws_tags:
+
+ingress:
+  class: alb
+  # the below only work for alb ingress
+  wafAclArn:
+  acm_certificate:
+  loadBalancerSourceRanges:
+  enableStickyness: true
+  cookieDurationSeconds: 86400
+  # the below only work for gce ingress
+  gce_managed_certificate:
+  gce_managed_certificate_domains:

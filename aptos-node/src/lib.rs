@@ -19,7 +19,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
-use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level};
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -190,8 +190,8 @@ pub fn start(
             .expect("Failed to build rayon global thread _pool.");
     }
 
-    let mut logger = aptos_logger::Logger::new();
-    logger
+    let mut logger_builder = aptos_logger::Logger::builder();
+    logger_builder
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)
@@ -200,18 +200,19 @@ pub fn start(
         .console_port(config.logger.console_port)
         .read_env();
     if config.logger.enable_backtrace {
-        logger.enable_backtrace();
+        logger_builder.enable_backtrace();
     }
     if let Some(log_file) = log_file {
-        logger.printer(Box::new(FileWriter::new(log_file)));
+        logger_builder.printer(Box::new(FileWriter::new(log_file)));
     }
     let mut remote_log_rx = None;
     if config.logger.enable_telemetry_remote_log {
         let (tx, rx) = mpsc::channel(TELEMETRY_LOG_INGEST_BUFFER_SIZE);
-        logger.remote_log_tx(tx);
+        logger_builder.remote_log_tx(tx);
         remote_log_rx = Some(rx);
     }
-    let _logger = logger.build();
+    let logger = logger_builder.build();
+    let logger_filter_update_job = aptos_logger::LoggerFilterUpdater::new(logger, logger_builder);
 
     // Print out build information.
     log_build_information();
@@ -230,7 +231,7 @@ pub fn start(
         warn!("failpoints is set in config, but the binary doesn't compile with this feature");
     }
 
-    let _node_handle = setup_environment(config, remote_log_rx)?;
+    let _node_handle = setup_environment(config, remote_log_rx, Some(logger_filter_update_job))?;
 
     let term = Arc::new(AtomicBool::new(false));
 
@@ -278,6 +279,26 @@ where
         // Build a single validator network with a generated config
         let mut template = NodeConfig::default_for_validator();
 
+        // Adjust some fields in the default template to lower the overhead of running on a
+        // local machine
+        template.execution.concurrency_level = 1;
+        template.execution.num_proof_reading_threads = 1;
+        template.peer_monitoring_service.max_concurrent_requests = 1;
+        template.mempool.shared_mempool_max_concurrent_inbound_syncs = 1;
+
+        let validator_network = template.validator_network.as_mut().unwrap();
+        validator_network.max_concurrent_network_reqs = 1;
+        validator_network.connectivity_check_interval_ms = 10000;
+        validator_network.max_connection_delay_ms = 10000;
+        validator_network.ping_interval_ms = 10000;
+        validator_network.runtime_threads = Some(1);
+
+        let fnn = template.full_node_networks.get_mut(0).unwrap();
+        fnn.max_concurrent_network_reqs = 1;
+        fnn.connectivity_check_interval_ms = 10000;
+        fnn.max_connection_delay_ms = 10000;
+        fnn.ping_interval_ms = 10000;
+        fnn.runtime_threads = Some(1);
         // If a config path was provided, use that as the template
         if let Some(config_path) = config_path {
             if let Ok(config) = NodeConfig::load_config(config_path) {
@@ -552,6 +573,7 @@ fn bootstrap_indexer(
 pub fn setup_environment(
     node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
     // Start the node inspection service
     let node_config_clone = node_config.clone();
@@ -568,7 +590,7 @@ pub fn setup_environment(
             node_config.storage.storage_pruner_config,
             node_config.storage.rocksdb_configs,
             node_config.storage.enable_indexer,
-            node_config.storage.target_snapshot_size,
+            node_config.storage.buffered_state_target_items,
             node_config.storage.max_num_nodes_per_lru_cache_shard,
         )
         .map_err(|err| anyhow!("DB failed to open {}", err))?,
@@ -586,10 +608,20 @@ pub fn setup_environment(
     } else {
         info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");
     }
+    AptosVM::set_runtime_config(
+        node_config.execution.paranoid_type_verification,
+        node_config.execution.paranoid_hot_potato_verification,
+    );
     AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
     );
+    if node_config
+        .execution
+        .processed_transactions_detailed_counters
+    {
+        AptosVM::set_processed_transactions_detailed_counters();
+    }
 
     debug!(
         "Storage service started in {} ms",
@@ -644,6 +676,18 @@ pub fn setup_environment(
     let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
 
     let chain_id = fetch_chain_id(&db_rw)?;
+
+    let build_info = build_information!();
+    // Start the telemetry service as early as possible and before any blocking calls
+    // We have all the necesary info here to start the telemetry service
+    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
+        node_config.clone(),
+        chain_id,
+        build_info,
+        remote_log_rx,
+        logger_filter_update_job,
+    );
+
     for network_config in network_configs.into_iter() {
         let network_id = network_config.network_id;
         debug!("Creating runtime for {}", network_id);
@@ -829,15 +873,6 @@ pub fn setup_environment(
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     }
 
-    let build_info = build_information!();
-    // Create the telemetry service
-    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
-        node_config.clone(),
-        chain_id,
-        build_info,
-        remote_log_rx,
-    );
-
     Ok(AptosHandle {
         _api: api_runtime,
         _backup: backup_service,
@@ -872,6 +907,12 @@ mod tests {
         validator_network.mutual_authentication = false;
 
         // Starting the node should panic
-        setup_environment(node_config, None).unwrap();
+        setup_environment(node_config, None, None).unwrap();
+    }
+
+    #[cfg(feature = "check-vm-features")]
+    #[test]
+    fn test_aptos_vm_does_not_have_test_natives() {
+        aptos_vm::natives::assert_no_test_natives()
     }
 }

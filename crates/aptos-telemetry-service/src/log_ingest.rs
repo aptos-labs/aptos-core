@@ -9,14 +9,34 @@ use crate::{
     error::ServiceError,
     types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
 };
-use aptos_logger::{debug, error};
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use std::collections::HashMap;
+use tracing::{debug, error};
 use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
-pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
+/// TODO: Cleanup after v1 API is ramped up
+pub fn log_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("log_ingest")
+        .and(warp::post())
+        .and(context.clone().filter())
+        .and(with_auth(
+            context,
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+            ],
+        ))
+        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
+        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
+        .and(warp::body::aggregate())
+        .and_then(handle_log_ingest)
+        .boxed()
+}
+
+pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("ingest" / "logs")
         .and(warp::post())
         .and(context.clone().filter())
         .and(with_auth(
@@ -78,7 +98,7 @@ pub async fn handle_log_ingest(
     debug!("ingesting to humio: {:?}", unstructured_log);
 
     let res = context
-        .humio_client
+        .humio_client()
         .ingest_unstructured_log(unstructured_log)
         .await;
 

@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-table! {
+// @generated automatically by Diesel CLI.
+
+diesel::table! {
     block_metadata_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -16,26 +18,191 @@ table! {
     }
 }
 
-table! {
-    collection_datas (creator_address, collection_name_hash, transaction_version) {
-        creator_address -> Varchar,
-        collection_name_hash -> Varchar,
-        collection_name -> Text,
-        description -> Text,
+diesel::table! {
+    coin_activities (transaction_version, event_account_address, event_creation_number, event_sequence_number) {
         transaction_version -> Int8,
-        metadata_uri -> Text,
+        event_account_address -> Varchar,
+        event_creation_number -> Int8,
+        event_sequence_number -> Int8,
+        owner_address -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        activity_type -> Varchar,
+        is_gas_fee -> Bool,
+        is_transaction_success -> Bool,
+        entry_function_id_str -> Nullable<Varchar>,
+        block_height -> Int8,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    coin_balances (transaction_version, owner_address, coin_type_hash) {
+        transaction_version -> Int8,
+        owner_address -> Varchar,
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    coin_infos (coin_type_hash) {
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        transaction_version_created -> Int8,
+        creator_address -> Varchar,
+        name -> Varchar,
+        symbol -> Varchar,
+        decimals -> Int4,
+        transaction_created_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+        supply_aggregator_table_handle -> Nullable<Varchar>,
+        supply_aggregator_table_key -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    coin_supply (transaction_version, coin_type_hash) {
+        transaction_version -> Int8,
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        supply -> Numeric,
+        transaction_timestamp -> Timestamp,
+        transaction_epoch -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    collection_datas (collection_data_id_hash, transaction_version) {
+        collection_data_id_hash -> Varchar,
+        transaction_version -> Int8,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        description -> Text,
+        metadata_uri -> Varchar,
         supply -> Numeric,
         maximum -> Numeric,
         maximum_mutable -> Bool,
         uri_mutable -> Bool,
         description_mutable -> Bool,
         inserted_at -> Timestamp,
+        table_handle -> Varchar,
+        transaction_timestamp -> Timestamp,
     }
 }
 
-table! {
-    events (key, sequence_number) {
-        key -> Varchar,
+diesel::table! {
+    current_ans_lookup (domain, subdomain) {
+        domain -> Varchar,
+        subdomain -> Varchar,
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Timestamp,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    current_coin_balances (owner_address, coin_type_hash) {
+        owner_address -> Varchar,
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        amount -> Numeric,
+        last_transaction_version -> Int8,
+        last_transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    current_collection_datas (collection_data_id_hash) {
+        collection_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        description -> Text,
+        metadata_uri -> Varchar,
+        supply -> Numeric,
+        maximum -> Numeric,
+        maximum_mutable -> Bool,
+        uri_mutable -> Bool,
+        description_mutable -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+        table_handle -> Varchar,
+        last_transaction_timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
+    current_token_datas (token_data_id_hash) {
+        token_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        maximum -> Numeric,
+        supply -> Numeric,
+        largest_property_version -> Numeric,
+        metadata_uri -> Varchar,
+        payee_address -> Varchar,
+        royalty_points_numerator -> Numeric,
+        royalty_points_denominator -> Numeric,
+        maximum_mutable -> Bool,
+        uri_mutable -> Bool,
+        description_mutable -> Bool,
+        properties_mutable -> Bool,
+        royalty_mutable -> Bool,
+        default_properties -> Jsonb,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
+        last_transaction_timestamp -> Timestamp,
+        description -> Text,
+    }
+}
+
+diesel::table! {
+    current_token_ownerships (token_data_id_hash, property_version, owner_address) {
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        owner_address -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        amount -> Numeric,
+        token_properties -> Jsonb,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
+        table_type -> Text,
+        last_transaction_timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
+    current_token_pending_claims (token_data_id_hash, property_version, from_address, to_address) {
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        from_address -> Varchar,
+        to_address -> Varchar,
+        collection_data_id_hash -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        amount -> Numeric,
+        table_handle -> Varchar,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+        last_transaction_timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
+    events (account_address, creation_number, sequence_number) {
         sequence_number -> Int8,
         creation_number -> Int8,
         account_address -> Varchar,
@@ -48,13 +215,21 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
+    indexer_status (db) {
+        db -> Varchar,
+        is_indexer_up -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     ledger_infos (chain_id) {
         chain_id -> Int8,
     }
 }
 
-table! {
+diesel::table! {
     move_modules (transaction_version, write_set_change_index) {
         transaction_version -> Int8,
         write_set_change_index -> Int8,
@@ -70,7 +245,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     move_resources (transaction_version, write_set_change_index) {
         transaction_version -> Int8,
         write_set_change_index -> Int8,
@@ -87,7 +262,15 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
+    processor_status (processor) {
+        processor -> Varchar,
+        last_success_version -> Int8,
+        last_updated -> Timestamp,
+    }
+}
+
+diesel::table! {
     processor_statuses (name, version) {
         name -> Varchar,
         version -> Int8,
@@ -97,7 +280,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     signatures (transaction_version, multi_agent_index, multi_sig_index, is_sender_primary) {
         transaction_version -> Int8,
         multi_agent_index -> Int8,
@@ -115,7 +298,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     table_items (transaction_version, write_set_change_index) {
         key -> Text,
         transaction_version -> Int8,
@@ -129,7 +312,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     table_metadatas (handle) {
         handle -> Varchar,
         key_type -> Text,
@@ -138,18 +321,40 @@ table! {
     }
 }
 
-table! {
-    token_datas (creator_address, collection_name_hash, name_hash, transaction_version) {
-        creator_address -> Varchar,
-        collection_name_hash -> Varchar,
-        name_hash -> Varchar,
-        collection_name -> Text,
-        name -> Text,
+diesel::table! {
+    token_activities (transaction_version, event_account_address, event_creation_number, event_sequence_number) {
         transaction_version -> Int8,
+        event_account_address -> Varchar,
+        event_creation_number -> Int8,
+        event_sequence_number -> Int8,
+        collection_data_id_hash -> Varchar,
+        token_data_id_hash -> Varchar,
+        property_version -> Numeric,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
+        transfer_type -> Varchar,
+        from_address -> Nullable<Varchar>,
+        to_address -> Nullable<Varchar>,
+        token_amount -> Numeric,
+        coin_type -> Nullable<Text>,
+        coin_amount -> Nullable<Numeric>,
+        inserted_at -> Timestamp,
+        transaction_timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
+    token_datas (token_data_id_hash, transaction_version) {
+        token_data_id_hash -> Varchar,
+        transaction_version -> Int8,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
         maximum -> Numeric,
         supply -> Numeric,
         largest_property_version -> Numeric,
-        metadata_uri -> Text,
+        metadata_uri -> Varchar,
         payee_address -> Varchar,
         royalty_points_numerator -> Numeric,
         royalty_points_denominator -> Numeric,
@@ -160,41 +365,46 @@ table! {
         royalty_mutable -> Bool,
         default_properties -> Jsonb,
         inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
+        transaction_timestamp -> Timestamp,
+        description -> Text,
     }
 }
 
-table! {
-    token_ownerships (creator_address, collection_name_hash, name_hash, property_version, transaction_version, table_handle) {
-        creator_address -> Varchar,
-        collection_name_hash -> Varchar,
-        name_hash -> Varchar,
-        collection_name -> Text,
-        name -> Text,
+diesel::table! {
+    token_ownerships (token_data_id_hash, property_version, transaction_version, table_handle) {
+        token_data_id_hash -> Varchar,
         property_version -> Numeric,
         transaction_version -> Int8,
+        table_handle -> Varchar,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
         owner_address -> Nullable<Varchar>,
         amount -> Numeric,
-        table_handle -> Varchar,
         table_type -> Nullable<Text>,
         inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
+        transaction_timestamp -> Timestamp,
     }
 }
 
-table! {
-    tokens (creator_address, collection_name_hash, name_hash, property_version, transaction_version) {
-        creator_address -> Varchar,
-        collection_name_hash -> Varchar,
-        name_hash -> Varchar,
-        collection_name -> Text,
-        name -> Text,
+diesel::table! {
+    tokens (token_data_id_hash, property_version, transaction_version) {
+        token_data_id_hash -> Varchar,
         property_version -> Numeric,
         transaction_version -> Int8,
+        creator_address -> Varchar,
+        collection_name -> Varchar,
+        name -> Varchar,
         token_properties -> Jsonb,
         inserted_at -> Timestamp,
+        collection_data_id_hash -> Varchar,
+        transaction_timestamp -> Timestamp,
     }
 }
 
-table! {
+diesel::table! {
     transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -212,10 +422,11 @@ table! {
         num_events -> Int8,
         num_write_set_changes -> Int8,
         inserted_at -> Timestamp,
+        epoch -> Int8,
     }
 }
 
-table! {
+diesel::table! {
     user_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -228,10 +439,11 @@ table! {
         timestamp -> Timestamp,
         entry_function_id_str -> Text,
         inserted_at -> Timestamp,
+        epoch -> Int8,
     }
 }
 
-table! {
+diesel::table! {
     write_set_changes (transaction_version, index) {
         transaction_version -> Int8,
         index -> Int8,
@@ -244,17 +456,30 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
+    coin_activities,
+    coin_balances,
+    coin_infos,
+    coin_supply,
     collection_datas,
+    current_ans_lookup,
+    current_coin_balances,
+    current_collection_datas,
+    current_token_datas,
+    current_token_ownerships,
+    current_token_pending_claims,
     events,
+    indexer_status,
     ledger_infos,
     move_modules,
     move_resources,
+    processor_status,
     processor_statuses,
     signatures,
     table_items,
     table_metadatas,
+    token_activities,
     token_datas,
     token_ownerships,
     tokens,

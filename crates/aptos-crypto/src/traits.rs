@@ -130,7 +130,10 @@ pub trait SigningKey:
     ///
     /// Note: this assumes serialization is infallible. See crates::bcs::ser
     /// for a discussion of this assumption.
-    fn sign<T: CryptoHash + Serialize>(&self, message: &T) -> Self::SignatureMaterial;
+    fn sign<T: CryptoHash + Serialize>(
+        &self,
+        message: &T,
+    ) -> Result<Self::SignatureMaterial, CryptoMaterialError>;
 
     /// Signs a non-hash input message. For testing only.
     #[cfg(any(test, feature = "fuzzing"))]
@@ -144,12 +147,13 @@ pub trait SigningKey:
 
 /// Returns the signing message for the given message.
 /// It is used by `SigningKey#sign` function.
-pub fn signing_message<T: CryptoHash + Serialize>(message: &T) -> Vec<u8> {
+pub fn signing_message<T: CryptoHash + Serialize>(
+    message: &T,
+) -> Result<Vec<u8>, CryptoMaterialError> {
     let mut bytes = <T::Hasher as CryptoHasher>::seed().to_vec();
     bcs::serialize_into(&mut bytes, &message)
-        .map_err(|_| CryptoMaterialError::SerializationError)
-        .expect("Serialization of signable material should not fail.");
-    bytes
+        .map_err(|_| CryptoMaterialError::SerializationError)?;
+    Ok(bytes)
 }
 
 /// A type for key material that can be publicly shared, and in asymmetric

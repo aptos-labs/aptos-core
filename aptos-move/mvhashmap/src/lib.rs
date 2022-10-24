@@ -224,7 +224,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                             // fails, we return a corresponding error, so that
                             // the speculative execution can also fail.
                             accumulator
-                                .merge_with(*delta)
+                                .merge_onto(*delta)
                                 .map_err(|_| DeltaApplicationFailure)?;
                         }
                         (EntryCell::Delta(delta), None) => {

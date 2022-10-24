@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
-use aptos_logger::sample::Sampling;
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use async_trait::async_trait;
 use rand::prelude::StdRng;
 use rand::Rng;
 use rand_core::{OsRng, SeedableRng};
@@ -58,6 +58,7 @@ impl AccountGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for AccountGenerator {
     fn generate_transactions(
         &mut self,
@@ -128,8 +129,9 @@ impl AccountGeneratorCreator {
     }
 }
 
+#[async_trait]
 impl TransactionGeneratorCreator for AccountGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountGenerator::new(
             StdRng::from_seed(OsRng.gen()),
             self.txn_factory.clone(),

@@ -34,8 +34,11 @@ aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
 aptos-protos = { path = "../../../crates/aptos-protos" }
 aptos-types = { path = "../../../types" }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
-move-deps = { path = "../../../aptos-move/move-deps" }
 storage-interface = { path = "../../../storage/storage-interface" }
+
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-package = { workspace = true }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
@@ -57,7 +60,6 @@ executor = { path = "../../../execution/executor" }
 executor-types = { path = "../../../execution/executor-types" }
 framework = { path = "../../../aptos-move/framework" }
 mempool-notifications = { path = "../../../state-sync/inter-component/mempool-notifications" }
-move-deps = { path = "../../../aptos-move/move-deps" }
 vm-validator = { path = "../../../vm-validator" }
 
 [features]

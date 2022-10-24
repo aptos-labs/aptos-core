@@ -31,7 +31,6 @@ use aptos_types::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
-    write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
@@ -188,17 +187,6 @@ pub trait DbReader: Send + Sync {
         limit: u64,
         ledger_version: Version,
     ) -> Result<TransactionOutputListWithProof> {
-        unimplemented!()
-    }
-
-    /// See [`AptosDB::get_write_sets`].
-    ///
-    /// [`AptosDB::get_write_sets`]: ../aptosdb/struct.AptosDB.html#method.get_write_sets
-    fn get_write_sets(
-        &self,
-        start_version: Version,
-        end_version: Version,
-    ) -> Result<Vec<WriteSet>> {
         unimplemented!()
     }
 
@@ -502,10 +490,6 @@ pub trait DbReader: Send + Sync {
 }
 
 impl MoveStorage for &dyn DbReader {
-    fn fetch_resource(&self, access_path: AccessPath) -> Result<Vec<u8>> {
-        self.fetch_resource_by_version(access_path, self.fetch_latest_state_checkpoint_version()?)
-    }
-
     fn fetch_resource_by_version(
         &self,
         access_path: AccessPath,

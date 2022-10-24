@@ -8,8 +8,8 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     processors::{
-        default_processor::DefaultTransactionProcessor, token_processor::TokenTransactionProcessor,
-        Processor,
+        coin_processor::CoinTransactionProcessor, default_processor::DefaultTransactionProcessor,
+        token_processor::TokenTransactionProcessor, Processor,
     },
 };
 
@@ -133,7 +133,11 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
         }
-        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(conn_pool.clone())),
+        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
+            conn_pool.clone(),
+            config.ans_contract_address,
+        )),
+        Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
     };
 
     let options =
@@ -147,12 +151,17 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         tailer.run_migrations();
     }
 
+    info!(
+        processor_name = processor_name,
+        "Fetching starting version from db..."
+    );
     let starting_version_from_db = tailer
         .get_start_version(&processor_name)
+        .unwrap_or_else(|e| panic!("Failed to get starting version: {:?}", e))
         .unwrap_or_else(|| {
             info!(
                 processor_name = processor_name,
-                "Could not fetch version from db so starting from version 0"
+                "No starting version from db so starting from version 0"
             );
             0
         }) as u64;
@@ -164,8 +173,8 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     info!(
         processor_name = processor_name,
         final_start_version = start_version,
-        start_version_from_db = starting_version_from_db,
         start_version_from_config = config.starting_version,
+        starting_version_from_db = starting_version_from_db,
         "Setting starting version..."
     );
     tailer.set_fetcher_version(start_version as u64).await;
@@ -220,7 +229,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
                     processor_name = processor_name,
                     start_version = start_version,
                     end_version = end_version,
-                    error = format!("{:?}", err),
+                    error =? err,
                     "Error processing batch!"
                 );
                 panic!(
@@ -229,6 +238,18 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
                 );
             }
         };
+
+        tailer
+            .update_last_processed_version(&processor_name, processing_result.end_version)
+            .unwrap_or_else(|e| {
+                error!(
+                    processor_name = processor_name,
+                    end_version = processing_result.end_version,
+                    error = format!("{:?}", e),
+                    "Failed to update last processed version!"
+                );
+                panic!("Failed to update last processed version: {:?}", e);
+            });
 
         ma.tick_now(num_res);
 

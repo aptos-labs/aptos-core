@@ -41,7 +41,7 @@ edition = "2021"
 aptos-types = {{ path = "../aptos-types", version = "0.1.0" }}
 serde_bytes = "0.11.6"
 serde = {{ version = "1.0.114", features = ["derive"] }}
-bcs = "0.1.3"
+bcs = {{ git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }}
 once_cell = "1.10.0"
 
 [[bin]]

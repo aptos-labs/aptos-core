@@ -74,7 +74,7 @@ Although \LBFT is agnostic to \emph{epoch}, it has to support additional rules f
 maintain the safety property across \emph{epoch}.
 
 \subsubsection{Commit Flow}
-Just a kind reminder that \LBFT has three-phase commit rule - once we collects a QC for three contiguous rounds k, k+1, k+2, we commit the the block at round k
+Just a kind reminder that \LBFT has three-phase commit rule - once we collects a QC for three contiguous rounds k, k+1, k+2, we commit the block at round k
 and all its prefix.
 
 To support \rust{EpochChange} mentioned above, we need to add an optional field \rust{next\_configuration} to the \rust{ExecutedState}

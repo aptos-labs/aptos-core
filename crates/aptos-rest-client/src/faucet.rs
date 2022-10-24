@@ -3,7 +3,7 @@
 
 use crate::{error::FaucetClientError, Client, Result};
 use aptos_types::transaction::SignedTransaction;
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 use reqwest::{Client as ReqwestClient, Url};
 use std::time::Duration;
 
@@ -51,6 +51,7 @@ impl FaucetClient {
         let response = self
             .inner
             .post(url)
+            .header("content-length", 0)
             .send()
             .await
             .map_err(FaucetClientError::request)?;
@@ -84,6 +85,7 @@ impl FaucetClient {
         let response = self
             .inner
             .post(url)
+            .header("content-length", 0)
             .send()
             .await
             .map_err(FaucetClientError::request)?;

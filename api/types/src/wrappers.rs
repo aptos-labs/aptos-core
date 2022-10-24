@@ -10,9 +10,10 @@
 //! just strings, using the FromStr impl to parse the path param. They can
 //! then be unpacked to the real type beneath.
 
+use crate::VerifyInput;
+use anyhow::bail;
 use aptos_types::event::EventKey;
-use move_deps::move_core_types::identifier::{IdentStr, Identifier};
-
+use move_core_types::identifier::{IdentStr, Identifier};
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
@@ -22,6 +23,16 @@ use crate::{Address, U64};
 /// A wrapper of a Move identifier
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct IdentifierWrapper(pub Identifier);
+
+impl VerifyInput for IdentifierWrapper {
+    fn verify(&self) -> anyhow::Result<()> {
+        if Identifier::is_valid(self.as_str()) {
+            Ok(())
+        } else {
+            bail!("Identifier is invalid {}", self)
+        }
+    }
+}
 
 impl FromStr for IdentifierWrapper {
     type Err = anyhow::Error;
@@ -40,6 +51,12 @@ impl From<IdentifierWrapper> for Identifier {
 impl From<Identifier> for IdentifierWrapper {
     fn from(value: Identifier) -> IdentifierWrapper {
         Self(value)
+    }
+}
+
+impl From<&Identifier> for IdentifierWrapper {
+    fn from(value: &Identifier) -> IdentifierWrapper {
+        Self(value.clone())
     }
 }
 
@@ -89,30 +106,11 @@ impl From<EventKey> for EventGuid {
     }
 }
 
-impl From<crate::EventKey> for EventGuid {
-    fn from(event_key: crate::EventKey) -> Self {
-        Self {
-            creation_number: U64(event_key.0.get_creation_number()),
-            account_address: Address::from(event_key.0.get_creator_address()),
-        }
-    }
-}
-
 impl From<EventGuid> for EventKey {
     fn from(event_key_wrapper: EventGuid) -> EventKey {
         EventKey::new(
             event_key_wrapper.creation_number.0,
             event_key_wrapper.account_address.into(),
         )
-    }
-}
-
-impl From<EventGuid> for crate::EventKey {
-    fn from(event_key_wrapper: EventGuid) -> crate::EventKey {
-        EventKey::new(
-            event_key_wrapper.creation_number.0,
-            event_key_wrapper.account_address.into(),
-        )
-        .into()
     }
 }

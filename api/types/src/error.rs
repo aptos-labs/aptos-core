@@ -19,7 +19,7 @@ pub struct AptosError {
 
 impl std::fmt::Display for AptosError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error({:?}): {}", self.error_code, self.message)
+        write!(f, "Error({:?}): {:#}", self.error_code, self.message)
     }
 }
 
@@ -31,7 +31,7 @@ impl AptosError {
         error_code: AptosErrorCode,
     ) -> AptosError {
         Self {
-            message: error.to_string(),
+            message: format!("{:#}", error),
             error_code,
             vm_error_code: None,
         }
@@ -43,7 +43,7 @@ impl AptosError {
         vm_error_code: StatusCode,
     ) -> AptosError {
         Self {
-            message: error.to_string(),
+            message: format!("{:#}", error),
             error_code,
             vm_error_code: Some(vm_error_code as u64),
         }

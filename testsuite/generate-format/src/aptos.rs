@@ -11,7 +11,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     contract_event, event, state_store::state_key::StateKey, transaction, write_set,
 };
-use move_deps::move_core_types::language_storage;
+use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
@@ -36,7 +36,7 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
     let private_key = Ed25519PrivateKey::generate(&mut rng);
     let public_key: Ed25519PublicKey = (&private_key).into();
-    let signature = private_key.sign(&message);
+    let signature = private_key.sign(&message).unwrap();
 
     tracer.trace_value(samples, &hashed_message)?;
     tracer.trace_value(samples, &public_key)?;

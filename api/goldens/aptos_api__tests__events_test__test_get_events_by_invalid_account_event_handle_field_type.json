@@ -1,5 +1,5 @@
 {
-  "message": "Deserialization error, field(epoch) type is not a EventHandle struct",
+  "message": "Deserialization error, field(epoch) type is not a EventHandle struct: unexpected end of input",
   "error_code": "invalid_input",
   "vm_error_code": null
 }

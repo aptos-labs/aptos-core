@@ -5,7 +5,7 @@
 /* eslint-disable class-methods-use-this */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
-import sha3 from "js-sha3";
+import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { HexString } from "../hex_string";
 import {
   Deserializer,
@@ -23,8 +23,6 @@ import { AccountAddress } from "./account_address";
 import { TransactionAuthenticator } from "./authenticator";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
-
-const { sha3_256: sha3Hash } = sha3;
 
 export class RawTransaction {
   /**
@@ -532,7 +530,7 @@ export abstract class Transaction {
   getHashSalt(): Bytes {
     const hash = sha3Hash.create();
     hash.update("APTOS::Transaction");
-    return new Uint8Array(hash.arrayBuffer());
+    return hash.digest();
   }
 
   static deserialize(deserializer: Deserializer): Transaction {
@@ -555,7 +553,7 @@ export class UserTransaction extends Transaction {
     const hash = sha3Hash.create();
     hash.update(this.getHashSalt());
     hash.update(bcsToBytes(this));
-    return new Uint8Array(hash.arrayBuffer());
+    return hash.digest();
   }
 
   serialize(serializer: Serializer): void {

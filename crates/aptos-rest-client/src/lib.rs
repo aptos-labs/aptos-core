@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+extern crate core;
+
 pub mod aptos;
 pub mod error;
 pub mod faucet;
@@ -12,7 +14,7 @@ pub mod state;
 pub mod types;
 
 pub use aptos_api_types::{
-    self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
+    self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
 };
 pub use state::State;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
@@ -23,23 +25,28 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::{
     deserialize_from_string,
     mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
-    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData,
-    TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
+    AptosError, BcsBlock, Block, Bytecode, ExplainVMStatus, GasEstimation, HexEncodedBytes,
+    IndexResponse, MoveModuleId, TransactionData, TransactionOnChainData,
+    TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
+use aptos_logger::{debug, info, sample, sample::SampleRate};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
     contract_event::EventWithVersion,
-    transaction::{ExecutionStatus, SignedTransaction},
+    transaction::SignedTransaction,
 };
-use move_deps::move_core_types::language_storage::StructTag;
+use futures::executor::block_on;
+use move_binary_format::CompiledModule;
+use move_core_types::language_storage::{ModuleId, StructTag};
 use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::future::Future;
+use std::rc::Rc;
 use std::time::Duration;
 use tokio::time::Instant;
 use url::Url;
@@ -50,6 +57,7 @@ const DEFAULT_MAX_WAIT_MS: u64 = 60000;
 const DEFAULT_INTERVAL_MS: u64 = 1000;
 static DEFAULT_MAX_WAIT_DURATION: Duration = Duration::from_millis(DEFAULT_MAX_WAIT_MS);
 static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTERVAL_MS);
+const DEFAULT_MAX_SERVER_LAG_WAIT_DURATION: Duration = Duration::from_secs(60);
 
 type AptosResult<T> = Result<T, RestError>;
 
@@ -145,6 +153,54 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
+    /// This will get all the transactions from the block in successive calls
+    /// and will handle the successive calls
+    ///
+    /// Note: This could take a long time to run
+    pub async fn get_full_block_by_height_bcs(
+        &self,
+        height: u64,
+        page_size: u16,
+    ) -> AptosResult<Response<BcsBlock>> {
+        let (mut block, state) = self
+            .get_block_by_height_bcs(height, true)
+            .await?
+            .into_parts();
+
+        let mut current_version = block.first_version;
+
+        // Set the current version to the last known transaction
+        if let Some(ref txns) = block.transactions {
+            if let Some(txn) = txns.last() {
+                current_version = txn.version + 1;
+            }
+        } else {
+            return Err(RestError::Unknown(anyhow!(
+                "No transactions were returned in the block"
+            )));
+        }
+
+        // Add in all transactions by paging through the other transactions
+        while current_version <= block.last_version {
+            let page_end_version =
+                std::cmp::min(block.last_version, current_version + page_size as u64 - 1);
+
+            let transactions = self
+                .get_transactions_bcs(
+                    Some(current_version),
+                    Some((page_end_version - current_version + 1) as u16),
+                )
+                .await?
+                .into_inner();
+            if let Some(txn) = transactions.last() {
+                current_version = txn.version + 1;
+            };
+            block.transactions.as_mut().unwrap().extend(transactions);
+        }
+
+        Ok(Response::new(block, state))
+    }
+
     pub async fn get_block_by_version(
         &self,
         version: u64,
@@ -225,7 +281,7 @@ impl Client {
         self.get(self.build_path("")?).await
     }
 
-    pub async fn get_index_bcs(&self) -> AptosResult<Response<IndexResponse>> {
+    pub async fn get_index_bcs(&self) -> AptosResult<Response<IndexResponseBcs>> {
         let url = self.build_path("")?;
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
@@ -380,7 +436,7 @@ impl Client {
             .await?;
 
         let response = self.check_and_parse_bcs_response(response).await?;
-        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes)).unwrap())
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
     pub async fn submit_and_wait(
@@ -409,6 +465,8 @@ impl Client {
                 .request
                 .expiration_timestamp_secs
                 .inner(),
+            Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
+            None,
         )
         .await
     }
@@ -423,6 +481,8 @@ impl Client {
                 .request
                 .expiration_timestamp_secs
                 .inner(),
+            Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
+            None,
         )
         .await
     }
@@ -435,6 +495,8 @@ impl Client {
         self.wait_for_transaction_by_hash(
             transaction.clone().committed_hash(),
             expiration_timestamp,
+            Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
+            None,
         )
         .await
     }
@@ -447,86 +509,224 @@ impl Client {
         self.wait_for_transaction_by_hash_bcs(
             transaction.clone().committed_hash(),
             expiration_timestamp,
+            Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
+            None,
         )
         .await
+    }
+
+    /// Implementation of waiting for a transaction
+    /// * `hash`: hash of the submitted transaction
+    /// * `expiration_timestamp_secs`: expiration time of the submitted transaction
+    /// * `max_server_lag_wait`:
+    ///     Fullnodes generally lag some amount behind the authoritative blockchain ledger state.
+    ///     This field gives the node some time to update its ledger state to the point
+    ///     where your transaction might have expired.
+    ///     We recommend setting this value to at least 60 seconds.
+    /// * `timeout_from_call`:
+    ///     When an absolute timeout for this function is needed,
+    ///     irrespective of whether expiry time is reached.
+    async fn wait_for_transaction_by_hash_inner<F, Fut, T>(
+        &self,
+        hash: HashValue,
+        expiration_timestamp_secs: u64,
+        max_server_lag_wait: Option<Duration>,
+
+        timeout_from_call: Option<Duration>,
+        fetch: F,
+    ) -> AptosResult<Response<T>>
+    where
+        F: Fn(HashValue) -> Fut,
+        Fut: Future<Output = AptosResult<WaitForTransactionResult<T>>>,
+    {
+        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+        let mut reached_mempool = false;
+        let start = std::time::Instant::now();
+        loop {
+            let mut chain_timestamp_usecs = None;
+            match fetch(hash).await? {
+                WaitForTransactionResult::Success(result) => {
+                    return Ok(result);
+                }
+                WaitForTransactionResult::FailedExecution(vm_status) => {
+                    return Err(anyhow!(
+                        "Transaction committed on chain, but failed execution: {}",
+                        vm_status
+                    ))?;
+                }
+                WaitForTransactionResult::Pending(state) => {
+                    reached_mempool = true;
+                    if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
+                        return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
+                    }
+                    chain_timestamp_usecs = Some(state.timestamp_usecs);
+                }
+                WaitForTransactionResult::NotFound(error) => {
+                    if let RestError::Api(aptos_error_response) = error {
+                        if let Some(state) = aptos_error_response.state {
+                            if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
+                                if reached_mempool {
+                                    return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
+                                } else {
+                                    // We want to know whether we ever got Pending state from the mempool,
+                                    // to warn in case we didn't.
+                                    // Unless we are calling endpoint that is a very large load-balanced pool of nodes,
+                                    // we should always see pending after submitting a transaction.
+                                    // (i.e. if we hit the node we submitted a transaction to,
+                                    // it shouldn't return NotFound on the first call)
+                                    //
+                                    // At the end, when the expiration happens, we might get NotFound or Pending
+                                    // based on whether GC run on the full node to remove expired transaction,
+                                    // so that information is not useful. So we need to keep this variable as state.
+                                    return Err(anyhow!("Transaction expired, without being seen in mempool. It is guaranteed it will not be committed on chain.").into());
+                                }
+                            }
+                            chain_timestamp_usecs = Some(state.timestamp_usecs);
+                        }
+                    } else {
+                        return Err(error);
+                    }
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(30)),
+                        debug!(
+                            "Cannot yet find transaction in mempool on {:?}, continuing to wait.",
+                            self.path_prefix_string(),
+                        )
+                    );
+                }
+            }
+
+            if let Some(max_server_lag_wait_duration) = max_server_lag_wait {
+                if aptos_infallible::duration_since_epoch().as_secs()
+                    > expiration_timestamp_secs + max_server_lag_wait_duration.as_secs()
+                {
+                    return Err(anyhow!(
+                        "Ledger on endpoint ({}) is more than {}s behind current time, timing out waiting for the transaction. Warning, transaction ({}) might still succeed.",
+                        self.path_prefix_string(),
+                        max_server_lag_wait_duration.as_secs(),
+                        hash,
+                    ).into());
+                }
+            }
+
+            let elapsed = start.elapsed();
+            if let Some(timeout_duration) = timeout_from_call {
+                if elapsed > timeout_duration {
+                    return Err(anyhow!(
+                        "Timeout of {}s after calling wait_for_transaction reached. Warning, transaction ({}) might still succeed.",
+                        timeout_duration.as_secs(),
+                        hash,
+                    ).into());
+                }
+            }
+
+            if elapsed.as_secs() > 30 {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(30)),
+                    debug!(
+                        "Continuing to wait for transaction {}, ledger on endpoint ({}) is {}",
+                        hash,
+                        self.path_prefix_string(),
+                        if let Some(timestamp_usecs) = chain_timestamp_usecs {
+                            format!(
+                                "{}s behind current time",
+                                aptos_infallible::duration_since_epoch()
+                                    .saturating_sub(Duration::from_micros(timestamp_usecs))
+                                    .as_secs()
+                            )
+                        } else {
+                            "unreachable".to_string()
+                        },
+                    )
+                );
+            }
+
+            tokio::time::sleep(DEFAULT_DELAY).await;
+        }
     }
 
     pub async fn wait_for_transaction_by_hash(
         &self,
         hash: HashValue,
         expiration_timestamp_secs: u64,
+        max_server_lag_wait: Option<Duration>,
+        timeout_from_call: Option<Duration>,
     ) -> AptosResult<Response<Transaction>> {
-        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
-        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+        self.wait_for_transaction_by_hash_inner(
+            hash,
+            expiration_timestamp_secs,
+            max_server_lag_wait,
+            timeout_from_call,
+            |hash| async move {
+                let resp = self.get_transaction_by_hash_inner(hash).await?;
+                if resp.status() != StatusCode::NOT_FOUND {
+                    let txn_resp: Response<Transaction> = self.json(resp).await?;
+                    let (transaction, state) = txn_resp.into_parts();
 
-        let start = std::time::Instant::now();
-        while start.elapsed() < DEFAULT_TIMEOUT {
-            let resp = self.get_transaction_by_hash_inner(hash).await?;
-            if resp.status() != StatusCode::NOT_FOUND {
-                let txn_resp: Response<Transaction> = self.json(resp).await?;
-                let (transaction, state) = txn_resp.into_parts();
-
-                if !transaction.is_pending() {
-                    if !transaction.success() {
-                        return Err(anyhow!(
-                            "transaction execution failed: {}",
-                            transaction.vm_status()
-                        ))?;
+                    if !transaction.is_pending() {
+                        if !transaction.success() {
+                            Ok(WaitForTransactionResult::FailedExecution(
+                                transaction.vm_status(),
+                            ))
+                        } else {
+                            Ok(WaitForTransactionResult::Success(Response::new(
+                                transaction,
+                                state,
+                            )))
+                        }
+                    } else {
+                        Ok(WaitForTransactionResult::Pending(state))
                     }
-                    return Ok(Response::new(transaction, state));
+                } else {
+                    let error_response = parse_error(resp).await;
+                    Ok(WaitForTransactionResult::NotFound(error_response))
                 }
-                if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
-                    return Err(anyhow!("transaction expired").into());
-                }
-            }
-
-            tokio::time::sleep(DEFAULT_DELAY).await;
-        }
-
-        Err(anyhow!("timeout").into())
+            },
+        )
+        .await
     }
 
     pub async fn wait_for_transaction_by_hash_bcs(
         &self,
         hash: HashValue,
         expiration_timestamp_secs: u64,
+        max_server_lag_wait: Option<Duration>,
+        timeout_from_call: Option<Duration>,
     ) -> AptosResult<Response<TransactionOnChainData>> {
-        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
-        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+        self.wait_for_transaction_by_hash_inner(
+            hash,
+            expiration_timestamp_secs,
+            max_server_lag_wait,
+            timeout_from_call,
+            |hash| async move {
+                let resp = self.get_transaction_by_hash_bcs_inner(hash).await?;
+                if resp.status() != StatusCode::NOT_FOUND {
+                    let resp = self.check_and_parse_bcs_response(resp).await?;
+                    let resp = resp.and_then(|bytes| bcs::from_bytes(&bytes))?;
+                    let (maybe_pending_txn, state) = resp.into_parts();
 
-        let start = std::time::Instant::now();
-        while start.elapsed() < DEFAULT_TIMEOUT {
-            let resp = self.get_transaction_by_hash_bcs_inner(hash).await?;
+                    // If we have a committed transaction, determine if it failed or not
+                    if let TransactionData::OnChain(txn) = maybe_pending_txn {
+                        let status = txn.info.status();
 
-            // If it's not found, keep waiting for it
-            if resp.status() != StatusCode::NOT_FOUND {
-                let resp = self.check_and_parse_bcs_response(resp).await?;
-                let resp = resp.and_then(|bytes| bcs::from_bytes(&bytes))?;
-                let (maybe_pending_txn, state) = resp.into_parts();
-
-                // If we have a committed transaction, determine if it failed or not
-                if let TransactionData::OnChain(txn) = maybe_pending_txn {
-                    let status = txn.info.status();
-
-                    // The user can handle the error
-                    return match status {
-                        ExecutionStatus::Success => Ok(Response::new(txn, state)),
-                        _ => Err(anyhow!("Transaction failed").into()),
-                    };
+                        if status.is_success() {
+                            Ok(WaitForTransactionResult::Success(Response::new(txn, state)))
+                        } else {
+                            Ok(WaitForTransactionResult::FailedExecution(format!(
+                                "{:?}",
+                                status
+                            )))
+                        }
+                    } else {
+                        Ok(WaitForTransactionResult::Pending(state))
+                    }
+                } else {
+                    let error_response = parse_error(resp).await;
+                    Ok(WaitForTransactionResult::NotFound(error_response))
                 }
-
-                // If it's expired lets give up
-                if Duration::from_secs(expiration_timestamp_secs)
-                    <= Duration::from_micros(state.timestamp_usecs)
-                {
-                    return Err(anyhow!("Transaction expired").into());
-                }
-            }
-
-            tokio::time::sleep(DEFAULT_DELAY).await;
-        }
-
-        Err(anyhow!("Timed out waiting for transaction").into())
+            },
+        )
+        .await
     }
 
     pub async fn wait_for_version(&self, version: u64) -> Result<State> {
@@ -986,8 +1186,8 @@ impl Client {
 
     pub async fn estimate_gas_price(&self) -> AptosResult<Response<GasEstimation>> {
         let url = self.build_path("estimate_gas_price")?;
-        let response = self.get_bcs(url).await?;
-        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+        let response = self.inner.get(url).send().await?;
+        self.json(response).await
     }
 
     pub async fn set_failpoint(&self, name: String, actions: String) -> AptosResult<String> {
@@ -1137,7 +1337,7 @@ impl Client {
                 break;
             }
 
-            aptos_logger::info!(
+            info!(
                 "Failed to call API, retrying in {}ms: {:?}",
                 backoff.as_millis(),
                 result.as_ref().err().unwrap()
@@ -1209,4 +1409,23 @@ async fn parse_error(response: reqwest::Response) -> RestError {
 pub struct GasEstimationParams {
     pub estimated_gas_used: u64,
     pub estimated_gas_price: u64,
+}
+
+enum WaitForTransactionResult<T> {
+    NotFound(RestError),
+    FailedExecution(String),
+    Pending(State),
+    Success(Response<T>),
+}
+
+impl ExplainVMStatus for Client {
+    // TODO: Add some caching
+    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
+        let bytes =
+            block_on(self.get_account_module_bcs(*module_id.address(), module_id.name().as_str()))?
+                .into_inner();
+
+        let compiled_module = CompiledModule::deserialize(bytes.as_ref())?;
+        Ok(Rc::new(compiled_module) as Rc<dyn Bytecode>)
+    }
 }

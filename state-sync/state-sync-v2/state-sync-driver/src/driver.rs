@@ -327,7 +327,7 @@ impl<
             .reconfiguration_events
             .is_empty()
         {
-            utils::update_new_epoch_metrics(self.storage.clone());
+            utils::update_new_epoch_metrics();
         }
     }
 

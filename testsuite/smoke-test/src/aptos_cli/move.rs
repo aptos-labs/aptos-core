@@ -6,8 +6,8 @@ use aptos::move_tool::MemberId;
 use aptos::test::CliTestFramework;
 use aptos_logger::info;
 use framework::{BuildOptions, BuiltPackage};
-use move_deps::move_core_types::account_address::AccountAddress;
-use move_deps::move_package::source_package::manifest_parser::parse_move_manifest_from_file;
+use move_core_types::account_address::AccountAddress;
+use move_package::source_package::manifest_parser::parse_move_manifest_from_file;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -115,10 +115,7 @@ async fn test_move_publish_flow() {
     // Let's publish it
     let mut named_addresses = BTreeMap::new();
     named_addresses.insert(HELLO_BLOCKCHAIN, account.as_str());
-    let _ = match cli
-        .publish_package(0, None, named_addresses, false, None)
-        .await
-    {
+    let _ = match cli.publish_package(0, None, named_addresses, None).await {
         Ok(response) => response,
         Err(err) => panic!("Should not have failed to publish package {:?}", err),
     };

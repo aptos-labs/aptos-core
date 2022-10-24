@@ -16,7 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
 };
-use move_deps::move_core_types::{
+use move_core_types::{
     ident_str,
     language_storage::{ModuleId, TypeTag},
 };
@@ -34,8 +34,19 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    /// Burn a token by the token owner
     TokenBurn {
         creators_address: AccountAddress,
+        collection: Vec<u8>,
+        name: Vec<u8>,
+        property_version: u64,
+        amount: u64,
+    },
+
+    /// Burn a token by creator when the token's BURNABLE_BY_CREATOR is true
+    /// The token is owned at address owner
+    TokenBurnByCreator {
+        owner: AccountAddress,
         collection: Vec<u8>,
         name: Vec<u8>,
         property_version: u64,
@@ -105,16 +116,27 @@ pub enum EntryFunctionCall {
         opt_in: bool,
     },
 
+    /// Transfers `amount` of tokens from `from` to `to`.
+    /// The receiver `to` has to opt-in direct transfer first
+    TokenTransferWithOptIn {
+        creator: AccountAddress,
+        collection_name: Vec<u8>,
+        token_name: Vec<u8>,
+        token_property_version: u64,
+        to: AccountAddress,
+        amount: u64,
+    },
+
     /// Token owner lists their token for swapping
     TokenCoinSwapListTokenForSwap {
         coin_type: TypeTag,
-        creators_address: AccountAddress,
-        collection: Vec<u8>,
-        name: Vec<u8>,
-        property_version: u64,
-        token_amount: u64,
-        min_coin_per_token: u64,
-        locked_until_secs: u64,
+        _creators_address: AccountAddress,
+        _collection: Vec<u8>,
+        _name: Vec<u8>,
+        _property_version: u64,
+        _token_amount: u64,
+        _min_coin_per_token: u64,
+        _locked_until_secs: u64,
     },
 
     TokenTransfersCancelOfferScript {
@@ -155,6 +177,13 @@ impl EntryFunctionCall {
                 property_version,
                 amount,
             } => token_burn(creators_address, collection, name, property_version, amount),
+            TokenBurnByCreator {
+                owner,
+                collection,
+                name,
+                property_version,
+                amount,
+            } => token_burn_by_creator(owner, collection, name, property_version, amount),
             TokenCreateCollectionScript {
                 name,
                 description,
@@ -233,24 +262,39 @@ impl EntryFunctionCall {
                 types,
             ),
             TokenOptInDirectTransfer { opt_in } => token_opt_in_direct_transfer(opt_in),
+            TokenTransferWithOptIn {
+                creator,
+                collection_name,
+                token_name,
+                token_property_version,
+                to,
+                amount,
+            } => token_transfer_with_opt_in(
+                creator,
+                collection_name,
+                token_name,
+                token_property_version,
+                to,
+                amount,
+            ),
             TokenCoinSwapListTokenForSwap {
                 coin_type,
-                creators_address,
-                collection,
-                name,
-                property_version,
-                token_amount,
-                min_coin_per_token,
-                locked_until_secs,
+                _creators_address,
+                _collection,
+                _name,
+                _property_version,
+                _token_amount,
+                _min_coin_per_token,
+                _locked_until_secs,
             } => token_coin_swap_list_token_for_swap(
                 coin_type,
-                creators_address,
-                collection,
-                name,
-                property_version,
-                token_amount,
-                min_coin_per_token,
-                locked_until_secs,
+                _creators_address,
+                _collection,
+                _name,
+                _property_version,
+                _token_amount,
+                _min_coin_per_token,
+                _locked_until_secs,
             ),
             TokenTransfersCancelOfferScript {
                 receiver,
@@ -307,6 +351,7 @@ impl EntryFunctionCall {
     }
 }
 
+/// Burn a token by the token owner
 pub fn token_burn(
     creators_address: AccountAddress,
     collection: Vec<u8>,
@@ -326,6 +371,35 @@ pub fn token_burn(
         vec![],
         vec![
             bcs::to_bytes(&creators_address).unwrap(),
+            bcs::to_bytes(&collection).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Burn a token by creator when the token's BURNABLE_BY_CREATOR is true
+/// The token is owned at address owner
+pub fn token_burn_by_creator(
+    owner: AccountAddress,
+    collection: Vec<u8>,
+    name: Vec<u8>,
+    property_version: u64,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("burn_by_creator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&owner).unwrap(),
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
             bcs::to_bytes(&property_version).unwrap(),
@@ -527,16 +601,47 @@ pub fn token_opt_in_direct_transfer(opt_in: bool) -> TransactionPayload {
     ))
 }
 
+/// Transfers `amount` of tokens from `from` to `to`.
+/// The receiver `to` has to opt-in direct transfer first
+pub fn token_transfer_with_opt_in(
+    creator: AccountAddress,
+    collection_name: Vec<u8>,
+    token_name: Vec<u8>,
+    token_property_version: u64,
+    to: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("transfer_with_opt_in").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&collection_name).unwrap(),
+            bcs::to_bytes(&token_name).unwrap(),
+            bcs::to_bytes(&token_property_version).unwrap(),
+            bcs::to_bytes(&to).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
 /// Token owner lists their token for swapping
 pub fn token_coin_swap_list_token_for_swap(
     coin_type: TypeTag,
-    creators_address: AccountAddress,
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    property_version: u64,
-    token_amount: u64,
-    min_coin_per_token: u64,
-    locked_until_secs: u64,
+    _creators_address: AccountAddress,
+    _collection: Vec<u8>,
+    _name: Vec<u8>,
+    _property_version: u64,
+    _token_amount: u64,
+    _min_coin_per_token: u64,
+    _locked_until_secs: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -549,13 +654,13 @@ pub fn token_coin_swap_list_token_for_swap(
         ident_str!("list_token_for_swap").to_owned(),
         vec![coin_type],
         vec![
-            bcs::to_bytes(&creators_address).unwrap(),
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&property_version).unwrap(),
-            bcs::to_bytes(&token_amount).unwrap(),
-            bcs::to_bytes(&min_coin_per_token).unwrap(),
-            bcs::to_bytes(&locked_until_secs).unwrap(),
+            bcs::to_bytes(&_creators_address).unwrap(),
+            bcs::to_bytes(&_collection).unwrap(),
+            bcs::to_bytes(&_name).unwrap(),
+            bcs::to_bytes(&_property_version).unwrap(),
+            bcs::to_bytes(&_token_amount).unwrap(),
+            bcs::to_bytes(&_min_coin_per_token).unwrap(),
+            bcs::to_bytes(&_locked_until_secs).unwrap(),
         ],
     ))
 }
@@ -648,6 +753,20 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenBurn {
                 creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                collection: bcs::from_bytes(script.args().get(1)?).ok()?,
+                name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn token_burn_by_creator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenBurnByCreator {
+                owner: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -763,19 +882,34 @@ mod decoder {
         }
     }
 
+    pub fn token_transfer_with_opt_in(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenTransferWithOptIn {
+                creator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                collection_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                token_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                token_property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                to: bcs::from_bytes(script.args().get(4)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(5)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn token_coin_swap_list_token_for_swap(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenCoinSwapListTokenForSwap {
                 coin_type: script.ty_args().get(0)?.clone(),
-                creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                collection: bcs::from_bytes(script.args().get(1)?).ok()?,
-                name: bcs::from_bytes(script.args().get(2)?).ok()?,
-                property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
-                token_amount: bcs::from_bytes(script.args().get(4)?).ok()?,
-                min_coin_per_token: bcs::from_bytes(script.args().get(5)?).ok()?,
-                locked_until_secs: bcs::from_bytes(script.args().get(6)?).ok()?,
+                _creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                _collection: bcs::from_bytes(script.args().get(1)?).ok()?,
+                _name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                _property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                _token_amount: bcs::from_bytes(script.args().get(4)?).ok()?,
+                _min_coin_per_token: bcs::from_bytes(script.args().get(5)?).ok()?,
+                _locked_until_secs: bcs::from_bytes(script.args().get(6)?).ok()?,
             })
         } else {
             None
@@ -842,6 +976,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert("token_burn".to_string(), Box::new(decoder::token_burn));
         map.insert(
+            "token_burn_by_creator".to_string(),
+            Box::new(decoder::token_burn_by_creator),
+        );
+        map.insert(
             "token_create_collection_script".to_string(),
             Box::new(decoder::token_create_collection_script),
         );
@@ -868,6 +1006,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "token_opt_in_direct_transfer".to_string(),
             Box::new(decoder::token_opt_in_direct_transfer),
+        );
+        map.insert(
+            "token_transfer_with_opt_in".to_string(),
+            Box::new(decoder::token_transfer_with_opt_in),
         );
         map.insert(
             "token_coin_swap_list_token_for_swap".to_string(),

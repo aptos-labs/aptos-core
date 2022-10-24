@@ -7,6 +7,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
+use async_trait::async_trait;
 use rand::{
     distributions::{Distribution, Standard},
     prelude::{SliceRandom, StdRng},
@@ -157,6 +158,12 @@ impl TransactionGenerator for P2PTransactionGenerator {
                 .choose_multiple(&mut self.rng, transactions_per_account)
                 .cloned()
                 .collect::<Vec<_>>();
+            assert!(
+                receivers.len() >= transactions_per_account,
+                "failed: {} >= {}",
+                receivers.len(),
+                transactions_per_account
+            );
             for i in 0..transactions_per_account {
                 let receiver = receivers.get(i).expect("all_addresses can't be empty");
                 let request = if num_valid_tx > 0 {
@@ -212,8 +219,9 @@ impl P2PTransactionGeneratorCreator {
     }
 }
 
+#[async_trait]
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(P2PTransactionGenerator::new(
             self.rng.clone(),
             self.amount,

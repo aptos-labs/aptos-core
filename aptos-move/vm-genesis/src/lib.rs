@@ -13,7 +13,7 @@ use aptos_crypto::{
 };
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
-    ToOnChainGasSchedule,
+    ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::account_config::aptos_test_root_address;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
@@ -31,16 +31,14 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use framework::{ReleaseBundle, ReleasePackage};
-use move_deps::{
-    move_core_types::{
-        account_address::AccountAddress,
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-        resolver::MoveResolver,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    resolver::MoveResolver,
+    value::{serialize_values, MoveValue},
 };
+use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -70,6 +68,8 @@ pub struct GenesisConfiguration {
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voting_power_increase_limit: u64,
+    pub employee_vesting_start: u64,
+    pub employee_vesting_period_duration: u64,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -80,8 +80,8 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 });
 
 pub fn encode_aptos_mainnet_genesis_transaction(
-    accounts: &[AccountMap],
-    employees: &[EmployeeAccountMap],
+    accounts: &[AccountBalance],
+    employees: &[EmployeePool],
     validators: &[ValidatorWithCommissionRate],
     framework: &ReleaseBundle,
     chain_id: ChainId,
@@ -99,6 +99,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
     .unwrap();
@@ -107,17 +108,12 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
-    initialize(
-        &mut session,
-        consensus_config,
-        chain_id,
-        genesis_config,
-        true,
-    );
+    initialize(&mut session, consensus_config, chain_id, genesis_config);
+    initialize_features(&mut session);
     initialize_aptos_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
-    create_employee_validators(&mut session, employees);
+    create_employee_validators(&mut session, employees, genesis_config);
     create_and_initialize_validators_with_commission(&mut session, validators);
     set_genesis_end(&mut session);
 
@@ -139,7 +135,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     session1_out.squash(session2_out).unwrap();
 
-    let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
+    let change_set_ext = session1_out
+        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -174,7 +172,6 @@ pub fn encode_genesis_transaction(
         consensus_config,
         chain_id,
         &genesis_config,
-        true,
     )))
 }
 
@@ -185,7 +182,6 @@ pub fn encode_genesis_change_set(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
-    use_gas_schedule_v2: bool,
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
@@ -198,6 +194,7 @@ pub fn encode_genesis_change_set(
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
     .unwrap();
@@ -205,13 +202,8 @@ pub fn encode_genesis_change_set(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     // On-chain genesis process.
-    initialize(
-        &mut session,
-        consensus_config,
-        chain_id,
-        genesis_config,
-        use_gas_schedule_v2,
-    );
+    initialize(&mut session, consensus_config, chain_id, genesis_config);
+    initialize_features(&mut session);
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
@@ -242,7 +234,9 @@ pub fn encode_genesis_change_set(
 
     session1_out.squash(session2_out).unwrap();
 
-    let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
+    let change_set_ext = session1_out
+        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -317,37 +311,27 @@ fn exec_function(
         )
         .unwrap_or_else(|e| {
             panic!(
-                "Error calling {}.{}: {}",
+                "Error calling {}.{}: ({:#x}) {}",
                 module_name,
                 function_name,
-                e.into_vm_status()
+                e.sub_status().unwrap_or_default(),
+                e,
             )
         });
 }
-
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 1;
 
 fn initialize(
     session: &mut SessionExt<impl MoveResolver>,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
-    use_gas_schedule_v2: bool,
 ) {
-    let genesis_gas_params = AptosGasParameters::initial();
-    // TODO(Gas): The `use_gas_schedule_v2` flag is a hack to get tests working for the previous
-    //            testnet release.
-    //            We should get rid of it after we make another testnet release.
-    let gas_schedule_blob = if use_gas_schedule_v2 {
-        let gas_schedule = GasScheduleV2 {
-            feature_version: LATEST_GAS_FEATURE_VERSION,
-            entries: genesis_gas_params.to_on_chain_gas_schedule(),
-        };
-        bcs::to_bytes(&gas_schedule).expect("Failure serializing genesis gas schedule")
-    } else {
-        bcs::to_bytes(&genesis_gas_params.to_on_chain_gas_schedule())
-            .expect("Failure serializing genesis gas schedule")
+    let gas_schedule = GasScheduleV2 {
+        feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
+        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(),
     };
+    let gas_schedule_blob =
+        bcs::to_bytes(&gas_schedule).expect("Failure serializing genesis gas schedule");
 
     let consensus_config_bytes =
         bcs::to_bytes(&consensus_config).expect("Failure serializing genesis consensus config");
@@ -383,6 +367,22 @@ fn initialize(
             MoveValue::U64(rewards_rate_denominator),
             MoveValue::U64(genesis_config.voting_power_increase_limit),
         ]),
+    );
+}
+
+fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
+    let features: Vec<u64> = vec![1, 2];
+
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(bcs::to_bytes(&features).unwrap());
+    serialized_values.push(bcs::to_bytes(&Vec::<u64>::new()).unwrap());
+
+    exec_function(
+        session,
+        "features",
+        "change_feature_flags",
+        vec![],
+        serialized_values,
     );
 }
 
@@ -442,7 +442,7 @@ fn initialize_on_chain_governance(
     );
 }
 
-fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountMap]) {
+fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountBalance]) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
@@ -457,10 +457,14 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
 
 fn create_employee_validators(
     session: &mut SessionExt<impl MoveResolver>,
-    employees: &[EmployeeAccountMap],
+    employees: &[EmployeePool],
+    genesis_config: &GenesisConfiguration,
 ) {
     let employees_bytes = bcs::to_bytes(employees).expect("AccountMaps can be serialized");
-    let mut serialized_values = serialize_values(&[]);
+    let mut serialized_values = serialize_values(&vec![
+        MoveValue::U64(genesis_config.employee_vesting_start),
+        MoveValue::U64(genesis_config.employee_vesting_period_duration),
+    ]);
     serialized_values.push(employees_bytes);
 
     exec_function(
@@ -496,7 +500,10 @@ fn create_and_initialize_validators_with_commission(
     validators: &[ValidatorWithCommissionRate],
 ) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
-    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    let mut serialized_values = serialize_values(&vec![
+        MoveValue::Signer(CORE_CODE_ADDRESS),
+        MoveValue::Bool(true),
+    ]);
     serialized_values.push(validators_bytes);
     exec_function(
         session,
@@ -606,30 +613,35 @@ pub enum GenesisOptions {
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
-    let (framework, use_gas_schedule_v2) = match genesis_options {
-        GenesisOptions::Head => (cached_packages::head_release_bundle(), true),
-        GenesisOptions::Testnet => (framework::testnet_release_bundle(), false),
+    generate_genesis_change_set_for_testing_with_count(genesis_options, 1)
+}
+
+pub fn generate_genesis_change_set_for_testing_with_count(
+    genesis_options: GenesisOptions,
+    count: u64,
+) -> ChangeSet {
+    let framework = match genesis_options {
+        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => framework::testnet_release_bundle(),
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
-            (framework::testnet_release_bundle(), false)
+            framework::testnet_release_bundle()
         }
     };
 
-    generate_test_genesis(framework, Some(1), use_gas_schedule_v2).0
+    generate_test_genesis(framework, Some(count as usize)).0
 }
 
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
-    let (framework, use_gas_schedule_v2) = match genesis_options {
-        GenesisOptions::Head => (cached_packages::head_release_bundle(), true),
-        GenesisOptions::Testnet => (framework::testnet_release_bundle(), false),
-        GenesisOptions::Mainnet => {
-            // We don't yet have mainnet, so returning testnet here
-            (framework::testnet_release_bundle(), false)
-        }
+    let framework = match genesis_options {
+        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        // We don't yet have mainnet, so returning testnet here
+        GenesisOptions::Mainnet => framework::testnet_release_bundle(),
     };
 
-    generate_mainnet_genesis(framework, Some(1), use_gas_schedule_v2).0
+    generate_mainnet_genesis(framework, Some(1)).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -640,7 +652,7 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(cached_packages::head_release_bundle(), count, true)
+    generate_test_genesis(cached_packages::head_release_bundle(), count)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -717,7 +729,6 @@ impl TestValidator {
 pub fn generate_test_genesis(
     framework: &ReleaseBundle,
     count: Option<usize>,
-    use_gas_schedule_v2: bool,
 ) -> (ChangeSet, Vec<TestValidator>) {
     let test_validators = TestValidator::new_test_set(count, Some(100_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
@@ -742,8 +753,9 @@ pub fn generate_test_genesis(
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
+            employee_vesting_start: 1663456089,
+            employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
-        use_gas_schedule_v2,
     );
     (genesis, test_validators)
 }
@@ -751,7 +763,6 @@ pub fn generate_test_genesis(
 pub fn generate_mainnet_genesis(
     framework: &ReleaseBundle,
     count: Option<usize>,
-    use_gas_schedule_v2: bool,
 ) -> (ChangeSet, Vec<TestValidator>) {
     // TODO: Update to have custom validators/accounts with initial balances at genesis.
     let test_validators = TestValidator::new_test_set(count, Some(1_000_000_000_000_000));
@@ -765,7 +776,6 @@ pub fn generate_mainnet_genesis(
         OnChainConsensusConfig::default(),
         ChainId::test(),
         &mainnet_genesis_config(),
-        use_gas_schedule_v2,
     );
     (genesis, test_validators)
 }
@@ -785,27 +795,33 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         rewards_apy_percentage: 10,
         voting_duration_secs: 7 * 24 * 3600, // 7 days
         voting_power_increase_limit: 30,
+        employee_vesting_start: 1663456089,
+        employee_vesting_period_duration: 5 * 60, // 5 minutes
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountMap {
+pub struct AccountBalance {
     pub account_address: AccountAddress,
     pub balance: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmployeeAccountMap {
-    accounts: Vec<AccountAddress>,
-    validator: ValidatorWithCommissionRate,
-    vesting_schedule_numerators: Vec<u64>,
-    vesting_schedule_denominator: u64,
+pub struct EmployeePool {
+    pub accounts: Vec<AccountAddress>,
+    pub validator: ValidatorWithCommissionRate,
+    pub vesting_schedule_numerators: Vec<u64>,
+    pub vesting_schedule_denominator: u64,
+    // Address that can reset the beneficiary for any shareholder.
+    pub beneficiary_resetter: AccountAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidatorWithCommissionRate {
     pub validator: Validator,
     pub validator_commission_percentage: u64,
+    /// Whether the validator should be joining the genesis validator set.
+    pub join_during_genesis: bool,
 }
 
 #[test]
@@ -821,6 +837,7 @@ pub fn test_genesis_module_publishing() {
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
         false,
     )
     .unwrap();
@@ -852,6 +869,8 @@ pub fn test_mainnet_end_to_end() {
     let operator1 = AccountAddress::from_hex_literal("0x101").unwrap();
     let operator2 = AccountAddress::from_hex_literal("0x102").unwrap();
     let operator3 = AccountAddress::from_hex_literal("0x103").unwrap();
+    let operator4 = AccountAddress::from_hex_literal("0x104").unwrap();
+    let operator5 = AccountAddress::from_hex_literal("0x105").unwrap();
     let voter0 = AccountAddress::from_hex_literal("0x200").unwrap();
     let voter1 = AccountAddress::from_hex_literal("0x201").unwrap();
     let voter2 = AccountAddress::from_hex_literal("0x202").unwrap();
@@ -861,77 +880,85 @@ pub fn test_mainnet_end_to_end() {
     let admin2 = AccountAddress::from_hex_literal("0x302").unwrap();
 
     let accounts = vec![
-        AccountMap {
+        AccountBalance {
             account_address: account44,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account45,
-            balance,
+            balance: balance * 3, // Three times the balance so it can host 2 operators.
         },
-        AccountMap {
+        AccountBalance {
             account_address: account46,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account47,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account48,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: account49,
             balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: admin2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: operator3,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
+            account_address: operator4,
+            balance: non_validator_balance,
+        },
+        AccountBalance {
+            account_address: operator5,
+            balance: non_validator_balance,
+        },
+        AccountBalance {
             account_address: voter0,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter1,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter2,
             balance: non_validator_balance,
         },
-        AccountMap {
+        AccountBalance {
             account_address: voter3,
             balance: non_validator_balance,
         },
     ];
 
-    let test_validators = TestValidator::new_test_set(Some(4), Some(balance * 9 / 10));
+    let test_validators = TestValidator::new_test_set(Some(6), Some(balance * 9 / 10));
     let mut employee_validator_1 = test_validators[0].data.clone();
     employee_validator_1.owner_address = admin0;
     employee_validator_1.operator_address = operator0;
@@ -940,44 +967,68 @@ pub fn test_mainnet_end_to_end() {
     employee_validator_2.owner_address = admin1;
     employee_validator_2.operator_address = operator1;
     employee_validator_2.voter_address = voter1;
-    let mut direct_validator = test_validators[2].data.clone();
-    direct_validator.owner_address = account44;
-    direct_validator.operator_address = operator2;
-    direct_validator.voter_address = voter2;
-    let mut commissioned_validator = test_validators[3].data.clone();
-    commissioned_validator.owner_address = account45;
-    commissioned_validator.operator_address = operator3;
-    commissioned_validator.voter_address = voter3;
+    let mut zero_commission_validator = test_validators[2].data.clone();
+    zero_commission_validator.owner_address = account44;
+    zero_commission_validator.operator_address = operator2;
+    zero_commission_validator.voter_address = voter2;
+    let mut same_owner_validator_1 = test_validators[3].data.clone();
+    same_owner_validator_1.owner_address = account45;
+    same_owner_validator_1.operator_address = operator3;
+    same_owner_validator_1.voter_address = voter3;
+    let mut same_owner_validator_2 = test_validators[4].data.clone();
+    same_owner_validator_2.owner_address = account45;
+    same_owner_validator_2.operator_address = operator4;
+    same_owner_validator_2.voter_address = voter3;
+    let mut same_owner_validator_3 = test_validators[5].data.clone();
+    same_owner_validator_3.owner_address = account45;
+    same_owner_validator_3.operator_address = operator5;
+    same_owner_validator_3.voter_address = voter3;
 
     let employees = vec![
-        EmployeeAccountMap {
+        EmployeePool {
             accounts: vec![account46, account47],
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_1,
                 validator_commission_percentage: 10,
+                join_during_genesis: true,
             },
-            vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
+            vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
             vesting_schedule_denominator: 48,
+            beneficiary_resetter: AccountAddress::ZERO,
         },
-        EmployeeAccountMap {
+        EmployeePool {
             accounts: vec![account48, account49],
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_2,
                 validator_commission_percentage: 10,
+                join_during_genesis: false,
             },
-            vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
+            vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
             vesting_schedule_denominator: 48,
+            beneficiary_resetter: account44,
         },
     ];
 
     let validators = vec![
         ValidatorWithCommissionRate {
-            validator: commissioned_validator,
+            validator: same_owner_validator_1,
             validator_commission_percentage: 10,
+            join_during_genesis: true,
         },
         ValidatorWithCommissionRate {
-            validator: direct_validator,
+            validator: same_owner_validator_2,
+            validator_commission_percentage: 15,
+            join_during_genesis: true,
+        },
+        ValidatorWithCommissionRate {
+            validator: same_owner_validator_3,
+            validator_commission_percentage: 10,
+            join_during_genesis: false,
+        },
+        ValidatorWithCommissionRate {
+            validator: zero_commission_validator,
             validator_commission_percentage: 0,
+            join_during_genesis: true,
         },
     ];
 
@@ -1017,15 +1068,27 @@ pub fn test_mainnet_end_to_end() {
         .map(|v| v.account_address)
         .collect::<Vec<_>>();
 
-    let commissioned_pool_address =
+    let zero_commission_validator_pool_address =
+        account_address::default_stake_pool_address(account44, operator2);
+    let same_owner_validator_1_pool_address =
         account_address::default_stake_pool_address(account45, operator3);
+    let same_owner_validator_2_pool_address =
+        account_address::default_stake_pool_address(account45, operator4);
+    let same_owner_validator_3_pool_address =
+        account_address::default_stake_pool_address(account45, operator5);
     let employee_1_pool_address =
         account_address::create_vesting_pool_address(admin0, operator0, 0, &[]);
     let employee_2_pool_address =
         account_address::create_vesting_pool_address(admin1, operator1, 0, &[]);
 
+    assert!(validator_set_addresses.contains(&zero_commission_validator_pool_address));
     assert!(validator_set_addresses.contains(&employee_1_pool_address));
-    assert!(validator_set_addresses.contains(&employee_2_pool_address));
-    assert!(validator_set_addresses.contains(&commissioned_pool_address));
-    assert!(validator_set_addresses.contains(&account44));
+    // This validator should not be in the genesis validator set as they specified
+    // join_during_genesis = false.
+    assert!(!validator_set_addresses.contains(&employee_2_pool_address));
+    assert!(validator_set_addresses.contains(&same_owner_validator_1_pool_address));
+    assert!(validator_set_addresses.contains(&same_owner_validator_2_pool_address));
+    // This validator should not be in the genesis validator set as they specified
+    // join_during_genesis = false.
+    assert!(!validator_set_addresses.contains(&same_owner_validator_3_pool_address));
 }

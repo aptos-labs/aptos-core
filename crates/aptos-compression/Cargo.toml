@@ -18,7 +18,7 @@ aptos-logger = { path = "../aptos-logger" }
 aptos-metrics-core = { path = "../aptos-metrics-core" }
 
 [dev-dependencies]
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 serde = { version = "1.0.137", default-features = false }
 
 aptos-crypto = { path = "../aptos-crypto" }

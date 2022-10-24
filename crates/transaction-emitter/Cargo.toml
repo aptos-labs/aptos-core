@@ -18,6 +18,7 @@ rand = "0.7.3"
 rand_core = "0.5.1"
 tokio = { version = "1.21.0", features = ["full"] }
 
+aptos-global-constants = { path = "../../config/global-constants" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-sdk = { path = "../../sdk" }
 

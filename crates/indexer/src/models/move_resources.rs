@@ -1,39 +1,28 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::transactions::Transaction, schema::move_resources};
+use crate::{models::transactions::Transaction, schema::move_resources, util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_api_types::{DeleteResource, MoveStructTag as APIMoveStructTag, WriteResource};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 #[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Queryable,
-    Serialize,
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
 )]
-#[belongs_to(Transaction, foreign_key = "transaction_version")]
-#[primary_key(transaction_version, write_set_change_index)]
-#[diesel(table_name = "move_resources")]
+#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[diesel(primary_key(transaction_version, write_set_change_index))]
+#[diesel(table_name = move_resources)]
 pub struct MoveResource {
     pub transaction_version: i64,
     pub write_set_change_index: i64,
     pub transaction_block_height: i64,
     pub name: String,
-    #[diesel(column_name = type)]
     pub type_: String,
     pub address: String,
     pub module: String,
     pub generic_type_params: Option<serde_json::Value>,
     pub data: Option<serde_json::Value>,
     pub is_deleted: bool,
-    // Default time columns
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 pub struct MoveStructTag {
@@ -56,12 +45,11 @@ impl MoveResource {
             write_set_change_index,
             type_: write_resource.data.typ.to_string(),
             name: parsed_data.name.clone(),
-            address: write_resource.address.to_string(),
+            address: standardize_address(&write_resource.address.to_string()),
             module: parsed_data.module.clone(),
             generic_type_params: parsed_data.generic_type_params,
             data: Some(serde_json::to_value(&write_resource.data.data).unwrap()),
             is_deleted: false,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
@@ -78,12 +66,11 @@ impl MoveResource {
             write_set_change_index,
             type_: delete_resource.resource.to_string(),
             name: parsed_data.name.clone(),
-            address: delete_resource.address.to_string(),
+            address: standardize_address(&delete_resource.address.to_string()),
             module: parsed_data.module.clone(),
             generic_type_params: parsed_data.generic_type_params,
             data: None,
             is_deleted: true,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 

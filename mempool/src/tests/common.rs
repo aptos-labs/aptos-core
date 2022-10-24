@@ -5,7 +5,7 @@ use crate::core_mempool::{CoreMempool, TimelineState, TxnPointer};
 use crate::network::MempoolSyncMsg;
 use anyhow::{format_err, Result};
 use aptos_compression::metrics::CompressionClient;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
@@ -20,10 +20,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
-    (
-        CoreMempool::new(&NodeConfig::random()),
-        ConsensusMock::new(),
-    )
+    let mut config = NodeConfig::random();
+    config.mempool.broadcast_buckets = vec![0];
+    (CoreMempool::new(&config), ConsensusMock::new())
+}
+
+pub(crate) fn setup_mempool_with_broadcast_buckets(
+    buckets: Vec<u64>,
+) -> (CoreMempool, ConsensusMock) {
+    let mut config = NodeConfig::random();
+    config.mempool.broadcast_buckets = buckets;
+    (CoreMempool::new(&config), ConsensusMock::new())
 }
 
 static ACCOUNTS: Lazy<Vec<AccountAddress>> = Lazy::new(|| {
@@ -142,9 +149,7 @@ pub(crate) fn batch_add_signed_txn(
     transactions: Vec<SignedTransaction>,
 ) -> Result<()> {
     for txn in transactions.into_iter() {
-        if let Err(e) = add_signed_txn(pool, txn) {
-            return Err(e);
-        }
+        add_signed_txn(pool, txn)?
     }
     Ok(())
 }
@@ -181,7 +186,12 @@ impl ConsensusMock {
 /// Decompresses and deserializes the raw message bytes into a message struct
 pub fn decompress_and_deserialize(message_bytes: &Vec<u8>) -> MempoolSyncMsg {
     bcs::from_bytes(
-        &aptos_compression::decompress(message_bytes, CompressionClient::Mempool).unwrap(),
+        &aptos_compression::decompress(
+            message_bytes,
+            CompressionClient::Mempool,
+            MAX_APPLICATION_MESSAGE_SIZE,
+        )
+        .unwrap(),
     )
     .unwrap()
 }

@@ -1,16 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::init::Network;
 use crate::common::utils::prompt_yes_with_override;
 use crate::{
-    common::{
-        init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
-        utils::{
-            chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
-            write_to_user_only_file,
-        },
+    common::utils::{
+        chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+        get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
+        to_common_success_result, write_to_file, write_to_file_with_opts, write_to_user_only_file,
     },
     config::GlobalConfig,
     genesis::git::from_yaml,
@@ -20,8 +17,9 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
+use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
+use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue, UserTransaction};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
@@ -31,11 +29,12 @@ use aptos_types::transaction::{
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use hex::FromHexError;
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
+use std::time::Duration;
 use std::{
     collections::BTreeMap,
     fmt::{Debug, Display, Formatter},
@@ -47,6 +46,7 @@ use std::{
 use thiserror::Error;
 
 const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
+pub const DEFAULT_PROFILE: &str = "default";
 
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
@@ -83,6 +83,8 @@ pub enum CliError {
     UnableToReadFile(String, String),
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
+    #[error("Simulation failed with status: {0}")]
+    SimulationError(String),
 }
 
 impl CliError {
@@ -101,6 +103,7 @@ impl CliError {
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
+            CliError::SimulationError(_) => "SimulationError",
         }
     }
 }
@@ -180,6 +183,8 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
     /// Private key for commands.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub private_key: Option<Ed25519PrivateKey>,
@@ -274,11 +279,24 @@ impl CliConfig {
     }
 
     pub fn load_profile(
-        profile: &str,
+        profile: Option<&str>,
         mode: ConfigSearchMode,
     ) -> CliTypedResult<Option<ProfileConfig>> {
         let mut config = Self::load(mode)?;
-        Ok(config.remove_profile(profile))
+
+        // If no profile was given, use `default`
+        if let Some(profile) = profile {
+            if let Some(account_profile) = config.remove_profile(profile) {
+                Ok(Some(account_profile))
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Profile {} not found",
+                    profile
+                )))
+            }
+        } else {
+            Ok(config.remove_profile(DEFAULT_PROFILE))
+        }
     }
 
     pub fn remove_profile(&mut self, profile: &str) -> Option<ProfileConfig> {
@@ -326,6 +344,8 @@ pub enum KeyType {
     Ed25519,
     /// X25519 key used for network handshakes and identity
     X25519,
+    /// A BLS12381 key for consensus
+    Bls12381,
 }
 
 impl Display for KeyType {
@@ -333,6 +353,7 @@ impl Display for KeyType {
         let str = match self {
             KeyType::Ed25519 => "ed25519",
             KeyType::X25519 => "x25519",
+            KeyType::Bls12381 => "bls12381",
         };
         write!(f, "{}", str)
     }
@@ -345,19 +366,22 @@ impl FromStr for KeyType {
         match s.to_lowercase().as_str() {
             "ed25519" => Ok(KeyType::Ed25519),
             "x25519" => Ok(KeyType::X25519),
+            "bls12381" => Ok(KeyType::Bls12381),
             _ => Err("Invalid key type: Must be one of [ed25519, x25519]"),
         }
     }
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct ProfileOptions {
     /// Profile to use from the CLI config
     ///
     /// This will be used to override associated settings such as
-    /// the REST URL, the Faucet URL, and the private key arguments
-    #[clap(long, default_value = "default")]
-    pub profile: String,
+    /// the REST URL, the Faucet URL, and the private key arguments.
+    ///
+    /// Defaults to "default"
+    #[clap(long)]
+    pub profile: Option<String>,
 }
 
 impl ProfileOptions {
@@ -367,7 +391,11 @@ impl ProfileOptions {
             return Ok(account);
         }
 
-        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+        Err(CliError::ConfigNotFoundError(
+            self.profile
+                .clone()
+                .unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
+        ))
     }
 
     pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
@@ -376,25 +404,29 @@ impl ProfileOptions {
             return Ok(public_key);
         }
 
-        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+        Err(CliError::ConfigNotFoundError(
+            self.profile
+                .clone()
+                .unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
+        ))
+    }
+
+    pub fn profile_name(&self) -> Option<&str> {
+        self.profile.as_ref().map(|inner| inner.trim())
     }
 
     pub fn profile(&self) -> CliTypedResult<ProfileConfig> {
         if let Some(profile) =
-            CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
+            CliConfig::load_profile(self.profile_name(), ConfigSearchMode::CurrentDirAndParents)?
         {
             return Ok(profile);
         }
 
-        Err(CliError::ConfigNotFoundError(self.profile.clone()))
-    }
-}
-
-impl Default for ProfileOptions {
-    fn default() -> Self {
-        Self {
-            profile: "default".to_string(),
-        }
+        Err(CliError::ConfigNotFoundError(
+            self.profile
+                .clone()
+                .unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
+        ))
     }
 }
 
@@ -470,6 +502,19 @@ pub struct RngArgs {
 
 impl RngArgs {
     pub fn from_seed(seed: [u8; 32]) -> RngArgs {
+        RngArgs {
+            random_seed: Some(hex::encode(seed)),
+        }
+    }
+
+    pub fn from_string_seed(str: &str) -> RngArgs {
+        assert!(str.len() < 32);
+
+        let mut seed = [0u8; 32];
+        for (i, byte) in str.bytes().enumerate() {
+            seed[i] = byte;
+        }
+
         RngArgs {
             random_seed: Some(hex::encode(seed)),
         }
@@ -557,10 +602,14 @@ pub struct EncodingOptions {
 
 #[derive(Debug, Parser)]
 pub struct PublicKeyInputOptions {
-    /// Public key input file name
+    /// Ed25519 Public key input file name
+    ///
+    /// Mutually exclusive with `--public-key`
     #[clap(long, group = "public_key_input", parse(from_os_str))]
     public_key_file: Option<PathBuf>,
-    /// Public key encoded in a type as shown in `encoding`
+    /// Ed25519 Public key encoded in a type as shown in `encoding`
+    ///
+    /// Mutually exclusive with `--public-key-file`
     #[clap(long, group = "public_key_input")]
     public_key: Option<String>,
 }
@@ -578,16 +627,18 @@ impl ExtractPublicKey for PublicKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
         if let Some(ref file) = self.public_key_file {
             encoding.load_key("--public-key-file", file.as_path())
         } else if let Some(ref key) = self.public_key {
             let key = key.as_bytes().to_vec();
             encoding.decode_key("--public-key", key)
-        } else if let Some(Some(public_key)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|p| p.public_key)
+        } else if let Some(Some(public_key)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.public_key)
         {
             Ok(public_key)
         } else {
@@ -621,10 +672,16 @@ pub trait ParsePrivateKey {
 
 #[derive(Debug, Default, Parser)]
 pub struct PrivateKeyInputOptions {
-    /// Private key input file name
+    /// Signing Ed25519 private key file path
+    ///
+    /// Encoded with type from `--encoding`
+    /// Mutually exclusive with `--private-key`
     #[clap(long, group = "private_key_input", parse(from_os_str))]
     private_key_file: Option<PathBuf>,
-    /// Private key encoded in a type as shown in `encoding`
+    /// Signing Ed25519 private key
+    ///
+    /// Encoded with type from `--encoding`
+    /// Mutually exclusive with `--private-key-file`
     #[clap(long, group = "private_key_input")]
     private_key: Option<String>,
 }
@@ -665,7 +722,7 @@ impl PrivateKeyInputOptions {
     pub fn extract_private_key_and_address(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
         maybe_address: Option<AccountAddress>,
     ) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
         // Order of operations
@@ -680,9 +737,11 @@ impl PrivateKeyInputOptions {
                 let address = account_address_from_public_key(&key.public_key());
                 Ok((key, address))
             }
-        } else if let Some((Some(key), maybe_config_address)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|p| (p.private_key, p.account))
+        } else if let Some((Some(key), maybe_config_address)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| (p.private_key, p.account))
         {
             match (maybe_address, maybe_config_address) {
                 (Some(address), _) => Ok((key, address)),
@@ -703,13 +762,15 @@ impl PrivateKeyInputOptions {
     pub fn extract_private_key(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PrivateKey> {
         if let Some(key) = self.extract_private_key_cli(encoding)? {
             Ok(key)
-        } else if let Some(Some(private_key)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|p| p.private_key)
+        } else if let Some(Some(private_key)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.private_key)
         {
             Ok(private_key)
         } else {
@@ -736,7 +797,7 @@ impl ExtractPublicKey for PrivateKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
         self.extract_private_key(encoding, profile)
             .map(|private_key| private_key.public_key())
@@ -747,7 +808,7 @@ pub trait ExtractPublicKey {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
-        profile: &str,
+        profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey>;
 }
 
@@ -758,7 +819,7 @@ pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> Account
 
 #[derive(Debug, Parser)]
 pub struct SaveFile {
-    /// Output file name
+    /// Output file path
     #[clap(long, parse(from_os_str))]
     pub output_file: PathBuf,
 
@@ -791,35 +852,45 @@ impl SaveFile {
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
-    /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
+    /// Defaults to the URL in the `default` profile
     #[clap(long)]
     pub(crate) url: Option<reqwest::Url>,
+
+    /// Connection timeout in seconds, used for the REST endpoint of the fullnode
+    #[clap(long, default_value = "30", alias = "connection-timeout-s")]
+    pub connection_timeout_secs: u64,
 }
 
 impl RestOptions {
-    pub fn new(url: Option<reqwest::Url>) -> Self {
-        RestOptions { url }
+    pub fn new(url: Option<reqwest::Url>, connection_timeout_secs: Option<u64>) -> Self {
+        RestOptions {
+            url,
+            connection_timeout_secs: connection_timeout_secs.unwrap_or(30),
+        }
     }
 
     /// Retrieve the URL from the profile or the command line
-    pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
+    pub fn url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref url) = self.url {
             Ok(url.clone())
-        } else if let Some(Some(url)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|p| p.rest_url)
+        } else if let Some(Some(url)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.rest_url)
         {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
-            reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
-            })
+            Err(CliError::CommandArgumentError("No rest url given.  Please add --url or add a rest_url to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 
-    pub fn client(&self, profile: &str) -> CliTypedResult<Client> {
-        Ok(Client::new(self.url(profile)?))
+    pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
+        Ok(Client::new_with_timeout(
+            self.url(profile)?,
+            Duration::from_secs(self.connection_timeout_secs),
+        ))
     }
 }
 
@@ -891,7 +962,8 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
     } else if let Some(Some(private_key)) =
-        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+            .map(|p| p.private_key)
     {
         let public_key = private_key.public_key();
         Ok(account_address_from_public_key(&public_key))
@@ -931,7 +1003,8 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(Some(account_address))
     } else if let Some(Some(private_key)) =
-        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+            .map(|p| p.private_key)
     {
         let public_key = private_key.public_key();
         Ok(Some(account_address_from_public_key(&public_key)))
@@ -1103,19 +1176,19 @@ impl FaucetOptions {
         FaucetOptions { faucet_url }
     }
 
-    pub fn faucet_url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
+    pub fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
             Ok(faucet_url.clone())
-        } else if let Some(Some(url)) =
-            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
-                .map(|profile| profile.faucet_url)
+        } else if let Some(Some(url)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|profile| profile.faucet_url)
         {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
         } else {
-            reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
-            })
+            Err(CliError::CommandArgumentError("No faucet given.  Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 }
@@ -1125,9 +1198,9 @@ impl FaucetOptions {
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
-    /// The amount of coins used for a transaction is equal
+    /// The amount of Octas (10^-8 APT) used for a transaction is equal
     /// to (gas unit price * gas used).  The gas_unit_price can
-    /// be used as a multiplier for the amount of coins willing
+    /// be used as a multiplier for the amount of Octas willing
     /// to be paid for a transaction.  This will prioritize the
     /// transaction with a higher gas unit price.
     ///
@@ -1137,31 +1210,21 @@ pub struct GasOptions {
     /// Maximum amount of gas units to be used to send this transaction
     ///
     /// The maximum amount of gas units willing to pay for the transaction.
-    /// This is the (max gas in coins / gas unit price).
+    /// This is the (max gas in Octas / gas unit price).
     ///
-    /// For example if I wanted to pay a maximum of 100 coins, I may have the
+    /// For example if I wanted to pay a maximum of 100 Octas, I may have the
     /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
     /// gas unit price of 2, the max gas would need to be 50 to still only have
-    /// a maximum price of 100 coins.
+    /// a maximum price of 100 Octas.
     ///
     /// Without a value, it will determine the price based on simulating the current transaction
     #[clap(long)]
     pub max_gas: Option<u64>,
 }
 
-const DEFAULT_MAX_GAS: u64 = 50000;
-
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
-    /// Estimate maximum gas via simulation
-    ///
-    /// This will simulate the transaction, and use the simulated actual amount of gas
-    /// to be used as the max gas.  If disabled, and no max gas provided, 50000 will be used
-    /// as the max gas
-    #[clap(long)]
-    pub(crate) estimate_max_gas: bool,
-
     /// Sender account address
     ///
     /// This allows you to override the account address from the derived account address
@@ -1186,7 +1249,7 @@ pub struct TransactionOptions {
 impl TransactionOptions {
     /// Builds a rest client
     fn rest_client(&self) -> CliTypedResult<Client> {
-        self.rest_options.client(&self.profile_options.profile)
+        self.rest_options.client(&self.profile_options)
     }
 
     /// Retrieves the public key and the associated address
@@ -1194,7 +1257,7 @@ impl TransactionOptions {
     pub fn get_key_and_address(&self) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
         self.private_key_options.extract_private_key_and_address(
             self.encoding_options.encoding,
-            &self.profile_options.profile,
+            &self.profile_options,
             self.sender_account,
         )
     }
@@ -1243,8 +1306,13 @@ impl TransactionOptions {
         };
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
+            // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
+            if ask_to_confirm_price {
+                let message = format!("Do you want to submit transaction for a maximum of {} Octas at a gas unit price of {} Octas?",  max_gas * gas_unit_price, gas_unit_price);
+                prompt_yes_with_override(&message, self.prompt_options)?;
+            }
             max_gas
-        } else if self.estimate_max_gas {
+        } else {
             let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
                 .with_gas_unit_price(gas_unit_price);
 
@@ -1262,26 +1330,38 @@ impl TransactionOptions {
             // TODO: Cleanup to use the gas price estimation here
             let simulated_txn = client
                 .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
-                .await?;
-            simulated_txn
-                .into_inner()
-                .transaction
-                .as_signed_user_txn()
-                .map_err(|err| {
-                    CliError::UnexpectedError(format!(
-                        "Transaction found was not a user transaction {}",
-                        err
-                    ))
-                })?
-                .max_gas_amount()
-        } else {
-            // TODO: Remove once simulation is stabilized and can handle all cases
-            DEFAULT_MAX_GAS
-        };
+                .await?
+                .into_inner();
 
-        if ask_to_confirm_price {
-            prompt_yes_with_override(&format!("Estimated gas price is currently {}, do you want to execute a transaction for a total of {} coins?", gas_unit_price, max_gas * gas_unit_price), self.prompt_options)?;
-        }
+            // Check if the transaction will pass, if it doesn't then fail
+            // TODO: Add move resolver so we can explain the VM status with a proper error map
+            let status = simulated_txn.info.status();
+            if !status.is_success() {
+                let status = client.explain_vm_status(status);
+                return Err(CliError::SimulationError(status));
+            }
+
+            // Take the gas used and use a headroom factor on it
+            let adjusted_max_gas = adjust_gas_headroom(
+                simulated_txn.info.gas_used(),
+                simulated_txn
+                    .transaction
+                    .as_signed_user_txn()
+                    .expect("Should be signed user transaction")
+                    .max_gas_amount(),
+            );
+
+            // Ask if you want to accept the estimate amount
+            let upper_cost_bound = adjusted_max_gas * gas_unit_price;
+            let lower_cost_bound = simulated_txn.info.gas_used() * gas_unit_price;
+            let message = format!(
+                    "Do you want to submit a transaction for a range of [{} - {}] Octas at a gas unit price of {} Octas?",
+                    lower_cost_bound,
+                    upper_cost_bound,
+                    gas_unit_price);
+            prompt_yes_with_override(&message, self.prompt_options)?;
+            adjusted_max_gas
+        };
 
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
@@ -1379,6 +1459,8 @@ impl TransactionOptions {
 #[derive(Parser)]
 pub struct OptionalPoolAddressArgs {
     /// Address of the Staking pool
+    ///
+    /// Defaults to the profile's `AccountAddress`
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) pool_address: Option<AccountAddress>,
 }

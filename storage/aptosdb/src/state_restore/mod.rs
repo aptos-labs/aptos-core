@@ -178,6 +178,14 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
         };
         Ok(hash_opt)
     }
+
+    pub fn wait_for_async_commit(&self) -> Result<()> {
+        self.tree_restore
+            .lock()
+            .as_mut()
+            .unwrap()
+            .wait_for_async_commit()
+    }
 }
 
 impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>

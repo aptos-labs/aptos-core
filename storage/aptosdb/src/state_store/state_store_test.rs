@@ -410,9 +410,14 @@ proptest! {
         let tmp_dir2 = TempPath::new();
         let db2 = AptosDB::new_for_test(&tmp_dir2);
         let store2 = &db2.state_store;
-
+        let max_hash = HashValue::new([0xff; HashValue::LENGTH]);
         let mut restore =
             StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */).unwrap();
+
+        let dummy_state_key = StateKey::Raw(vec![]);
+        let (batch, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], None, 0, None, None).unwrap();
+        store2.state_merkle_db.db.write_schemas(batch).unwrap();
+        assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -429,9 +434,10 @@ proptest! {
             .unwrap();
 
         restore.add_chunk(batch1, proof_of_batch1).unwrap();
+        restore.wait_for_async_commit().unwrap();
 
-        let expected = store2.state_merkle_db.get_rightmost_leaf_naive().unwrap();
-        let actual = store2.state_merkle_db.get_rightmost_leaf().unwrap();
+        let expected = store2.state_merkle_db.get_rightmost_leaf_naive(version).unwrap();
+        let actual = store2.state_merkle_db.get_rightmost_leaf(version).unwrap();
         prop_assert_eq!(actual, expected);
     }
 

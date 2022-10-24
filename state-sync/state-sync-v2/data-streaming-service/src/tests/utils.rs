@@ -516,7 +516,7 @@ fn create_transaction() -> Transaction {
         0,
         ChainId::new(10),
     );
-    let signature = private_key.sign(&raw_transaction);
+    let signature = private_key.sign(&raw_transaction).unwrap();
     let signed_transaction = SignedTransaction::new(raw_transaction, public_key, signature);
 
     Transaction::UserTransaction(signed_transaction)

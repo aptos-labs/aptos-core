@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module defines physical storage schema for write set emited by each transaction
+//! This module defines physical storage schema for write set emitted by each transaction
 //! saved to storage.
 //!
 //! Serialized signed transaction bytes identified by version.

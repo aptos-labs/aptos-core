@@ -269,6 +269,7 @@ impl PreheatedEpochEndingRestore {
 #[derive(Clone)]
 pub struct EpochHistory {
     pub epoch_endings: Vec<LedgerInfo>,
+    pub trusted_waypoints: Arc<HashMap<Version, Waypoint>>,
 }
 
 impl EpochHistory {
@@ -290,13 +291,24 @@ impl EpochHistory {
                 li_with_sigs.ledger_info() == &self.epoch_endings[0],
                 "Genesis epoch LedgerInfo info doesn't match.",
             );
-            Ok(())
+        } else if let Some(wp_trusted) = self
+            .trusted_waypoints
+            .get(&li_with_sigs.ledger_info().version())
+        {
+            let wp_li = Waypoint::new_any(li_with_sigs.ledger_info());
+            ensure!(
+                *wp_trusted == wp_li,
+                "Waypoints don't match. In backup: {}, trusted: {}",
+                wp_li,
+                wp_trusted,
+            );
         } else {
             self.epoch_endings[epoch as usize - 1]
                 .next_epoch_state()
                 .ok_or_else(|| anyhow!("Shouldn't contain non- epoch bumping LIs."))?
-                .verify(li_with_sigs)
-        }
+                .verify(li_with_sigs)?;
+        };
+        Ok(())
     }
 }
 
@@ -341,6 +353,7 @@ impl EpochHistoryRestoreController {
         if self.manifest_handles.is_empty() {
             return Ok(EpochHistory {
                 epoch_endings: Vec::new(),
+                trusted_waypoints: Arc::new(HashMap::new()),
             });
         }
 
@@ -394,6 +407,9 @@ impl EpochHistoryRestoreController {
             "Epoch history recovered in {:.2} seconds",
             timer.elapsed().as_secs_f64()
         );
-        Ok(EpochHistory { epoch_endings })
+        Ok(EpochHistory {
+            epoch_endings,
+            trusted_waypoints: self.global_opt.trusted_waypoints.clone(),
+        })
     }
 }

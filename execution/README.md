@@ -102,11 +102,24 @@ storage. As another example, if we want to execute transaction T<sub>i+2</sub>,
 we can use the tree S<sub>i+1</sub> that has updated values for both account `A`
 and `B`.
 
-## How is this component organized?
-```
-    executor
-      ├──src
-      │   ├── block_processor    # A processor thread that execute and commit block directly.
-      │   └── mock_vm            # Mock implementations that are used for testing only.
-      └── tests                  # Integration tests with storage, etc.
+## Configs
+
+The executors cares about these config items. One needs to specify `genesis_file_location`
+in the Aptos Node config file for it to work, but can leave other entries
+default by not specifying them.
+
+```yaml
+execution:
+    # see https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/test_data/public_full_node.yaml
+    # for explanation
+    genesis_file_location: ""
+    # Determines how many threads the Parallel Executor spawns for transaction execution.
+    # This is a mixed CPU and IO workload, and a number greater than the number
+    # of CPUs is ignored and the Parallel Executor will use the number of CPUs
+    # instead.
+    concurrency_level: 8
+    # Determines how many threads the AsyncProofFetch spawns, which is used to
+    # fetch state proof in parallel with transaction execution, this is IO bound
+    # workload and we think the default value is good for most.
+    num_proof_reading_threads: 32
 ```

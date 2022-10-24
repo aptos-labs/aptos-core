@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::{models::transactions::Transaction, schema::signatures};
+use crate::{models::transactions::Transaction, schema::signatures, util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_api_types::{
     AccountSignature as APIAccountSignature, Ed25519Signature as APIEd25519Signature,
@@ -15,24 +15,16 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Queryable,
-    Serialize,
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
 )]
-#[diesel(table_name = "signatures")]
-#[belongs_to(Transaction, foreign_key = "transaction_version")]
-#[primary_key(
+#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[diesel(primary_key(
     transaction_version,
     multi_agent_index,
     multi_sig_index,
     is_sender_primary
-)]
+))]
+#[diesel(table_name = signatures)]
 pub struct Signature {
     pub transaction_version: i64,
     pub multi_agent_index: i64,
@@ -40,14 +32,11 @@ pub struct Signature {
     pub transaction_block_height: i64,
     pub signer: String,
     pub is_sender_primary: bool,
-    #[diesel(column_name = type)]
     pub type_: String,
     pub public_key: String,
     pub signature: String,
     pub threshold: i64,
     pub public_key_indices: serde_json::Value,
-    // Default time columns
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl Signature {
@@ -109,11 +98,11 @@ impl Signature {
         multi_agent_index: i64,
         override_address: Option<&String>,
     ) -> Self {
-        let signer = override_address.unwrap_or(sender);
+        let signer = standardize_address(override_address.unwrap_or(sender));
         Self {
             transaction_version,
             transaction_block_height,
-            signer: signer.clone(),
+            signer,
             is_sender_primary,
             type_: String::from("ed25519_signature"),
             public_key: s.public_key.to_string(),
@@ -122,7 +111,6 @@ impl Signature {
             signature: s.signature.to_string(),
             multi_agent_index,
             multi_sig_index: 0,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
@@ -136,10 +124,8 @@ impl Signature {
         override_address: Option<&String>,
     ) -> Vec<Self> {
         let mut signatures = Vec::default();
-        let mut signer = sender;
-        if let Some(addr) = override_address {
-            signer = addr;
-        }
+        let signer = standardize_address(override_address.unwrap_or(sender));
+
         let public_key_indices: Vec<usize> = BitVec::from(s.bitmap.0.clone()).iter_ones().collect();
         for (index, signature) in s.signatures.iter().enumerate() {
             let public_key = s
@@ -166,7 +152,6 @@ impl Signature {
                 ),
                 multi_agent_index,
                 multi_sig_index: index as i64,
-                inserted_at: chrono::Utc::now().naive_utc(),
             });
         }
         signatures

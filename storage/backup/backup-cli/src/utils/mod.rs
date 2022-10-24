@@ -12,8 +12,8 @@ pub mod test_utils;
 
 use anyhow::{anyhow, Result};
 use aptos_config::config::{
-    RocksdbConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    RocksdbConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
@@ -256,7 +256,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.into(),
                 false,
-                TARGET_SNAPSHOT_SIZE,
+                BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )?)
             .get_restore_handler();
@@ -309,9 +309,8 @@ impl TrustedWaypointOpt {
 pub struct ConcurrentDownloadsOpt {
     #[clap(
         long,
-        help = "[Defaults to number of CPUs] \
-        number of concurrent downloads including metadata files from the backup storage. \
-        Speeds up accessing remote backup access."
+        help = "Number of concurrent downloads from the backup storage. This covers the initial \
+        metadata downloads as well. Speeds up remote backup access. [Defaults to number of CPUs]"
     )]
     concurrent_downloads: Option<usize>,
 }
@@ -332,9 +331,8 @@ pub struct ReplayConcurrencyLevelOpt {
     /// AptosVM::set_concurrency_level_once() is called with this
     #[clap(
         long,
-        help = "[Defaults to number of CPUs] \
-        concurrency_level used by the transaction executor, applicable when replaying transactions \
-        after a state snapshot."
+        help = "concurrency_level used by the transaction executor, applicable when replaying transactions \
+        after a state snapshot. [Defaults to number of CPUs]"
     )]
     replay_concurrency_level: Option<usize>,
 }

@@ -6,17 +6,15 @@ use anyhow::bail;
 use aptos_types::transaction::ModuleBundle;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
-use move_deps::move_binary_format::errors::PartialVMError;
-use move_deps::move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
-use move_deps::move_vm_types::pop_arg;
-use move_deps::move_vm_types::values::Struct;
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_core_types::account_address::AccountAddress,
-    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
-    move_vm_types::{
-        loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
-    },
+use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::account_address::AccountAddress;
+use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::pop_arg;
+use move_vm_types::values::Struct;
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
 };
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
@@ -139,7 +137,7 @@ impl fmt::Display for UpgradePolicy {
 /// Abort code when code publishing is requested twice (0x03 == INVALID_STATE)
 const EALREADY_REQUESTED: u64 = 0x03_0000;
 
-const CHECK_COMPAT_POLICY: u8 = 1;
+const ARBITRARY_POLICY: u8 = 0;
 
 /// The native code context.
 #[derive(Tid, Default)]
@@ -282,7 +280,7 @@ fn native_request_publish(
         bundle: ModuleBundle::new(code),
         expected_modules,
         allowed_deps,
-        check_compat: policy == CHECK_COMPAT_POLICY,
+        check_compat: policy != ARBITRARY_POLICY,
     });
     // TODO(Gas): charge gas for requesting code load (charge for actual code loading done elsewhere)
     Ok(NativeResult::ok(cost, smallvec![]))

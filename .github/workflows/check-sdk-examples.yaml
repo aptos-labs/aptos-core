@@ -19,12 +19,13 @@ jobs:
     env:
       APTOS_NODE_URL: https://fullnode.devnet.aptoslabs.com
       APTOS_FAUCET_URL: https://faucet.devnet.aptoslabs.com
+      FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
         with:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
@@ -32,7 +33,7 @@ jobs:
       - run: npm install -g yarn@1.22.19
 
       # Run example code in typescript.
-      - uses: nick-fields/retry@v2
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: ts-example-test
         with:
           max_attempts: 5
@@ -40,7 +41,7 @@ jobs:
           command: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
 
       # Run example code in javascript.
-      - uses: nick-fields/retry@v2
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: js-example-test
         with:
           max_attempts: 5

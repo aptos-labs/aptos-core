@@ -1,0 +1,22 @@
+name: Continuous E2E Account Creation Test
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+jobs:
+  ### Please remember to use different namespace for different tests
+  # Performance test in an optimal setting
+  run-forge-account-creation-test:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-account-creation-test
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: account_creation
+      POST_TO_SLACK: true

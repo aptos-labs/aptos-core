@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos::test::CliTestFramework;
+use aptos_config::config::NodeConfig;
 use aptos_config::{keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
-use aptos_logger::info;
+use aptos_logger::prelude::*;
 use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
 use forge::{ActiveNodesGuard, Node};
 use forge::{Factory, LocalFactory, LocalSwarm};
@@ -17,12 +18,16 @@ use rand::rngs::OsRng;
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 use tokio::task::JoinHandle;
 
+const SWARM_BUILD_NUM_RETRIES: u8 = 3;
+
+#[derive(Clone)]
 pub struct SwarmBuilder {
     local: bool,
     num_validators: NonZeroUsize,
     num_fullnodes: usize,
     genesis_framework: Option<ReleaseBundle>,
     init_config: Option<InitConfigFn>,
+    vfn_config: Option<NodeConfig>,
     init_genesis_config: Option<InitGenesisConfigFn>,
 }
 
@@ -34,6 +39,7 @@ impl SwarmBuilder {
             num_fullnodes: 0,
             genesis_framework: None,
             init_config: None,
+            vfn_config: None,
             init_genesis_config: None,
         }
     }
@@ -47,8 +53,18 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_aptos_testnet(mut self) -> Self {
+        self.genesis_framework = Some(framework::testnet_release_bundle().clone());
+        self
+    }
+
     pub fn with_init_config(mut self, init_config: InitConfigFn) -> Self {
         self.init_config = Some(init_config);
+        self
+    }
+
+    pub fn with_vfn_config(mut self, config: NodeConfig) -> Self {
+        self.vfn_config = Some(config);
         self
     }
 
@@ -63,7 +79,7 @@ impl SwarmBuilder {
     }
 
     // Gas is not enabled with this setup, it's enabled via forge instance.
-    pub async fn build(self) -> LocalSwarm {
+    pub async fn build_inner(&mut self) -> anyhow::Result<LocalSwarm> {
         ::aptos_logger::Logger::new().init();
         info!("Preparing to finish compiling");
         // TODO change to return Swarm trait
@@ -78,16 +94,17 @@ impl SwarmBuilder {
         static ACTIVE_NODES: Lazy<Arc<Mutex<usize>>> = Lazy::new(|| Arc::new(Mutex::new(0)));
         let guard = ActiveNodesGuard::grab(slots, ACTIVE_NODES.clone()).await;
 
-        let init_genesis_config = self.init_genesis_config;
-
+        let builder = self.clone();
+        let init_genesis_config = builder.init_genesis_config;
         FACTORY
             .new_swarm_with_version(
                 OsRng,
-                self.num_validators,
-                self.num_fullnodes,
+                builder.num_validators,
+                builder.num_fullnodes,
                 &version,
-                self.genesis_framework,
-                self.init_config,
+                builder.genesis_framework,
+                builder.init_config,
+                builder.vfn_config,
                 Some(Arc::new(move |genesis_config| {
                     if let Some(init_genesis_config) = &init_genesis_config {
                         (init_genesis_config)(genesis_config);
@@ -96,11 +113,29 @@ impl SwarmBuilder {
                 guard,
             )
             .await
-            .unwrap()
+    }
+
+    // Gas is not enabled with this setup, it's enabled via forge instance.
+    // Local swarm spin-up can fail due to port issues. So we retry SWARM_BUILD_NUM_RETRIES times.
+    pub async fn build(&mut self) -> LocalSwarm {
+        let num_retries = SWARM_BUILD_NUM_RETRIES;
+        let mut attempt = 0;
+        loop {
+            if attempt > num_retries {
+                panic!("Exhausted retries: {} / {}", attempt, num_retries);
+            }
+            match self.build_inner().await {
+                Ok(swarm) => {
+                    return swarm;
+                }
+                Err(err) => warn!("Attempt {} / {} failed with: {}", attempt, num_retries, err),
+            }
+            attempt += 1;
+        }
     }
 
     pub async fn build_with_cli(
-        self,
+        &mut self,
         num_cli_accounts: usize,
     ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>) {
         let swarm = self.build().await;

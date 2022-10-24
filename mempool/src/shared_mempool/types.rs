@@ -16,7 +16,7 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
-use consensus_types::common::TransactionSummary;
+use consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
     future::Future,
@@ -24,6 +24,7 @@ use futures::{
 };
 use network::{application::storage::PeerMetadataStorage, transport::ConnectionMetadata};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
@@ -164,7 +165,7 @@ pub enum QuorumStoreRequest {
     /// Notifications about *rejected* committed txns.
     RejectNotification(
         // rejected transactions from consensus
-        Vec<TransactionSummary>,
+        Vec<RejectedTransactionSummary>,
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
@@ -217,15 +218,15 @@ pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
 /// `is_alive` - is connection healthy
 #[derive(Clone, Debug)]
 pub(crate) struct PeerSyncState {
-    pub timeline_id: u64,
+    pub timeline_id: MultiBucketTimelineIndexIds,
     pub broadcast_info: BroadcastInfo,
     pub metadata: ConnectionMetadata,
 }
 
 impl PeerSyncState {
-    pub fn new(metadata: ConnectionMetadata) -> Self {
+    pub fn new(metadata: ConnectionMetadata, num_broadcast_buckets: usize) -> Self {
         PeerSyncState {
-            timeline_id: 0,
+            timeline_id: MultiBucketTimelineIndexIds::new(num_broadcast_buckets),
             broadcast_info: BroadcastInfo::new(),
             metadata,
         }
@@ -236,11 +237,11 @@ impl PeerSyncState {
 /// For BatchId(`start_id`, `end_id`), (`start_id`, `end_id`) is the range of timeline IDs read from
 /// the core mempool timeline index that produced the txns in this batch.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct BatchId(pub u64, pub u64);
+struct BatchId(pub u64, pub u64);
 
 impl PartialOrd for BatchId {
     fn partial_cmp(&self, other: &BatchId) -> Option<std::cmp::Ordering> {
-        Some((other.0, other.1).cmp(&(self.0, self.1)))
+        Some(self.cmp(other))
     }
 }
 
@@ -250,13 +251,104 @@ impl Ord for BatchId {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct MultiBucketTimelineIndexIds {
+    pub id_per_bucket: Vec<u64>,
+}
+
+impl MultiBucketTimelineIndexIds {
+    pub(crate) fn new(num_buckets: usize) -> Self {
+        Self {
+            id_per_bucket: vec![0; num_buckets],
+        }
+    }
+
+    pub(crate) fn update(&mut self, batch_id: &MultiBatchId) {
+        if self.id_per_bucket.len() != batch_id.0.len() {
+            return;
+        }
+
+        for (cur, &(_start, end)) in self.id_per_bucket.iter_mut().zip(batch_id.0.iter()) {
+            *cur = std::cmp::max(*cur, end)
+        }
+    }
+}
+
+impl From<Vec<u64>> for MultiBucketTimelineIndexIds {
+    fn from(timeline_ids: Vec<u64>) -> Self {
+        Self {
+            id_per_bucket: timeline_ids,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct MultiBatchId(pub Vec<(u64, u64)>);
+
+impl MultiBatchId {
+    pub(crate) fn from_timeline_ids(
+        old: &MultiBucketTimelineIndexIds,
+        new: &MultiBucketTimelineIndexIds,
+    ) -> Self {
+        Self(
+            old.id_per_bucket
+                .iter()
+                .cloned()
+                .zip(new.id_per_bucket.iter().cloned())
+                .collect(),
+        )
+    }
+}
+
+impl PartialOrd for MultiBatchId {
+    fn partial_cmp(&self, other: &MultiBatchId) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+// Note: in rev order to check significant pairs first (right -> left)
+impl Ord for MultiBatchId {
+    fn cmp(&self, other: &MultiBatchId) -> std::cmp::Ordering {
+        for (&self_pair, &other_pair) in self.0.iter().rev().zip(other.0.iter().rev()) {
+            let ordering = self_pair.cmp(&other_pair);
+            if ordering != Ordering::Equal {
+                return ordering;
+            }
+        }
+        Ordering::Equal
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::shared_mempool::types::{MultiBatchId, MultiBucketTimelineIndexIds};
+
+    #[test]
+    fn test_multi_bucket_timeline_ids_update() {
+        let mut timeline_ids = MultiBucketTimelineIndexIds {
+            id_per_bucket: vec![1, 2, 3],
+        };
+        let batch_id = MultiBatchId(vec![(1, 3), (1, 1), (3, 6)]);
+        timeline_ids.update(&batch_id);
+        assert_eq!(vec![3, 2, 6], timeline_ids.id_per_bucket);
+    }
+
+    #[test]
+    fn test_multi_batch_id_ordering() {
+        let left = MultiBatchId(vec![(0, 3), (1, 4), (2, 5)]);
+        let right = MultiBatchId(vec![(2, 5), (1, 4), (0, 3)]);
+
+        assert!(left > right);
+    }
+}
+
 /// Txn broadcast-related info for a given remote peer.
 #[derive(Clone, Debug)]
 pub struct BroadcastInfo {
     // Sent broadcasts that have not yet received an ack.
-    pub sent_batches: BTreeMap<BatchId, SystemTime>,
+    pub sent_batches: BTreeMap<MultiBatchId, SystemTime>,
     // Broadcasts that have received a retry ack and are pending a resend.
-    pub retry_batches: BTreeSet<BatchId>,
+    pub retry_batches: BTreeSet<MultiBatchId>,
     // Whether broadcasting to this peer is in backoff mode, e.g. broadcasting at longer intervals.
     pub backoff_mode: bool,
 }

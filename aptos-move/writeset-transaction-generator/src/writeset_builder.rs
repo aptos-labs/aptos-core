@@ -3,7 +3,7 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
@@ -15,16 +15,14 @@ use aptos_vm::{
     data_cache::StorageAdapter,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
 };
-use move_deps::{
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-        transaction_argument::convert_txn_args,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_runtime::session::SerializedReturnValues,
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    transaction_argument::convert_txn_args,
+    value::{serialize_values, MoveValue},
 };
+use move_vm_runtime::session::SerializedReturnValues;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
 
@@ -111,6 +109,7 @@ where
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
     .unwrap();
@@ -133,7 +132,7 @@ where
 
     // Genesis never produces the delta change set.
     let (_, change_set) = session_out
-        .into_change_set(&mut ())
+        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
         .unwrap()
         .into_inner();

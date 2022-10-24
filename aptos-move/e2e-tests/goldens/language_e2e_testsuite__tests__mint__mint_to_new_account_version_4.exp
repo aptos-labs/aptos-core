@@ -57,7 +57,7 @@ Ok(
             events: [
                 ContractEvent { key: EventKey { creation_number: 0, account_address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1 }, index: 0, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("DepositEvent"), type_params: [] }), event_data: "20a1070000000000" },
             ],
-            gas_used: 26,
+            gas_used: 439,
             status: Keep(
                 Success,
             ),

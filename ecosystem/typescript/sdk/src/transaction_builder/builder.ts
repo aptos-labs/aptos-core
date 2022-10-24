@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import sha3 from "js-sha3";
+import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import {
   Ed25519PublicKey,
   Ed25519Signature,
@@ -29,11 +29,9 @@ import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArg
 import { HexString, MaybeHexString } from "../hex_string";
 import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 import * as Gen from "../generated/index";
-import { MemoizeExpiring } from "../utils";
+import { DEFAULT_TXN_EXP_SEC_FROM_NOW, DEFAULT_MAX_GAS_AMOUNT, MemoizeExpiring } from "../utils";
 
-export { TypeTagParser } from "./builder_utils.js";
-
-const { sha3_256: sha3Hash } = sha3;
+export { TypeTagParser } from "./builder_utils";
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
@@ -78,7 +76,7 @@ export class TransactionBuilder<F extends SigningFn> {
       throw new Error("Unknown transaction type.");
     }
 
-    const prefix = new Uint8Array(hash.arrayBuffer());
+    const prefix = hash.digest();
 
     const body = bcsToBytes(rawTxn);
 
@@ -151,7 +149,7 @@ export class TransactionBuilderMultiEd25519 extends TransactionBuilder<SigningFn
 interface ABIBuilderConfig {
   sender: MaybeHexString | AccountAddress;
   sequenceNumber: Uint64 | string;
-  gasUnitPrice?: Uint64 | string;
+  gasUnitPrice: Uint64 | string;
   maxGasAmount?: Uint64 | string;
   expSecFromNow?: number | string;
   chainId: Uint8 | string;
@@ -163,7 +161,7 @@ interface ABIBuilderConfig {
 export class TransactionBuilderABI {
   private readonly abiMap: Map<string, ScriptABI>;
 
-  private readonly builderConfig: ABIBuilderConfig;
+  private readonly builderConfig: Partial<ABIBuilderConfig>;
 
   /**
    * Constructs a TransactionBuilderABI instance
@@ -194,9 +192,8 @@ export class TransactionBuilderABI {
     });
 
     this.builderConfig = {
-      gasUnitPrice: BigInt(1),
-      maxGasAmount: BigInt(2000),
-      expSecFromNow: 20,
+      maxGasAmount: BigInt(DEFAULT_MAX_GAS_AMOUNT),
+      expSecFromNow: DEFAULT_TXN_EXP_SEC_FROM_NOW,
       ...builderConfig,
     };
   }
@@ -251,13 +248,14 @@ export class TransactionBuilderABI {
       payload = new TransactionPayloadEntryFunction(
         new EntryFunction(funcABI.module_name, new Identifier(funcABI.name), typeTags, bcsArgs),
       );
-    }
-
-    if (scriptABI instanceof TransactionScriptABI) {
+    } else if (scriptABI instanceof TransactionScriptABI) {
       const funcABI = scriptABI as TransactionScriptABI;
       const scriptArgs = TransactionBuilderABI.toTransactionArguments(funcABI.args, args);
 
       payload = new TransactionPayloadScript(new Script(funcABI.code, typeTags, scriptArgs));
+    } else {
+      /* istanbul ignore next */
+      throw new Error("Unknown ABI format.");
     }
 
     return payload;
@@ -285,17 +283,21 @@ export class TransactionBuilderABI {
   build(func: string, ty_tags: string[], args: any[]): RawTransaction {
     const { sender, sequenceNumber, gasUnitPrice, maxGasAmount, expSecFromNow, chainId } = this.builderConfig;
 
-    const senderAccount = sender instanceof AccountAddress ? sender : AccountAddress.fromHex(sender);
+    if (!gasUnitPrice) {
+      throw new Error("No gasUnitPrice provided.");
+    }
+
+    const senderAccount = sender instanceof AccountAddress ? sender : AccountAddress.fromHex(sender!);
     const expTimestampSec = BigInt(Math.floor(Date.now() / 1000) + Number(expSecFromNow));
     const payload = this.buildTransactionPayload(func, ty_tags, args);
 
     if (payload) {
       return new RawTransaction(
         senderAccount,
-        BigInt(sequenceNumber),
+        BigInt(sequenceNumber!),
         payload,
-        BigInt(maxGasAmount),
-        BigInt(gasUnitPrice),
+        BigInt(maxGasAmount!),
+        BigInt(gasUnitPrice!),
         expTimestampSec,
         new ChainId(Number(chainId)),
       );
@@ -313,6 +315,7 @@ interface AptosClientInterface {
   getAccountModules: (accountAddress: MaybeHexString) => Promise<Gen.MoveModuleBytecode[]>;
   getAccount: (accountAddress: MaybeHexString) => Promise<Gen.AccountData>;
   getChainId: () => Promise<number>;
+  estimateGasPrice: () => Promise<Gen.GasEstimation>;
 }
 
 /**
@@ -333,12 +336,12 @@ export class TransactionBuilderRemoteABI {
     const abis = modules
       .map((module) => module.abi)
       .flatMap((abi) =>
-        abi.exposed_functions
+        abi!.exposed_functions
           .filter((ef) => ef.is_entry)
           .map(
             (ef) =>
               ({
-                fullName: `${abi.address}::${abi.name}::${ef.name}`,
+                fullName: `${abi!.address}::${abi!.name}::${ef.name}`,
                 ...ef,
               } as Gen.MoveFunction & { fullName: string }),
           ),
@@ -385,16 +388,16 @@ export class TransactionBuilderRemoteABI {
     // Remove all `signer` and `&signer` from argument list because the Move VM injects those arguments. Clients do not
     // need to care about those args. `signer` and `&signer` are required be in the front of the argument list. But we
     // just loop through all arguments and filter out `signer` and `&signer`.
-    const originalArgs = funcAbi.params.filter((param) => param !== "signer" && param !== "&signer");
+    const originalArgs = funcAbi!.params.filter((param) => param !== "signer" && param !== "&signer");
 
     // Convert string arguments to TypeArgumentABI
     const typeArgABIs = originalArgs.map((arg, i) => new ArgumentABI(`var${i}`, new TypeTagParser(arg).parseTypeTag()));
 
     const entryFunctionABI = new EntryFunctionABI(
-      funcAbi.name,
+      funcAbi!.name,
       ModuleId.fromStr(`${addr}::${module}`),
       "", // Doc string
-      funcAbi.generic_type_params.map((_, i) => new TypeArgumentABI(`${i}`)),
+      funcAbi!.generic_type_params.map((_, i) => new TypeArgumentABI(`${i}`)),
       typeArgABIs,
     );
 
@@ -402,17 +405,19 @@ export class TransactionBuilderRemoteABI {
 
     const senderAddress = sender instanceof AccountAddress ? HexString.fromUint8Array(sender.address) : sender;
 
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+    const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasUnitPrice }] = await Promise.all([
       rest?.sequenceNumber
         ? Promise.resolve({ sequence_number: rest?.sequenceNumber })
         : this.aptosClient.getAccount(senderAddress),
       rest?.chainId ? Promise.resolve(rest?.chainId) : this.aptosClient.getChainId(),
+      rest?.gasUnitPrice ? Promise.resolve({ gas_estimate: rest?.gasUnitPrice }) : this.aptosClient.estimateGasPrice(),
     ]);
 
     const builderABI = new TransactionBuilderABI([bcsToBytes(entryFunctionABI)], {
       sender,
       sequenceNumber,
       chainId,
+      gasUnitPrice: BigInt(gasUnitPrice),
       ...rest,
     });
 

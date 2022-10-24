@@ -4,6 +4,7 @@
 //! Internal module containing convenience utility functions mainly for testing
 
 use crate::traits::Uniform;
+use rand::distributions;
 use serde::{Deserialize, Serialize};
 
 /// A deterministic seed for PRNGs related to keys
@@ -140,7 +141,7 @@ pub fn small_order_pk_with_adversarial_message(
             |(R, pk_point, msg)| {
                 let pk_bytes = pk_point.compress().to_bytes();
 
-                let msg_bytes = signing_message(msg);
+                let msg_bytes = signing_message(msg).unwrap();
 
                 let mut h: Sha512 = Sha512::new();
                 h.update(R.compress().as_bytes());
@@ -191,6 +192,15 @@ where
     vec.sort_unstable();
 
     vec
+}
+
+/// Returns n random bytes.
+pub fn random_bytes<R>(rng: &mut R, n: usize) -> Vec<u8>
+where
+    R: ::rand::Rng + Copy,
+{
+    let range = distributions::Uniform::from(0u8..u8::MAX);
+    rng.sample_iter(&range).take(n).collect()
 }
 
 /// Generates `num_signers` random key-pairs.

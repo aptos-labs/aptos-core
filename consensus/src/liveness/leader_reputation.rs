@@ -54,7 +54,7 @@ impl AptosDBBackend {
     fn refresh_db_result(
         &self,
         mut locked: MutexGuard<'_, (Vec<NewBlockEvent>, u64, bool)>,
-        lastest_db_version: u64,
+        latest_db_version: u64,
     ) -> Result<(Vec<NewBlockEvent>, u64, bool)> {
         // assumes target round is not too far from latest commit
         let limit = self.window_size + self.seek_len;
@@ -72,7 +72,7 @@ impl AptosDBBackend {
             u64::max_value(),
             Order::Descending,
             limit as u64,
-            lastest_db_version,
+            latest_db_version,
         )?;
 
         let max_returned_version = events.first().map_or(0, |first| first.transaction_version);
@@ -86,7 +86,7 @@ impl AptosDBBackend {
 
         let result = (
             new_block_events,
-            std::cmp::max(lastest_db_version, max_returned_version),
+            std::cmp::max(latest_db_version, max_returned_version),
             hit_end,
         );
         *locked = result.clone();
@@ -143,10 +143,10 @@ impl MetadataBackend for AptosDBBackend {
         let has_larger = events.first().map_or(false, |e| {
             (e.epoch(), e.round()) >= (target_epoch, target_round)
         });
-        let lastest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
+        let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
-        if !has_larger && version < lastest_db_version {
-            let fresh_db_result = self.refresh_db_result(locked, lastest_db_version);
+        if !has_larger && version < latest_db_version {
+            let fresh_db_result = self.refresh_db_result(locked, latest_db_version);
             match fresh_db_result {
                 Ok((events, _version, hit_end)) => {
                     self.get_from_db_result(target_epoch, target_round, &events, hit_end)
@@ -240,14 +240,37 @@ impl NewBlockEventAggregation {
         history: &'a [NewBlockEvent],
         epoch_to_candidates: &'a HashMap<u64, Vec<Author>>,
         window_size: usize,
+        from_stale_end: bool,
     ) -> impl Iterator<Item = &'a NewBlockEvent> {
-        let start = if history.len() > window_size {
-            history.len() - window_size
-        } else {
-            0
-        };
+        let sub_history = if from_stale_end {
+            let start = if history.len() > window_size {
+                history.len() - window_size
+            } else {
+                0
+            };
 
-        (&history[start..])
+            &history[start..]
+        } else {
+            if !history.is_empty() {
+                assert!(
+                    (
+                        history.first().unwrap().epoch(),
+                        history.first().unwrap().round()
+                    ) >= (
+                        history.last().unwrap().epoch(),
+                        history.last().unwrap().round()
+                    )
+                );
+            }
+            let end = if history.len() > window_size {
+                window_size
+            } else {
+                history.len()
+            };
+
+            &history[..end]
+        };
+        sub_history
             .iter()
             .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
     }
@@ -282,15 +305,16 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::count_votes_custom(epoch_to_candidates, history, self.voter_window_size)
+        Self::count_votes_custom(epoch_to_candidates, history, self.voter_window_size, true)
     }
 
     pub fn count_votes_custom(
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
         window_size: usize,
+        from_stale_end: bool,
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch_to_candidates, window_size).fold(
+        Self::history_iter(history, epoch_to_candidates, window_size, from_stale_end).fold(
             HashMap::new(),
             |mut map, meta| {
                 match Self::bitvec_to_voters(
@@ -322,15 +346,21 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::count_proposals_custom(epoch_to_candidates, history, self.proposer_window_size)
+        Self::count_proposals_custom(
+            epoch_to_candidates,
+            history,
+            self.proposer_window_size,
+            true,
+        )
     }
 
     pub fn count_proposals_custom(
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
         window_size: usize,
+        from_stale_end: bool,
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch_to_candidates, window_size).fold(
+        Self::history_iter(history, epoch_to_candidates, window_size, from_stale_end).fold(
             HashMap::new(),
             |mut map, meta| {
                 let count = map.entry(meta.proposer()).or_insert(0);
@@ -345,28 +375,34 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch_to_candidates, self.proposer_window_size).fold(
-            HashMap::new(),
-            |mut map, meta| {
-                match Self::indices_to_validators(&epoch_to_candidates[&meta.epoch()], meta.failed_proposer_indices()) {
-                    Ok(failed_proposers) => {
-                        for &failed_proposer in failed_proposers {
-                            let count = map.entry(failed_proposer).or_insert(0);
-                            *count += 1;
-                        }
-                    }
-                    Err(msg) => {
-                        error!(
-                            "Failed proposer conversion from indices failed at epoch {}, round {}: {}",
-                            meta.epoch(),
-                            meta.round(),
-                            msg
-                        )
+        Self::history_iter(
+            history,
+            epoch_to_candidates,
+            self.proposer_window_size,
+            true,
+        )
+        .fold(HashMap::new(), |mut map, meta| {
+            match Self::indices_to_validators(
+                &epoch_to_candidates[&meta.epoch()],
+                meta.failed_proposer_indices(),
+            ) {
+                Ok(failed_proposers) => {
+                    for &failed_proposer in failed_proposers {
+                        let count = map.entry(failed_proposer).or_insert(0);
+                        *count += 1;
                     }
                 }
-                map
-            },
-        )
+                Err(msg) => {
+                    error!(
+                        "Failed proposer conversion from indices failed at epoch {}, round {}: {}",
+                        meta.epoch(),
+                        meta.round(),
+                        msg
+                    )
+                }
+            }
+            map
+        })
     }
 }
 
@@ -505,6 +541,7 @@ impl LeaderReputation {
                     &self.epoch_to_proposers,
                     history,
                     *participants_window_size,
+                    false,
                 )
                 .into_keys()
                 .chain(
@@ -512,6 +549,7 @@ impl LeaderReputation {
                         &self.epoch_to_proposers,
                         history,
                         *participants_window_size,
+                        false,
                     )
                     .into_keys(),
                 )

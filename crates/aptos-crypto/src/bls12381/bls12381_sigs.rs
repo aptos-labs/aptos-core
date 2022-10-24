@@ -106,11 +106,15 @@ impl Signature {
         msgs: &[&T],
         pks: &[&PublicKey],
     ) -> Result<()> {
-        let msgs = msgs
+        let mut messages: Vec<Vec<u8>> = vec![];
+        for message in msgs {
+            messages.push(signing_message(*message)?);
+        }
+
+        let msgs_refs = messages
             .iter()
-            .map(|&m| signing_message(m))
-            .collect::<Vec<Vec<u8>>>();
-        let msgs_refs = msgs.iter().map(|m| m.as_slice()).collect::<Vec<&[u8]>>();
+            .map(|m| m.as_slice())
+            .collect::<Vec<&[u8]>>();
 
         self.verify_aggregate_arbitrary_msg(&msgs_refs, pks)
     }
@@ -136,7 +140,7 @@ impl traits::Signature for Signature {
 
     /// Serializes the message of type `T` to bytes and calls `Signature::verify_arbitrary_msg`.
     fn verify<T: CryptoHash + Serialize>(&self, message: &T, public_key: &PublicKey) -> Result<()> {
-        self.verify_arbitrary_msg(&signing_message(message), public_key)
+        self.verify_arbitrary_msg(&signing_message(message)?, public_key)
     }
 
     /// Verifies a BLS signature share or multisignature. Does not assume the signature to be

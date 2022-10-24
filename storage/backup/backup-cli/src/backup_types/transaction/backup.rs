@@ -10,7 +10,7 @@ use crate::{
         should_cut_chunk, storage_ext::BackupStorageExt, GlobalBackupOpt,
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -103,9 +103,12 @@ impl TransactionBackupController {
         }
 
         assert!(!chunk_bytes.is_empty());
-        assert_eq!(
+        let expected_next_version = self.start_version + self.num_transactions as u64;
+        ensure!(
+            current_ver == expected_next_version,
+            "Server did not return all transactions requested. Expecting last version {}, got {}",
+            expected_next_version,
             current_ver,
-            self.start_version + self.num_transactions as u64
         );
         let chunk = self
             .write_chunk(

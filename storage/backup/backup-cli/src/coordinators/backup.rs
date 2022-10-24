@@ -35,14 +35,33 @@ use tokio_stream::wrappers::IntervalStream;
 pub struct BackupCoordinatorOpt {
     #[clap(flatten)]
     pub metadata_cache_opt: MetadataCacheOpt,
-    // Taking a state snapshot involves going through the entire state tree, should be taken
-    // infrequently.
-    #[clap(long, default_value = "24")]
+    // Defaulting to 1 to try to always have the latest state snapshot.
+    #[clap(
+        long,
+        default_value = "1",
+        help = "Frequency (in number of epochs) to take state snapshots at epoch ending versions. \
+        Adjacent epochs share much of the state, so it's inefficient storage-wise and bandwidth-wise \
+        to take it too frequently. However, a recent snapshot is obviously desirable if one intends \
+        to recover a snapshot and catch up with the chain by replaying transactions on top of it. \
+        Notice: If, while a snapshot is being taken, the chain advanced several epoch, past several \
+        new points where a snapshot is eligible according to this setting, we will skip those in the \
+        middle and take only at the newest epoch among them. For example, if the setting is 5, \
+        then the snapshots will be at at 0, 5, 10 ... If when the snapshot at 5 ends the chain \
+        is already at 19, then snapshot at 15 will be taken instead of at 10 (not at 18)."
+    )]
     pub state_snapshot_interval_epochs: usize,
-    // Assuming the network runs at 100 tps, it's 100 * 3600 = 360k transactions per hour, we don't
-    // want the backups to lag behind too much. Defaulting to 100k here in case the network is way
-    // slower than expected.
-    #[clap(long, default_value = "100000")]
+    // Defaulting to 1M, which converts to a 20 minutes delay of a transaction showing up in a backup,
+    // from a 1K TPS chain, and a few minutes replay time.
+    #[clap(
+        long,
+        default_value = "1000000",
+        help = "The frequency (in transaction versions) to take an incremental transaction backup. \
+        Making a transaction backup every 10 Million versions will result in the latest transaction \
+        to appear in the backup potentially 10 Million versions later. If the net work is running \
+        at 1 thousand transactions per second, that is roughly 3 hours. On the other hand, if \
+        backups are too frequent and hence small, it slows down loading the backup metadata by too \
+        many small files. "
+    )]
     pub transaction_batch_size: usize,
     #[clap(flatten)]
     pub concurrent_downloads: ConcurrentDownloadsOpt,
@@ -95,11 +114,11 @@ impl BackupCoordinator {
             self.concurrent_downloads,
         )
         .await?
-        .get_storage_state();
+        .get_storage_state()?;
 
         // On new DbState retrieved:
         // `watch_db_state` informs `backup_epoch_endings` via channel 1,
-        // and the the latter informs the other backup type workers via channel 2, after epoch
+        // and the latter informs the other backup type workers via channel 2, after epoch
         // ending is properly backed up, if necessary. This way, the epoch ending LedgerInfo needed
         // for proof verification is always available in the same backup storage.
         let (tx1, rx1) = watch::channel::<Option<DbState>>(None);

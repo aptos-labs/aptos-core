@@ -10,7 +10,7 @@ use crate::responses::Error::DegenerateRangeError;
 use crate::{Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL};
 use aptos_compression::metrics::CompressionClient;
 use aptos_compression::{CompressedData, CompressionError};
-use aptos_config::config::StorageServiceConfig;
+use aptos_config::config::{StorageServiceConfig, MAX_APPLICATION_MESSAGE_SIZE};
 use aptos_types::epoch_change::EpochChangeProof;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use aptos_types::state_store::state_value::StateValueChunkWithProof;
@@ -58,8 +58,11 @@ impl StorageServiceResponse {
         if perform_compression {
             let raw_data = bcs::to_bytes(&data_response)
                 .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-            let compressed_data =
-                aptos_compression::compress(raw_data, CompressionClient::StateSync)?;
+            let compressed_data = aptos_compression::compress(
+                raw_data,
+                CompressionClient::StateSync,
+                MAX_APPLICATION_MESSAGE_SIZE,
+            )?;
             let label = data_response.get_label().to_string() + COMPRESSION_SUFFIX_LABEL;
             Ok(StorageServiceResponse::CompressedResponse(
                 label,
@@ -74,8 +77,11 @@ impl StorageServiceResponse {
     pub fn get_data_response(&self) -> Result<DataResponse, Error> {
         match self {
             StorageServiceResponse::CompressedResponse(_, compressed_data) => {
-                let raw_data =
-                    aptos_compression::decompress(compressed_data, CompressionClient::StateSync)?;
+                let raw_data = aptos_compression::decompress(
+                    compressed_data,
+                    CompressionClient::StateSync,
+                    MAX_APPLICATION_MESSAGE_SIZE,
+                )?;
                 let data_response = bcs::from_bytes::<DataResponse>(&raw_data)
                     .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
                 Ok(data_response)

@@ -46,9 +46,13 @@ fn main() {
             prev_dir.join("move-stdlib").join("Move.toml").display()
         );
         ReleaseTarget::Head
-            .create_release(Some(
-                PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined")).join("head.mrb"),
-            ))
+            .create_release(
+                true,
+                Some(
+                    PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined"))
+                        .join("head.mrb"),
+                ),
+            )
             .expect("release build failed");
     }
 }

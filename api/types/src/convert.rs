@@ -27,16 +27,13 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm::move_vm_ext::MoveResolverExt;
-use move_deps::{
-    move_binary_format::file_format::FunctionHandleIndex,
-    move_core_types,
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{ModuleId, StructTag, TypeTag},
-        value::{MoveStructLayout, MoveTypeLayout},
-    },
-    move_resource_viewer::MoveValueAnnotator,
+use move_binary_format::file_format::FunctionHandleIndex;
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    value::{MoveStructLayout, MoveTypeLayout},
 };
+use move_resource_viewer::MoveValueAnnotator;
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
@@ -151,6 +148,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 .filter_map(|(sk, wo)| self.try_into_write_set_change(sk, wo).ok())
                 .collect(),
             block_height: None,
+            epoch: None,
         }
     }
 
@@ -598,7 +596,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         layout: &MoveTypeLayout,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        use move_deps::move_core_types::value::MoveValue::*;
+        use move_core_types::value::MoveValue::*;
         Ok(match layout {
             MoveTypeLayout::Bool => Bool(serde_json::from_value::<bool>(val)?),
             MoveTypeLayout::U8 => U8(serde_json::from_value::<u8>(val)?),
@@ -679,15 +677,62 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         ))
     }
 
+    pub fn try_into_move_value(&self, typ: &TypeTag, bytes: &[u8]) -> Result<MoveValue> {
+        self.inner.view_value(typ, bytes)?.try_into()
+    }
+}
+
+impl<'a, R: MoveResolverExt + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
+    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
+        self.inner
+            .get_module(module_id)
+            .map(|inner| inner as Rc<dyn Bytecode>)
+    }
+}
+pub trait AsConverter<R> {
+    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
+}
+
+impl<R: MoveResolverExt> AsConverter<R> for R {
+    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
+        MoveConverter::new(self, db)
+    }
+}
+
+pub fn new_vm_utf8_string(string: &str) -> move_core_types::value::MoveValue {
+    use move_core_types::value::{MoveStruct, MoveValue};
+
+    let byte_vector = MoveValue::Vector(
+        string
+            .as_bytes()
+            .iter()
+            .map(|byte| MoveValue::U8(*byte))
+            .collect(),
+    );
+    let move_string = MoveStruct::Runtime(vec![byte_vector]);
+    MoveValue::Struct(move_string)
+}
+
+fn abort_location_to_str(loc: &AbortLocation) -> String {
+    match loc {
+        AbortLocation::Module(mid) => {
+            format!("{}::{}", mid.address().to_hex_literal(), mid.name())
+        }
+        _ => loc.to_string(),
+    }
+}
+
+pub trait ExplainVMStatus {
+    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>>;
+
     fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
         match status {
             ExecutionStatus::MoveAbort { location, code, info } => match &location {
                 AbortLocation::Module(_) => {
-
                     info.as_ref().map(|i| {
-                        format!("Move abort in {}: {}({:#x}): {}", Self::abort_location_to_str(location), i.reason_name, code, i.description)
+                        format!("Move abort in {}: {}({:#x}): {}", abort_location_to_str(location), i.reason_name, code, i.description)
                     }).unwrap_or_else(|| {
-                        format!("Move abort in {}: {:#x}", Self::abort_location_to_str(location), code)
+                        format!("Move abort in {}: {:#x}", abort_location_to_str(location), code)
                     })
                 }
                 AbortLocation::Script => format!("Move abort: code {:#x}", code),
@@ -700,10 +745,9 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 code_offset,
             } => {
                 let func_name = match location {
-                    AbortLocation::Module(module_id) => self
-                        .explain_function_index(module_id, function)
-                        .map(|name| format!("{}::{}", Self::abort_location_to_str(location), name))
-                        .unwrap_or_else(|_| format!("{}::<#{} function>", Self::abort_location_to_str(location), function)),
+                    AbortLocation::Module(module_id) => self.explain_function_index(module_id, function)
+                        .map(|name| format!("{}::{}", abort_location_to_str(location), name))
+                        .unwrap_or_else(|_| format!("{}::<#{} function>", abort_location_to_str(location), function)),
                     AbortLocation::Script => "script".to_owned(),
                 };
                 format!(
@@ -722,47 +766,12 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         }
     }
 
-    fn abort_location_to_str(loc: &AbortLocation) -> String {
-        match loc {
-            AbortLocation::Module(mid) => {
-                format!("{}::{}", mid.address().to_hex_literal(), mid.name())
-            }
-            _ => loc.to_string(),
-        }
-    }
-
-    pub fn try_into_move_value(&self, typ: &TypeTag, bytes: &[u8]) -> Result<MoveValue> {
-        self.inner.view_value(typ, bytes)?.try_into()
-    }
-
     fn explain_function_index(&self, module_id: &ModuleId, function: &u16) -> Result<String> {
-        let code = self.inner.get_module(&module_id.clone())? as Rc<dyn Bytecode>;
+        let code = self.get_module_bytecode(module_id)?;
         let func = code.function_handle_at(FunctionHandleIndex::new(*function));
         let id = code.identifier_at(func.name);
-        Ok(format!("{}", id))
+        Ok(id.to_string())
     }
 }
 
-pub trait AsConverter<R> {
-    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
-}
-
-impl<R: MoveResolverExt> AsConverter<R> for R {
-    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
-        MoveConverter::new(self, db)
-    }
-}
-
-pub fn new_vm_utf8_string(string: &str) -> move_core_types::value::MoveValue {
-    use move_deps::move_core_types::value::{MoveStruct, MoveValue};
-
-    let byte_vector = MoveValue::Vector(
-        string
-            .as_bytes()
-            .iter()
-            .map(|byte| MoveValue::U8(*byte))
-            .collect(),
-    );
-    let move_string = MoveStruct::Runtime(vec![byte_vector]);
-    MoveValue::Struct(move_string)
-}
+// TODO: add caching?

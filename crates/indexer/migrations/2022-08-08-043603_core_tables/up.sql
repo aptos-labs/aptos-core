@@ -206,17 +206,20 @@ CREATE INDEX sig_insat_index ON signatures (inserted_at);
  }
  */
 CREATE TABLE events (
-  key VARCHAR(100) NOT NULL,
   sequence_number BIGINT NOT NULL,
   creation_number BIGINT NOT NULL,
-  account_address VARCHAR(64) NOT NULL,
+  account_address VARCHAR(66) NOT NULL,
   transaction_version BIGINT NOT NULL,
   transaction_block_height BIGINT NOT NULL,
   type TEXT NOT NULL,
   data jsonb NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
-  PRIMARY KEY (key, sequence_number),
+  PRIMARY KEY (
+    account_address,
+    creation_number,
+    sequence_number
+  ),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
 );
 CREATE INDEX ev_addr_type_index ON events (account_address);
@@ -299,7 +302,7 @@ CREATE TABLE table_metadatas (
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX tm_insat_index ON table_metadatas (inserted_at);
--- table metadatas in write set changes
+-- Tracks processor version status
 CREATE TABLE processor_statuses (
   name VARCHAR(50) NOT NULL,
   version BIGINT NOT NULL,

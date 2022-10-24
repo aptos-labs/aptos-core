@@ -1,33 +1,32 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Address, Bytecode, IdentifierWrapper};
+use crate::{Address, Bytecode, IdentifierWrapper, VerifyInput, VerifyInputWithRecursion};
 use anyhow::{bail, format_err};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
-use move_deps::{
-    move_binary_format::{
-        access::ModuleAccess,
-        file_format::{
-            Ability, AbilitySet, CompiledModule, CompiledScript, StructTypeParameter, Visibility,
-        },
-    },
-    move_core_types,
-    move_core_types::{
-        account_address::AccountAddress,
-        identifier::Identifier,
-        language_storage::{ModuleId, StructTag, TypeTag},
-        parser::{parse_struct_tag, parse_type_tag},
-        transaction_argument::TransactionArgument,
-    },
-    move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
-};
 
-use poem_openapi::{Enum, Object, Union};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{
+        Ability, AbilitySet, CompiledModule, CompiledScript, StructTypeParameter, Visibility,
+    },
+};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    parser::{parse_struct_tag, parse_type_tag},
+    transaction_argument::TransactionArgument,
+};
+use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
+
+use poem_openapi::{types::Type, Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
     convert::{From, Into, TryFrom, TryInto},
     fmt,
+    fmt::Display,
     result::Result,
     str::FromStr,
 };
@@ -309,7 +308,16 @@ impl MoveValue {
 
     pub fn convert_utf8_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
         if let Some((_, AnnotatedMoveValue::Bytes(bytes))) = v.value.into_iter().next() {
-            Ok(MoveValue::String(String::from_utf8(bytes)?))
+            match String::from_utf8(bytes.clone()) {
+                Ok(string) => Ok(MoveValue::String(string)),
+                Err(_) => {
+                    // There's no real use in logging the error, since this is only done on output conversion
+                    Ok(MoveValue::String(format!(
+                        "Unparsable utf-8 {}",
+                        HexEncodedBytes(bytes)
+                    )))
+                }
+            }
         } else {
             bail!("expect string::String, but failed to decode struct value");
         }
@@ -382,6 +390,33 @@ pub struct MoveStructTag {
     pub generic_type_params: Vec<MoveType>,
 }
 
+impl VerifyInputWithRecursion for MoveStructTag {
+    fn verify(&self, recursion_count: u8) -> anyhow::Result<()> {
+        if recursion_count > MAX_RECURSIVE_TYPES_ALLOWED {
+            bail!(
+                "Move struct tag {} has gone over the limit of recursive types {}",
+                self,
+                MAX_RECURSIVE_TYPES_ALLOWED
+            );
+        }
+        verify_module_identifier(self.module.as_str())
+            .map_err(|_| anyhow::anyhow!("invalid struct tag: {}", self))?;
+        verify_identifier(self.name.as_str())
+            .map_err(|_| anyhow::anyhow!("invalid struct tag: {}", self))?;
+        for param in self.generic_type_params.iter() {
+            param.verify(recursion_count + 1).map_err(|err| {
+                anyhow::anyhow!(
+                    "Invalid struct tag for generic type params: {} {}",
+                    self,
+                    err
+                )
+            })?;
+        }
+
+        Ok(())
+    }
+}
+
 impl MoveStructTag {
     pub fn new(
         address: Address,
@@ -413,6 +448,17 @@ impl From<StructTag> for MoveStructTag {
             module: tag.module.into(),
             name: tag.name.into(),
             generic_type_params: tag.type_params.into_iter().map(MoveType::from).collect(),
+        }
+    }
+}
+
+impl From<&StructTag> for MoveStructTag {
+    fn from(tag: &StructTag) -> Self {
+        Self {
+            address: tag.address.into(),
+            module: IdentifierWrapper::from(&tag.module),
+            name: IdentifierWrapper::from(&tag.name),
+            generic_type_params: tag.type_params.iter().map(MoveType::from).collect(),
         }
     }
 }
@@ -492,6 +538,32 @@ pub enum MoveType {
     /// This prevents the parser from just throwing an error because one field
     /// was unparsable, and gives the value in it.
     Unparsable(String),
+}
+
+/// Maximum number of recursive types
+/// Currently, this is allowed up to the serde limit of 16
+///
+/// TODO: Should this number be re-evaluated
+pub const MAX_RECURSIVE_TYPES_ALLOWED: u8 = 16;
+
+impl VerifyInputWithRecursion for MoveType {
+    fn verify(&self, recursion_count: u8) -> anyhow::Result<()> {
+        if recursion_count > MAX_RECURSIVE_TYPES_ALLOWED {
+            bail!(
+                "Move type {} has gone over the limit of recursive types {}",
+                self,
+                MAX_RECURSIVE_TYPES_ALLOWED
+            );
+        }
+        match self {
+            MoveType::Vector { items } => items.verify(recursion_count + 1),
+            MoveType::Struct(struct_tag) => struct_tag.verify(recursion_count + 1),
+            MoveType::GenericTypeParam { .. } => Ok(()),
+            MoveType::Reference { to, .. } => to.verify(recursion_count + 1),
+            MoveType::Unparsable(inner) => bail!("Unable to parse move type {}", inner),
+            _ => Ok(()),
+        }
+    }
 }
 
 impl MoveType {
@@ -621,7 +693,24 @@ impl From<TypeTag> for MoveType {
             TypeTag::Vector(v) => MoveType::Vector {
                 items: Box::new(MoveType::from(*v)),
             },
-            TypeTag::Struct(v) => MoveType::Struct(v.into()),
+            TypeTag::Struct(v) => MoveType::Struct((*v).into()),
+        }
+    }
+}
+
+impl From<&TypeTag> for MoveType {
+    fn from(tag: &TypeTag) -> Self {
+        match tag {
+            TypeTag::Bool => MoveType::Bool,
+            TypeTag::U8 => MoveType::U8,
+            TypeTag::U64 => MoveType::U64,
+            TypeTag::U128 => MoveType::U128,
+            TypeTag::Address => MoveType::Address,
+            TypeTag::Signer => MoveType::Signer,
+            TypeTag::Vector(v) => MoveType::Vector {
+                items: Box::new(MoveType::from(v.as_ref())),
+            },
+            TypeTag::Struct(v) => MoveType::Struct((&**v).into()),
         }
     }
 }
@@ -637,10 +726,10 @@ impl TryFrom<MoveType> for TypeTag {
             MoveType::Address => TypeTag::Address,
             MoveType::Signer => TypeTag::Signer,
             MoveType::Vector { items } => TypeTag::Vector(Box::new((*items).try_into()?)),
-            MoveType::Struct(v) => TypeTag::Struct(v.try_into()?),
+            MoveType::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
             _ => {
                 return Err(anyhow::anyhow!(
-                    "invalid move type for converting into `TypeTag`: {:?}",
+                    "Invalid move type for converting into `TypeTag`: {:?}",
                     &tag
                 ))
             }
@@ -698,6 +787,12 @@ pub struct MoveModuleId {
     pub name: IdentifierWrapper,
 }
 
+impl VerifyInput for MoveModuleId {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.name.verify().map_err(|_| invalid_move_module_id(self))
+    }
+}
+
 impl From<ModuleId> for MoveModuleId {
     fn from(id: ModuleId) -> Self {
         let (address, name) = <(AccountAddress, Identifier)>::from(id);
@@ -735,8 +830,8 @@ impl FromStr for MoveModuleId {
 }
 
 #[inline]
-fn invalid_move_module_id(s: &str) -> anyhow::Error {
-    format_err!("invalid Move module id: {}", s)
+fn invalid_move_module_id<S: Display + Sized>(s: S) -> anyhow::Error {
+    format_err!("Invalid Move module ID: {}", s)
 }
 
 impl Serialize for MoveModuleId {
@@ -809,7 +904,7 @@ impl FromStr for MoveAbility {
             "drop" => Ability::Drop,
             "store" => Ability::Store,
             "key" => Ability::Key,
-            _ => return Err(anyhow::anyhow!("invalid ability string: {}", ability)),
+            _ => return Err(anyhow::anyhow!("Invalid ability string: {}", ability)),
         }))
     }
 }
@@ -959,6 +1054,16 @@ pub struct MoveModuleBytecode {
     pub abi: Option<MoveModule>,
 }
 
+impl VerifyInput for MoveModuleBytecode {
+    fn verify(&self) -> anyhow::Result<()> {
+        if self.bytecode.is_empty() {
+            bail!("Move module bytecode is empty")
+        }
+
+        Ok(())
+    }
+}
+
 impl MoveModuleBytecode {
     pub fn new(bytes: Vec<u8>) -> Self {
         Self {
@@ -996,6 +1101,16 @@ pub struct MoveScriptBytecode {
     pub abi: Option<MoveFunction>,
 }
 
+impl VerifyInput for MoveScriptBytecode {
+    fn verify(&self) -> anyhow::Result<()> {
+        if self.bytecode.is_empty() {
+            bail!("Move script bytecode is empty")
+        }
+
+        Ok(())
+    }
+}
+
 impl MoveScriptBytecode {
     pub fn new(bytes: Vec<u8>) -> Self {
         Self {
@@ -1024,6 +1139,17 @@ pub struct EntryFunctionId {
     pub name: IdentifierWrapper,
 }
 
+impl VerifyInput for EntryFunctionId {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.module
+            .verify()
+            .map_err(|_| invalid_entry_function_id(self))?;
+        self.name
+            .verify()
+            .map_err(|_| invalid_entry_function_id(self))
+    }
+}
+
 impl FromStr for EntryFunctionId {
     type Err = anyhow::Error;
 
@@ -1039,8 +1165,8 @@ impl FromStr for EntryFunctionId {
 }
 
 #[inline]
-fn invalid_entry_function_id(s: &str) -> anyhow::Error {
-    format_err!("invalid entry function id {:?}", s)
+fn invalid_entry_function_id<S: Display + Sized>(s: S) -> anyhow::Error {
+    format_err!("Invalid entry function ID {}", s)
 }
 
 impl Serialize for EntryFunctionId {
@@ -1065,19 +1191,39 @@ impl fmt::Display for EntryFunctionId {
     }
 }
 
+pub fn verify_function_identifier(function: &str) -> anyhow::Result<()> {
+    verify_identifier(function).map_err(|_| format_err!("invalid Move function name: {}", function))
+}
+pub fn verify_module_identifier(module: &str) -> anyhow::Result<()> {
+    verify_identifier(module).map_err(|_| format_err!("invalid Move module name: {}", module))
+}
+
+pub fn verify_field_identifier(field: &str) -> anyhow::Result<()> {
+    verify_identifier(field).map_err(|_| format_err!("invalid Move field name: {}", field))
+}
+
+pub fn verify_identifier(identifier: &str) -> anyhow::Result<()> {
+    if identifier.contains("::") {
+        Err(format_err!(
+            "Identifier should not contain '::' {}",
+            identifier
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use aptos_types::account_address::AccountAddress;
-    use move_deps::{
-        move_binary_format::file_format::AbilitySet,
-        move_core_types::{
-            identifier::Identifier,
-            language_storage::{StructTag, TypeTag},
-        },
-        move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
+    use move_binary_format::file_format::AbilitySet;
+    use move_core_types::{
+        identifier::Identifier,
+        language_storage::{StructTag, TypeTag},
     };
+    use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
     use serde::{de::DeserializeOwned, Serialize};
     use serde_json::{json, to_value, Value};
@@ -1100,7 +1246,7 @@ mod tests {
         assert_serialize(Vector(Box::new(U8)), json!("vector<u8>"));
 
         assert_serialize(
-            Struct(create_nested_struct()),
+            Struct(Box::new(create_nested_struct())),
             json!("0x1::Home::ABC<address, 0x1::account::Base<u128, vector<u64>, vector<0x1::type::String>, 0x1::type::String>>"),
         );
     }
@@ -1129,7 +1275,7 @@ mod tests {
                         vec![(
                             identifier("nested_vector"),
                             Vector(
-                                TypeTag::Struct(type_struct("Host")),
+                                TypeTag::Struct(Box::new(type_struct("Host"))),
                                 vec![Struct(annotated_move_struct(
                                     "String",
                                     vec![
@@ -1211,19 +1357,19 @@ mod tests {
     #[test]
     fn test_parse_invalid_move_module_id_string() {
         assert_eq!(
-            "invalid Move module id: 0x1",
+            "Invalid Move module ID: 0x1",
             "0x1".parse::<MoveModuleId>().err().unwrap().to_string()
         );
         assert_eq!(
-            "invalid Move module id: 0x1:",
+            "Invalid Move module ID: 0x1:",
             "0x1:".parse::<MoveModuleId>().err().unwrap().to_string()
         );
         assert_eq!(
-            "invalid Move module id: 0x1:::",
+            "Invalid Move module ID: 0x1:::",
             "0x1:::".parse::<MoveModuleId>().err().unwrap().to_string()
         );
         assert_eq!(
-            "invalid Move module id: 0x1::???",
+            "Invalid Move module ID: 0x1::???",
             "0x1::???"
                 .parse::<MoveModuleId>()
                 .err()
@@ -1231,7 +1377,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid Move module id: Aptos::Aptos",
+            "Invalid Move module ID: Aptos::Aptos",
             "Aptos::Aptos"
                 .parse::<MoveModuleId>()
                 .err()
@@ -1239,7 +1385,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid Move module id: 0x1::Aptos::Aptos",
+            "Invalid Move module ID: 0x1::Aptos::Aptos",
             "0x1::Aptos::Aptos"
                 .parse::<MoveModuleId>()
                 .err()
@@ -1265,15 +1411,15 @@ mod tests {
     #[test]
     fn test_parse_invalid_move_entry_function_id_string() {
         assert_eq!(
-            "invalid entry function id \"0x1\"",
+            "Invalid entry function ID 0x1",
             "0x1".parse::<EntryFunctionId>().err().unwrap().to_string()
         );
         assert_eq!(
-            "invalid entry function id \"0x1:\"",
+            "Invalid entry function ID 0x1:",
             "0x1:".parse::<EntryFunctionId>().err().unwrap().to_string()
         );
         assert_eq!(
-            "invalid entry function id \"0x1:::\"",
+            "Invalid entry function ID 0x1:::",
             "0x1:::"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1281,7 +1427,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid entry function id \"0x1::???\"",
+            "Invalid entry function ID 0x1::???",
             "0x1::???"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1289,7 +1435,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid entry function id \"Aptos::Aptos\"",
+            "Invalid entry function ID Aptos::Aptos",
             "Aptos::Aptos"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1297,7 +1443,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid entry function id \"Aptos::Aptos::??\"",
+            "Invalid entry function ID Aptos::Aptos::??",
             "Aptos::Aptos::??"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1305,7 +1451,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid entry function id \"0x1::Aptos::Aptos::Aptos\"",
+            "Invalid entry function ID 0x1::Aptos::Aptos::Aptos",
             "0x1::Aptos::Aptos::Aptos"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1337,7 +1483,7 @@ mod tests {
             address: address("0x1"),
             module: identifier("Home"),
             name: identifier("ABC"),
-            type_params: vec![TypeTag::Address, TypeTag::Struct(account)],
+            type_params: vec![TypeTag::Address, TypeTag::Struct(Box::new(account))],
         }
     }
 
@@ -1349,8 +1495,8 @@ mod tests {
             type_params: vec![
                 TypeTag::U128,
                 TypeTag::Vector(Box::new(TypeTag::U64)),
-                TypeTag::Vector(Box::new(TypeTag::Struct(type_struct("String")))),
-                TypeTag::Struct(type_struct("String")),
+                TypeTag::Vector(Box::new(TypeTag::Struct(Box::new(type_struct("String"))))),
+                TypeTag::Struct(Box::new(type_struct("String"))),
             ],
         }
     }

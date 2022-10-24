@@ -199,14 +199,20 @@ impl StateMerkleDb {
 
     /// Finds the rightmost leaf by scanning the entire DB.
     #[cfg(test)]
-    pub fn get_rightmost_leaf_naive(&self) -> Result<Option<(NodeKey, LeafNode)>> {
+    pub fn get_rightmost_leaf_naive(
+        &self,
+        version: Version,
+    ) -> Result<Option<(NodeKey, LeafNode)>> {
         let mut ret = None;
 
         let mut iter = self.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
-        iter.seek_to_first();
+        iter.seek(&(version, 0)).unwrap();
 
         while let Some((node_key, node)) = iter.next().transpose()? {
             if let Node::Leaf(leaf_node) = node {
+                if node_key.version() != version {
+                    break;
+                }
                 match ret {
                     None => ret = Some((node_key, leaf_node)),
                     Some(ref other) => {
@@ -257,17 +263,16 @@ impl TreeReader<StateKey> for StateMerkleDb {
         Ok(node_opt)
     }
 
-    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode)>> {
+    fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode)>> {
         // Since everything has the same version during restore, we seek to the first node and get
         // its version.
         let mut iter = self.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
-        iter.seek_to_first();
-        let version = match iter.next().transpose()? {
+        iter.seek(&(version, 0))?;
+        match iter.next().transpose()? {
             Some((node_key, node)) => {
-                if node.node_type() == NodeType::Null {
+                if node.node_type() == NodeType::Null || node_key.version() != version {
                     return Ok(None);
                 }
-                node_key.version()
             }
             None => return Ok(None),
         };
@@ -300,9 +305,9 @@ impl TreeReader<StateKey> for StateMerkleDb {
             iter.seek_for_prev(&seek_key)?;
 
             if let Some((node_key, node)) = iter.next().transpose()? {
-                debug_assert_eq!(node_key.version(), version);
-                debug_assert!(node_key.nibble_path().num_nibbles() < num_nibbles);
-
+                if node_key.version() != version {
+                    continue;
+                }
                 if let Node::Leaf(leaf_node) = node {
                     match ret {
                         None => ret = Some((node_key, leaf_node)),

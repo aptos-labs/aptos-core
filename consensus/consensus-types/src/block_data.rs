@@ -38,7 +38,7 @@ pub enum BlockType {
     },
     /// A genesis block is the first committed block in any epoch that is identically constructed on
     /// all validators by any (potentially different) LedgerInfo that justifies the epoch change
-    /// from the previous epoch.  The genesis block is used as the the first root block of the
+    /// from the previous epoch.  The genesis block is used as the first root block of the
     /// BlockTree for all epochs.
     Genesis,
 }

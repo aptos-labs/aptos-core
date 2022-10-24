@@ -6,6 +6,7 @@ use crate::{proof_fetcher::ProofFetcher, DbReader};
 use crate::metrics::TIMER;
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_logger::{error, sample, sample::SampleRate};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -20,6 +21,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
@@ -99,20 +101,27 @@ impl AsyncProofFetcher {
                     .verify_by_hash(root_hash, state_key.hash(), value_hash)
                     .map_err(|err| {
                         anyhow!(
-                            "Proof is invalid for key {:?} with state root hash {:?}: {}.",
+                            "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
                             state_key,
                             root_hash,
+                            version,
                             err
                         )
                     })
                     .expect("Failed to verify proof.");
             }
-            data_sender
-                .send(Proof {
-                    state_key_hash: state_key.hash(),
-                    proof,
-                })
-                .expect("Sending proof should succeed.");
+            match data_sender.send(Proof {
+                state_key_hash: state_key.hash(),
+                proof,
+            }) {
+                Ok(_) => {}
+                Err(_) => {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(5)),
+                        error!("Failed to send proof, something is wrong in execution.")
+                    );
+                }
+            }
         });
     }
 }

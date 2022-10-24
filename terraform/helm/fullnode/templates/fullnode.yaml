@@ -20,6 +20,8 @@ spec:
         app.kubernetes.io/name: fullnode
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
       containers:
@@ -31,7 +33,7 @@ spec:
         - -c
         - |-
           set -e
-          {{- if not .Values.chain.genesisConfigmap }}
+          {{- if and (not .Values.chain.genesisConfigmap) (not .Values.chain.genesisSecret) }}
           # Download genesis and waypoint if necessary
           curl -o /opt/aptos/genesis/waypoint.txt {{ (get .Values.aptos_chains .Values.chain.name).waypoint_txt_url }}
           curl -o /opt/aptos/genesis/genesis.blob {{ (get .Values.aptos_chains .Values.chain.name).genesis_blob_url }}
@@ -67,15 +69,19 @@ spec:
         ports:
         - containerPort: 6182
         - containerPort: 6186
-        - containerPort: 8080
         - containerPort: 8081
+        - containerPort: 8080
+          name: api
         - containerPort: 9101
-        livenessProbe:
-          tcpSocket:
-            port: 9101
+          name: metrics
+        livenessProbe: # restart the pod if the REST API is ever unresponsive
+          httpGet:
+            path: /v1/-/healthy
+            port: 8080
           initialDelaySeconds: 30
-        readinessProbe:
-          tcpSocket:
+        readinessProbe: # pod is ready when state sync is caught up
+          httpGet:
+            path: /v1/-/healthy?duration_secs=10
             port: 8080
         securityContext:
           readOnlyRootFilesystem: true
@@ -108,6 +114,9 @@ spec:
       {{- if .Values.chain.genesisConfigmap }}
         configMap:
           name: {{ .Values.chain.genesisConfigmap }}
+      {{- else if .Values.chain.genesisSecret }}
+        secret:
+          secretName: {{ .Values.chain.genesisSecret }}
       {{- else }}
         emptyDir: {}
       {{- end }}

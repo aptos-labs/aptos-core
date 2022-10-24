@@ -16,7 +16,6 @@ jobs:
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-continuous-e2e-single-vfn
-      FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 8 minutes
       FORGE_RUNNER_DURATION_SECS: 480
       FORGE_TEST_SUITE: single_vfn_perf

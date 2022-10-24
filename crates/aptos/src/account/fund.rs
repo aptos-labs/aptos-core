@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use crate::{
     account::create::DEFAULT_FUNDED_COINS,
@@ -14,16 +14,22 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
 
-/// Command to fund an account with tokens from a faucet
+/// Fund an account with tokens from a faucet
 ///
-/// If the account doesn't exist, it will create it when funding it from the faucet
+/// This will create an account if it doesn't exist with the faucet.  This is mostly useful
+/// for local development and devnet.
 #[derive(Debug, Parser)]
 pub struct FundWithFaucet {
     /// Address to fund
+    ///
+    /// If the account wasn't previously created, it will be created when being funded
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
-    /// Coins to fund when using the faucet
+    /// Number of Octas to fund the account from the faucet
+    ///
+    /// The amount added to the account may be limited by the faucet, and may be less
+    /// than the amount requested.
     #[clap(long, default_value_t = DEFAULT_FUNDED_COINS)]
     pub(crate) amount: u64,
 
@@ -43,8 +49,7 @@ impl CliCommand<String> for FundWithFaucet {
 
     async fn execute(self) -> CliTypedResult<String> {
         let hashes = fund_account(
-            self.faucet_options
-                .faucet_url(&self.profile_options.profile)?,
+            self.faucet_options.faucet_url(&self.profile_options)?,
             self.amount,
             self.account,
         )
@@ -53,13 +58,20 @@ impl CliCommand<String> for FundWithFaucet {
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|e| CliError::UnexpectedError(e.to_string()))?
             .as_secs()
-            + 10;
-        let client = self.rest_options.client(&self.profile_options.profile)?;
+            + 30;
+        let client = self.rest_options.client(&self.profile_options)?;
         for hash in hashes {
-            client.wait_for_transaction_by_hash(hash, sys_time).await?;
+            client
+                .wait_for_transaction_by_hash(
+                    hash.into(),
+                    sys_time,
+                    Some(Duration::from_secs(60)),
+                    None,
+                )
+                .await?;
         }
         return Ok(format!(
-            "Added {} coins to account {}",
+            "Added {} Octas to account {}",
             self.amount, self.account
         ));
     }
