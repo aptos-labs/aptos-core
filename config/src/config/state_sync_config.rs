@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 // The maximum message size per state sync message
-pub const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; /* 16 MiB */
+pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -178,7 +178,7 @@ impl Default for AptosDataClientConfig {
         Self {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
-            response_timeout_ms: 10000,
+            response_timeout_ms: 20000, // 20 seconds
             summary_poll_interval_ms: 200,
             use_compression: true,
         }
