@@ -90,6 +90,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_COLLECT_GAS_FEES"></a>
+
+Whether gas fees are collected and distributed to block proposer.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_COLLECT_GAS_FEES">COLLECT_GAS_FEES</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="0x1_features_EFRAMEWORK_SIGNER_NEEDED"></a>
 
 The provided signer has not a framework address.
@@ -172,6 +183,7 @@ Lifetime: ephemeral
 
 </details>
 
+<<<<<<< HEAD
 <a name="0x1_features_get_sha_512_and_ripemd_160_feature"></a>
 
 ## Function `get_sha_512_and_ripemd_160_feature`
@@ -179,6 +191,15 @@ Lifetime: ephemeral
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_sha_512_and_ripemd_160_feature">get_sha_512_and_ripemd_160_feature</a>(): u64
+=======
+<a name="0x1_features_collect_gas_fees"></a>
+
+## Function `collect_gas_fees`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_gas_fees">collect_gas_fees</a>(): bool
+>>>>>>> 1f72fd0d2f ([framework] Added docs)
 </code></pre>
 
 
@@ -187,6 +208,7 @@ Lifetime: ephemeral
 <summary>Implementation</summary>
 
 
+<<<<<<< HEAD
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_sha_512_and_ripemd_160_feature">get_sha_512_and_ripemd_160_feature</a>(): u64 { <a href="features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">SHA_512_AND_RIPEMD_160_NATIVES</a> }
 </code></pre>
 
@@ -257,6 +279,10 @@ Lifetime: ephemeral
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aptos_stdlib_chain_id_enabled">aptos_stdlib_chain_id_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_APTOS_STD_CHAIN_ID_NATIVES">APTOS_STD_CHAIN_ID_NATIVES</a>)
+=======
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_gas_fees">collect_gas_fees</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECT_GAS_FEES">COLLECT_GAS_FEES</a>)
+>>>>>>> 1f72fd0d2f ([framework] Added docs)
 }
 </code></pre>
 
