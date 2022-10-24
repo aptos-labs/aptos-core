@@ -169,6 +169,7 @@ dependencies = [
  "futures",
  "hex",
  "itertools",
+ "jemallocator",
  "move-cli",
  "move-command-line-common",
  "move-core-types",
