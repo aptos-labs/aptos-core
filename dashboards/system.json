@@ -495,6 +495,7 @@
       "yaxis": { "align": false }
     }
   ],
+  "refresh": false,
   "schemaVersion": 37,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -613,29 +614,6 @@
       },
       {
         "allFormat": "",
-        "allValue": ".*",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": true,
-        "label": "",
-        "multi": true,
-        "multiFormat": "",
-        "name": "kubernetes_pod_name",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
         "allValue": "",
         "current": { "text": ["validator"], "value": ["validator"] },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -718,6 +696,6 @@
   "timezone": "",
   "title": "System",
   "uid": "system",
-  "version": 6,
+  "version": 7,
   "weekStart": ""
 }
