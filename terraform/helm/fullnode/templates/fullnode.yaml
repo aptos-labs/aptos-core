@@ -74,6 +74,7 @@ spec:
           name: api
         - containerPort: 9101
           name: metrics
+        # NOTE: these require the API to be enabled, which is not always the case
         livenessProbe: # restart the pod if the REST API is ever unresponsive
           httpGet:
             path: /v1/-/healthy
