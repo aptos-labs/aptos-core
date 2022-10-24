@@ -52,6 +52,14 @@
   "liveNow": false,
   "panels": [
     {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 191,
+      "panels": [],
+      "title": "Overall",
+      "type": "row"
+    },
+    {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "description": "",
       "fieldConfig": {
@@ -88,7 +96,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
       "id": 159,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -148,7 +156,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
       "id": 173,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -168,7 +176,7 @@
           "refId": "A"
         }
       ],
-      "title": "Transactions per second",
+      "title": "Transactions by status",
       "type": "timeseries"
     },
     {
@@ -208,8 +216,8 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 3, "w": 3, "x": 16, "y": 0 },
-      "id": 6,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "id": 160,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
         "tooltip": { "mode": "multi", "sort": "none" }
@@ -220,23 +228,23 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "quantile by (state) (0.5, rate(aptos_consensus_committed_txns_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile by (kind) (0.5, sum by (kind, kubernetes_pod_name) (rate(aptos_processed_txns_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", state!=\"success\"}[$interval])))",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{state}}",
+          "legendFormat": "{{kind}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "to delete",
+      "title": "Transactions by type",
       "type": "timeseries"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
-      "id": 153,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 203,
       "panels": [],
-      "title": "Transaction Basic Breakdown",
+      "title": "Ecosystem",
       "type": "row"
     },
     {
@@ -276,11 +284,11 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
-      "id": 160,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
+      "id": 200,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "tooltip": { "mode": "single", "sort": "none" }
       },
       "pluginVersion": "9.1.1",
       "targets": [
@@ -288,15 +296,15 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "quantile by (process, kind, state) (0.5, sum by (kind, state, kubernetes_pod_name) (rate(aptos_processed_txns_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", state!=\"success\"}[$interval])))",
+          "expr": "quantile by (account, name) (0.5, sum by (kubernetes_pod_name, account, name) (rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\", account!=\"core\"}[$interval])))\n\n\n",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kind}}-{{state}}",
+          "legendFormat": "{{account}}-{{name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "By type and execution outcome",
+      "title": "Function transactions by user module",
       "type": "timeseries"
     },
     {
@@ -336,7 +344,303 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
+      "id": 201,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "quantile by (account, name, state) (0.5, sum by (kubernetes_pod_name, account, name, state) (rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\", state!=\"keep_success\"}[$interval])))\n",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{account}}-{{name}}-{{state}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Failed function transactions by module",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "failure_percent" },
+            "properties": [{ "id": "custom.width", "value": 115 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed_count" },
+            "properties": [{ "id": "custom.width", "value": 97 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "total_count" },
+            "properties": [{ "id": "custom.width", "value": 93 }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
+      "id": 204,
+      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true, "sortBy": [] },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "connectionArgs": { "location": "US" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "editorMode": "code",
+          "format": 1,
+          "key": "Q-2130acf3-cec5-4aec-89ab-c5ff823a6263-0",
+          "location": "US",
+          "project": "analytics-test-345723",
+          "rawQuery": true,
+          "rawSql": "SELECT 100 * (failed_count / total_count) as failure_percent, failed_count, total_count, SPLIT(fun, \"::\")[OFFSET(1)] as module, SPLIT(fun, \"::\")[OFFSET(2)] as method\nFROM (\n  SELECT fun, SUM(failed_count) as failed_count, ARRAY_AGG((vm_status, failed_count)) AS vm_statuses\n  FROM (\n    SELECT \n      JSON_EXTRACT_SCALAR(json_payload, \"$.function\") as fun, \n      vm_status,\n      SUM(1) as failed_count\n    FROM `analytics-test-345723.indexer_mainnet_gcp.transactions_view` \n    WHERE success=false and $__timeFilter(inserted_at)\n    GROUP BY fun, vm_status\n  ) z\n  WHERE NOT(fun LIKE \"0x1::%\") AND NOT(fun LIKE \"0x3::%\")\n  GROUP BY fun\n) a\nJOIN (\n  SELECT entry_function_id_str, SUM(1) as total_count\n  FROM `analytics-test-345723.indexer_mainnet_gcp.user_transactions`\n  where $__timeFilter(timestamp)\n  GROUP BY entry_function_id_str\n) b\nON fun = entry_function_id_str\nORDER BY total_count DESC, failed_count DESC\nLIMIT 30\n",
+          "refId": "A",
+          "sql": {
+            "columns": [{ "parameters": [], "type": "function" }],
+            "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "User methods by failure rate",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "transactions / s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+      "id": 197,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "quantile (0.5, sum by (kubernetes_pod_name) (rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\", state!=\"keep_success\", account=\"user\"}[$interval]))) / quantile (0.5, sum by (kubernetes_pod_name) (rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\", account=\"user\"}[$interval])))\n",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{account}}-{{name}}-{{state}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Ecosystem (non 0x1) function failure rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "transactions / s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+      "id": 199,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "((quantile by (account, name) (0.5, sum by (kubernetes_pod_name, account, name) (rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\", state!=\"keep_success\"}[$interval]))) > 0.1) / quantile by (account, name) (0.5, sum by (kubernetes_pod_name, account, name) (rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\"}[$interval])))) < 1.1\n",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{account}}-{{name}}-{{state}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Failure rate by module (with >0.1 TPS)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "failure_percent" },
+            "properties": [{ "id": "custom.width", "value": 70 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed_count" },
+            "properties": [{ "id": "custom.width", "value": 65 }]
+          },
+          { "matcher": { "id": "byName", "options": "module" }, "properties": [{ "id": "custom.width", "value": 95 }] },
+          { "matcher": { "id": "byName", "options": "method" }, "properties": [{ "id": "custom.width", "value": 123 }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
+      "id": 205,
+      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true, "sortBy": [] },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "connectionArgs": { "location": "US" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "editorMode": "code",
+          "format": 1,
+          "key": "Q-2130acf3-cec5-4aec-89ab-c5ff823a6263-0",
+          "location": "US",
+          "project": "analytics-test-345723",
+          "rawQuery": true,
+          "rawSql": "SELECT 100 * (failed_count / total_count) as failure_percent, failed_count, SPLIT(fun, \"::\")[OFFSET(1)] as module, SPLIT(fun, \"::\")[OFFSET(2)] as method, vm_status\nFROM (\n  SELECT \n    JSON_EXTRACT_SCALAR(json_payload, \"$.function\") as fun, \n    vm_status,\n    SUM(1) as failed_count\n  FROM `analytics-test-345723.indexer_mainnet_gcp.transactions_view` \n  WHERE success=false and $__timeFilter(inserted_at) AND NOT(JSON_EXTRACT_SCALAR(json_payload, \"$.function\") LIKE \"0x1::%\") AND NOT(JSON_EXTRACT_SCALAR(json_payload, \"$.function\") LIKE \"0x3::%\")\n  GROUP BY fun, vm_status\n\n) a\nJOIN (\n  SELECT entry_function_id_str, SUM(1) as total_count\n  FROM `analytics-test-345723.indexer_mainnet_gcp.user_transactions`\n  where $__timeFilter(timestamp)\n  GROUP BY entry_function_id_str\n) b\nON fun = entry_function_id_str\nORDER BY failed_count DESC\nLIMIT 30\n\n",
+          "refId": "A",
+          "sql": {
+            "columns": [{ "parameters": [], "type": "function" }],
+            "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "User methods by failure code",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 153,
+      "panels": [],
+      "title": "Failures Breakdown",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "transactions / s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 27 },
       "id": 167,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -348,10 +652,10 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "quantile by (process, state, reason, error_code) (0.5, rate(aptos_processed_failed_txns_reason_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"false\"}[$interval]))",
+          "expr": "quantile by (state, reason) (0.5, sum by (kubernetes_pod_name, state, reason) (rate(aptos_processed_failed_txns_reason_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"false\"}[$interval])))",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "__auto",
+          "legendFormat": "{{state}}-{{reason}}",
           "range": true,
           "refId": "A"
         }
@@ -396,7 +700,129 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 9 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 27 },
+      "id": 170,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "quantile by (state, reason, error_code) (0.5, sum by (state, reason, error_code, kubernetes_pod_name) (rate(aptos_processed_failed_txns_reason_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\"}[$interval])))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{state}}-{{reason}}-{{error_code}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Detailed failed reason",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "transactions / s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 27 },
+      "id": 196,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "quantile by (module, method) (0.5, sum by (kubernetes_pod_name, module, method) (rate(aptos_processed_user_transactions_entry_function_by_core_method{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", state!=\"keep_success\"}[$interval])))\n\n",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{module}}-{{method}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Core function failures by method",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "id": 193,
+      "panels": [],
+      "title": "User transaction breakdown",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "transactions / s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 36 },
       "id": 161,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -408,10 +834,10 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "quantile by (process, payload_type, state) (0.5, rate(aptos_processed_user_transactions_by_payload{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", state!=\"\"}[$interval]))>0",
+          "expr": "quantile by (payload_type) (0.5, sum by (kubernetes_pod_name, payload_type) (rate(aptos_processed_user_transactions_by_payload{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", state!=\"\"}[$interval])))",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{process}}-{{payload_type}}-{{state}}",
+          "legendFormat": "{{payload_type}}",
           "range": true,
           "refId": "A"
         }
@@ -445,18 +871,12 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 17 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
       "id": 162,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -468,10 +888,64 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "quantile by (process, account, name, state) (0.5, rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"false\"}[$interval]))>0\n\n\n",
+          "expr": "quantile by (account, state) (0.5, sum by (account, state) (rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"false\"}[$interval])))\n\n\n",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{process}}-{{account}}-{{name}}-{{state}}",
+          "legendFormat": "{{account}}-{{state}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Function transactions status by module",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "transactions / s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
+      "id": 171,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "quantile by (account, name) (0.5, sum by (kubernetes_pod_name, account, name) (rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\"}[$interval])))\n\n\n",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{account}}-{{name}}",
           "range": true,
           "refId": "A"
         }
@@ -505,18 +979,74 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 17 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 44 },
+      "id": 165,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "quantile by (module, method) (0.5, sum by (kubernetes_pod_name, module, method) (rate(aptos_processed_user_transactions_entry_function_by_core_method{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])))\n\n",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{module}}-{{method}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Core function transactions by method",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
+      "id": 195,
+      "panels": [],
+      "title": "Events",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "transactions / s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 53 },
       "id": 166,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -540,14 +1070,6 @@
       "type": "timeseries"
     },
     {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
-      "id": 169,
-      "panels": [],
-      "title": "Transaction Detailed Breakdown",
-      "type": "row"
-    },
-    {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "description": "",
       "fieldConfig": {
@@ -573,19 +1095,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
-      "id": 170,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 53 },
+      "id": 198,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
         "tooltip": { "mode": "multi", "sort": "none" }
@@ -596,140 +1112,20 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "quantile by (process, state, reason, error_code) (0.5, rate(aptos_processed_failed_txns_reason_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\"}[$interval]))",
+          "expr": "quantile by (account, creation_number) (0.5, sum by (kubernetes_pod_name, account, creation_number) (rate(aptos_processed_user_transactions_core_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\"}[$interval])))\n\n\n",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "__auto",
+          "legendFormat": "{{account}}-{{creation_number}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Failed reason",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "transactions / s",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
-      "id": 171,
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
-      "pluginVersion": "9.1.1",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "quantile by (process, account, name, state) (0.5, rate(aptos_processed_user_transactions_entry_function_by_module{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", is_detailed=\"true\"}[$interval]))>0\n\n\n",
-          "format": "time_series",
-          "intervalFactor": 1,
-          "legendFormat": "{{process}}-{{account}}-{{name}}-{{state}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Function transactions by module",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "transactions / s",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
-      "id": 165,
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
-      "pluginVersion": "9.1.1",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "quantile by (process, module, method, state) (0.5, rate(aptos_processed_user_transactions_entry_function_by_core_method{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))>0\n\n\n",
-          "format": "time_series",
-          "intervalFactor": 1,
-          "legendFormat": "{{process}}-{{module}}-{{method}}-{{state}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Function transactions by method",
+      "title": "Emitted events by account of the module",
       "type": "timeseries"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 61 },
       "id": 185,
       "panels": [],
       "title": "Performance",
@@ -746,7 +1142,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 35 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 62 },
       "hiddenSeries": false,
       "id": 179,
       "isNew": false,
@@ -809,7 +1205,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 35 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 62 },
       "hiddenSeries": false,
       "id": 181,
       "isNew": false,
@@ -872,7 +1268,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 35 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 62 },
       "hiddenSeries": false,
       "id": 183,
       "isNew": false,
@@ -926,7 +1322,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 70 },
       "id": 177,
       "panels": [],
       "title": "Gas Market",
@@ -943,7 +1339,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 44 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 71 },
       "hiddenSeries": false,
       "id": 175,
       "isNew": false,
@@ -1025,18 +1421,12 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 44 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 71 },
       "id": 187,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1084,18 +1474,12 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 44 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 71 },
       "id": 189,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1314,7 +1698,7 @@
       }
     ]
   },
-  "time": { "from": "now-3h", "to": "now" },
+  "time": { "from": "now-6h", "to": "now" },
   "timepicker": {
     "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
     "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
@@ -1322,6 +1706,6 @@
   "timezone": "browser",
   "title": "Transactions",
   "uid": "p-8XUDI4z",
-  "version": 9,
+  "version": 22,
   "weekStart": ""
 }
