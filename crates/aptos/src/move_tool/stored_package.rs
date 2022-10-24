@@ -129,7 +129,13 @@ impl<'a> CachedPackageMetadata<'a> {
         let sources_dir = path.join(CompiledPackageLayout::Sources.path());
         fs::create_dir_all(&sources_dir)?;
         for module in &self.metadata.modules {
-            let source = unzip_metadata_str(&module.source)?;
+            let source = match module.source.is_empty() {
+                true => {
+                    print!("module without code: {}\n", module.name);
+                    "".into()
+                },
+                false => unzip_metadata_str(&module.source)?
+            };
             fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;
         }
         Ok(())
