@@ -95,7 +95,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         if let StreamRequest::TerminateStream(request) = request_message.stream_request {
             // Process the feedback request
             if let Err(error) = self.process_terminate_stream_request(&request) {
-                error!(LogSchema::new(LogEntry::HandleTerminateRequest)
+                warn!(LogSchema::new(LogEntry::HandleTerminateRequest)
                     .event(LogEvent::Error)
                     .error(&error));
             }
@@ -107,7 +107,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         if let Err(error) = &response {
             sample!(
                 SampleRate::Duration(Duration::from_secs(STREAM_REQUEST_ERROR_LOG_FREQ_SECS)),
-                error!(LogSchema::new(LogEntry::HandleStreamRequest)
+                warn!(LogSchema::new(LogEntry::HandleStreamRequest)
                     .event(LogEvent::Error)
                     .error(error));
             );
@@ -115,7 +115,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
         // Send the response to the client
         if let Err(error) = request_message.response_sender.send(response) {
-            error!(LogSchema::new(LogEntry::RespondToStreamRequest)
+            warn!(LogSchema::new(LogEntry::RespondToStreamRequest)
                 .event(LogEvent::Error)
                 .message(&format!(
                     "Failed to send response for stream request: {:?}",
@@ -231,7 +231,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
             metrics::increment_counter(&metrics::GLOBAL_DATA_SUMMARY_ERROR, error.get_label());
             sample!(
                 SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
-                error!(LogSchema::new(LogEntry::RefreshGlobalData)
+                warn!(LogSchema::new(LogEntry::RefreshGlobalData)
                     .event(LogEvent::Error)
                     .error(&error))
             );
@@ -273,7 +273,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
                         &metrics::CHECK_STREAM_PROGRESS_ERROR,
                         error.get_label(),
                     );
-                    error!(LogSchema::new(LogEntry::CheckStreamProgress)
+                    warn!(LogSchema::new(LogEntry::CheckStreamProgress)
                         .stream_id(*data_stream_id)
                         .event(LogEvent::Error)
                         .error(&error));

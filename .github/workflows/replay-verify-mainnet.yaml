@@ -8,7 +8,7 @@ on:
         type: string
         description: The git SHA1 to test. If not specified, Forge will check the latest commits on the current branch
   schedule:
-    - cron: "0 * * * */1"
+    - cron: "0 9/12 * * *"
   pull_request:
     paths:
       - ".github/workflows/nightly-replay-verify.yaml"
@@ -17,6 +17,7 @@ env:
   BUCKET: aptos-mainnet-backup-backup-831a69a8
   SUB_DIR: e1
   HISTORY_START: 0
+  CONFIG_TEMPLATE_NAME: s3-public.yaml
 
 jobs:
   replay-transactions:
