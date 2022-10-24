@@ -2,12 +2,10 @@ spec aptos_framework::coin {
 
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
     }
 
     spec mint {
         pragma opaque;
-        pragma aborts_if_is_partial;
         let addr = spec_coin_address<CoinType>();
         modifies global<CoinInfo<CoinType>>(addr);
         aborts_if [abstract] false;
