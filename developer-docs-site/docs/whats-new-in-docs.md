@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 17 October 2022
+
+- Added [resource account](/docs/reference/glossary.md#resource-account) definition and details to the Aptos Glossary.
+
 ## 13 October 2022
 
 - Added [user documentation](/docs/guides/use-aptos-explorer.md) for [Aptos Explorer](https://explorer.aptoslabs.com/) to Aptos.dev covering common use cases and popular Explorer screen descriptions.
