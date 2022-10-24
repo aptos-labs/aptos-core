@@ -5,7 +5,7 @@
 
 mod log_build_information;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::{
@@ -301,9 +301,8 @@ where
         fnn.runtime_threads = Some(1);
         // If a config path was provided, use that as the template
         if let Some(config_path) = config_path {
-            if let Ok(config) = NodeConfig::load_config(config_path) {
-                template = config;
-            }
+            template = NodeConfig::load_config(&config_path)
+                .with_context(|| format!("Failed to load config at path: {:?}", config_path))?;
         }
 
         template.logger.level = Level::Debug;
