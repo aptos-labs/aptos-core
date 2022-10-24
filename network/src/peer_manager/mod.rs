@@ -590,7 +590,7 @@ where
                 .timeout(TRANSPORT_TIMEOUT, connection.socket.close())
                 .await
             {
-                error!(
+                warn!(
                     NetworkSchema::new(&network_context)
                         .remote_peer(&peer_id),
                     error = %e,

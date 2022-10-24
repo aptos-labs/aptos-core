@@ -59,6 +59,8 @@ move-vm-types ={ workspace = true }
 
 [dev-dependencies]
 claims = "0.7"
+dir-diff = "0.3.2"
+fs_extra = "1.2.0"
 
 aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["testing"] }

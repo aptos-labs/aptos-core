@@ -100,15 +100,19 @@ impl AptosDBBackend {
         events: &Vec<NewBlockEvent>,
         hit_end: bool,
     ) -> Vec<NewBlockEvent> {
-        let has_larger = events.first().map_or(false, |e| {
-            (e.epoch(), e.round()) >= (target_epoch, target_round)
-        });
-        if !has_larger {
-            // error, and not a fatal, in an unlikely scenario that we have many failed consecutive rounds,
-            // and nobody has any newer successful blocks.
-            error!(
-                "Local history is too old, asking for {} epoch and {} round, and latest from db is {} epoch and {} round! Elected proposers are unlikely to match!!",
-                target_epoch, target_round, events.first().map_or(0, |e| e.epoch()), events.first().map_or(0, |e| e.round()))
+        // Do not warn when round==0, because check will always be unsure of whether we have
+        // all events from the previous epoch. If there is an actual issue, next round will log it.
+        if target_round != 0 {
+            let has_larger = events.first().map_or(false, |e| {
+                (e.epoch(), e.round()) >= (target_epoch, target_round)
+            });
+            if !has_larger {
+                // error, and not a fatal, in an unlikely scenario that we have many failed consecutive rounds,
+                // and nobody has any newer successful blocks.
+                warn!(
+                    "Local history is too old, asking for {} epoch and {} round, and latest from db is {} epoch and {} round! Elected proposers are unlikely to match!!",
+                    target_epoch, target_round, events.first().map_or(0, |e| e.epoch()), events.first().map_or(0, |e| e.round()))
+            }
         }
 
         let mut result = vec![];

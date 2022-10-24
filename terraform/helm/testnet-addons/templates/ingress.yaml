@@ -30,7 +30,7 @@ metadata:
 spec:
   rules:
   {{- if .Values.service.domain }}
-  - host: fullnode.{{ .Values.service.domain }}
+  - host: api.{{ .Values.service.domain }}
     http:
       paths:
       - path: /

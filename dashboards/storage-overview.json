@@ -207,7 +207,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sort_desc(rate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) < 10000)",
+          "expr": "sort_desc(irate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) < 10000)",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
           "range": true,
@@ -310,7 +310,7 @@
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 2 },
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 21 },
           "id": 3252,
           "options": {
             "content": "We expect nodes to have more than 200GB free space all the time.\r\n\r\nIdentify outliers on the left and filter by peer name to see it's specific values on the other panels. Otherwise you are seeing average values.",
@@ -320,6 +320,63 @@
           "type": "text"
         },
         {
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "fillOpacity": 70, "lineWidth": 1 },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "#EAB839", "value": 100000 },
+                  { "color": "red", "value": 1000000 }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "epoch" },
+                "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+          "hideTimeOverride": false,
+          "id": 3303,
+          "options": {
+            "colWidth": 0.9,
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "rowHeight": 0.9,
+            "showValue": "auto",
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "9.1.1",
+          "targets": [
+            {
+              "dataset": "indexer_mainnet_gcp",
+              "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+              "editorMode": "code",
+              "format": 0,
+              "location": "US",
+              "project": "analytics-test-345723",
+              "rawQuery": true,
+              "rawSql": "SELECT timestamp, epoch,\nCAST(JSON_VALUE(json_data, '$.per_byte_read') AS INT64) as per_byte_read,\nCAST(JSON_VALUE(json_data, '$.per_item_read') AS INT64) as per_item_read,\nCAST(JSON_VALUE(json_data, '$.per_byte_write') AS INT64) as per_byte_write,\nCAST(JSON_VALUE(json_data, '$.per_item_write') AS INT64) as per_item_write,\nCAST(JSON_VALUE(json_data, '$.per_byte_create') AS INT64) as per_byte_create,\nCAST(JSON_VALUE(json_data, '$.per_item_create') AS INT64) as per_item_create,\nFROM `analytics-test-345723.indexer_mainnet_gcp.block_metadata_transactions` JOIN (\n  SELECT json_data, transaction_version FROM `analytics-test-345723.indexer_mainnet_gcp.move_resources_view`\n  WHERE name = \"StorageGas\"\n) on version = transaction_version\nWHERE timestamp between TIMESTAMP_MILLIS($__from) and TIMESTAMP_MILLIS($__to)\n",
+              "refId": "A",
+              "sql": {
+                "columns": [{ "parameters": [], "type": "function" }],
+                "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Gas Cost",
+          "transformations": [],
+          "type": "status-history"
+        },
+        {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "description": "",
           "fieldConfig": {
@@ -327,7 +384,7 @@
               "color": { "mode": "palette-classic" },
               "custom": {
                 "axisCenteredZero": false,
-                "axisColorMode": "text",
+                "axisColorMode": "series",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -345,18 +402,23 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "none"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "percent of 2B target" },
+                "properties": [
+                  { "id": "custom.axisLabel", "value": "percent of 2B target" },
+                  { "id": "custom.axisPlacement", "value": "left" },
+                  { "id": "unit", "value": "percent" },
+                  { "id": "decimals", "value": 2 },
+                  { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+                ]
+              }
+            ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 32 },
           "id": 3250,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -380,6 +442,13 @@
               "legendFormat": "__auto",
               "range": true,
               "refId": "B"
+            },
+            {
+              "datasource": { "name": "Expression", "type": "__expr__", "uid": "__expr__" },
+              "expression": "$B / 2000000000 * 100",
+              "hide": false,
+              "refId": "percent of 2B target",
+              "type": "math"
             }
           ],
           "title": "latest total number of state items (p80)",
@@ -430,10 +499,20 @@
                   { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
                   { "id": "custom.axisLabel", "value": "average per item bytes" }
                 ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "percent of 1TB target" },
+                "properties": [
+                  { "id": "unit", "value": "percent" },
+                  { "id": "decimals", "value": 2 },
+                  { "id": "custom.axisLabel", "value": "percent of 1TB target" },
+                  { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
+                  { "id": "custom.axisPlacement", "value": "left" }
+                ]
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 32 },
           "id": 3295,
           "options": {
             "legend": { "calcs": [], "displayMode": "table", "placement": "right", "showLegend": false },
@@ -457,6 +536,13 @@
               "legendFormat": "per item",
               "range": true,
               "refId": "A"
+            },
+            {
+              "datasource": { "name": "Expression", "type": "__expr__", "uid": "__expr__" },
+              "expression": "$B / 1000000000000 * 100",
+              "hide": false,
+              "refId": "percent of 1TB target",
+              "type": "math"
             }
           ],
           "title": "(max) latest total state KV size",
@@ -506,7 +592,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 41 },
           "id": 3297,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -577,7 +663,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 41 },
           "id": 3298,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -649,7 +735,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 23 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 50 },
           "id": 40,
           "links": [],
           "options": {
@@ -738,7 +824,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 23 },
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 50 },
           "id": 3300,
           "links": [],
           "options": {
@@ -842,7 +928,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 32 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 59 },
           "id": 3296,
           "links": [],
           "options": {
@@ -947,7 +1033,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 32 },
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 59 },
           "id": 3299,
           "links": [],
           "options": {
@@ -1039,18 +1125,12 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "bytes"
             },
             "overrides": []
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 41 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 68 },
           "id": 1193,
           "options": {
             "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": false },
@@ -1126,13 +1206,7 @@
                 "thresholdsStyle": { "mode": "line" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 950 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 950 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1140,14 +1214,14 @@
           "gridPos": { "h": 9, "w": 12, "x": 0, "y": 10 },
           "id": 3262,
           "options": {
-            "legend": { "calcs": [], "displayMode": "table", "placement": "right", "showLegend": false },
+            "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": false },
             "tooltip": { "mode": "single", "sort": "none" }
           },
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])\r\n",
+              "expr": "sort_desc(rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))\r\n",
               "legendFormat": "{{kubernetes_pod_name}}",
               "range": true,
               "refId": "A"
@@ -1181,13 +1255,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1237,13 +1305,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1301,13 +1363,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1368,13 +1424,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1423,13 +1473,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "percentunit"
             },
             "overrides": []
@@ -1478,13 +1522,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": [
               {
@@ -1562,13 +1600,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "percentunit"
             },
             "overrides": []
@@ -1618,13 +1650,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1679,7 +1705,7 @@
               "decimals": 0,
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
               "unit": "none"
             },
             "overrides": [
@@ -1829,13 +1855,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1886,13 +1906,7 @@
               },
               "decimals": 2,
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "percentunit"
             },
             "overrides": []
@@ -1945,13 +1959,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -2242,6 +2250,6 @@
   "timezone": "",
   "title": "Storage Overview",
   "uid": "ptUp6Vn4k",
-  "version": 165,
+  "version": 184,
   "weekStart": ""
 }
