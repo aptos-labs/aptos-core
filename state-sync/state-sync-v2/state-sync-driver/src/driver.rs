@@ -232,7 +232,7 @@ impl<
                         .await;
                 }
             }
-            error!(LogSchema::new(LogEntry::ConsensusNotification)
+            warn!(LogSchema::new(LogEntry::ConsensusNotification)
                 .error(&error)
                 .message("Error encountered when handling the consensus notification!"));
             return;
@@ -252,7 +252,7 @@ impl<
 
         // Log any errors from notification handling
         if let Err(error) = result {
-            error!(LogSchema::new(LogEntry::ConsensusNotification)
+            warn!(LogSchema::new(LogEntry::ConsensusNotification)
                 .error(&error)
                 .message("Error encountered when handling the consensus notification!"));
         }
@@ -375,7 +375,7 @@ impl<
             .subscribe_to_bootstrap_notifications(notifier_channel)
             .await
         {
-            error!(LogSchema::new(LogEntry::ClientNotification)
+            warn!(LogSchema::new(LogEntry::ClientNotification)
                 .error(&error)
                 .message("Failed to subscribe to bootstrap notifications!"));
         }
@@ -405,7 +405,7 @@ impl<
 
     /// Handles an error notification sent by the storage synchronizer
     async fn handle_error_notification(&mut self, error_notification: ErrorNotification) {
-        error!(LogSchema::new(LogEntry::SynchronizerNotification)
+        warn!(LogSchema::new(LogEntry::SynchronizerNotification)
             .error_notification(error_notification.clone())
             .message("Received an error notification from the storage synchronizer!"));
 
@@ -526,13 +526,13 @@ impl<
                             "Passed the connection deadline! Auto-bootstrapping the validator!"
                         ));
                         if let Err(error) = self.bootstrapper.bootstrapping_complete().await {
-                            error!(LogSchema::new(LogEntry::AutoBootstrapping)
+                            warn!(LogSchema::new(LogEntry::AutoBootstrapping)
                                 .error(&error)
                                 .message("Failed to mark bootstrapping as complete!"));
                         }
                     }
                 } else {
-                    error!(LogSchema::new(LogEntry::AutoBootstrapping)
+                    warn!(LogSchema::new(LogEntry::AutoBootstrapping)
                         .message("The connection deadline overflowed! Unable to auto-bootstrap!"));
                 }
             }
@@ -552,7 +552,7 @@ impl<
 
         // Check the progress of any sync requests
         if let Err(error) = self.check_sync_request_progress().await {
-            error!(LogSchema::new(LogEntry::Driver)
+            warn!(LogSchema::new(LogEntry::Driver)
                 .error(&error)
                 .message("Error found when checking the sync request progress!"));
         }
@@ -585,7 +585,7 @@ impl<
             {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(DRIVER_ERROR_LOG_FREQ_SECS)),
-                    error!(LogSchema::new(LogEntry::Driver)
+                    warn!(LogSchema::new(LogEntry::Driver)
                         .error(&error)
                         .message("Error found when driving progress of the continuous syncer!"));
                 );
@@ -599,7 +599,7 @@ impl<
             if let Err(error) = self.bootstrapper.drive_progress(&global_data_summary).await {
                 sample!(
                         SampleRate::Duration(Duration::from_secs(DRIVER_ERROR_LOG_FREQ_SECS)),
-                        error!(LogSchema::new(LogEntry::Driver)
+                        warn!(LogSchema::new(LogEntry::Driver)
                             .error(&error)
                             .message("Error found when checking the bootstrapper progress!"));
                 );

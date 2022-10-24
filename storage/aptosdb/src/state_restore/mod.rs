@@ -182,7 +182,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
     pub fn wait_for_async_commit(&self) -> Result<()> {
         self.tree_restore
             .lock()
-            .as_ref()
+            .as_mut()
             .unwrap()
             .wait_for_async_commit()
     }

@@ -10,7 +10,7 @@ pub use aptos_metrics_core::{
     HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 
-use aptos_logger::{error, info};
+use aptos_logger::{error, info, warn};
 use aptos_metrics_core::{Encoder, TextEncoder};
 use std::{env, sync::mpsc, thread, thread::JoinHandle, time::Duration};
 
@@ -39,7 +39,7 @@ impl MetricsPusher {
                 .timeout_connect(10_000)
                 .send_bytes(&buffer);
             if let Some(error) = response.synthetic_error() {
-                error!(
+                warn!(
                     "Failed to push metrics to {}. Error: {}",
                     push_metrics_endpoint, error
                 );
