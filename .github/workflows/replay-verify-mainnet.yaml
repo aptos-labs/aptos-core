@@ -8,7 +8,7 @@ on:
         type: string
         description: The git SHA1 to test. If not specified, Forge will check the latest commits on the current branch
   schedule:
-    - cron: "0 * * * */1"
+    - cron: "0 9/12 * * *"
   pull_request:
     paths:
       - ".github/workflows/nightly-replay-verify.yaml"
