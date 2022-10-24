@@ -6,7 +6,7 @@ use serde_json::Value;
 use sha2::Digest;
 
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
-pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
+pub const MAX_TIMESTAMP_SECS: u64 = 253_402_300_799;
 
 /// Standardizes all addresses and table handles to be length 66 (0x-64 length hash)
 pub fn standardize_address(handle: &str) -> String {
@@ -40,13 +40,23 @@ pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
 }
 
 pub fn parse_timestamp(ts: u64, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt((ts / 1000000) as i64, 0)
-        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+    let defaulted_secs = std::cmp::min(ts / 1000000, MAX_TIMESTAMP_SECS);
+    chrono::NaiveDateTime::from_timestamp_opt(defaulted_secs as i64, 0).unwrap_or_else(|| {
+        panic!(
+            "Could not parse timestamp (ms) {:?} for version {}",
+            ts, version
+        )
+    })
 }
 
 pub fn parse_timestamp_secs(ts: u64, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt(std::cmp::min(ts as i64, MAX_TIMESTAMP_SECS), 0)
-        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+    let defaulted_secs = std::cmp::min(ts, MAX_TIMESTAMP_SECS);
+    chrono::NaiveDateTime::from_timestamp_opt(defaulted_secs as i64, 0).unwrap_or_else(|| {
+        panic!(
+            "Could not parse timestamp (s) {:?} for version {}",
+            ts, version
+        )
+    })
 }
 
 pub fn remove_null_bytes<T: serde::Serialize + for<'de> serde::Deserialize<'de>>(input: &T) -> T {
@@ -99,5 +109,22 @@ mod tests {
 
         let ts3 = parse_timestamp_secs(1659386386, 2);
         assert_eq!(ts3.timestamp(), 1659386386);
+
+        let ts4 = parse_timestamp(ts3.timestamp_micros() as u64, 2);
+        assert_eq!(ts3, ts4);
+
+        let ts5 = parse_timestamp_secs(MAX_TIMESTAMP_SECS, 2);
+        assert_eq!(ts5.year(), 9999);
+
+        let ts6 = parse_timestamp_secs(MAX_TIMESTAMP_SECS + 1, 2);
+        let ts7 = parse_timestamp_secs(u64::MAX, 2);
+        assert_eq!(ts5, ts6);
+        assert_eq!(ts6, ts7);
+
+        let ts8 = parse_timestamp(MAX_TIMESTAMP_SECS * 1000000, 2);
+        assert_eq!(ts5, ts8);
+
+        let ts9 = parse_timestamp(ts7.timestamp_micros() as u64, 2);
+        assert_eq!(ts7, ts9);
     }
 }
