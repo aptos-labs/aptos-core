@@ -131,10 +131,10 @@ impl<'a> CachedPackageMetadata<'a> {
         for module in &self.metadata.modules {
             let source = match module.source.is_empty() {
                 true => {
-                    print!("module without code: {}\n", module.name);
+                    println!("module without code: {}", module.name);
                     "".into()
-                },
-                false => unzip_metadata_str(&module.source)?
+                }
+                false => unzip_metadata_str(&module.source)?,
             };
             fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;
         }
