@@ -439,7 +439,7 @@ impl BlockTree {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with
             // executor.
-            error!(error = ?e, "fail to delete block");
+            warn!(error = ?e, "fail to delete block");
         }
         self.process_pruned_blocks(id_to_remove);
         self.update_highest_commit_cert(commit_proof);
