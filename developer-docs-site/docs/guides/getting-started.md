@@ -114,7 +114,9 @@ As described in [Workflows](#workflows), you may interact with Aptos using only 
 
 ## Prepare development environment
 
-Prepare your developer environment by installing the dependencies needed to build, test and inspect Aptos Core. You can do this either via the Aptos [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) Bash script or by manually installing all dependencies. as shown below. 
+Prepare your developer environment by installing the dependencies needed to build, test and inspect Aptos Core. You can do this either via the Aptos [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) Bash script or by manually installing all dependencies. as shown below.
+
+No matter your selected mechanism for installing these dependencies, **it is imperative you keep your entire toolchain up-to-date**. If you encounter issues later, update all packages and try again.
 
 ### Use the script
 The `dev_setup.sh` script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. Note, you may be prompted for your password:
