@@ -472,8 +472,7 @@ impl<'a> AptosTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs =
-            AptosVM::execute_block_and_keep_vm_status(vec![txn], &self.storage, true)?;
+        let mut outputs = AptosVM::execute_block_and_keep_vm_status(vec![txn], &self.storage)?;
 
         assert_eq!(outputs.len(), 1);
 

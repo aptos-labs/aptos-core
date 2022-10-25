@@ -18,6 +18,5 @@ pub fn aptos_debug_natives(
         gas_parameters,
         abs_val_size_gas_params,
         LATEST_GAS_FEATURE_VERSION,
-        true,
     )
 }

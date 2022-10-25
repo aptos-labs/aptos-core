@@ -16,6 +16,6 @@ pub fn set_aptos_version(executor: &mut FakeExecutor, version: Version) {
     executor.new_block();
     executor.execute_and_apply(txn);
 
-    let new_vm = AptosVM::new(executor.get_state_view(), false);
+    let new_vm = AptosVM::new(executor.get_state_view());
     assert_eq!(new_vm.internals().version().unwrap(), version);
 }

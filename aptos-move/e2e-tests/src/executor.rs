@@ -355,7 +355,6 @@ impl FakeExecutor {
                 .map(Transaction::UserTransaction)
                 .collect(),
             &self.data_store,
-            true,
         )
     }
 
@@ -483,7 +482,7 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(self.get_state_view(), true);
+        let vm = AptosVM::new(self.get_state_view());
         vm.validate_transaction(txn, &self.data_store)
     }
 
@@ -568,7 +567,6 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 self.features
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                true,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -615,7 +613,6 @@ impl FakeExecutor {
             LATEST_GAS_FEATURE_VERSION,
             self.features
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-            true,
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

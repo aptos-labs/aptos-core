@@ -24,7 +24,6 @@ pub fn aptos_natives(
     gas_params: NativeGasParameters,
     abs_val_size_gas_params: AbstractValueSizeGasParameters,
     feature_version: u64,
-    include_test_natives: bool,
 ) -> NativeFunctionTable {
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
@@ -57,7 +56,6 @@ pub fn assert_no_test_natives() {
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        false,
     )
     .into_iter()
     .all(

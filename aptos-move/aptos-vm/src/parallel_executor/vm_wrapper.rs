@@ -33,7 +33,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
     type Argument = &'a S;
 
     fn init(argument: &'a S) -> Self {
-        let vm = AptosVM::new(argument, false);
+        let vm = AptosVM::new(argument);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
         //

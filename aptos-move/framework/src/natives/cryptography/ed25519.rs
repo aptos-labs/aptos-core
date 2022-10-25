@@ -162,6 +162,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     crate::natives::helpers::make_module_natives(natives)
 }
 
+#[cfg(feature = "testing")]
 fn native_test_only_generate_keys_internal(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -177,6 +178,7 @@ fn native_test_only_generate_keys_internal(
     ))
 }
 
+#[cfg(feature = "testing")]
 fn native_test_only_sign_internal(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
