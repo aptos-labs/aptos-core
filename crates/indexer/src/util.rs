@@ -45,8 +45,11 @@ pub fn parse_timestamp(ts: u64, version: i64) -> chrono::NaiveDateTime {
 }
 
 pub fn parse_timestamp_secs(ts: u64, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt(std::cmp::min(ts as i64, MAX_TIMESTAMP_SECS), 0)
-        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+    chrono::NaiveDateTime::from_timestamp_opt(
+        std::cmp::min(ts, MAX_TIMESTAMP_SECS as u64) as i64,
+        0,
+    )
+    .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 pub fn remove_null_bytes<T: serde::Serialize + for<'de> serde::Deserialize<'de>>(input: &T) -> T {
