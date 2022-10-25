@@ -1812,10 +1812,12 @@ The token is owned at address owner
                 &<b>mut</b> collections.collection_data,
                 token_id.token_data_id.collection
             );
-            collection_data.supply = collection_data.supply - 1;
-            // delete the collection data <b>if</b> the collection supply equals 0
-            <b>if</b> (collection_data.supply == 0) {
-                <a href="token.md#0x3_token_destroy_collection_data">destroy_collection_data</a>(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> collections.collection_data, collection_data.name));
+            <b>if</b> (collection_data.maximum &gt; 0) {
+                collection_data.supply = collection_data.supply - 1;
+                // delete the collection data <b>if</b> the collection supply equals 0
+                <b>if</b> (collection_data.supply == 0) {
+                    <a href="token.md#0x3_token_destroy_collection_data">destroy_collection_data</a>(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> collections.collection_data, collection_data.name));
+                };
             };
         };
     };
@@ -1904,10 +1906,14 @@ Burn a token by the token owner
                 &<b>mut</b> collections.collection_data,
                 token_id.token_data_id.collection
             );
-            collection_data.supply = collection_data.supply - 1;
-            // delete the collection data <b>if</b> the collection supply equals 0
-            <b>if</b> (collection_data.supply == 0) {
-                <a href="token.md#0x3_token_destroy_collection_data">destroy_collection_data</a>(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> collections.collection_data, collection_data.name));
+
+            // only <b>update</b> and check the supply for unlimited collection
+            <b>if</b> (collection_data.maximum &gt; 0){
+                collection_data.supply = collection_data.supply - 1;
+                // delete the collection data <b>if</b> the collection supply equals 0
+                <b>if</b> (collection_data.supply == 0) {
+                    <a href="token.md#0x3_token_destroy_collection_data">destroy_collection_data</a>(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> collections.collection_data, collection_data.name));
+                };
             };
         };
     };
