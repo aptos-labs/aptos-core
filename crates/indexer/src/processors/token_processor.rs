@@ -178,7 +178,11 @@ fn insert_tokens(
             diesel::insert_into(schema::tokens::table)
                 .values(&tokens_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, property_version, transaction_version))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -206,7 +210,11 @@ fn insert_token_ownerships(
                     transaction_version,
                     table_handle,
                 ))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -226,7 +234,11 @@ fn insert_token_datas(
             diesel::insert_into(schema::token_datas::table)
                 .values(&token_datas_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, transaction_version))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -385,7 +397,11 @@ fn insert_token_activities(
                     event_creation_number,
                     event_sequence_number,
                 ))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
