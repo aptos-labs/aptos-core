@@ -17,8 +17,6 @@ To download the Aptos source code, related tools, and IDE plugins for the Move p
 Aptos offers the [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies. 
 :::
 
-No matter your selected mechanism for installing these dependencies, it is imperative you keep your entire toolchain up-to-date. If you encounter issues, update all packages and try again.
-
 ## Download precompiled binary
 <details>
 <summary>macOS</summary>
