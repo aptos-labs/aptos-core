@@ -367,7 +367,7 @@ impl BlockStore {
         let current_timestamp = self.time_service.get_current_timestamp();
         if let Some(t) = block_time.checked_sub(current_timestamp) {
             if t > Duration::from_secs(1) {
-                error!(
+                warn!(
                     "Long wait time {}ms for block {}",
                     t.as_millis(),
                     executed_block.block()
@@ -465,7 +465,7 @@ impl BlockStore {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with
             // executor.
-            error!(error = ?e, "fail to delete block");
+            warn!(error = ?e, "fail to delete block");
         }
 
         // synchronously update both root_id and commit_root_id

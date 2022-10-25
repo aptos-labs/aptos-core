@@ -169,6 +169,7 @@ dependencies = [
  "futures",
  "hex",
  "itertools",
+ "jemallocator",
  "move-cli",
  "move-command-line-common",
  "move-core-types",
@@ -3336,6 +3337,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dir-diff"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2860407d7d7e2e004bb2128510ad9e8d669e76fa005ccf567977b5d71b8b4a0b"
+dependencies = [
+ "walkdir",
+]
+
+[[package]]
 name = "directories"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3948,7 +3958,9 @@ dependencies = [
  "clap 3.2.17",
  "codespan-reporting",
  "curve25519-dalek",
+ "dir-diff",
  "flate2",
+ "fs_extra",
  "gas-algebra-ext",
  "include_dir 0.7.2",
  "itertools",
