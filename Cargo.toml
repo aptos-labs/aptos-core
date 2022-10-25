@@ -7,6 +7,7 @@ members = [
     "api/test-context",
     "api/types",
     "aptos-move/aptos-aggregator",
+    "aptos-move/aptos-debugger",
     "aptos-move/aptos-gas",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
