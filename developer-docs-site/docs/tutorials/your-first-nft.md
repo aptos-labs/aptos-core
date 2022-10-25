@@ -299,7 +299,7 @@ In Aptos, each account must have an on-chain representation in order to receive 
 
 ### Step 4.4: Creating a resource account
 
-Create a [resource account](../reference/glossary.md#resource-account) to initialize the `mint_nft` module and retrieve the signer capability from both the resource account and module account. To do so, call `create_resource_account_and_publish_package` to publish the module under the resource account's address and make this example code work. For an example, see: [mint_nft.rs](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs#L62).
+Create a [resource account](../reference/glossary.md#resource-account) to [initialize](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/resource_account) the `mint_nft` module and retrieve the signer capability from both the resource account and module account. To do so, call `create_resource_account_and_publish_package` to publish the module under the resource account's address and make this example code work. For an example, see: [mint_nft.rs](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs#L62).
 
 
 ### Step 4.5: Creating a collection
