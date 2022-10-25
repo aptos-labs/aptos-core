@@ -1,26 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::QuorumStoreSender;
-use crate::quorum_store::proof_builder::ProofBuilderCommand;
-use crate::quorum_store::types::{Batch, PersistedValue};
-use crate::quorum_store::{
-    batch_reader::{BatchReader, BatchReaderCommand},
-    counters,
-    quorum_store_db::QuorumStoreDB,
+use crate::{
+    network::QuorumStoreSender,
+    quorum_store::{
+        batch_reader::{BatchReader, BatchReaderCommand},
+        counters,
+        proof_builder::ProofBuilderCommand,
+        quorum_store_db::QuorumStoreDB,
+        types::{Batch, PersistedValue},
+    },
 };
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 // use aptos_logger::spawn_named;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
+use aptos_types::{
+    transaction::SignedTransaction, validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier, PeerId,
+};
 use consensus_types::{
     common::Round,
     proof_of_store::{LogicalTime, SignedDigest},
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
@@ -119,7 +122,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             tokio::spawn(async move {
                 for interval in metrics_monitor.intervals() {
                     // pretty-print the metric interval
-                    println!("Quorum:BatchReader: {:?}", interval);
+                    // println!("Quorum:BatchReader: {:?}", interval);
                     // wait 500ms
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }

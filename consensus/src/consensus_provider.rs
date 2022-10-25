@@ -1,10 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::{DataManager, DummyDataManager};
 use crate::{
     counters,
-    data_manager::QuorumStoreDataManager,
+    data_manager::{DataManager, DummyDataManager, QuorumStoreDataManager},
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
@@ -22,11 +21,13 @@ use event_notifications::ReconfigNotificationListener;
 use executor::block_executor::BlockExecutor;
 use futures::channel::mpsc;
 use network::application::storage::PeerMetadataStorage;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
-use std::time::Duration;
 use storage_interface::DbReaderWriter;
 use tokio::runtime::{self, Runtime};
 
@@ -55,7 +56,7 @@ pub fn start_consensus(
     runtime.spawn(async move {
         for interval in runtime_monitor.intervals() {
             // pretty-print the metric interval
-            println!("ConsensusRuntime:{:?}", interval);
+            // println!("ConsensusRuntime:{:?}", interval);
             // wait 500ms
             tokio::time::sleep(Duration::from_secs(10)).await;
         }

@@ -1,14 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::emitter::wait_for_single_account_sequence;
 use crate::{
-    emitter::{RETRY_POLICY, SEND_AMOUNT},
+    emitter::{wait_for_single_account_sequence, RETRY_POLICY, SEND_AMOUNT},
     query_sequence_number, EmitJobRequest, EmitModeParams,
 };
 use anyhow::{anyhow, format_err, Context, Result};
-use aptos::common::types::EncodingType;
-use aptos::common::utils::prompt_yes;
+use aptos::common::{types::EncodingType, utils::prompt_yes};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
@@ -30,9 +28,12 @@ use core::{
 use futures::StreamExt;
 use rand::{rngs::StdRng, seq::SliceRandom};
 use rand_core::SeedableRng;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
 
 #[derive(Debug)]
 pub struct AccountMinter<'t> {
@@ -460,7 +461,7 @@ pub async fn execute_and_wait_transactions(
     txns: Vec<SignedTransaction>,
     failure_counter: &AtomicUsize,
 ) -> Result<()> {
-    debug!(
+    info!(
         "[{:?}] Submitting transactions {} - {} for {}",
         client.path_prefix_string(),
         account.sequence_number() - txns.len() as u64,
@@ -580,6 +581,7 @@ pub async fn execute_and_wait_transactions(
         );
     }
 
+    /*
     let state = state.into_inner();
 
     for txn in state.txns.iter() {
@@ -594,9 +596,9 @@ pub async fn execute_and_wait_transactions(
             })
             .await
             .map_err(|e| format_err!("Failed to wait for transactions: {:?}", e))?;
-    }
+    }*/
 
-    debug!(
+    println!(
         "[{:?}] Account {} is at sequence number {} now",
         client.path_prefix_string(),
         account.address(),

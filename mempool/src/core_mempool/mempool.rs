@@ -3,8 +3,6 @@
 
 //! Mempool is used to track transactions which have been submitted but not yet
 //! agreed upon.
-use crate::counters::{CONSENSUS_PULLED_LABEL, E2E_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL};
-use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     core_mempool::{
         index::TxnPointer,
@@ -12,7 +10,9 @@ use crate::{
         transaction_store::TransactionStore,
     },
     counters,
+    counters::{CONSENSUS_PULLED_LABEL, E2E_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL},
     logging::{LogEntry, LogSchema, TxnsLog},
+    shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
@@ -125,6 +125,7 @@ impl Mempool {
             committed_seq_number = db_sequence_number
         );
 
+        /*
         // don't accept old transactions (e.g. seq is less than account's current seq_number)
         if txn.sequence_number() < db_sequence_number {
             return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
@@ -132,7 +133,7 @@ impl Mempool {
                 txn.sequence_number(),
                 db_sequence_number,
             ));
-        }
+        }*/
 
         let now = SystemTime::now();
         let expiration_time =
@@ -175,13 +176,15 @@ impl Mempool {
         // Later txn has higher gas price and will be observed first in priority index iterator,
         // but can't be executed before first txn. Once observed, such txn will be saved in
         // `skipped` DS and rechecked once it's ancestor becomes available
-        let mut skipped = HashSet::new();
+
+        // let mut skipped = HashSet::new();
         let mut total_bytes = 0;
         let seen_size = seen.len();
         let mut txn_walked = 0usize;
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
+            /*
             if seen.contains(&TxnPointer::from(txn)) {
                 continue;
             }
@@ -211,7 +214,9 @@ impl Mempool {
                 }
             } else {
                 skipped.insert(TxnPointer::from(txn));
-            }
+            }*/
+            let ptr = TxnPointer::from(txn);
+            result.push(ptr);
         }
         let result_size = result.len();
         let mut block = Vec::with_capacity(result_size);

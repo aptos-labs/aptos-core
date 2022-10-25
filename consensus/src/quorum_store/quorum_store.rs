@@ -1,26 +1,30 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::NetworkSender;
-use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::{
-    batch_aggregator::BatchAggregator,
-    batch_reader::BatchReader,
-    batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
-    network_listener::NetworkListener,
-    proof_builder::{ProofBuilder, ProofBuilderCommand, ProofReturnChannel},
-    quorum_store_db::QuorumStoreDB,
-    types::{BatchId, Fragment, SerializedTransaction},
+use crate::{
+    network::NetworkSender,
+    network_interface::ConsensusMsg,
+    quorum_store::{
+        batch_aggregator::BatchAggregator,
+        batch_reader::BatchReader,
+        batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
+        network_listener::NetworkListener,
+        proof_builder::{ProofBuilder, ProofBuilderCommand, ProofReturnChannel},
+        quorum_store_db::QuorumStoreDB,
+        types::{BatchId, Fragment, SerializedTransaction},
+    },
+    round_manager::VerifiedEvent,
 };
-use crate::round_manager::VerifiedEvent;
 use aptos_logger::debug;
 // use aptos_logger::spawn_named;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use channel::aptos_channel;
-use consensus_types::proof_of_store::SignedDigestInfo;
-use consensus_types::{common::Round, proof_of_store::LogicalTime};
+use consensus_types::{
+    common::Round,
+    proof_of_store::{LogicalTime, SignedDigestInfo},
+};
 use std::sync::Arc;
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
@@ -161,7 +165,7 @@ impl QuorumStore {
             let metrics_monitor = metrics_monitor.clone();
             tokio::spawn(async move {
                 for interval in metrics_monitor.intervals() {
-                    println!("QuorumStore:{:?}", interval);
+                    //println!("QuorumStore:{:?}", interval);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             });

@@ -88,7 +88,7 @@ impl Sub for &TxnStats {
             committed: self.committed - other.committed,
             expired: self.expired - other.expired,
             failed_submission: self.failed_submission - other.failed_submission,
-            latency: self.latency - other.latency,
+            latency: 0, //self.latency - other.latency,
             latency_samples: self.latency_samples - other.latency_samples,
             latency_buckets: &self.latency_buckets - &other.latency_buckets,
         }

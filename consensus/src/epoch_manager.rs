@@ -1,12 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_reader::BatchReader,
-    quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig},
-    quorum_store_db::QuorumStoreDB,
-    quorum_store_wrapper::QuorumStoreWrapper,
-};
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -39,7 +33,13 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkSender},
     payload_manager::QuorumStoreClient,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore,
+    quorum_store::{
+        batch_reader::BatchReader,
+        direct_mempool_quorum_store::DirectMempoolQuorumStore,
+        quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig},
+        quorum_store_db::QuorumStoreDB,
+        quorum_store_wrapper::QuorumStoreWrapper,
+    },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,
@@ -534,7 +534,7 @@ impl EpochManager {
             let metrics_monitor = metrics_monitor.clone();
             tokio::spawn(async move {
                 for interval in metrics_monitor.intervals() {
-                    println!("QuorumStore:{:?}", interval);
+                    //println!("QuorumStore:{:?}", interval);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             });
@@ -590,7 +590,7 @@ impl EpochManager {
             let metrics_monitor = metrics_monitor.clone();
             tokio::spawn(async move {
                 for interval in metrics_monitor.intervals() {
-                    println!("QuorumStoreWrapper:{:?}", interval);
+                    //println!("QuorumStoreWrapper:{:?}", interval);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             });

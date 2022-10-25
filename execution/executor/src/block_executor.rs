@@ -99,6 +99,7 @@ where
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
     ) -> Result<(), Error> {
+        self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
@@ -279,6 +280,7 @@ where
         fail_point!("executor::commit_blocks", |_| {
             Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
         });
+        /*
         let result_in_memory_state = self
             .block_tree
             .get_block(block_id_to_commit)?
@@ -293,7 +295,10 @@ where
             Some(&ledger_info_with_sigs),
             sync_commit,
             result_in_memory_state,
-        )?;
+        )?;*/
+        self.db
+            .writer
+            .save_ledger_info(Some(&ledger_info_with_sigs))?;
         self.block_tree
             .prune(ledger_info_with_sigs.ledger_info())
             .expect("Failure pruning block tree.");

@@ -65,8 +65,6 @@ use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_types::proof::TransactionAccumulatorSummary;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -77,12 +75,13 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
-        TransactionInfoListWithProof,
+        TransactionAccumulatorSummary, TransactionInfoListWithProof,
     },
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
+        state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
     },
@@ -108,12 +107,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::pruner::{
-    ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
-    state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
+use crate::{
+    pruner::{
+        ledger_pruner_manager::LedgerPrunerManager,
+        ledger_store::ledger_store_pruner::LedgerPruner, state_pruner_manager::StatePrunerManager,
+        state_store::StateMerklePruner,
+    },
+    stale_node_index::StaleNodeIndexSchema,
+    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
 };
-use crate::stale_node_index::StaleNodeIndexSchema;
-use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver,
@@ -1472,6 +1474,21 @@ impl DbReader for AptosDB {
 }
 
 impl DbWriter for AptosDB {
+    fn save_ledger_info(
+        &self,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        gauged_api("save_ledger_info", || {
+            if let Some(x) = ledger_info_with_sigs {
+                self.ledger_store.set_latest_ledger_info(x.clone());
+
+                LEDGER_VERSION.set(x.ledger_info().version() as i64);
+                NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
+            }
+            Ok(())
+        })
+    }
+
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
