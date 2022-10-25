@@ -7,7 +7,7 @@ import { AptosAccount } from "./aptos_account";
 import { TxnBuilderTypes, TransactionBuilderMultiEd25519, TransactionBuilderRemoteABI } from "./transaction_builder";
 import { TokenClient } from "./token_client";
 import { HexString } from "./hex_string";
-import { getFaucetClient, NODE_URL } from "./utils/test_helper.test";
+import { getFaucetClient, longTestTimeout, NODE_URL } from "./utils/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "./bcs";
 import { Ed25519PublicKey } from "./aptos_types";
 
@@ -110,7 +110,7 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("717");
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -147,7 +147,7 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("400");
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -221,7 +221,7 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("123");
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -281,7 +281,7 @@ test(
     });
     await checkAptosCoin();
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -339,7 +339,7 @@ test(
     expect(account2AptosCoin).toHaveLength(1);
     await checkAptosCoin();
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -421,7 +421,7 @@ test(
     const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -456,7 +456,7 @@ test(
     const txn = await client.getTransactionByHash(txnHash);
     expect((txn as any).success).toBeTruthy();
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -483,7 +483,7 @@ test(
       HexString.fromUint8Array(bcsToBytes(aliceAddress)).hex(),
     );
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -494,7 +494,7 @@ test(
     const block = await client.getBlockByHeight(blockHeight);
     expect(block.block_height).toBe(blockHeight.toString());
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -506,7 +506,7 @@ test(
     expect(parseInt(block.first_version, 10)).toBeLessThanOrEqual(version);
     expect(parseInt(block.last_version, 10)).toBeGreaterThanOrEqual(version);
   },
-  30 * 1000,
+  longTestTimeout,
 );
 
 test(
@@ -522,5 +522,5 @@ test(
 
     expect(maxGasAmount).toBeGreaterThan(BigInt(0));
   },
-  30 * 1000,
+  longTestTimeout,
 );
