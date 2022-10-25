@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_storage::BlockStore;
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
 use crate::quorum_store::utils::ProofQueue;
@@ -66,6 +67,7 @@ pub struct QuorumStoreWrapper {
     last_batch_id: u64,
     remaining_proof_num: usize,
     back_pressure_limit: usize,
+    block_store: Arc<BlockStore>,
 }
 
 impl QuorumStoreWrapper {
@@ -83,6 +85,7 @@ impl QuorumStoreWrapper {
         batch_expiry_round_gap_beyond_latest_certified: Round,
         end_batch_ms: u128,
         back_pressure_limit: usize,
+        block_store: Arc<BlockStore>,
     ) -> Self {
         let batch_id = if let Some(id) = db
             .clean_and_get_batch_id(epoch)
@@ -116,6 +119,7 @@ impl QuorumStoreWrapper {
             last_batch_id: 0,
             remaining_proof_num: 0,
             back_pressure_limit,
+            block_store,
         }
     }
 
@@ -125,7 +129,7 @@ impl QuorumStoreWrapper {
             "QS: back pressure check remaining_proof_num {} back_pressure_limit {}",
             self.remaining_proof_num, self.back_pressure_limit
         );
-        self.remaining_proof_num > self.back_pressure_limit
+        self.remaining_proof_num > self.back_pressure_limit && self.block_store.back_pressure()
     }
 
     pub(crate) async fn handle_scheduled_pull(

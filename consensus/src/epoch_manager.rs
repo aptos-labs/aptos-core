@@ -557,6 +557,7 @@ impl EpochManager {
         wrapper_to_quorum_store_tx: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
         qs_config: &QuorumStoreConfig,
         num_validators: usize,
+        block_store: Arc<BlockStore>,
     ) {
         // TODO: make this not use a ConsensusRequest
         let (wrapper_quorum_store_msg_tx, wrapper_quorum_store_msg_rx) =
@@ -584,6 +585,7 @@ impl EpochManager {
             qs_config.batch_expiry_round_gap_beyond_latest_certified,
             qs_config.end_batch_ms,
             qs_config.back_pressure_factor * num_validators,
+            block_store,
         );
         let metrics_monitor = tokio_metrics::TaskMonitor::new();
         {
@@ -797,6 +799,27 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
+        self.commit_state_computer.new_epoch(&epoch_state);
+        let state_computer = if onchain_config.decoupled_execution() {
+            Arc::new(self.spawn_decoupled_execution(
+                safety_rules_container.clone(),
+                epoch_state.verifier.clone(),
+            ))
+        } else {
+            self.commit_state_computer.clone()
+        };
+
+        info!(epoch = epoch, "Create BlockStore");
+        let block_store = Arc::new(BlockStore::new(
+            Arc::clone(&self.storage),
+            recovery_data,
+            state_computer,
+            self.config.max_pruned_blocks_in_mem,
+            Arc::clone(&self.time_service),
+            onchain_config.back_pressure_limit(),
+            self.data_manager.clone(),
+        ));
+
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
@@ -846,6 +869,7 @@ impl EpochManager {
                 wrapper_quorum_store_tx,
                 &config,
                 epoch_state.verifier.len(),
+                block_store.clone(),
             );
         } else {
             self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
@@ -856,27 +880,6 @@ impl EpochManager {
             self.config.quorum_store_poll_count,
             self.config.quorum_store_pull_timeout_ms,
         );
-
-        self.commit_state_computer.new_epoch(&epoch_state);
-        let state_computer = if onchain_config.decoupled_execution() {
-            Arc::new(self.spawn_decoupled_execution(
-                safety_rules_container.clone(),
-                epoch_state.verifier.clone(),
-            ))
-        } else {
-            self.commit_state_computer.clone()
-        };
-
-        info!(epoch = epoch, "Create BlockStore");
-        let block_store = Arc::new(BlockStore::new(
-            Arc::clone(&self.storage),
-            recovery_data,
-            state_computer,
-            self.config.max_pruned_blocks_in_mem,
-            Arc::clone(&self.time_service),
-            onchain_config.back_pressure_limit(),
-            self.data_manager.clone(),
-        ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)

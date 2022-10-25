@@ -247,7 +247,7 @@ impl ProofQueue {
             .iter()
             .take_while(|(_, expiration_time)| *expiration_time < current_time)
             .count();
-        for (digest, expiration_time) in self.digest_queue.drain(0..num_expired) {
+        for (digest, _expiration_time) in self.digest_queue.drain(0..num_expired) {
             assert_some!(self.digest_proof.remove(&digest));
             // if expiration_time < current_time && expiration_time.round() < current_time.round() {
             //     counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
