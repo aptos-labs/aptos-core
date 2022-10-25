@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+/* eslint-disable max-len */
+
 import { AptosAccount } from "./aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "./aptos_client";
 import * as TokenTypes from "./token_types";
@@ -8,9 +10,16 @@ import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";
 import { TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./transaction_builder";
 import { MAX_U64_BIG_INT } from "./bcs/consts";
-import { TOKEN_ABIS } from "./abis";
+import { TOKEN_ABIS, TOKEN_TRANSFER_OPT_IN } from "./abis";
 import { AnyNumber, bcsToBytes, Bytes } from "./bcs";
 import { getPropertyValueRaw } from "./utils/property_map_serializer";
+import {
+  Script,
+  TransactionArgumentAddress,
+  TransactionArgumentU64,
+  TransactionArgumentU8Vector,
+  TransactionPayloadScript,
+} from "./aptos_types";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -342,6 +351,45 @@ export class TokenClient {
    */
   async optInTokenTransfer(sender: AptosAccount, optIn: boolean): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload("0x3::token::opt_in_direct_transfer", [], [optIn]);
+
+    return this.aptosClient.generateSignSubmitTransaction(sender, payload);
+  }
+
+  /**
+   * User opt-in or out direct transfer through a boolean flag
+   *
+   * @param sender AptosAccount where the token will be transferred
+   * @param creator  address of the token creator
+   * @param collectionName Name of collection where token is stored
+   * @param name Token name
+   * @param property_version the version of token PropertyMap
+   * @param amount Amount of tokens which will be transfered
+   * @returns The hash of the transaction submitted to the API
+   */
+  async transferWithOptIn(
+    sender: AptosAccount,
+    creator: MaybeHexString,
+    collectionName: string,
+    tokenName: string,
+    propertyVersion: number,
+    receiver: MaybeHexString,
+    amount: number,
+  ): Promise<string> {
+    // compile script to invoke public transfer function
+    const payload = new TransactionPayloadScript(
+      new Script(
+        new HexString(TOKEN_TRANSFER_OPT_IN).toUint8Array(),
+        [],
+        [
+          new TransactionArgumentAddress(TxnBuilderTypes.AccountAddress.fromHex(creator)),
+          new TransactionArgumentU8Vector(new TextEncoder().encode(collectionName)),
+          new TransactionArgumentU8Vector(new TextEncoder().encode(tokenName)),
+          new TransactionArgumentU64(BigInt(propertyVersion)),
+          new TransactionArgumentAddress(TxnBuilderTypes.AccountAddress.fromHex(receiver)),
+          new TransactionArgumentU64(BigInt(amount)),
+        ],
+      ),
+    );
 
     return this.aptosClient.generateSignSubmitTransaction(sender, payload);
   }
