@@ -378,7 +378,7 @@ impl QuorumStoreWrapper {
                     "Wrong epoch"
                 );
                 assert!(
-                    self.latest_logical_time < logical_time,
+                    self.latest_logical_time <= logical_time,
                     "Non-increasing logical time"
                 );
                 self.latest_logical_time = logical_time;

@@ -534,7 +534,7 @@ impl EpochManager {
             let metrics_monitor = metrics_monitor.clone();
             tokio::spawn(async move {
                 for interval in metrics_monitor.intervals() {
-                    println!("QuorumStore:{:?}", interval);
+                    //println!("QuorumStore:{:?}", interval);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             });
@@ -592,7 +592,7 @@ impl EpochManager {
             let metrics_monitor = metrics_monitor.clone();
             tokio::spawn(async move {
                 for interval in metrics_monitor.intervals() {
-                    println!("QuorumStoreWrapper:{:?}", interval);
+                    //println!("QuorumStoreWrapper:{:?}", interval);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             });
@@ -831,7 +831,7 @@ impl EpochManager {
                 proof_timeout_ms: 10000,
                 batch_request_num_peers: 2,
                 end_batch_ms: 500,
-                max_batch_bytes: 100000,
+                max_batch_bytes: 1000000,
                 batch_request_timeout_ms: 10000,
                 batch_expiry_round_gap_when_init: 150,
                 batch_expiry_round_gap_behind_latest_certified: 500,
@@ -839,7 +839,7 @@ impl EpochManager {
                 batch_expiry_grace_rounds: 5,
                 memory_quota: 100000000,
                 db_quota: 10000000000,
-                mempool_txn_pull_max_count: 100,
+                mempool_txn_pull_max_count: 2000,
                 mempool_txn_pull_max_bytes: 1000000,
                 num_nodes_per_worker_handles: 2,
                 back_pressure_factor: 1, // back pressure limit for QS is back_pressure_factor * num_validator

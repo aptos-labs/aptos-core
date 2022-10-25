@@ -19,8 +19,10 @@ pub use aptos_api_types::{
 pub use state::State;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 
-use crate::aptos::{AptosVersion, Balance};
-use crate::error::RestError;
+use crate::{
+    aptos::{AptosVersion, Balance},
+    error::RestError,
+};
 use anyhow::{anyhow, Result};
 use aptos_api_types::{
     deserialize_from_string,
@@ -40,14 +42,13 @@ use aptos_types::{
 use futures::executor::block_on;
 use move_binary_format::CompiledModule;
 use move_core_types::language_storage::{ModuleId, StructTag};
-use reqwest::header::ACCEPT;
-use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
+use reqwest::{
+    header::{ACCEPT, CONTENT_TYPE},
+    Client as ReqwestClient, StatusCode,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
-use std::future::Future;
-use std::rc::Rc;
-use std::time::Duration;
+use std::{collections::BTreeMap, future::Future, rc::Rc, time::Duration};
 use tokio::time::Instant;
 use url::Url;
 

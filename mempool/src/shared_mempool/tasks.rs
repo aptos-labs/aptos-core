@@ -246,13 +246,17 @@ where
 {
     let mut statuses = vec![];
 
+    /*
     let start_storage_read = Instant::now();
     let state_view = smp
         .db
         .latest_state_checkpoint_view()
         .expect("Failed to get latest state checkpoint view.");
+    */
 
     // Track latency: fetching seq number
+
+    /*
     let seq_numbers = IO_POOL.install(|| {
         transactions
             .par_iter()
@@ -266,11 +270,10 @@ where
             .collect::<Vec<_>>()
     });
     // Track latency for storage read fetching sequence number
-    let storage_read_latency = start_storage_read.elapsed();
+    // let storage_read_latency = start_storage_read.elapsed();
     counters::PROCESS_TXN_BREAKDOWN_LATENCY
         .with_label_values(&[counters::FETCH_SEQ_NUM_LABEL])
         .observe(storage_read_latency.as_secs_f64() / transactions.len() as f64);
-
     let transactions: Vec<_> = transactions
         .into_iter()
         .enumerate()
@@ -310,6 +313,9 @@ where
         .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
         .collect::<Vec<_>>();
     vm_validation_timer.stop_and_record();
+    */
+
+    /*
     {
         let mut mempool = smp.mempool.lock();
         for (idx, (transaction, sequence_info)) in transactions.into_iter().enumerate() {
@@ -344,6 +350,20 @@ where
                     ),
                 ));
             }
+        }
+    }
+    */
+    use aptos_types::account_config::AccountSequenceInfo;
+    {
+        let mut mempool = smp.mempool.lock();
+        for transaction in transactions.into_iter() {
+            let mempool_status = mempool.add_txn(
+                transaction.clone(),
+                0,
+                AccountSequenceInfo::Sequential(transaction.sequence_number()),
+                timeline_state,
+            );
+            statuses.push((transaction, (mempool_status, None)));
         }
     }
     notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
@@ -394,7 +414,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
 ) {
     // Start latency timer
     let start_time = Instant::now();
-    // debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
+    info!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
 
     let (resp, callback, counter_label) = match req {
         QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, transactions, callback) => {

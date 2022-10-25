@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
     data_manager::DataManager,
     error::StateSyncError,
+    monitor,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     txn_notifier::TxnNotifier,
 };
@@ -15,13 +15,19 @@ use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    account_address::AccountAddress,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{ExecutionStatus, Transaction, TransactionStatus},
 };
 use consensus_notifications::ConsensusNotificationSender;
-use consensus_types::common::Payload;
-use consensus_types::proof_of_store::LogicalTime;
-use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
+use consensus_types::{
+    block::Block,
+    common::{Payload, Round},
+    executed_block::ExecutedBlock,
+    proof_of_store::LogicalTime,
+};
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
@@ -132,6 +138,29 @@ impl StateComputer for ExecutionProxy {
         let compute_result = monitor!(
             "execute_block",
             tokio::task::spawn_blocking(move || {
+                info!(
+                    "received block {} to execute, len: {}",
+                    block_id,
+                    transactions_to_execute.len()
+                );
+                /*
+                let mut txn_status = Vec::new();
+                txn_status.resize(
+                    transactions_to_execute.len(),
+                    TransactionStatus::Keep(ExecutionStatus::Success),
+                );
+
+                Ok::<StateComputeResult, executor_types::Error>(StateComputeResult::new(
+                    parent_block_id,
+                    Vec::new(),
+                    0,
+                    Vec::new(),
+                    0,
+                    None,
+                    txn_status,
+                    Vec::new(),
+                    Vec::new(),
+                ))*/
                 executor.execute_block((block_id, transactions_to_execute), parent_block_id)
             })
             .await
@@ -249,6 +278,13 @@ impl StateComputer for ExecutionProxy {
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
+
+        self.executor.commit_blocks_ext(
+            vec![target.ledger_info().consensus_block_id()],
+            target,
+            true,
+        )?;
+        /*
         // Here to start to do state synchronization where ChunkExecutor inside will
         // process chunks and commit to Storage. However, after block execution and
         // commitments, the sync state of ChunkExecutor may be not up to date so
@@ -257,16 +293,18 @@ impl StateComputer for ExecutionProxy {
         let res = monitor!(
             "sync_to",
             self.state_sync_notifier.sync_to_target(target).await
-        );
+        );*/
 
         // Similarly, after the state synchronization, we have to reset the cache
         // of BlockExecutor to guarantee the latest committed state is up to date.
         self.executor.reset()?;
 
+        /*
         res.map_err(|error| {
             let anyhow_error: anyhow::Error = error.into();
             anyhow_error.into()
-        })
+        })*/
+        Ok(())
     }
 
     fn new_epoch(&self, epoch_state: &EpochState) {
