@@ -448,7 +448,7 @@ impl TransactionRestoreBatchController {
             .try_buffered_x(self.global_opt.concurrent_downloads, 1)
             .and_then(future::ready);
 
-        db_commit_stream
+        let total_replayed = db_commit_stream
             .and_then(|()| {
                 let chunk_replayer = chunk_replayer.clone();
                 async move {
@@ -458,20 +458,27 @@ impl TransactionRestoreBatchController {
                     tokio::task::spawn_blocking(move || {
                         let committed_chunk = chunk_replayer.commit()?;
                         let v = committed_chunk.result_view.version().unwrap_or(0);
+                        let total_replayed = v - first_version + 1;
                         TRANSACTION_REPLAY_VERSION.set(v as i64);
                         info!(
                             version = v,
-                            accumulative_tps = (v - first_version + 1) as f64
-                                / replay_start.elapsed().as_secs_f64(),
+                            accumulative_tps =
+                                total_replayed as f64 / replay_start.elapsed().as_secs_f64(),
                             "Transactions replayed."
                         );
-                        Ok(())
+                        Ok(v)
                     })
                     .await?
                 }
             })
-            .try_fold((), |(), ()| future::ok(()))
-            .await
+            .try_fold(0, |_total, total| future::ok(total))
+            .await?;
+        info!(
+            total_replayed = total_replayed,
+            accumulative_tps = total_replayed as f64 / replay_start.elapsed().as_secs_f64(),
+            "Replay finished."
+        );
+        Ok(())
     }
 
     async fn go_through_verified_chunks(
