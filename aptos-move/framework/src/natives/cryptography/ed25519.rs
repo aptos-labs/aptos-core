@@ -155,7 +155,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ));
         natives.push((
             "sign_internal",
-            make_native_from_func(gas_params.clone(), native_test_only_sign_internal),
+            make_native_from_func(gas_params, native_test_only_sign_internal),
         ));
     }
     crate::natives::helpers::make_module_natives(natives)
