@@ -90,7 +90,7 @@ spec aptos_framework::account {
 
     spec create_authorized_signer {
         pragma aborts_if_is_partial;
-        let account_resource = borrow_global<Account>(offerer_address);
+        let account_resource = global<Account>(offerer_address);
         aborts_if !exists<Account>(offerer_address);
         ensures exists<Account>(offerer_address);
         ensures signer::address_of(result) == offerer_address;
@@ -121,20 +121,19 @@ spec aptos_framework::account {
 
     spec create_guid {
         let addr = signer::address_of(account_signer);
-        let account = borrow_global_mut<Account>(addr);
+        let account = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if account.guid_creation_num + 1 > MAX_U64;
     }
 
     spec new_event_handle {
         let addr = signer::address_of(account);
-        let account = borrow_global_mut<Account>(addr);
+        let account = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if account.guid_creation_num + 1 > MAX_U64;
     }
 
     spec register_coin {
-        pragma aborts_if_is_partial;
         aborts_if !exists<Account>(account_addr);
     }
 

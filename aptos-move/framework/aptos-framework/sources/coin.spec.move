@@ -28,6 +28,8 @@ spec aptos_framework::coin {
         let aptos_addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<SupplyConfig>(aptos_addr);
+        ensures !global<SupplyConfig>(aptos_addr).allow_upgrades;
+        ensures exists<SupplyConfig>(aptos_addr);
     }
 
     spec allow_supply_upgrades {
