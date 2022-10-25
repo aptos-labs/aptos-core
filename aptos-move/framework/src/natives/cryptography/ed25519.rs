@@ -3,6 +3,8 @@
 
 use crate::natives::util::make_native_from_func;
 #[cfg(feature = "testing")]
+use crate::natives::util::make_test_only_native_from_func;
+#[cfg(feature = "testing")]
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey, ED25519_PUBLIC_KEY_LENGTH};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
@@ -148,18 +150,18 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ),
         (
             "signature_verify_strict_internal",
-            make_native_from_func(gas_params.clone(), native_signature_verify_strict),
+            make_native_from_func(gas_params, native_signature_verify_strict),
         ),
     ];
     if cfg!(feature = "testing") {
         let mut test_only_natives = vec![
             (
                 "generate_keys_internal",
-                make_native_from_func(gas_params.clone(), native_test_only_generate_keys_internal),
+                make_test_only_native_from_func(native_test_only_generate_keys_internal),
             ),
             (
                 "sign_internal",
-                make_native_from_func(gas_params, native_test_only_sign_internal),
+                make_test_only_native_from_func(native_test_only_sign_internal),
             ),
         ];
         natives.append(&mut test_only_natives);
@@ -170,7 +172,6 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
 
 #[cfg(feature = "testing")]
 fn native_test_only_generate_keys_internal(
-    _gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
@@ -187,7 +188,6 @@ fn native_test_only_generate_keys_internal(
 
 #[cfg(feature = "testing")]
 fn native_test_only_sign_internal(
-    _gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
