@@ -154,7 +154,8 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params, native_signature_verify_strict),
         ),
     ];
-    if cfg!(feature = "testing") {
+    #[cfg(feature = "testing")]
+    {
         let mut test_only_natives = vec![
             (
                 "generate_keys_internal",
