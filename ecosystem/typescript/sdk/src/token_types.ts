@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { AnyObject } from "./utils";
+
 export interface TokenData {
   /** Unique name within this creator's account for this Token's collection */
   collection: string;
@@ -47,5 +49,5 @@ export interface Token {
   /** server will return string for u64 */
   amount: U64;
   /** the property map of the token */
-  token_properties: any;
+  token_properties: AnyObject;
 }

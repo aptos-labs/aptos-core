@@ -37,7 +37,7 @@ test(
         collectionName,
         tokenName,
         "Alice's simple token",
-        1,
+        2,
         "https://aptos.dev/img/nyan.jpeg",
         1000,
         alice.address(),
@@ -63,7 +63,7 @@ test(
     // Transfer Token from Alice's Account to Bob's Account
     await tokenClient.getCollectionData(alice.address().hex(), collectionName);
     let aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
-    expect(aliceBalance.amount).toBe("1");
+    expect(aliceBalance.amount).toBe("2");
     const tokenData = await tokenClient.getTokenData(alice.address().hex(), collectionName, tokenName);
     expect(tokenData.name).toBe(tokenName);
 
@@ -72,21 +72,21 @@ test(
       { checkSuccess: true },
     );
     aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
-    expect(aliceBalance.amount).toBe("0");
+    expect(aliceBalance.amount).toBe("1");
 
     await client.waitForTransaction(
       await tokenClient.cancelTokenOffer(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName),
       { checkSuccess: true },
     );
     aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
-    expect(aliceBalance.amount).toBe("1");
+    expect(aliceBalance.amount).toBe("2");
 
     await client.waitForTransaction(
       await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
       { checkSuccess: true },
     );
     aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
-    expect(aliceBalance.amount).toBe("0");
+    expect(aliceBalance.amount).toBe("1");
 
     await client.waitForTransaction(
       await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collectionName, tokenName),
@@ -124,10 +124,28 @@ test(
     expect(mutated_token.token_properties.map.data.length).toBe(2);
 
     // burn the token by owner
-    let b = await tokenClient.burnByOwner(bob, alice.address(), collectionName, tokenName, 1, 1);
-    await client.waitForTransactionWithResult(b);
+    var txn_hash = await tokenClient.burnByOwner(bob, alice.address(), collectionName, tokenName, 1, 1);
+    await client.waitForTransactionWithResult(txn_hash);
     const newbalance = await tokenClient.getTokenForAccount(bob.address().hex(), newTokenId);
     expect(newbalance.amount).toBe("0");
+
+    //bob opt_in directly transfer and alice transfer token to bob directly
+    txn_hash = await tokenClient.optInTokenTransfer(bob, true);
+    await client.waitForTransactionWithResult(txn_hash);
+
+    // alice still have one token with property version 0.
+    txn_hash = await tokenClient.transferWithOptIn(
+      alice,
+      alice.address(),
+      collectionName,
+      tokenName,
+      0,
+      bob.address(),
+      1,
+    );
+    await client.waitForTransactionWithResult(txn_hash);
+    const balance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
+    expect(balance.amount).toBe("1");
   },
   longTestTimeout,
 );
