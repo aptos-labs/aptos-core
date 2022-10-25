@@ -42,6 +42,7 @@ async fn test_critical_timeout() {
     driver_configuration.config.continuous_syncing_mode =
         ContinuousSyncingMode::ApplyTransactionOutputs;
     driver_configuration.config.max_stream_wait_time_ms = 1000;
+    driver_configuration.config.max_num_stream_timeouts = 4;
 
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
@@ -82,8 +83,8 @@ async fn test_critical_timeout() {
         .await
         .unwrap();
 
-    // Drive progress twice and verify we get non-critical timeouts
-    for _ in 0..2 {
+    // Drive progress and verify we get non-critical timeouts
+    for _ in 0..3 {
         let error = continuous_syncer
             .drive_progress(no_sync_request.clone())
             .await

@@ -143,6 +143,11 @@ variable "enable_backup" {
   default     = false
 }
 
+variable "enable_public_backup" {
+  description = "provide data backups to the public"
+  default     = false
+}
+
 variable "backup_fullnode_index" {
   description = "index of fullnode to backup data from"
   default     = 0
@@ -152,7 +157,7 @@ variable "fullnode_storage_class" {
   description = "Which storage class to use for the validator and fullnode"
   default     = "io1"
   validation {
-    condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
+    condition     = contains(["gp3", "gp2", "io1", "io2"], var.fullnode_storage_class)
     error_message = "Supported storage classes are gp3, io1, io2"
   }
 }

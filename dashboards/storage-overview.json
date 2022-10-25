@@ -185,7 +185,16 @@
           },
           "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "P50" },
+            "properties": [
+              { "id": "custom.lineWidth", "value": 5 },
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "solid" } }
+            ]
+          }
+        ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "id": 257,
@@ -203,6 +212,15 @@
           "legendFormat": "{{kubernetes_pod_name}}",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, (rate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])))",
+          "hide": false,
+          "legendFormat": "P50",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Transactions per second",
@@ -244,7 +262,15 @@
           },
           "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "P50" },
+            "properties": [
+              { "id": "custom.lineWidth", "value": 5 },
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+            ]
+          }
+        ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "id": 258,
@@ -257,12 +283,21 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sort_desc(irate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name, kubernetes_pod_name) irate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", api_name=\"save_transactions\", role=~\"$role\", result=\"Ok\"}[1m]) < 10000)",
+          "expr": "sort_desc(rate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name) rate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", api_name=\"save_transactions\", role=~\"$role\", result=\"Ok\"}[1m]) < 10000)",
           "hide": false,
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}} ",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, rate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name) rate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", api_name=\"save_transactions\", role=~\"$role\", result=\"Ok\"}[1m]) < 10000)",
+          "hide": false,
+          "legendFormat": "P50",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Transactions per save",
@@ -275,7 +310,7 @@
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 2 },
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 21 },
           "id": 3252,
           "options": {
             "content": "We expect nodes to have more than 200GB free space all the time.\r\n\r\nIdentify outliers on the left and filter by peer name to see it's specific values on the other panels. Otherwise you are seeing average values.",
@@ -285,6 +320,63 @@
           "type": "text"
         },
         {
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "fillOpacity": 70, "lineWidth": 1 },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "#EAB839", "value": 100000 },
+                  { "color": "red", "value": 1000000 }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "epoch" },
+                "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+          "hideTimeOverride": false,
+          "id": 3303,
+          "options": {
+            "colWidth": 0.9,
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "rowHeight": 0.9,
+            "showValue": "auto",
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "9.1.1",
+          "targets": [
+            {
+              "dataset": "indexer_mainnet_gcp",
+              "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+              "editorMode": "code",
+              "format": 0,
+              "location": "US",
+              "project": "analytics-test-345723",
+              "rawQuery": true,
+              "rawSql": "SELECT timestamp, epoch,\nCAST(JSON_VALUE(json_data, '$.per_byte_read') AS INT64) as per_byte_read,\nCAST(JSON_VALUE(json_data, '$.per_item_read') AS INT64) as per_item_read,\nCAST(JSON_VALUE(json_data, '$.per_byte_write') AS INT64) as per_byte_write,\nCAST(JSON_VALUE(json_data, '$.per_item_write') AS INT64) as per_item_write,\nCAST(JSON_VALUE(json_data, '$.per_byte_create') AS INT64) as per_byte_create,\nCAST(JSON_VALUE(json_data, '$.per_item_create') AS INT64) as per_item_create,\nFROM `analytics-test-345723.indexer_mainnet_gcp.block_metadata_transactions` JOIN (\n  SELECT json_data, transaction_version FROM `analytics-test-345723.indexer_mainnet_gcp.move_resources_view`\n  WHERE name = \"StorageGas\"\n) on version = transaction_version\nWHERE timestamp between TIMESTAMP_MILLIS($__from) and TIMESTAMP_MILLIS($__to)\n",
+              "refId": "A",
+              "sql": {
+                "columns": [{ "parameters": [], "type": "function" }],
+                "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Gas Cost",
+          "transformations": [],
+          "type": "status-history"
+        },
+        {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "description": "",
           "fieldConfig": {
@@ -292,7 +384,7 @@
               "color": { "mode": "palette-classic" },
               "custom": {
                 "axisCenteredZero": false,
-                "axisColorMode": "text",
+                "axisColorMode": "series",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -310,18 +402,23 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "none"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "percent of 2B target" },
+                "properties": [
+                  { "id": "custom.axisLabel", "value": "percent of 2B target" },
+                  { "id": "custom.axisPlacement", "value": "left" },
+                  { "id": "unit", "value": "percent" },
+                  { "id": "decimals", "value": 2 },
+                  { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+                ]
+              }
+            ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 32 },
           "id": 3250,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -345,6 +442,13 @@
               "legendFormat": "__auto",
               "range": true,
               "refId": "B"
+            },
+            {
+              "datasource": { "name": "Expression", "type": "__expr__", "uid": "__expr__" },
+              "expression": "$B / 2000000000 * 100",
+              "hide": false,
+              "refId": "percent of 2B target",
+              "type": "math"
             }
           ],
           "title": "latest total number of state items (p80)",
@@ -395,10 +499,20 @@
                   { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
                   { "id": "custom.axisLabel", "value": "average per item bytes" }
                 ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "percent of 1TB target" },
+                "properties": [
+                  { "id": "unit", "value": "percent" },
+                  { "id": "decimals", "value": 2 },
+                  { "id": "custom.axisLabel", "value": "percent of 1TB target" },
+                  { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
+                  { "id": "custom.axisPlacement", "value": "left" }
+                ]
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 32 },
           "id": 3295,
           "options": {
             "legend": { "calcs": [], "displayMode": "table", "placement": "right", "showLegend": false },
@@ -422,6 +536,13 @@
               "legendFormat": "per item",
               "range": true,
               "refId": "A"
+            },
+            {
+              "datasource": { "name": "Expression", "type": "__expr__", "uid": "__expr__" },
+              "expression": "$B / 1000000000000 * 100",
+              "hide": false,
+              "refId": "percent of 1TB target",
+              "type": "math"
             }
           ],
           "title": "(max) latest total state KV size",
@@ -471,7 +592,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 41 },
           "id": 3297,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -542,7 +663,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 41 },
           "id": 3298,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -614,7 +735,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 23 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 50 },
           "id": 40,
           "links": [],
           "options": {
@@ -703,7 +824,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 23 },
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 50 },
           "id": 3300,
           "links": [],
           "options": {
@@ -715,7 +836,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"transaction|event_accumulator|transaction_info|transaction_accumulator|event|transaction_by_hash|event_by_version|event_by_key|transaction_by_account|version_data|ledger_info|epoch_by_version|db_metadata|default\"}[5m])))",
+              "expr": "sort_desc(sum(avg by(cf_name)(avg_over_time(aptos_rocksdb_properties{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", property_name=\"aptos_rocksdb_total-sst-files-size\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", cf_name=~\"transaction|event_accumulator|transaction_info|transaction_accumulator|event|transaction_by_hash|event_by_version|event_by_key|transaction_by_account|version_data|ledger_info|epoch_by_version|db_metadata|default\"}[5m]))))",
               "hide": false,
               "legendFormat": "TOTAL",
               "range": true,
@@ -807,7 +928,7 @@
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 32 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 59 },
           "id": 3296,
           "links": [],
           "options": {
@@ -905,14 +1026,14 @@
                   { "id": "custom.lineWidth", "value": 2 },
                   { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } },
                   { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.axisLabel", "value": "per byte on disk (unpruned amortized)" },
+                  { "id": "custom.axisLabel", "value": "per item on disk (unpruned amortized)" },
                   { "id": "decimals", "value": 1 },
                   { "id": "custom.stacking", "value": { "group": "A", "mode": "none" } }
                 ]
               }
             ]
           },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 32 },
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 59 },
           "id": 3299,
           "links": [],
           "options": {
@@ -1004,18 +1125,12 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "bytes"
             },
             "overrides": []
           },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 41 },
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 68 },
           "id": 1193,
           "options": {
             "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": false },
@@ -1091,13 +1206,7 @@
                 "thresholdsStyle": { "mode": "line" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 950 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 950 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1105,14 +1214,14 @@
           "gridPos": { "h": 9, "w": 12, "x": 0, "y": 10 },
           "id": 3262,
           "options": {
-            "legend": { "calcs": [], "displayMode": "table", "placement": "right", "showLegend": false },
+            "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": false },
             "tooltip": { "mode": "single", "sort": "none" }
           },
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])\r\n",
+              "expr": "sort_desc(rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))\r\n",
               "legendFormat": "{{kubernetes_pod_name}}",
               "range": true,
               "refId": "A"
@@ -1146,13 +1255,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1202,13 +1305,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1266,13 +1363,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1333,13 +1424,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1388,13 +1473,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "percentunit"
             },
             "overrides": []
@@ -1443,13 +1522,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": [
               {
@@ -1527,13 +1600,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "percentunit"
             },
             "overrides": []
@@ -1583,13 +1650,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1644,7 +1705,7 @@
               "decimals": 0,
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
               "unit": "none"
             },
             "overrides": [
@@ -1760,7 +1821,7 @@
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
-          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 23 },
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 4 },
           "id": 3256,
           "options": {
             "content": "Errors can be due to either internal or external reasons.\n\nTBD",
@@ -1798,7 +1859,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 7 },
           "id": 3258,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1850,7 +1911,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 7 },
           "id": 1195,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1902,7 +1963,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 7 },
           "id": 3260,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1951,7 +2012,8 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": null,
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -1965,6 +2027,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "type": "query"
       },
@@ -1973,6 +2036,7 @@
         "allValue": "",
         "current": { "text": ["mainnet"], "value": "mainnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -1986,6 +2050,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -1993,7 +2058,8 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
-        "datasource": null,
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -2007,6 +2073,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "type": "query"
       },
@@ -2015,6 +2082,7 @@
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -2028,6 +2096,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -2036,6 +2105,7 @@
         "allValue": ".*",
         "current": { "text": ["All"], "value": ["$__all"] },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -2049,6 +2119,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -2179,6 +2250,6 @@
   "timezone": "",
   "title": "Storage Overview",
   "uid": "ptUp6Vn4k",
-  "version": 157,
+  "version": 184,
   "weekStart": ""
 }

@@ -7,7 +7,9 @@ use super::{
     move_tables::{TableItem, TableMetadata},
     transactions::TransactionQuery,
 };
-use crate::{models::transactions::Transaction, schema::write_set_changes};
+use crate::{
+    models::transactions::Transaction, schema::write_set_changes, util::standardize_address,
+};
 use aptos_api_types::WriteSetChange as APIWriteSetChange;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -55,7 +57,7 @@ impl WriteSetChange {
                     hash: module.state_key_hash.clone(),
                     transaction_block_height,
                     type_,
-                    address: module.address.to_string(),
+                    address: standardize_address(&module.address.to_string()),
                     index,
                 },
                 WriteSetChangeDetail::Module(MoveModule::from_write_module(
@@ -71,7 +73,7 @@ impl WriteSetChange {
                     hash: module.state_key_hash.clone(),
                     transaction_block_height,
                     type_,
-                    address: module.address.to_string(),
+                    address: standardize_address(&module.address.to_string()),
                     index,
                 },
                 WriteSetChangeDetail::Module(MoveModule::from_delete_module(
@@ -87,7 +89,7 @@ impl WriteSetChange {
                     hash: resource.state_key_hash.clone(),
                     transaction_block_height,
                     type_,
-                    address: resource.address.to_string(),
+                    address: standardize_address(&resource.address.to_string()),
                     index,
                 },
                 WriteSetChangeDetail::Resource(MoveResource::from_write_resource(
@@ -103,7 +105,7 @@ impl WriteSetChange {
                     hash: resource.state_key_hash.clone(),
                     transaction_block_height,
                     type_,
-                    address: resource.address.to_string(),
+                    address: standardize_address(&resource.address.to_string()),
                     index,
                 },
                 WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(

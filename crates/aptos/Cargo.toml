@@ -1,6 +1,6 @@
 [package]
 name = "aptos"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos tool for management of nodes and interacting with the blockchain"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -21,6 +21,7 @@ dirs = "4.0.0"
 futures = "0.3.21"
 hex = "0.4.3"
 itertools = "0.10.3"
+jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 rand = "0.7.3"
 regex = "1.1.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
