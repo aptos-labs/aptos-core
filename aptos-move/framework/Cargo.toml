@@ -50,12 +50,17 @@ move-core-types ={ workspace = true }
 move-docgen ={ workspace = true }
 move-model ={ workspace = true }
 move-package ={ workspace = true }
+move-prover ={ workspace = true }
+move-prover-boogie-backend ={ workspace = true }
+move-stackless-bytecode ={ workspace = true }
 move-table-extension ={ workspace = true }
 move-vm-runtime ={ workspace = true }
 move-vm-types ={ workspace = true }
 
 [dev-dependencies]
 claims = "0.7"
+dir-diff = "0.3.2"
+fs_extra = "1.2.0"
 
 aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["testing"] }

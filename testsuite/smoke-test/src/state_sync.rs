@@ -275,6 +275,27 @@ async fn test_validator_bootstrap_outputs_network_limit() {
     test_validator_sync(&mut swarm, 1).await;
 }
 
+#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[tokio::test]
+async fn test_validator_bootstrap_outputs_network_limit_tiny() {
+    // Create a swarm of 4 validators using output syncing and an unrealistic network limit.
+    // This forces all chunks to be of size 1.
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::ApplyTransactionOutputsFromGenesis;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ApplyTransactionOutputs;
+            config.state_sync.storage_service.max_network_chunk_bytes = 1;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(&mut swarm, 1).await;
+}
+
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot_no_compression() {
     // Create a swarm of 4 validators using state snapshot syncing
@@ -314,6 +335,27 @@ async fn test_validator_bootstrap_state_snapshot_network_limit() {
     test_validator_sync(&mut swarm, 1).await;
 }
 
+#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[tokio::test]
+async fn test_validator_bootstrap_state_snapshot_network_limit_tiny() {
+    // Create a swarm of 4 validators using state snapshot syncing and an unrealistic network limit.
+    // This forces all chunks to be of size 1.
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::DownloadLatestStates;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+            config.state_sync.storage_service.max_network_chunk_bytes = 1;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(&mut swarm, 1).await;
+}
+
 #[tokio::test]
 async fn test_validator_bootstrap_transactions() {
     // Create a swarm of 4 validators using transaction syncing
@@ -344,6 +386,27 @@ async fn test_validator_bootstrap_transactions_network_limit() {
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ExecuteTransactions;
             config.state_sync.storage_service.max_network_chunk_bytes = 100 * 1024;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(&mut swarm, 1).await;
+}
+
+#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[tokio::test]
+async fn test_validator_bootstrap_transactions_network_limit_tiny() {
+    // Create a swarm of 4 validators using transaction syncing and an unrealistic network limit.
+    // This forces all chunks to be of size 1.
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::ExecuteTransactionsFromGenesis;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+            config.state_sync.storage_service.max_network_chunk_bytes = 1;
         }))
         .build()
         .await;

@@ -8,6 +8,11 @@ use sha2::Digest;
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
 pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
 
+/// Standardizes all addresses and table handles to be length 66 (0x-64 length hash)
+pub fn standardize_address(handle: &str) -> String {
+    format!("0x{:0>64}", &handle[2..])
+}
+
 pub fn hash_str(val: &str) -> String {
     hex::encode(sha2::Sha256::digest(val.as_bytes()))
 }

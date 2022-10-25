@@ -118,9 +118,9 @@ jobs:
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
-      - name: Upload smoke test logs for failures
+      # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
+      - name: Upload smoke test logs for failed and flaky tests
         uses: actions/upload-artifact@v3
-        if: failure()
         with:
           name: failed-smoke-test-logs
           # Retain all smoke test data except for the db (which may be large).

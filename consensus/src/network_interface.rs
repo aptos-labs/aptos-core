@@ -205,7 +205,7 @@ impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
         if !not_available.is_empty() {
             sample!(
                 SampleRate::Duration(Duration::from_secs(10)),
-                error!("Unavailable peers: {:?}", not_available)
+                warn!("Unavailable peers: {:?}", not_available)
             );
         }
         for (protocol, peers) in peers_per_protocol {

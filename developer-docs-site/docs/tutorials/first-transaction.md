@@ -119,7 +119,10 @@ Now see the below walkthrough of the SDK functions used to accomplish the above 
 
 ## Step 4: The SDK in depth
 
-The `transfer-coin` example code uses helper functions to interact with the [REST API][rest_spec]. This section reviews each of the calls and gives insights into functionality.
+The `transfer-coin` example code uses helper functions to interact with the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/). This section reviews each of the calls and gives insights into functionality.
+
+
+
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -209,7 +212,7 @@ By default, the URLs for both the services point to Aptos devnet services. Howev
 
 ### Step 4.2: Creating local accounts
 
-The next step is to create two accounts locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+The next step is to create two accounts locally. [Accounts](../concepts/basics-accounts.md) represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">

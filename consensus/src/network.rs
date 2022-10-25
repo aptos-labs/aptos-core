@@ -159,7 +159,7 @@ impl NetworkSender {
             .network_sender
             .send_to_many(other_validators.into_iter(), msg)
         {
-            error!(error = ?err, "Error broadcasting message");
+            warn!(error = ?err, "Error broadcasting message");
         }
     }
 
@@ -180,7 +180,7 @@ impl NetworkSender {
                 .with_label_values(&[msg.name()])
                 .inc();
             if let Err(e) = network_sender.send_to(peer, msg.clone()) {
-                error!(
+                warn!(
                     remote_peer = peer,
                     error = ?e, "Failed to send a msg to peer",
                 );
