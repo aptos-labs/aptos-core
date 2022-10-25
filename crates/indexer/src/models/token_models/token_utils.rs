@@ -43,11 +43,7 @@ impl TokenDataIdType {
     }
 
     pub fn get_collection_data_id_hash(&self) -> String {
-        CollectionDataIdType {
-            creator: self.creator.clone(),
-            name: self.name.clone(),
-        }
-        .to_hash()
+        CollectionDataIdType::new(self.creator.clone(), self.collection.clone()).to_hash()
     }
 }
 
