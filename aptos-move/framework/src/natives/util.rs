@@ -24,13 +24,6 @@ pub fn make_native_from_func<T: std::marker::Send + std::marker::Sync + 'static>
     Arc::new(move |context, ty_args, args| func(&gas_params, context, ty_args, args))
 }
 
-/// Wraps a test-only native function inside an Arc<UnboxedNativeFunction>.
-pub fn make_test_only_native_from_func(
-    func: fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>,
-) -> NativeFunction {
-    Arc::new(func)
-}
-
 /// Used to pop a Vec<Vec<u8>> argument off the stack.
 #[macro_export]
 macro_rules! pop_vec_arg {

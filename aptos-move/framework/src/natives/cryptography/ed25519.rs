@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::util::make_native_from_func;
-use crate::natives::util::make_test_only_native_from_func;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey, ED25519_PUBLIC_KEY_LENGTH};
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, traits::*};
@@ -146,17 +145,17 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     ));
     natives.push((
         "signature_verify_strict_internal",
-        make_native_from_func(gas_params, native_signature_verify_strict),
+        make_native_from_func(gas_params.clone(), native_signature_verify_strict),
     ));
     #[cfg(feature = "testing")]
     {
         natives.push((
             "generate_keys_internal",
-            make_test_only_native_from_func(native_test_only_generate_keys_internal),
+            make_native_from_func(gas_params.clone(), native_test_only_generate_keys_internal),
         ));
         natives.push((
             "sign_internal",
-            make_test_only_native_from_func(native_test_only_sign_internal),
+            make_native_from_func(gas_params.clone(), native_test_only_sign_internal),
         ));
     }
     crate::natives::helpers::make_module_natives(natives)
@@ -164,6 +163,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
 
 #[cfg(feature = "testing")]
 fn native_test_only_generate_keys_internal(
+    _gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
@@ -180,6 +180,7 @@ fn native_test_only_generate_keys_internal(
 
 #[cfg(feature = "testing")]
 fn native_test_only_sign_internal(
+    _gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
