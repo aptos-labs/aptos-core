@@ -24,7 +24,7 @@ runs:
       shell: bash
       run: |
         set -o nounset -o errexit -o pipefail
-        N=32
+        N=16
         PER_PARTITION=$(( ($LATEST_VERSION - $HISTORY_START) / $N ))
 
         for n in `seq 1 $N`
