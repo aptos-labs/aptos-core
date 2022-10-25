@@ -19,7 +19,7 @@ use regex::Regex;
 use std::time::Instant;
 use std::{fs, process::Command, str::FromStr, time::Duration};
 
-async fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig) {
+fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig) {
     validator.stop();
     let node_path = validator.config_path();
     config.save(node_path).unwrap();
@@ -64,7 +64,7 @@ async fn test_genesis_transaction_flow() {
     let node = env.validators_mut().nth(4).unwrap();
     let mut new_config = node.config().clone();
     new_config.consensus.sync_only = true;
-    update_node_config_restart(node, new_config.clone()).await;
+    update_node_config_restart(node, new_config.clone());
     wait_for_node(node, num_nodes - 1).await;
     // wait for some versions
     env.wait_for_all_nodes_to_catchup_to_version(10, Duration::from_secs(10))
@@ -75,7 +75,7 @@ async fn test_genesis_transaction_flow() {
     for node in env.validators_mut() {
         let mut node_config = node.config().clone();
         node_config.consensus.sync_only = true;
-        update_node_config_restart(node, node_config).await;
+        update_node_config_restart(node, node_config);
         wait_for_node(node, num_nodes - 1).await;
     }
 
@@ -174,7 +174,7 @@ async fn test_genesis_transaction_flow() {
         node_config.execution.genesis = Some(genesis_transaction.clone());
         // reset the sync_only flag to false
         node_config.consensus.sync_only = false;
-        update_node_config_restart(node, node_config).await;
+        update_node_config_restart(node, node_config);
         wait_for_node(node, expected_to_connect).await;
     }
 
