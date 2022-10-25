@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{natives::make_native_from_func, pop_vec_arg};
+use crate::{natives::util::make_native_from_func, pop_vec_arg};
 use aptos_crypto::{bls12381, traits};
 use move_binary_format::errors::PartialVMError;
 use move_binary_format::errors::PartialVMResult;

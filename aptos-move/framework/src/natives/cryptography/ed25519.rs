@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::make_native_from_func;
-use crate::natives::make_test_only_native_from_func;
+use crate::natives::util::make_native_from_func;
+use crate::natives::util::make_test_only_native_from_func;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey, ED25519_PUBLIC_KEY_LENGTH};
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, traits::*};
