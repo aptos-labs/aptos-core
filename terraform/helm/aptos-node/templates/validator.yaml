@@ -148,7 +148,9 @@ spec:
         - containerPort: 6180
         - containerPort: 6181  # VFN
         - containerPort: 6182  # Public
+  {{- if $.Values.service.validator.enableRestApi }}
         - containerPort: 8080
+  {{- end }}
           name: api
         - containerPort: 9101
           name: metrics

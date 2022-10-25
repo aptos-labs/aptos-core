@@ -44,5 +44,5 @@ full_node_networks:
     peer_id: "00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237"
 
 api:
-  enabled: true
+  enabled: false
   address: "0.0.0.0:8080"

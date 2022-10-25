@@ -147,7 +147,7 @@ service:
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs
     loadBalancerSourceRanges:
     # -- Enable the REST API on the validator
-    enableRestApi: true
+    enableRestApi: false
     # -- Enable the metrics port on the validator
     enableMetricsPort: true
   fullnode:
@@ -162,7 +162,7 @@ service:
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs
     loadBalancerSourceRanges:
     # -- Enable the REST API on fullnodes
-    enableRestApi: true
+    enableRestApi: false
     # -- Enable the metrics port on fullnodes
     enableMetricsPort: true
 
