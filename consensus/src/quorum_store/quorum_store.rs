@@ -166,7 +166,7 @@ impl QuorumStore {
             let metrics_monitor = metrics_monitor.clone();
             tokio::spawn(async move {
                 for interval in metrics_monitor.intervals() {
-                    println!("QuorumStore:{:?}", interval);
+                    //println!("QuorumStore:{:?}", interval);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             });

@@ -209,6 +209,7 @@ impl BlockTree {
         let ledger_info = ledger_info_with_sigs.ledger_info();
         let ledger_view = db.get_latest_executed_trees()?;
 
+        println!("{:?}", ledger_view.version());
         ensure!(
             ledger_view.version() == Some(ledger_info.version()),
             "Missing ledger info at the end of the ledger. latest version {:?}, LI version {}",

@@ -3,8 +3,6 @@
 
 //! Mempool is used to track transactions which have been submitted but not yet
 //! agreed upon.
-use crate::counters::{CONSENSUS_PULLED_LABEL, E2E_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL};
-use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     core_mempool::{
         index::TxnPointer,
@@ -12,7 +10,9 @@ use crate::{
         transaction_store::TransactionStore,
     },
     counters,
+    counters::{CONSENSUS_PULLED_LABEL, E2E_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL},
     logging::{LogEntry, LogSchema, TxnsLog},
+    shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
@@ -125,6 +125,7 @@ impl Mempool {
             committed_seq_number = db_sequence_number
         );
 
+        /*
         // don't accept old transactions (e.g. seq is less than account's current seq_number)
         if txn.sequence_number() < db_sequence_number {
             return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
@@ -132,7 +133,7 @@ impl Mempool {
                 txn.sequence_number(),
                 db_sequence_number,
             ));
-        }
+        }*/
 
         let now = SystemTime::now();
         let expiration_time =
@@ -175,7 +176,8 @@ impl Mempool {
         // Later txn has higher gas price and will be observed first in priority index iterator,
         // but can't be executed before first txn. Once observed, such txn will be saved in
         // `skipped` DS and rechecked once it's ancestor becomes available
-        let mut skipped = HashSet::new();
+
+        // let mut skipped = HashSet::new();
         let mut total_bytes = 0;
         let seen_size = seen.len();
         let mut txn_walked = 0usize;
@@ -185,6 +187,7 @@ impl Mempool {
             if seen.contains(&TxnPointer::from(txn)) {
                 continue;
             }
+            /*
             let tx_seq = txn.sequence_number.transaction_sequence_number;
             let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
             let seen_previous = tx_seq > 0 && seen.contains(&(txn.address, tx_seq - 1));
@@ -211,6 +214,11 @@ impl Mempool {
                 }
             } else {
                 skipped.insert(TxnPointer::from(txn));
+            }*/
+            let ptr = TxnPointer::from(txn);
+            result.push(ptr);
+            if result.len() as u64 == max_txns {
+                break;
             }
         }
         let result_size = result.len();
@@ -260,13 +268,14 @@ impl Mempool {
     /// Removes all expired transactions and clears expired entries in metrics
     /// cache and sequence number cache.
     pub(crate) fn gc(&mut self) {
+        /*
         let now = aptos_infallible::duration_since_epoch();
-        self.transactions.gc_by_system_ttl(now);
+        self.transactions.gc_by_system_ttl(now);*/
     }
 
     /// Garbage collection based on client-specified expiration time.
-    pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
-        self.transactions.gc_by_expiration_time(block_time);
+    pub(crate) fn gc_by_expiration_time(&mut self, _block_time: Duration) {
+        //self.transactions.gc_by_expiration_time(block_time);
     }
 
     /// Returns block of transactions and new last_timeline_id.

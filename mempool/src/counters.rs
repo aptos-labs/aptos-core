@@ -150,10 +150,11 @@ pub fn core_mempool_timeline_index_size(bucket_min_size_pairs: &Vec<(&str, usize
 }
 
 /// Counter tracking number of txns removed from core mempool
-pub static CORE_MEMPOOL_REMOVED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+pub static CORE_MEMPOOL_REMOVED_TXNS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "aptos_core_mempool_removed_txns_count",
-        "Number of txns removed from core mempool"
+        "Number of txns removed from core mempool",
+        &["reason"]
     )
     .unwrap()
 });

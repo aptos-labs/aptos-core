@@ -1,10 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::{
-    BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL, LOCAL_LABEL,
-};
-use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     core_mempool::{
         index::{
@@ -14,7 +10,12 @@ use crate::{
         transaction::{MempoolTransaction, TimelineState},
     },
     counters,
+    counters::{
+        BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL,
+        LOCAL_LABEL,
+    },
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
+    shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
 use aptos_crypto::HashValue;
@@ -25,10 +26,10 @@ use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
-use std::cmp::max;
-use std::mem::size_of;
 use std::{
+    cmp::max,
     collections::HashMap,
+    mem::size_of,
     ops::Bound,
     time::{Duration, SystemTime},
 };
@@ -216,7 +217,7 @@ impl TransactionStore {
                 } else if current_version.txn.gas_unit_price() < txn.get_gas_price() {
                     // Update txn if gas unit price is a larger value than before
                     if let Some(txn) = txns.remove(&sequence_number.transaction_sequence_number) {
-                        self.index_remove(&txn);
+                        self.index_remove(&txn, "large_txn_gas");
                     };
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
@@ -335,7 +336,7 @@ impl TransactionStore {
                             txn.sequence_info.transaction_sequence_number
                         ))
                     );
-                    self.index_remove(&txn);
+                    self.index_remove(&txn, "evict_non_ready");
                 }
             }
         }
@@ -467,6 +468,7 @@ impl TransactionStore {
         // nodes has sent the transaction to consensus but this node still has the
         // transaction sitting in mempool.
         if let Some(txns) = self.transactions.get_mut(address) {
+            /*
             let mut active = txns.split_off(&sequence_number);
             let txns_for_removal = txns.clone();
             txns.clear();
@@ -481,14 +483,20 @@ impl TransactionStore {
                     transaction.get_sender(),
                     transaction.sequence_info.transaction_sequence_number,
                 );
-                self.index_remove(transaction);
+                self.index_remove(transaction, "clear_committed");
+            }*/
+
+            if let Some(txn_to_remove) = txns.remove(&sequence_number) {
+                self.index_remove(&txn_to_remove, "clear_committed");
             }
+
+            /*
             trace!(
                 LogSchema::new(LogEntry::CleanCommittedTxn).txns(rm_txns),
                 "txns cleaned with committing tx {}:{}",
                 address,
                 sequence_number
-            );
+            );*/
         }
     }
 
@@ -521,7 +529,7 @@ impl TransactionStore {
             if let Some(txns) = self.transactions.get_mut(account) {
                 txns.remove(&sequence_number);
             }
-            self.index_remove(&txn_to_remove);
+            self.index_remove(&txn_to_remove, "reject");
 
             if aptos_logger::enabled!(Level::Trace) {
                 let mut txns_log = TxnsLog::new();
@@ -535,8 +543,10 @@ impl TransactionStore {
     }
 
     /// Removes transaction from all indexes. Only call after removing from main transactions DS.
-    fn index_remove(&mut self, txn: &MempoolTransaction) {
-        counters::CORE_MEMPOOL_REMOVED_TXNS.inc();
+    fn index_remove(&mut self, txn: &MempoolTransaction, reason: &str) {
+        counters::CORE_MEMPOOL_REMOVED_TXNS
+            .with_label_values(&[reason])
+            .inc();
         self.system_ttl_index.remove(txn);
         self.expiration_time_index.remove(txn);
         self.priority_index.remove(txn);
@@ -700,7 +710,7 @@ impl TransactionStore {
                     }
 
                     // remove txn
-                    self.index_remove(&txn);
+                    self.index_remove(&txn, "gc");
                 }
             }
         }
