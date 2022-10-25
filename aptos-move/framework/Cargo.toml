@@ -71,6 +71,7 @@ move-unit-test = { workspace = true }
 [features]
 default = []
 fuzzing = ["aptos-types/fuzzing", "proptest", "proptest-derive"]
+testing = []
 
 [lib]
 doctest = false

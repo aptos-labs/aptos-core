@@ -232,22 +232,6 @@ pub fn all_natives(
     make_table_from_iter(framework_addr, natives)
 }
 
-pub fn all_test_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
-    let mut natives = vec![];
-
-    macro_rules! add_natives_from_module {
-        ($module_name: expr, $natives: expr) => {
-            natives.extend(
-                $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
-            );
-        };
-    }
-
-    add_natives_from_module!("ed25519", cryptography::ed25519::make_all_test());
-
-    make_table_from_iter(framework_addr, natives)
-}
-
 /// A temporary hack to patch Table -> table module name as long as it is not upgraded
 /// in the Move repo.
 pub fn patch_table_module(table: NativeFunctionTable) -> NativeFunctionTable {

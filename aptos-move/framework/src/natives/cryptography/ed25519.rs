@@ -139,33 +139,26 @@ pub struct GasParameters {
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [
-        // Ed25519
-        (
-            "public_key_validate_internal",
-            make_native_from_func(gas_params.clone(), native_public_key_validate),
-        ),
-        (
-            "signature_verify_strict_internal",
-            make_native_from_func(gas_params, native_signature_verify_strict),
-        ),
-    ];
-
-    crate::natives::helpers::make_module_natives(natives)
-}
-
-pub fn make_all_test() -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [
-        (
+    let mut natives = vec![];
+    natives.push((
+        "public_key_validate_internal",
+        make_native_from_func(gas_params.clone(), native_public_key_validate),
+    ));
+    natives.push((
+        "signature_verify_strict_internal",
+        make_native_from_func(gas_params, native_signature_verify_strict),
+    ));
+    #[cfg(feature = "testing")]
+    {
+        natives.push((
             "generate_keys_internal",
             make_test_only_native_from_func(native_test_only_generate_keys_internal),
-        ),
-        (
+        ));
+        natives.push((
             "sign_internal",
             make_test_only_native_from_func(native_test_only_sign_internal),
-        ),
-    ];
-
+        ));
+    }
     crate::natives::helpers::make_module_natives(natives)
 }
 

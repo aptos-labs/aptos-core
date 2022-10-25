@@ -49,13 +49,6 @@ pub fn aptos_natives(
                 !(*addr == CORE_CODE_ADDRESS && module_name.as_str() == "event")
             }),
         )
-        .chain({
-            if cfg!(feature = "testing") {
-                framework::natives::all_test_natives(CORE_CODE_ADDRESS)
-            } else {
-                vec![]
-            }
-        })
         .collect()
 }
 
