@@ -1,0 +1,6 @@
+[package]
+name = "TokenScript"
+version = "0.0.0"
+
+[dependencies]
+AptosToken = { local = "../../../../../../aptos-move/framework/aptos-token" }
