@@ -45,8 +45,14 @@ spec:
               value: "1"
             - name: STRUCT_LOG_TCP_ADDR
               value: {{ include "backup.loggingAddress" $ | quote }}
+            {{- if (include "backup.pushMetricsEndpoint" $) }}
+            - name: KUBERNETES_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: PUSH_METRICS_ENDPOINT
-              value: "{{- include "backup.pushGateway" $ }}/metrics/job/{{- .Values.backup_verify.jobName | default "db_backup_verify" }}"
+              value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup_verify" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)"
+            {{- end }}
             {{- include "backup.backupEnvironment" (dict "config" $.Values.backup.config "era" $.Values.chain.era) | nindent 12 }}
             {{- with .Values.backup_verify }}
             resources:

@@ -446,7 +446,7 @@ impl EpochManager {
                     "process_block_retrieval",
                     block_store.process_block_retrieval(request).await
                 ) {
-                    error!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                    warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
                 }
             }
             info!(epoch = epoch, "Block retrieval task stops");

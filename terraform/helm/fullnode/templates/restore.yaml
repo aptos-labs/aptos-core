@@ -43,9 +43,13 @@ spec:
           value: "1"
         - name: STRUCT_LOG_TCP_ADDR
           value: {{ include "backup.loggingAddress" $ | quote }}
-        {{- if (include "backup.pushGateway" $) }}
+        {{- if (include "backup.pushMetricsEndpoint" $) }}
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: PUSH_METRICS_ENDPOINT
-          value: "{{- include "backup.pushGateway" $ }}/metrics/job/{{- .jobName | default "db_restore" }}"
+          value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_restore" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)"
         {{- end }}
         - name: CONTROLLER_UID
           valueFrom:

@@ -556,7 +556,7 @@ impl RoundManager {
         self.round_state.record_vote(timeout_vote.clone());
         let timeout_vote_msg = VoteMsg::new(timeout_vote, self.block_store.sync_info());
         self.network.broadcast_timeout_vote(timeout_vote_msg).await;
-        error!(
+        warn!(
             round = round,
             remote_peer = self.proposer_election.get_valid_proposer(round),
             voted_nil = is_nil_vote,
@@ -947,7 +947,7 @@ impl RoundManager {
                         Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
                         Err(e) => {
                             counters::ERROR_COUNT.inc();
-                            error!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
+                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
                         }
                     }
                 }
