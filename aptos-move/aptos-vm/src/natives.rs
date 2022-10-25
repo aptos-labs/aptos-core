@@ -50,7 +50,7 @@ pub fn aptos_natives(
             }),
         )
         .chain({
-            if include_test_natives {
+            if cfg!(feature = "testing") {
                 framework::natives::all_test_natives(CORE_CODE_ADDRESS)
             } else {
                 vec![]
