@@ -1,9 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_manager::{DataManager, DummyDataManager};
 use crate::{
-    commit_notifier::QuorumStoreCommitNotifier,
     counters,
+    data_manager::QuorumStoreDataManager,
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
@@ -25,6 +26,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use std::time::Duration;
 use storage_interface::DbReaderWriter;
 use tokio::runtime::{self, Runtime};
 
@@ -34,7 +36,7 @@ pub fn start_consensus(
     mut network_sender: ConsensusNetworkSender,
     network_events: ConsensusNetworkEvents,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-    consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
+    consensus_to_mempool_tx: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
@@ -49,20 +51,33 @@ pub fn start_consensus(
         .enable_all()
         .build()
         .expect("Failed to create Tokio runtime!");
+    let runtime_monitor = tokio_metrics::RuntimeMonitor::new(&runtime.handle());
+    runtime.spawn(async move {
+        for interval in runtime_monitor.intervals() {
+            // pretty-print the metric interval
+            println!("ConsensusRuntime:{:?}", interval);
+            // wait 500ms
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
+    });
+
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let txn_notifier = Arc::new(MempoolNotifier::new(
-        consensus_to_mempool_sender.clone(),
+        consensus_to_mempool_tx.clone(),
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
-    let commit_notifier = Arc::new(QuorumStoreCommitNotifier::new(
-        node_config.consensus.quorum_store_pull_timeout_ms,
-    ));
+
+    let data_manager: Arc<dyn DataManager> = if node_config.consensus.use_quorum_store {
+        Arc::new(QuorumStoreDataManager::new())
+    } else {
+        Arc::new(DummyDataManager::new())
+    };
 
     let state_computer = Arc::new(ExecutionProxy::new(
         Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
-        commit_notifier.clone(),
+        data_manager.clone(),
         runtime.handle(),
     ));
 
@@ -78,11 +93,11 @@ pub fn start_consensus(
         self_sender,
         network_sender,
         timeout_sender,
-        consensus_to_mempool_sender,
+        consensus_to_mempool_tx,
         state_computer,
         storage,
         reconfig_events,
-        commit_notifier,
+        data_manager,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);

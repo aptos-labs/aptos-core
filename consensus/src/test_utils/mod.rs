@@ -17,9 +17,11 @@ use tokio::{runtime, time::timeout};
 
 #[cfg(any(test, feature = "fuzzing"))]
 mod mock_payload_manager;
+pub mod mock_quorum_store_sender;
 mod mock_state_computer;
 mod mock_storage;
 
+use crate::data_manager::DummyDataManager;
 use crate::util::mock_time_service::SimulatedTimeService;
 use aptos_types::block_info::BlockInfo;
 use consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
@@ -74,6 +76,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        Arc::new(DummyDataManager::new()),
     ))
 }
 

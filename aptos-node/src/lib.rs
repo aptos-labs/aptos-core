@@ -823,7 +823,7 @@ pub fn setup_environment(
     let index_runtime = bootstrap_indexer(&node_config, chain_id, aptos_db, mp_client_sender)?;
 
     let mut consensus_runtime = None;
-    let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
+    let (consensus_to_mempool_tx, consensus_to_mempool_rx) =
         mpsc::channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
 
     instant = Instant::now();
@@ -832,17 +832,13 @@ pub fn setup_environment(
         Arc::clone(&db_rw.reader),
         mempool_network_handles,
         mp_client_events,
-        consensus_to_mempool_receiver,
+        consensus_to_mempool_rx,
         mempool_listener,
         mempool_reconfig_subscription,
         peer_metadata_storage.clone(),
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 
-    assert!(
-        !node_config.consensus.use_quorum_store,
-        "QuorumStore is not yet implemented"
-    );
     assert_ne!(
         node_config.consensus.use_quorum_store,
         node_config.mempool.shared_mempool_validator_broadcast,
@@ -868,8 +864,8 @@ pub fn setup_environment(
             consensus_network_sender,
             consensus_network_events,
             Arc::new(consensus_notifier),
-            consensus_to_mempool_sender,
-            db_rw,
+            consensus_to_mempool_tx,
+            db_rw.clone(),
             consensus_reconfig_subscription
                 .expect("Consensus requires a reconfiguration subscription!"),
             peer_metadata_storage,

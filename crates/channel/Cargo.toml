@@ -15,6 +15,7 @@ futures = "0.3.21"
 
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
+aptos-logger = { path = "../../crates/aptos-logger" }
 
 [dev-dependencies]
 tokio = { version = "1.21.0", features = ["full"] }

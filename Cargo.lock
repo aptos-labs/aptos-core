@@ -998,7 +998,7 @@ dependencies = [
  "criterion",
  "crossbeam",
  "crossbeam-queue",
- "dashmap",
+ "dashmap 5.2.0",
  "mvhashmap",
  "num_cpus",
  "once_cell",
@@ -1462,7 +1462,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "dashmap",
+ "dashmap 5.2.0",
  "fail 0.5.0",
  "framework",
  "move-binary-format",
@@ -2362,6 +2362,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
  "futures",
@@ -2579,6 +2580,8 @@ dependencies = [
  "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-keygen",
  "aptos-logger",
@@ -2588,14 +2591,17 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "arc-swap",
  "async-trait",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "byteorder",
  "bytes 1.2.1",
  "channel",
+ "chrono",
  "claims",
  "consensus-notifications",
  "consensus-types",
+ "dashmap 4.0.2",
  "event-notifications",
  "executor",
  "executor-test-helpers",
@@ -2622,6 +2628,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-metrics",
  "vm-validator",
 ]
 
@@ -2656,10 +2663,12 @@ dependencies = [
  "itertools",
  "mirai-annotations",
  "proptest",
+ "rand 0.7.3",
  "rayon",
  "serde 1.0.144",
  "serde_json",
  "short-hex-str",
+ "tokio",
 ]
 
 [[package]]
@@ -2690,9 +2699,9 @@ dependencies = [
 
 [[package]]
 name = "console-subscriber"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e933c43a5db3779b3600cdab18856af2411ca2237e33ba8ab476d5d5b1a6c1e7"
+checksum = "22a3a81dfaf6b66bce5d159eddae701e3a002f194d378cbf7be5f053c281d9be"
 dependencies = [
  "console-api",
  "crossbeam-channel",
@@ -3155,6 +3164,16 @@ dependencies = [
  "darling_core",
  "quote 1.0.21",
  "syn 1.0.99",
+]
+
+[[package]]
+name = "dashmap"
+version = "4.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
+dependencies = [
+ "cfg-if",
+ "num_cpus",
 ]
 
 [[package]]
@@ -4819,7 +4838,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
 dependencies = [
  "ahash",
- "dashmap",
+ "dashmap 5.2.0",
  "hashbrown",
  "once_cell",
  "parking_lot 0.12.1",
@@ -6324,7 +6343,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "crossbeam",
- "dashmap",
+ "dashmap 5.2.0",
  "proptest",
  "proptest-derive",
  "rayon",
@@ -9369,6 +9388,17 @@ dependencies = [
  "proc-macro2 1.0.43",
  "quote 1.0.21",
  "syn 1.0.99",
+]
+
+[[package]]
+name = "tokio-metrics"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcb585a0069b53171684e22d5255984ec30d1c7304fd0a4a9a603ffd8c765cdd"
+dependencies = [
+ "futures-util",
+ "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]

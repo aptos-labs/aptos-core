@@ -4,12 +4,14 @@
 //! Interface between Consensus and Network layers.
 
 use crate::counters;
+use crate::quorum_store::types::{Batch, Fragment};
 use anyhow::anyhow;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use async_trait::async_trait;
 use channel::{aptos_channel, message_queues::QueueStyle};
+use consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
@@ -62,6 +64,14 @@ pub enum ConsensusMsg {
     /// than 2f + 1 signatures on the commit proposal. This part is not on the critical path, but
     /// it can save slow machines to quickly confirm the execution result.
     CommitDecisionMsg(Box<CommitDecision>),
+    /// TODO
+    SignedDigestMsg(Box<SignedDigest>),
+    /// TODO
+    BatchMsg(Box<Batch>), //TODO: add to the networking flow - note that it translates into two events
+    /// TODO
+    FragmentMsg(Box<Fragment>),
+    /// TODO
+    ProofOfStoreBroadcastMsg(Box<ProofOfStore>),
 }
 
 /// Network type for consensus
@@ -79,6 +89,10 @@ impl ConsensusMsg {
             ConsensusMsg::VoteMsg(_) => "VoteMsg",
             ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
             ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
+            ConsensusMsg::SignedDigestMsg(_) => "SignedDigestMsg",
+            ConsensusMsg::BatchMsg(_) => "BatchMsg",
+            ConsensusMsg::FragmentMsg(_) => "FragmentMsg",
+            ConsensusMsg::ProofOfStoreBroadcastMsg(_) => "ProofOfStoreBroadcastMsg",
         }
     }
 }
@@ -170,6 +184,7 @@ impl ConsensusNetworkSender {
         let remote_protocols = self.supported_protocols(peer)?;
         for protocol in local_protocols {
             if remote_protocols.contains(*protocol) {
+                debug!("QS: protocolID {}", *protocol);
                 return Ok(*protocol);
             }
         }

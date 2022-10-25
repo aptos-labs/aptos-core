@@ -11,11 +11,13 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
+    quorum_store,
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 
+use crate::data_manager::DataManager;
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -55,6 +57,9 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         counters::LAST_COMMITTED_ROUND.set(block.round() as i64);
         counters::LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
 
+        // Quorum store metrics
+        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
+
         for status in txn_status.iter() {
             match status {
                 TransactionStatus::Keep(_) => {
@@ -62,7 +67,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
                         .with_label_values(&["success"])
                         .inc();
                 }
-                TransactionStatus::Discard(_) => {
+                TransactionStatus::Discard(status) => {
+                    debug!("QS: discard status {:?}", status);
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["failed"])
                         .inc();
@@ -103,6 +109,7 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     back_pressure_limit: Round,
+    data_manager: Arc<dyn DataManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
 }
@@ -115,9 +122,14 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        data_manager: Arc<dyn DataManager>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
+        debug!(
+            "QS: number of block in storage in a new epoch {}",
+            blocks.len()
+        );
         let block_store = block_on(Self::build(
             root,
             root_metadata,
@@ -129,6 +141,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             time_service,
             back_pressure_limit,
+            data_manager,
         ));
         block_on(block_store.try_commit());
         block_store
@@ -166,6 +179,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        data_manager: Arc<dyn DataManager>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -220,6 +234,7 @@ impl BlockStore {
             storage,
             time_service,
             back_pressure_limit,
+            data_manager,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
         };
@@ -316,6 +331,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.back_pressure_limit,
+            self.data_manager.clone(),
         )
         .await;
 
@@ -375,6 +391,9 @@ impl BlockStore {
             }
             self.time_service.wait_until(block_time).await;
         }
+        self.data_manager
+            .update_payload(executed_block.block())
+            .await;
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;

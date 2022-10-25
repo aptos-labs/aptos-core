@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{bail, ensure, format_err};
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -99,6 +100,17 @@ impl Block {
 
     pub fn payload(&self) -> Option<&Payload> {
         self.block_data.payload()
+    }
+
+    pub fn payload_size(&self) -> usize {
+        match self.block_data.payload() {
+            None => 0,
+            Some(payload) => match payload {
+                Payload::Empty => 0,
+                Payload::InQuorumStore(pos) => pos.len(),
+                Payload::DirectMempool(_) => unreachable!(),
+            },
+        }
     }
 
     pub fn quorum_cert(&self) -> &QuorumCert {
@@ -331,17 +343,15 @@ impl Block {
         Ok(())
     }
 
-    pub fn transactions_to_execute(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
+    pub fn transactions_to_execute(
+        &self,
+        validators: &[AccountAddress],
+        txns: Vec<SignedTransaction>,
+    ) -> Vec<Transaction> {
         once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-        .chain(
-            self.payload()
-                .unwrap_or(&Payload::empty())
-                .clone()
-                .into_iter()
-                .map(Transaction::UserTransaction),
-        )
+        .chain(txns.into_iter().map(Transaction::UserTransaction))
         .chain(once(Transaction::StateCheckpoint(self.id)))
         .collect()
     }

@@ -80,6 +80,9 @@ impl ProposalMsg {
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> Result<()> {
+        if self.proposal().payload().is_some() {
+            self.proposal().payload().unwrap().verify(validator)?;
+        }
         self.proposal
             .validate_signature(validator)
             .map_err(|e| format_err!("{:?}", e))?;

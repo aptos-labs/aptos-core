@@ -4,6 +4,7 @@
 use crate::error::{QuorumStoreError, StateSyncError};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_types::block_info::Round;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use consensus_types::{
     block::Block,
@@ -21,6 +22,7 @@ pub type StateComputerCommitCallBackType =
 pub trait PayloadManager: Send + Sync {
     async fn pull_payload(
         &self,
+        round: Round,
         max_items: u64,
         max_bytes: u64,
         exclude: PayloadFilter,

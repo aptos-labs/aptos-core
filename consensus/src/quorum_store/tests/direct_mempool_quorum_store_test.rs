@@ -5,7 +5,7 @@ use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use consensus_types::{
     common::{Payload, PayloadFilter},
-    request_response::{ConsensusRequest, ConsensusResponse},
+    request_response::{ConsensusResponse, WrapperCommand},
 };
 use futures::{
     channel::{mpsc, oneshot},
@@ -20,16 +20,13 @@ async fn test_block_request_no_txns() {
         mpsc::channel(1_024);
     let (mut consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
         mpsc::channel(1_024);
-    let quorum_store = DirectMempoolQuorumStore::new(
-        consensus_to_quorum_store_receiver,
-        quorum_store_to_mempool_sender,
-        10_000,
-    );
-    let join_handle = tokio::spawn(quorum_store.start());
+    let quorum_store = DirectMempoolQuorumStore::new(quorum_store_to_mempool_sender, 10_000);
+    let join_handle = tokio::spawn(quorum_store.start(consensus_to_quorum_store_receiver));
 
     let (consensus_callback, consensus_callback_rcv) = oneshot::channel();
     consensus_to_quorum_store_sender
-        .try_send(ConsensusRequest::GetBlockRequest(
+        .try_send(WrapperCommand::GetBlockRequest(
+            1,
             100,
             1000,
             PayloadFilter::DirectMempool(vec![]),
@@ -66,10 +63,8 @@ async fn test_block_request_no_txns() {
             assert!(payload.is_empty());
             match payload {
                 Payload::DirectMempool(txns) => assert!(txns.is_empty()),
+                _ => {}
             }
-        }
-        _ => {
-            panic!("Unexpected variant")
         }
     }
 
