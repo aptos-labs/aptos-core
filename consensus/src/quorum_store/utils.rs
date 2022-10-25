@@ -1,10 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
-use crate::quorum_store::{
-    counters,
-    types::{BatchId, SerializedTransaction},
+use crate::{
+    monitor,
+    quorum_store::{
+        counters,
+        types::{BatchId, SerializedTransaction},
+    },
 };
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
@@ -12,14 +14,17 @@ use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
 use claims::assert_some;
-use consensus_types::common::{Round, TransactionSummary};
-use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
+use consensus_types::{
+    common::{Round, TransactionSummary},
+    proof_of_store::{LogicalTime, ProofOfStore},
+};
 use futures::channel::{mpsc::Sender, oneshot};
-use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::HashMap;
 use std::{
     cmp::Reverse,
-    collections::{BinaryHeap, HashSet, VecDeque},
+    collections::{
+        hash_map::Entry::{Occupied, Vacant},
+        BinaryHeap, HashMap, HashSet, VecDeque,
+    },
     hash::Hash,
     mem,
     time::Duration,

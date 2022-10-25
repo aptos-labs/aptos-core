@@ -5,29 +5,41 @@ use anyhow::{format_err, Context, Result};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
-use forge::success_criteria::{StateProgressThreshold, SuccessCriteria};
-use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
-use forge::{ForgeConfig, Options, *};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::{env, num::NonZeroUsize, process, thread, time::Duration};
+use forge::{
+    success_criteria::{StateProgressThreshold, SuccessCriteria},
+    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
+    ForgeConfig, Options, *,
+};
+use std::{
+    env,
+    num::NonZeroUsize,
+    process,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 use structopt::StructOpt;
-use testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
-use testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
-use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
-use testcases::network_bandwidth_test::NetworkBandwidthTest;
-use testcases::network_loss_test::NetworkLossTest;
-use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
-use testcases::state_sync_performance::StateSyncValidatorPerformance;
-use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
-use testcases::twin_validator_test::TwinValidatorTest;
-use testcases::validator_join_leave_test::ValidatorJoinLeaveTest;
-use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
 use testcases::{
-    compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
-    network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
+    compatibility_test::SimpleValidatorUpgrade,
+    consensus_reliability_tests::ChangingWorkingQuorumTest,
+    forge_setup_test::ForgeSetupTest,
+    fullnode_reboot_stress_test::FullNodeRebootStressTest,
+    generate_traffic,
+    load_vs_perf_benchmark::LoadVsPerfBenchmark,
+    network_bandwidth_test::NetworkBandwidthTest,
+    network_loss_test::NetworkLossTest,
+    network_partition_test::NetworkPartitionTest,
+    performance_test::PerformanceBenchmark,
+    performance_with_fullnode_test::PerformanceBenchmarkWithFN,
     reconfiguration_test::ReconfigurationTest,
-    state_sync_performance::StateSyncFullnodePerformance,
+    state_sync_performance::{StateSyncFullnodePerformance, StateSyncValidatorPerformance},
+    three_region_simulation_test::ThreeRegionSimulationTest,
+    twin_validator_test::TwinValidatorTest,
+    validator_join_leave_test::ValidatorJoinLeaveTest,
+    validator_reboot_stress_test::ValidatorRebootStressTest,
 };
 use tokio::runtime::Runtime;
 use url::Url;

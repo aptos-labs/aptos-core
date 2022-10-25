@@ -1,18 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::BlockStore;
-use crate::network::NetworkSender;
-use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::utils::ProofQueue;
-use crate::quorum_store::{
-    counters,
-    quorum_store::{QuorumStoreCommand, QuorumStoreError},
-    quorum_store_db::BatchIdDB,
-    types::BatchId,
-    utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+use crate::{
+    block_storage::BlockStore,
+    network::NetworkSender,
+    network_interface::ConsensusMsg,
+    quorum_store::{
+        counters,
+        quorum_store::{QuorumStoreCommand, QuorumStoreError},
+        quorum_store_db::BatchIdDB,
+        types::BatchId,
+        utils::{BatchBuilder, MempoolProxy, ProofQueue, RoundExpirations},
+    },
+    round_manager::VerifiedEvent,
 };
-use crate::round_manager::VerifiedEvent;
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::QuorumStoreRequest;
@@ -37,7 +38,10 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{sync::mpsc::Sender as TokioSender, sync::oneshot as TokioOneshot, time};
+use tokio::{
+    sync::{mpsc::Sender as TokioSender, oneshot as TokioOneshot},
+    time,
+};
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
