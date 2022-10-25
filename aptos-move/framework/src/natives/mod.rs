@@ -18,16 +18,9 @@ use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use cryptography::ed25519;
 use gas_algebra_ext::AbstractValueSize;
-use move_binary_format::errors::PartialVMResult;
-use std::collections::VecDeque;
-use std::sync::Arc;
 
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use move_vm_runtime::native_functions::{
-    make_table_from_iter, NativeContext, NativeFunction, NativeFunctionTable,
-};
-use move_vm_types::loaded_data::runtime_types::Type;
-use move_vm_types::natives::function::NativeResult;
+use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use move_vm_types::values::Value;
 
 pub mod status {

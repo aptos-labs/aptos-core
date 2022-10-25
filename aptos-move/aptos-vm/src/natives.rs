@@ -55,7 +55,7 @@ pub fn assert_no_test_natives() {
     assert!(aptos_natives(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
-        LATEST_GAS_FEATURE_VERSION,
+        LATEST_GAS_FEATURE_VERSION
     )
     .into_iter()
     .all(
