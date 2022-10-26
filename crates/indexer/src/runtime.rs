@@ -9,7 +9,8 @@ use crate::{
     },
     processors::{
         coin_processor::CoinTransactionProcessor, default_processor::DefaultTransactionProcessor,
-        token_processor::TokenTransactionProcessor, Processor,
+        stake_processor::StakeTransactionProcessor, token_processor::TokenTransactionProcessor,
+        Processor,
     },
 };
 
@@ -112,6 +113,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let processor_tasks = config.processor_tasks.unwrap();
     let emit_every = config.emit_every.unwrap();
     let batch_size = config.batch_size.unwrap();
+    let lookback_versions = config.gap_lookback_versions.unwrap() as i64;
 
     info!(processor_name = processor_name, "Starting indexer...");
 
@@ -138,6 +140,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
             config.ans_contract_address,
         )),
         Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
+        Processor::StakeProcessor => Arc::new(StakeTransactionProcessor::new(conn_pool.clone())),
     };
 
     let options =
@@ -153,9 +156,11 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     info!(
         processor_name = processor_name,
+        lookback_versions = lookback_versions,
         "Fetching starting version from db..."
     );
-    let starting_version_from_db = tailer
+    // For now this is not being used but we'd want to track it anyway
+    let starting_version_from_db_short = tailer
         .get_start_version(&processor_name)
         .unwrap_or_else(|e| panic!("Failed to get starting version: {:?}", e))
         .unwrap_or_else(|| {
@@ -166,7 +171,15 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
             0
         }) as u64;
     let start_version = match config.starting_version {
-        None => starting_version_from_db,
+        None => tailer
+            .get_start_version_long(&processor_name, lookback_versions)
+            .unwrap_or_else(|| {
+                info!(
+                    processor_name = processor_name,
+                    "Could not fetch version from db so starting from version 0"
+                );
+                0
+            }) as u64,
         Some(version) => version,
     };
 
@@ -174,7 +187,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         processor_name = processor_name,
         final_start_version = start_version,
         start_version_from_config = config.starting_version,
-        starting_version_from_db = starting_version_from_db,
+        starting_version_from_db_short = starting_version_from_db_short,
         "Setting starting version..."
     );
     tailer.set_fetcher_version(start_version as u64).await;
