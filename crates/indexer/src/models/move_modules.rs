@@ -1,21 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::transactions::Transaction, schema::move_modules};
+use crate::{models::transactions::Transaction, schema::move_modules, util::standardize_address};
 use aptos_api_types::{DeleteModule, MoveModule as APIMoveModule, MoveModuleBytecode, WriteModule};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Queryable,
-    Serialize,
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
 )]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
@@ -31,8 +23,6 @@ pub struct MoveModule {
     pub friends: Option<serde_json::Value>,
     pub structs: Option<serde_json::Value>,
     pub is_deleted: bool,
-    // Default time columns
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 pub struct MoveModuleByteCodeParsed {
@@ -60,13 +50,12 @@ impl MoveModule {
                 .as_ref()
                 .map(|d| d.name.clone())
                 .unwrap_or_default(),
-            address: write_module.address.to_string(),
+            address: standardize_address(&write_module.address.to_string()),
             bytecode: parsed_data.as_ref().map(|d| d.bytecode.clone()),
             exposed_functions: parsed_data.as_ref().map(|d| d.exposed_functions.clone()),
             friends: parsed_data.as_ref().map(|d| d.friends.clone()),
             structs: parsed_data.as_ref().map(|d| d.structs.clone()),
             is_deleted: false,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
@@ -81,13 +70,12 @@ impl MoveModule {
             transaction_block_height,
             write_set_change_index,
             name: delete_module.module.name.to_string(),
-            address: delete_module.address.to_string(),
+            address: standardize_address(&delete_module.address.to_string()),
             bytecode: None,
             exposed_functions: None,
             friends: None,
             structs: None,
             is_deleted: true,
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 
@@ -109,7 +97,7 @@ impl MoveModule {
         bytecode: Vec<u8>,
     ) -> MoveModuleByteCodeParsed {
         MoveModuleByteCodeParsed {
-            address: move_module.address.to_string(),
+            address: standardize_address(&move_module.address.to_string()),
             name: move_module.name.0.to_string(),
             bytecode,
             exposed_functions: move_module

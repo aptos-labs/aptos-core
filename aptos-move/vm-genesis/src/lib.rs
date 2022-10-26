@@ -13,7 +13,7 @@ use aptos_crypto::{
 };
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
-    ToOnChainGasSchedule,
+    ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::account_config::aptos_test_root_address;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
@@ -68,6 +68,8 @@ pub struct GenesisConfiguration {
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voting_power_increase_limit: u64,
+    pub employee_vesting_start: u64,
+    pub employee_vesting_period_duration: u64,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -97,6 +99,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
     .unwrap();
@@ -106,10 +109,11 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
     initialize(&mut session, consensus_config, chain_id, genesis_config);
+    initialize_features(&mut session);
     initialize_aptos_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
-    create_employee_validators(&mut session, employees);
+    create_employee_validators(&mut session, employees, genesis_config);
     create_and_initialize_validators_with_commission(&mut session, validators);
     set_genesis_end(&mut session);
 
@@ -131,7 +135,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     session1_out.squash(session2_out).unwrap();
 
-    let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
+    let change_set_ext = session1_out
+        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -188,6 +194,7 @@ pub fn encode_genesis_change_set(
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
     .unwrap();
@@ -196,6 +203,7 @@ pub fn encode_genesis_change_set(
 
     // On-chain genesis process.
     initialize(&mut session, consensus_config, chain_id, genesis_config);
+    initialize_features(&mut session);
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
@@ -226,7 +234,9 @@ pub fn encode_genesis_change_set(
 
     session1_out.squash(session2_out).unwrap();
 
-    let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
+    let change_set_ext = session1_out
+        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -360,6 +370,22 @@ fn initialize(
     );
 }
 
+fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
+    let features: Vec<u64> = vec![1, 2];
+
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(bcs::to_bytes(&features).unwrap());
+    serialized_values.push(bcs::to_bytes(&Vec::<u64>::new()).unwrap());
+
+    exec_function(
+        session,
+        "features",
+        "change_feature_flags",
+        vec![],
+        serialized_values,
+    );
+}
+
 fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
@@ -432,9 +458,13 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
 fn create_employee_validators(
     session: &mut SessionExt<impl MoveResolver>,
     employees: &[EmployeePool],
+    genesis_config: &GenesisConfiguration,
 ) {
     let employees_bytes = bcs::to_bytes(employees).expect("AccountMaps can be serialized");
-    let mut serialized_values = serialize_values(&[]);
+    let mut serialized_values = serialize_values(&vec![
+        MoveValue::U64(genesis_config.employee_vesting_start),
+        MoveValue::U64(genesis_config.employee_vesting_period_duration),
+    ]);
     serialized_values.push(employees_bytes);
 
     exec_function(
@@ -583,6 +613,13 @@ pub enum GenesisOptions {
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
+    generate_genesis_change_set_for_testing_with_count(genesis_options, 1)
+}
+
+pub fn generate_genesis_change_set_for_testing_with_count(
+    genesis_options: GenesisOptions,
+    count: u64,
+) -> ChangeSet {
     let framework = match genesis_options {
         GenesisOptions::Head => cached_packages::head_release_bundle(),
         GenesisOptions::Testnet => framework::testnet_release_bundle(),
@@ -592,7 +629,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         }
     };
 
-    generate_test_genesis(framework, Some(1)).0
+    generate_test_genesis(framework, Some(count as usize)).0
 }
 
 /// Generate a genesis `ChangeSet` for mainnet
@@ -716,6 +753,8 @@ pub fn generate_test_genesis(
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
+            employee_vesting_start: 1663456089,
+            employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
     );
     (genesis, test_validators)
@@ -756,6 +795,8 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         rewards_apy_percentage: 10,
         voting_duration_secs: 7 * 24 * 3600, // 7 days
         voting_power_increase_limit: 30,
+        employee_vesting_start: 1663456089,
+        employee_vesting_period_duration: 5 * 60, // 5 minutes
     }
 }
 
@@ -796,6 +837,7 @@ pub fn test_genesis_module_publishing() {
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
         false,
     )
     .unwrap();

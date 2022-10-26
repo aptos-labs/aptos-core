@@ -3,7 +3,7 @@
 
 use crate::FuzzTargetImpl;
 use aptos_proptest_helpers::ValueGenerator;
-use move_deps::move_binary_format::file_format::CompiledModule;
+use move_binary_format::file_format::CompiledModule;
 use proptest::prelude::*;
 
 #[derive(Clone, Debug, Default)]

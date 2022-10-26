@@ -17,12 +17,12 @@ module aptos_framework::aptos_governance {
     use std::signer;
     use std::string::{Self, String, utf8};
 
-    use aptos_std::event::{Self, EventHandle};
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account::{Self, SignerCapability, create_signer_with_capability};
     use aptos_framework::coin;
+    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::governance_proposal::{Self, GovernanceProposal};
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;

@@ -51,6 +51,7 @@ impl FaucetClient {
         let response = self
             .inner
             .post(url)
+            .header("content-length", 0)
             .send()
             .await
             .map_err(FaucetClientError::request)?;
@@ -84,6 +85,7 @@ impl FaucetClient {
         let response = self
             .inner
             .post(url)
+            .header("content-length", 0)
             .send()
             .await
             .map_err(FaucetClientError::request)?;

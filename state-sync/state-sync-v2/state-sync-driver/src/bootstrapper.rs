@@ -12,10 +12,7 @@ use crate::{
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
-use aptos_logger::{
-    prelude::*,
-    sample::{SampleRate, Sampling},
-};
+use aptos_logger::{prelude::*, sample::SampleRate};
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
@@ -24,11 +21,10 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
-use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback},
+    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
@@ -451,8 +447,16 @@ impl<
 
         // If we've already synced to the highest known version, there's nothing to do
         if highest_synced_version >= highest_known_ledger_version {
+            info!(LogSchema::new(LogEntry::Bootstrapper)
+                .message(&format!("Highest synced version {} is >= highest known ledger version {}, nothing needs to be done.",
+                    highest_synced_version, highest_known_ledger_version)));
             return self.bootstrapping_complete().await;
         }
+
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+            "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
+            highest_synced_version, highest_known_ledger_info,
+            self.driver_configuration.config.bootstrapping_mode)));
 
         // Bootstrap according to the mode
         match self.driver_configuration.config.bootstrapping_mode {
@@ -511,6 +515,10 @@ impl<
                     .config
                     .num_versions_to_skip_snapshot_sync
             {
+                info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                    "The node is only {} versions behind, will skip bootstrapping.",
+                    num_versions_behind
+                )));
                 // We've already bootstrapped to an initial state snapshot. If this a fullnode, the
                 // continuous syncer will take control and get the node up-to-date. If this is a
                 // validator, consensus will take control and sync depending on how it sees fit.
@@ -527,9 +535,13 @@ impl<
     /// Attempts to fetch a data notification from the active stream
     async fn fetch_next_data_notification(&mut self) -> Result<DataNotification, Error> {
         let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
-        let result =
-            utils::get_data_notification(max_stream_wait_time_ms, self.active_data_stream.as_mut())
-                .await;
+        let max_num_stream_timeouts = self.driver_configuration.config.max_num_stream_timeouts;
+        let result = utils::get_data_notification(
+            max_stream_wait_time_ms,
+            max_num_stream_timeouts,
+            self.active_data_stream.as_mut(),
+        )
+        .await;
         if matches!(result, Err(Error::CriticalDataStreamTimeout(_))) {
             // If the stream has timed out too many times, we need to reset it
             warn!("Resetting the currently active data stream due to too many timeouts!");

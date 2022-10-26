@@ -7,8 +7,8 @@ pub mod submission_worker;
 
 use again::RetryPolicy;
 use anyhow::{anyhow, format_err, Result};
+use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_infallible::RwLock;
-use aptos_logger::sample::Sampling;
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
@@ -40,7 +40,8 @@ use crate::{
         submission_worker::SubmissionWorker,
     },
     transaction_generator::{
-        account_generator::AccountGeneratorCreator, nft_mint::NFTMintGeneratorCreator,
+        account_generator::AccountGeneratorCreator,
+        nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
         transaction_mix_generator::TxnMixGeneratorCreator, TransactionGeneratorCreator,
     },
@@ -51,7 +52,6 @@ use rand::rngs::StdRng;
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 100_000_000_000;
 const SEND_AMOUNT: u64 = 1;
-const GAS_AMOUNT: u64 = aptos_global_constants::MAX_GAS_AMOUNT;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -105,6 +105,8 @@ impl EmitJobMode {
     }
 }
 
+/// total coins consumed are less than 2 * max_txns * expected_gas_per_txn,
+/// which is by default 100000000000 * 100000, but can be overriden.
 #[derive(Clone, Debug)]
 pub struct EmitJobRequest {
     rest_clients: Vec<RestClient>,
@@ -121,6 +123,9 @@ pub struct EmitJobRequest {
     max_account_working_set: usize,
 
     txn_expiration_time_secs: u64,
+    expected_max_txns: u64,
+    expected_gas_per_txn: u64,
+    promt_before_spending: bool,
 }
 
 impl Default for EmitJobRequest {
@@ -138,6 +143,9 @@ impl Default for EmitJobRequest {
             add_created_accounts_to_pool: true,
             max_account_working_set: 1_000_000,
             txn_expiration_time_secs: 60,
+            expected_max_txns: MAX_TXNS,
+            expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
+            promt_before_spending: false,
         }
     }
 }
@@ -154,6 +162,21 @@ impl EmitJobRequest {
 
     pub fn gas_price(mut self, gas_price: u64) -> Self {
         self.gas_price = gas_price;
+        self
+    }
+
+    pub fn expected_max_txns(mut self, expected_max_txns: u64) -> Self {
+        self.expected_max_txns = expected_max_txns;
+        self
+    }
+
+    pub fn expected_gas_per_txn(mut self, expected_gas_per_txn: u64) -> Self {
+        self.expected_gas_per_txn = expected_gas_per_txn;
+        self
+    }
+
+    pub fn promt_before_spending(mut self) -> Self {
+        self.promt_before_spending = true;
         self
     }
 
@@ -224,8 +247,9 @@ impl EmitJobRequest {
                 EmitModeParams {
                     wait_millis: 0,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
-                    transactions_per_account,
-                    max_submit_batch_size: 100,
+                    transactions_per_account: transactions_per_account
+                        .min(num_workers_per_endpoint * clients_count),
+                    max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     start_offset_multiplier_millis: 0.0,
                     start_jitter_millis: 5000,
                     accounts_per_worker: 1,
@@ -254,7 +278,7 @@ impl EmitJobRequest {
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
-                let transactions_per_account = min(100, tps);
+                let transactions_per_account = min(20, tps);
                 assert!(
                     transactions_per_account > 0,
                     "TPS ({}) needs to be larger than 0",
@@ -298,7 +322,7 @@ impl EmitJobRequest {
                     wait_millis: wait_seconds * 1000,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
                     transactions_per_account,
-                    max_submit_batch_size: 100,
+                    max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     start_offset_multiplier_millis: (wait_seconds * 1000) as f64
                         / (num_workers_per_endpoint * clients_count) as f64,
                     // Using jitter here doesn't make TPS vary enough, as we have many workers.
@@ -419,8 +443,8 @@ impl TxnEmitter {
                     req.max_account_working_set,
                     req.gas_price,
                 )),
-                TransactionType::NftMint => Box::new(
-                    NFTMintGeneratorCreator::new(
+                TransactionType::NftMintAndTransfer => Box::new(
+                    NFTMintAndTransferGeneratorCreator::new(
                         self.from_rng(),
                         txn_factory.clone(),
                         root_account,
@@ -460,9 +484,10 @@ impl TxnEmitter {
             for client in &req.rest_clients {
                 let accounts = (&mut all_accounts)
                     .take(mode_params.accounts_per_worker)
-                    .collect();
+                    .collect::<Vec<_>>();
                 let stop = stop.clone();
                 let stats = Arc::clone(&stats);
+                let txn_generator = txn_generator_creator.create_transaction_generator().await;
 
                 let worker = SubmissionWorker::new(
                     accounts,
@@ -470,7 +495,7 @@ impl TxnEmitter {
                     stop,
                     mode_params.clone(),
                     stats,
-                    txn_generator_creator.create_transaction_generator(),
+                    txn_generator,
                     workers.len(),
                     check_account_sequence_only_once_for.contains(&workers.len()),
                     self.from_rng(),
@@ -525,11 +550,11 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for(
         &mut self,
-        root_account: &mut LocalAccount,
+        source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
-        let job = self.start_job(root_account, emit_job_request, 1).await?;
+        let job = self.start_job(source_account, emit_job_request, 1).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         time::sleep(duration).await;
         info!("Ran for {} secs, stopping job...", duration.as_secs());
@@ -540,13 +565,13 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for_with_stats(
         &mut self,
-        root_account: &mut LocalAccount,
+        source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         interval_secs: u64,
     ) -> Result<TxnStats> {
         info!("Starting emitting txns for {} secs", duration.as_secs());
-        let job = self.start_job(root_account, emit_job_request, 1).await?;
+        let job = self.start_job(source_account, emit_job_request, 1).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
         info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;

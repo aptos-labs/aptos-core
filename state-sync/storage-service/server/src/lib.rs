@@ -1116,7 +1116,11 @@ impl StorageReaderInterface for StorageReader {
                     include_events,
                 )
                 .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            if num_transactions_to_fetch == 1 {
+                return Ok(transaction_list_with_proof); // We cannot return less than a single item
+            }
 
+            // Attempt to divide up the request if it overflows the message size
             let (overflow_frame, num_bytes) = check_overflow_network_frame(
                 &transaction_list_with_proof,
                 self.config.max_network_chunk_bytes,
@@ -1134,12 +1138,12 @@ impl StorageReaderInterface for StorageReader {
             }
         }
 
-        panic!(
+        Err(Error::UnexpectedErrorEncountered(format!(
             "Unable to serve the get_transactions_with_proof request! Proof version: {:?}, \
             start version: {:?}, end version: {:?}, include events: {:?}. The data cannot fit into \
             a single network frame!",
-            proof_version, start_version, end_version, include_events
-        )
+            proof_version, start_version, end_version, include_events,
+        )))
     }
 
     fn get_epoch_ending_ledger_infos(
@@ -1165,7 +1169,11 @@ impl StorageReaderInterface for StorageReader {
                 .storage
                 .get_epoch_ending_ledger_infos(start_epoch, end_epoch)
                 .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            if num_ledger_infos_to_fetch == 1 {
+                return Ok(epoch_change_proof); // We cannot return less than a single item
+            }
 
+            // Attempt to divide up the request if it overflows the message size
             let (overflow_frame, num_bytes) = check_overflow_network_frame(
                 &epoch_change_proof,
                 self.config.max_network_chunk_bytes,
@@ -1183,11 +1191,11 @@ impl StorageReaderInterface for StorageReader {
             }
         }
 
-        panic!(
+        Err(Error::UnexpectedErrorEncountered(format!(
             "Unable to serve the get_epoch_ending_ledger_infos request! Start epoch: {:?}, \
             expected end epoch: {:?}. The data cannot fit into a single network frame!",
             start_epoch, expected_end_epoch
-        )
+        )))
     }
 
     fn get_transaction_outputs_with_proof(
@@ -1207,7 +1215,11 @@ impl StorageReaderInterface for StorageReader {
                 .storage
                 .get_transaction_outputs(start_version, num_outputs_to_fetch, proof_version)
                 .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            if num_outputs_to_fetch == 1 {
+                return Ok(output_list_with_proof); // We cannot return less than a single item
+            }
 
+            // Attempt to divide up the request if it overflows the message size
             let (overflow_frame, num_bytes) = check_overflow_network_frame(
                 &output_list_with_proof,
                 self.config.max_network_chunk_bytes,
@@ -1225,11 +1237,11 @@ impl StorageReaderInterface for StorageReader {
             }
         }
 
-        panic!(
+        Err(Error::UnexpectedErrorEncountered(format!(
             "Unable to serve the get_transaction_outputs_with_proof request! Proof version: {:?}, \
             start version: {:?}, end version: {:?}. The data cannot fit into a single network frame!",
             proof_version, start_version, end_version
-        )
+        )))
     }
 
     fn get_number_of_states(&self, version: u64) -> Result<u64, Error> {
@@ -1261,7 +1273,11 @@ impl StorageReaderInterface for StorageReader {
                     num_state_values_to_fetch as usize,
                 )
                 .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            if num_state_values_to_fetch == 1 {
+                return Ok(state_value_chunk_with_proof); // We cannot return less than a single item
+            }
 
+            // Attempt to divide up the request if it overflows the message size
             let (overflow_frame, num_bytes) = check_overflow_network_frame(
                 &state_value_chunk_with_proof,
                 self.config.max_network_chunk_bytes,
@@ -1280,11 +1296,11 @@ impl StorageReaderInterface for StorageReader {
             }
         }
 
-        panic!(
+        Err(Error::UnexpectedErrorEncountered(format!(
             "Unable to serve the get_state_value_chunk_with_proof request! Version: {:?}, \
             start index: {:?}, end index: {:?}. The data cannot fit into a single network frame!",
             version, start_index, end_index
-        )
+        )))
     }
 }
 

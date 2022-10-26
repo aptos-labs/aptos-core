@@ -85,6 +85,7 @@ async fn account_balance(
 }
 
 /// Retrieve the balances for an account
+#[allow(clippy::manual_retain)]
 async fn get_balances(
     rest_client: &aptos_rest_client::Client,
     account: AccountIdentifier,

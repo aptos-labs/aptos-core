@@ -23,7 +23,7 @@ VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.0
 CVC5_VERSION=0.0.3
 DOTNET_VERSION=6.0
-BOOGIE_VERSION=2.15.7
+BOOGIE_VERSION=2.15.8
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
@@ -642,6 +642,13 @@ function install_postgres {
   fi
 }
 
+function install_lld {
+  # Right now, only install lld for linux
+  if [[ "$(uname)" == "Linux" ]]; then
+    install_pkg lld "$PACKAGE_MANAGER"
+  fi
+}
+
 function welcome_message {
 cat <<EOF
 Welcome to Aptos!
@@ -664,6 +671,7 @@ Build tools (since -t or no option was provided):
   * libssl-dev
   * NodeJS / NPM
   * protoc (and related tools)
+  * lld (only for Linux)
 EOF
   fi
 
@@ -867,6 +875,8 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
+  install_lld
+
   install_rustup "$BATCH_MODE"
   install_toolchain "$(cat ./rust-toolchain)"
   # Add all the components that we need
@@ -880,6 +890,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
   install_nodejs "$PACKAGE_MANAGER"
+  install_pkg unzip "$PACKAGE_MANAGER"
   install_protoc
 fi
 

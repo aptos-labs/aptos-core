@@ -16,15 +16,13 @@ use language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
     compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
 };
-use move_deps::{
-    move_binary_format::file_format::CompiledModule,
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{StructTag, TypeTag},
-        vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
-    },
-    move_ir_compiler::Compiler,
+use move_binary_format::file_format::CompiledModule;
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
 };
+use move_ir_compiler::Compiler;
 
 pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
@@ -801,12 +799,12 @@ fn test_type_tag_dependency_fails_verification() {
         .transaction()
         .script(Script::new(
             script,
-            vec![TypeTag::Struct(StructTag {
+            vec![TypeTag::Struct(Box::new(StructTag {
                 address: account_config::CORE_CODE_ADDRESS,
                 module: Identifier::new("Test").unwrap(),
                 name: Identifier::new("S1").unwrap(),
                 type_params: vec![],
-            })],
+            }))],
             vec![],
         ))
         .sequence_number(10)
@@ -970,12 +968,12 @@ fn test_type_tag_transitive_dependency_fails_verification() {
         .transaction()
         .script(Script::new(
             script,
-            vec![TypeTag::Struct(StructTag {
+            vec![TypeTag::Struct(Box::new(StructTag {
                 address: account_config::CORE_CODE_ADDRESS,
                 module: Identifier::new("Test2").unwrap(),
                 name: Identifier::new("S").unwrap(),
                 type_params: vec![],
-            })],
+            }))],
             vec![],
         ))
         .sequence_number(10)

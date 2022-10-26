@@ -21,7 +21,7 @@ use crate::{
 use anyhow::{bail, format_err, Context, Result};
 use aptos_config::config::RoleType;
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
-use aptos_rest_client::{Client as AptosRestClient, IndexResponse};
+use aptos_rest_client::{aptos_api_types::IndexResponse, Client as AptosRestClient};
 use aptos_sdk::types::{chain_id::ChainId, network_address::NetworkAddress};
 use clap::Parser;
 use once_cell::sync::Lazy;

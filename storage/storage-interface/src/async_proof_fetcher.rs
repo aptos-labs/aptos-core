@@ -6,10 +6,7 @@ use crate::{proof_fetcher::ProofFetcher, DbReader};
 use crate::metrics::TIMER;
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{
-    error, sample,
-    sample::{SampleRate, Sampling},
-};
+use aptos_logger::{error, sample, sample::SampleRate};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -104,9 +101,10 @@ impl AsyncProofFetcher {
                     .verify_by_hash(root_hash, state_key.hash(), value_hash)
                     .map_err(|err| {
                         anyhow!(
-                            "Proof is invalid for key {:?} with state root hash {:?}: {}.",
+                            "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
                             state_key,
                             root_hash,
+                            version,
                             err
                         )
                     })

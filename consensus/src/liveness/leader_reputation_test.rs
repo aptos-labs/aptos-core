@@ -26,7 +26,7 @@ use aptos_types::{
 use claims::assert_err;
 use consensus_types::common::{Author, Round};
 use itertools::Itertools;
-use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use num_traits::Pow;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::{DbReader, Order};
@@ -470,7 +470,7 @@ impl MockDbReader {
             ContractEvent::new(
                 new_block_event_key(),
                 *idx,
-                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 bcs::to_bytes(&NewBlockEvent::new(
                     AccountAddress::random(),
                     epoch,

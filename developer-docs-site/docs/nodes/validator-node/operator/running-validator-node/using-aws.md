@@ -5,7 +5,7 @@ slug: "run-validator-node-using-aws"
 
 # On AWS
 
-This is a step-by-step guide to install an Aptos node on AWS. These steps will configure a validator node and a fullnode on separate machines. 
+This is a step-by-step guide to install an Aptos node on AWS. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
 
 ## Before you proceed
 
@@ -13,47 +13,46 @@ Make sure you complete these prerequisite steps before you proceed:
 
 1. Set up your AWS account. 
 2. Make sure the following are installed on your local computer:
-
-   * **Aptos CLI 0.3.1**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
-   * **Terraform 1.2.4**: https://www.terraform.io/downloads.html
-   * **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
-   * **AWS CLI**: https://aws.amazon.com/cli/
+   - **Aptos CLI**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
+   - **Terraform 1.2.4**: https://www.terraform.io/downloads.html
+   - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
+   - **AWS CLI**: https://aws.amazon.com/cli/
 
 ## Install
 
 :::tip One validator node + one validator fullnode
-When you follow all the below instructions, you will run one validator node and one validator fullnode in the cluster. 
+Follow the below instructions **twice**, i.e., first on one machine to run a validator node and the second time on another machine to run a validator fullnode. 
 :::
 
 1. Create a working directory for your node configuration.
 
-    * Choose a workspace name, for example, `testnet`. **Note**: This defines the Terraform workspace name, which, in turn, is used to form the resource names.
+    * Choose a workspace name, for example, `mainnet` for mainnet, or `testnet` for testnet, and so on. **Note**: This defines the Terraform workspace name, which, in turn, is used to form the resource names.
 
-      ```
-      export WORKSPACE=testnet
+      ```bash
+      export WORKSPACE=mainnet
       ```
 
     * Create a directory for the workspace.
 
-      ```
+      ```bash
       mkdir -p ~/$WORKSPACE
       ```
     
     * Choose a username for your node, for example `alice`.
 
-      ```
+      ```bash
       export USERNAME=alice
       ```
 
 2. Create an S3 storage bucket for storing the Terraform state on AWS. You can do this on the AWS UI or by the below command: 
 
-      ```
+      ```bash
       aws s3 mb s3://<bucket name> --region <region name>
       ```
 
 3. Create a Terraform file called `main.tf` in your working directory:
 
-    ```
+    ```bash
     cd ~/$WORKSPACE
     vi main.tf
     ```
@@ -76,13 +75,13 @@ When you follow all the below instructions, you will run one validator node and 
 
     module "aptos-node" {
       # Download Terraform module from aptos-labs/aptos-core repo
-      source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/aws?ref=testnet"
+      source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/aws?ref=mainnet"
       region        = <aws region>  # Specify the region
       # zone_id     = "<Route53 zone id>"  # zone id for Route53 if you want to use DNS
-      era           = 1              # bump era number to wipe the chain
-      chain_id      = 43
-      image_tag     = "testnet" # Specify the image tag to use
-      validator_name = "<Name of your Validator>"
+      era           = 1  # bump era number to wipe the chain
+      chain_id      = 1  # for mainnet. Use different value for testnet or devnet.
+      image_tag     = "mainnet" # Specify the image tag to use
+      validator_name = "<Name of your validator>"
     }
     ```
 
@@ -92,14 +91,14 @@ When you follow all the below instructions, you will run one validator node and 
 
 5. Initialize Terraform in the `$WORKSPACE` directory where you created the `main.tf` file.
 
-  ```
+  ```bash
   terraform init
   ```
 This will download all the Terraform dependencies into the `.terraform` folder in your current working directory.
 
 6. Create a new Terraform workspace to isolate your environments:
 
-  ```
+  ```bash
   terraform workspace new $WORKSPACE
   # This command will list all workspaces
   terraform workspace list
@@ -107,7 +106,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 7. Apply the configuration.
 
-  ```
+  ```bash
   terraform apply
   ```
 
@@ -121,7 +120,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 9. Get your node IP information into your environment:
 
-    ```
+    ```bash
     export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-validator-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 
     export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-fullnode-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
@@ -129,7 +128,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 10. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
 
-    ```
+    ```bash
     aptos genesis generate-keys --output-dir ~/$WORKSPACE/keys
     ```
 
@@ -139,14 +138,14 @@ This will download all the Terraform dependencies into the `.terraform` folder i
       - `validator-identity.yaml`, and
       - `validator-full-node-identity.yaml`.
       
-      :::caution IMPORTANT
+      :::danger IMPORTANT
 
-       Backup your private key files somewhere safe. These key files are important for you to establish ownership of your node. **Never share private keys with anyone.**
+       Backup your `private-keys.yaml` somewhere safe. These keys are important for you to establish ownership of your node. **Never share private keys with anyone.**
       :::
 
-11. Configure the Validator information. This is all the information you need to register on Aptos community website later.
+11. Configure the validator information. 
 
-    ```
+    ```bash
     aptos genesis set-validator-configuration \
       --local-repository-dir ~/$WORKSPACE \
       --username $USERNAME \
@@ -159,32 +158,26 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the genesis blob and waypoint for the network you want to connect to, you can find a full list of networks [here](https://github.com/aptos-labs/aptos-genesis-waypoint)
+12. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
+    - `genesis.blob`
+    - `waypoint.txt`
 
-  For example, to download testnet genesis and waypoint:
-
-  ```
-  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/waypoint.txt -o waypoint.txt
-  curl https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/genesis.blob -o genesis.blob
-  ```
-
-
-13. To summarize, in your working directory you should have a list of files:
+13. **Summary:** To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).
-    - `keys` folder, which includes:
+    - `keys` folder containing:
       - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 10).
       - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 10).
       - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 10).
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 10).
-    - `username` folder, which includes: 
-      - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 11).
-      - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 11). 
+    - `username` folder containing: 
+      - `owner.yaml`: Defines owner, operator, and voter mapping. 
+      - `operator.yaml`: Node information that will be used for both the validator and the validator fullnode (from step 11). 
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 12).
-    - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 12).
+    - `genesis.blob` The genesis binary that contains all the information about the framework, validator set, and more (from step 12).
 
 14. Insert `genesis.blob`, `waypoint.txt` and the identity files as secret into k8s cluster.
 
-    ```
+    ```bash
     kubectl create secret generic ${WORKSPACE}-aptos-node-0-genesis-e1 \
         --from-file=genesis.blob=genesis.blob \
         --from-file=waypoint.txt=waypoint.txt \
@@ -192,7 +185,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
         --from-file=validator-full-node-identity.yaml=keys/validator-full-node-identity.yaml
     ```
 
-    :::note
+    :::tip
     
     The `-e1` suffix refers to the era number. If you changed the era number, make sure it matches when creating the secret.
 
@@ -201,7 +194,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
 15. Check that all the pods are running.
 
-    ```
+    ```bash
     kubectl get pods
 
     NAME                                        READY   STATUS    RESTARTS   AGE
@@ -210,4 +203,4 @@ This will download all the Terraform dependencies into the `.terraform` folder i
     node1-aptos-node-0-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have successfully completed setting up your node.
+Now you have successfully completed setting up your node. Make sure that you have set up one machine to run a validator node and a second machine to run a validator fullnode.

@@ -12,7 +12,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.57"
 async-trait = "0.1.53"
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 byteorder = { version = "1.4.3" }
 bytes = "1.1.0"
 fail = "0.5.0"
@@ -66,7 +66,7 @@ aptos-keygen = { path = "../crates/aptos-keygen" }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 consensus-types = { path = "consensus-types", default-features = false, features = ["fuzzing"] }
 executor-test-helpers = { path = "../execution/executor-test-helpers" }
-move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
+move-core-types = { workspace = true }
 network = { path = "../network", features = ["fuzzing"] }
 safety-rules = { path = "safety-rules", features = ["testing"] }
 vm-validator = { path = "../vm-validator" }

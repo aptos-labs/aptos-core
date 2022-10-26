@@ -5,15 +5,16 @@ use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,
     move_tables::{TableItem, TableMetadata},
+    transactions::TransactionQuery,
 };
-use crate::{models::transactions::Transaction, schema::write_set_changes};
+use crate::{
+    models::transactions::Transaction, schema::write_set_changes, util::standardize_address,
+};
 use aptos_api_types::WriteSetChange as APIWriteSetChange;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize,
-)]
+#[derive(Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(transaction_version, index))]
 #[diesel(table_name = write_set_changes)]
@@ -24,7 +25,20 @@ pub struct WriteSetChange {
     transaction_block_height: i64,
     pub type_: String,
     pub address: String,
-    // Default time columns
+}
+
+/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
+#[derive(Associations, Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[diesel(belongs_to(TransactionQuery, foreign_key = transaction_version))]
+#[diesel(primary_key(transaction_version, index))]
+#[diesel(table_name = write_set_changes)]
+pub struct WriteSetChangeQuery {
+    pub transaction_version: i64,
+    pub index: i64,
+    pub hash: String,
+    transaction_block_height: i64,
+    pub type_: String,
+    pub address: String,
     pub inserted_at: chrono::NaiveDateTime,
 }
 
@@ -43,9 +57,8 @@ impl WriteSetChange {
                     hash: module.state_key_hash.clone(),
                     transaction_block_height,
                     type_,
-                    address: module.address.to_string(),
+                    address: standardize_address(&module.address.to_string()),
                     index,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                 },
                 WriteSetChangeDetail::Module(MoveModule::from_write_module(
                     module,
@@ -60,9 +73,8 @@ impl WriteSetChange {
                     hash: module.state_key_hash.clone(),
                     transaction_block_height,
                     type_,
-                    address: module.address.to_string(),
+                    address: standardize_address(&module.address.to_string()),
                     index,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                 },
                 WriteSetChangeDetail::Module(MoveModule::from_delete_module(
                     module,
@@ -77,9 +89,8 @@ impl WriteSetChange {
                     hash: resource.state_key_hash.clone(),
                     transaction_block_height,
                     type_,
-                    address: resource.address.to_string(),
+                    address: standardize_address(&resource.address.to_string()),
                     index,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                 },
                 WriteSetChangeDetail::Resource(MoveResource::from_write_resource(
                     resource,
@@ -94,9 +105,8 @@ impl WriteSetChange {
                     hash: resource.state_key_hash.clone(),
                     transaction_block_height,
                     type_,
-                    address: resource.address.to_string(),
+                    address: standardize_address(&resource.address.to_string()),
                     index,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                 },
                 WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
                     resource,
@@ -113,7 +123,6 @@ impl WriteSetChange {
                     type_,
                     address: String::default(),
                     index,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                 },
                 WriteSetChangeDetail::Table(
                     TableItem::from_write_table_item(
@@ -133,7 +142,6 @@ impl WriteSetChange {
                     type_,
                     address: String::default(),
                     index,
-                    inserted_at: chrono::Utc::now().naive_utc(),
                 },
                 WriteSetChangeDetail::Table(
                     TableItem::from_delete_table_item(

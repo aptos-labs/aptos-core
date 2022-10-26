@@ -32,7 +32,7 @@ pub struct ReleaseBundle {
 /// A release package consists of package metdata and the code.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReleasePackage {
-    metadata: PackageMetadata,
+    pub metadata: PackageMetadata,
     code: Vec<Vec<u8>>,
 }
 
@@ -193,6 +193,23 @@ impl ReleasePackage {
         for_address: AccountAddress,
         out: PathBuf,
     ) -> anyhow::Result<()> {
+        self.generate_script_proposal_impl(for_address, out, false)
+    }
+
+    pub fn generate_script_proposal_testnet(
+        &self,
+        for_address: AccountAddress,
+        out: PathBuf,
+    ) -> anyhow::Result<()> {
+        self.generate_script_proposal_impl(for_address, out, true)
+    }
+
+    fn generate_script_proposal_impl(
+        &self,
+        for_address: AccountAddress,
+        out: PathBuf,
+        is_testnet: bool,
+    ) -> anyhow::Result<()> {
         let writer = CodeWriter::new(Loc::default());
         emitln!(
             writer,
@@ -205,33 +222,58 @@ impl ReleasePackage {
         emitln!(writer, "use std::vector;");
         emitln!(writer, "use aptos_framework::aptos_governance;");
         emitln!(writer, "use aptos_framework::code;\n");
-        emitln!(writer, "fun main(proposal_id: u64){");
-        writer.indent();
 
-        emitln!(
-            writer,
-            "let framework_signer = aptos_governance::resolve(proposal_id, @{});",
-            for_address
-        );
-        emit!(writer, "let code = ");
-        Self::generate_blobs(&writer, &self.code);
-        emitln!(writer, ";");
+        if is_testnet {
+            emitln!(writer, "fun main(core_resources: &signer){");
+            writer.indent();
+            emitln!(
+                writer,
+                "let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @{});",
+                for_address
+            );
+        } else {
+            emitln!(writer, "fun main(proposal_id: u64){");
+            writer.indent();
+            emitln!(
+                writer,
+                "let framework_signer = aptos_governance::resolve(proposal_id, @{});",
+                for_address
+            );
+        }
+
+        emitln!(writer, "let code = vector::empty();");
+
+        for i in 0..self.code.len() {
+            emitln!(writer, "let chunk{} = ", i);
+            Self::generate_blob(&writer, &self.code[i]);
+            emitln!(writer, ";");
+            emitln!(writer, "vector::push_back(&mut code, chunk{});", i);
+        }
 
         // The package metadata can be larger than 64k, which is the max for Move constants.
         // We therefore have to split it into chunks. Three chunks should be large enough
         // to cover any current and future needs. We then dynamically append them to obtain
         // the result.
         let mut metadata = bcs::to_bytes(&self.metadata)?;
-        let chunk_size = metadata.len() / 3;
-        for i in 1..4 {
-            let to_drain = if i == 3 { metadata.len() } else { chunk_size };
+        let chunk_size = (u16::MAX / 2) as usize;
+        let num_of_chunks = (metadata.len() / chunk_size) as usize + 1;
+
+        for i in 1..num_of_chunks + 1 {
+            let to_drain = if i == num_of_chunks {
+                metadata.len()
+            } else {
+                chunk_size
+            };
             let chunk = metadata.drain(0..to_drain).collect::<Vec<_>>();
             emit!(writer, "let chunk{} = ", i);
             Self::generate_blob(&writer, &chunk);
             emitln!(writer, ";")
         }
-        emitln!(writer, "vector::append(&mut chunk1, chunk2);");
-        emitln!(writer, "vector::append(&mut chunk1, chunk3);");
+
+        for i in 2..num_of_chunks + 1 {
+            emitln!(writer, "vector::append(&mut chunk1, chunk{});", i);
+        }
+
         emitln!(
             writer,
             "code::publish_package_txn(&framework_signer, chunk1, code)"
@@ -242,17 +284,6 @@ impl ReleasePackage {
         emitln!(writer, "}");
         writer.process_result(|s| std::fs::write(&out, s))?;
         Ok(())
-    }
-
-    fn generate_blobs(writer: &CodeWriter, blobs: &[Vec<u8>]) {
-        emitln!(writer, "vector[");
-        writer.indent();
-        for blob in blobs {
-            Self::generate_blob(writer, blob);
-            emitln!(writer, ",")
-        }
-        writer.unindent();
-        emit!(writer, "]");
     }
 
     fn generate_blob(writer: &CodeWriter, data: &[u8]) {

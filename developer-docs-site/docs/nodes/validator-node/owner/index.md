@@ -8,25 +8,25 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Owner 
 
-This document describes how to use [Aptos CLI](/docs/cli-tools/aptos-cli-tool/index.md) to perform owner operations during validation.
+This document describes how to use [Aptos CLI](/docs/cli-tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
 
-:::tip Using Petra wallet
-This document assumes that you are using [Petra wallet](/docs/guides/install-petra-wallet.md). The [Petra wallet](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. You can also use Petra extension on [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge).
+:::tip Petra on Chrome browser only
+The [Petra wallet extension](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) will also work.
 :::
 
 ## Owner operations with CLI
 
-:::tip Examples using testnet
-The CLI command examples used in this section use testnet. You can use the same command for mainnet by passing the mainnet URL for the `--rest-url` parameter.
-::: 
+:::tip Testnet vs Mainnet
+The below CLI command examples use mainnet. See the `--rest-url` value for testnet and devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
+:::
 
 ### Initialize CLI
 
-Initialize CLI with your Petra wallet private key or create new wallet. The below example uses testnet:
+Initialize CLI with your Petra wallet private key or create new wallet. 
 
 ```bash
-aptos init --profile testnet-owner \
-  --rest-url http://testnet.aptoslabs.com
+aptos init --profile mainnet-owner \
+  --rest-url https://fullnode.mainnet.aptoslabs.com/v1
 ```
 
 You can either enter the private key from an existing wallet, or create new wallet address.
@@ -38,7 +38,7 @@ aptos stake initialize-stake-owner \
   --initial-stake-amount 100000000000000 \
   --operator-address <operator-address> \
   --voter-address <voter-address> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Transfer coin between accounts
@@ -47,7 +47,7 @@ aptos stake initialize-stake-owner \
 aptos account transfer \
   --account <operator-address> \
   --amount <amount> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Switch operator
@@ -55,7 +55,7 @@ aptos account transfer \
 ```bash
 aptos stake set-operator \
   --operator-address <new-operator-address> \ 
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Switch voter
@@ -63,7 +63,7 @@ aptos stake set-operator \
 ```bash
 aptos stake set-delegated-voter \
   --voter-address <new-voter-address> \ 
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Add stake
@@ -71,18 +71,13 @@ aptos stake set-delegated-voter \
 ```bash
 aptos stake add-stake \
   --amount <amount> \
-  --profile testnet-owner \
-  --max-gas 10000
+  --profile mainnet-owner
 ```
-
-:::tip Max gas
-You can adjust the above `max-gas` number. Ensure that you sent your operator enough tokens to pay for the gas fee.
-:::
 
 ### Increase stake lockup
 
 ```bash
-aptos stake increase-lockup --profile testnet-owner
+aptos stake increase-lockup --profile mainnet-owner
 ```
 
 ### Unlock stake
@@ -90,7 +85,7 @@ aptos stake increase-lockup --profile testnet-owner
 ```bash
 aptos stake unlock-stake \
   --amount <amount> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```
 
 ### Withdraw stake
@@ -98,5 +93,5 @@ aptos stake unlock-stake \
 ```bash
 aptos stake withdraw-stake \
   --amount <amount> \
-  --profile testnet-owner
+  --profile mainnet-owner
 ```

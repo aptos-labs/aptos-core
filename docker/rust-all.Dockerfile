@@ -1,15 +1,16 @@
 #syntax=docker/dockerfile:1.4
 
-FROM debian:buster-20220822@sha256:faa416b9eeda2cbdb796544422eedd698e716dbd99841138521a94db51bf6123 AS debian-base
+FROM debian:bullseye-20220912@sha256:3e82b1af33607aebaeb3641b75d6e80fd28d36e17993ef13708e9493e30e8ff9 AS debian-base
 
 # Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
 ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "--"]
 
-FROM rust:1.63.0-buster@sha256:0110d1b4193029735f1db1c0ed661676ed4b6f705b11b1ebe95c655b52e6906f AS rust-base
+FROM rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300 AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
+RUN apt-get update && apt-get install binutils lld
 
 ### Build Rust code ###
 FROM rust-base as builder
@@ -37,7 +38,7 @@ ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
 
-RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target 
+RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target
 
 ### Validator Image ###
 FROM debian-base AS validator
@@ -133,7 +134,7 @@ RUN apt-get update && apt-get --no-install-recommends -y \
     ca-certificates \
     socat \
     python3-botocore/bullseye \
-    awscli/bullseye \ 
+    awscli/bullseye \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN ln -s /usr/bin/python3 /usr/local/bin/python
@@ -287,7 +288,7 @@ RUN apt-get update && apt-get install -y \
     htop \
     valgrind \
     bpfcc-tools \
-    python-bpfcc \
+    python3-bpfcc \
     libbpfcc \
     libbpfcc-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*

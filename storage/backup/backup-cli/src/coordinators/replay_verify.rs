@@ -14,6 +14,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
+use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
 use std::sync::Arc;
 
@@ -22,6 +23,7 @@ pub struct ReplayVerifyCoordinator {
     metadata_cache_opt: MetadataCacheOpt,
     trusted_waypoints_opt: TrustedWaypointOpt,
     concurrent_downloads: usize,
+    replay_concurrency_level: usize,
     restore_handler: RestoreHandler,
     start_version: Version,
     end_version: Version,
@@ -33,6 +35,7 @@ impl ReplayVerifyCoordinator {
         metadata_cache_opt: MetadataCacheOpt,
         trusted_waypoints_opt: TrustedWaypointOpt,
         concurrent_downloads: usize,
+        replay_concurrency_level: usize,
         restore_handler: RestoreHandler,
         start_version: Version,
         end_version: Version,
@@ -42,6 +45,7 @@ impl ReplayVerifyCoordinator {
             metadata_cache_opt,
             trusted_waypoints_opt,
             concurrent_downloads,
+            replay_concurrency_level,
             restore_handler,
             start_version,
             end_version,
@@ -66,6 +70,8 @@ impl ReplayVerifyCoordinator {
     }
 
     async fn run_impl(self) -> Result<()> {
+        AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+
         let metadata_view = metadata::cache::sync_and_load(
             &self.metadata_cache_opt,
             Arc::clone(&self.storage),
@@ -82,12 +88,14 @@ impl ReplayVerifyCoordinator {
         } else {
             metadata_view.select_state_snapshot(self.start_version.wrapping_sub(1))?
         };
-        let replay_transactions_from_version = state_snapshot
-            .as_ref()
-            .map(|b| b.version.wrapping_add(1))
-            .unwrap_or(0);
-        let transactions = metadata_view
-            .select_transaction_backups(replay_transactions_from_version, self.end_version)?;
+        let replay_transactions_from_version =
+            state_snapshot.as_ref().map(|b| b.version + 1).unwrap_or(0);
+        let transactions = metadata_view.select_transaction_backups(
+            // transaction info at the snapshot must be restored otherwise the db will be confused
+            // about the latest version after snapshot is restored.
+            replay_transactions_from_version.saturating_sub(1),
+            self.end_version,
+        )?;
 
         let global_opt = GlobalRestoreOptions {
             target_version: self.end_version,

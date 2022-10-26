@@ -7,16 +7,14 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
 use language_e2e_tests::{current_function_name, executor::FakeExecutor};
-use move_deps::{
-    move_binary_format::file_format::{
-        empty_script, AbilitySet, AddressIdentifierIndex, Bytecode, FunctionHandle,
-        FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, SignatureIndex,
-    },
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{StructTag, TypeTag},
-        vm_status::{StatusCode, StatusCode::LINKER_ERROR},
-    },
+use move_binary_format::file_format::{
+    empty_script, AbilitySet, AddressIdentifierIndex, Bytecode, FunctionHandle,
+    FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, SignatureIndex,
+};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    vm_status::{StatusCode, StatusCode::LINKER_ERROR},
 };
 
 #[test]
@@ -335,12 +333,12 @@ fn script_type_argument_module_does_not_exist() {
         .transaction()
         .script(Script::new(
             blob,
-            vec![TypeTag::Struct(StructTag {
+            vec![TypeTag::Struct(Box::new(StructTag {
                 address,
                 module,
                 name: Identifier::new("fake").unwrap(),
                 type_params: vec![],
-            })],
+            }))],
             vec![],
         ))
         .sequence_number(10)
@@ -400,12 +398,14 @@ fn script_nested_type_argument_module_does_not_exist() {
         .transaction()
         .script(Script::new(
             blob,
-            vec![TypeTag::Vector(Box::new(TypeTag::Struct(StructTag {
-                address,
-                module,
-                name: Identifier::new("fake").unwrap(),
-                type_params: vec![],
-            })))],
+            vec![TypeTag::Vector(Box::new(TypeTag::Struct(Box::new(
+                StructTag {
+                    address,
+                    module,
+                    name: Identifier::new("fake").unwrap(),
+                    type_params: vec![],
+                },
+            ))))],
             vec![],
         ))
         .sequence_number(10)

@@ -24,7 +24,7 @@ use crate::{
 };
 use aptos_api_types::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
+use diesel::{result::Error, PgConnection};
 use field_count::FieldCount;
 use std::fmt::Debug;
 
@@ -147,20 +147,7 @@ fn insert_user_transactions_w_sigs(
             diesel::insert_into(schema::user_transactions::table)
                 .values(&all_user_transactions[start_ind..end_ind])
                 .on_conflict(ut_schema::version)
-                .do_update()
-                .set((
-                    ut_schema::block_height.eq(excluded(ut_schema::block_height)),
-                    ut_schema::parent_signature_type.eq(excluded(ut_schema::parent_signature_type)),
-                    ut_schema::sender.eq(excluded(ut_schema::sender)),
-                    ut_schema::sequence_number.eq(excluded(ut_schema::sequence_number)),
-                    ut_schema::max_gas_amount.eq(excluded(ut_schema::max_gas_amount)),
-                    ut_schema::expiration_timestamp_secs
-                        .eq(excluded(ut_schema::expiration_timestamp_secs)),
-                    ut_schema::gas_unit_price.eq(excluded(ut_schema::gas_unit_price)),
-                    ut_schema::timestamp.eq(excluded(ut_schema::timestamp)),
-                    ut_schema::entry_function_id_str.eq(excluded(ut_schema::entry_function_id_str)),
-                    ut_schema::inserted_at.eq(excluded(ut_schema::inserted_at)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }

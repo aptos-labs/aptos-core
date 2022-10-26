@@ -20,10 +20,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
-    (
-        CoreMempool::new(&NodeConfig::random()),
-        ConsensusMock::new(),
-    )
+    let mut config = NodeConfig::random();
+    config.mempool.broadcast_buckets = vec![0];
+    (CoreMempool::new(&config), ConsensusMock::new())
+}
+
+pub(crate) fn setup_mempool_with_broadcast_buckets(
+    buckets: Vec<u64>,
+) -> (CoreMempool, ConsensusMock) {
+    let mut config = NodeConfig::random();
+    config.mempool.broadcast_buckets = buckets;
+    (CoreMempool::new(&config), ConsensusMock::new())
 }
 
 static ACCOUNTS: Lazy<Vec<AccountAddress>> = Lazy::new(|| {
@@ -142,9 +149,7 @@ pub(crate) fn batch_add_signed_txn(
     transactions: Vec<SignedTransaction>,
 ) -> Result<()> {
     for txn in transactions.into_iter() {
-        if let Err(e) = add_signed_txn(pool, txn) {
-            return Err(e);
-        }
+        add_signed_txn(pool, txn)?
     }
     Ok(())
 }

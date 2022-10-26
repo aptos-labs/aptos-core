@@ -446,7 +446,7 @@ impl EpochManager {
                     "process_block_retrieval",
                     block_store.process_block_retrieval(request).await
                 ) {
-                    error!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                    warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
                 }
             }
             info!(epoch = epoch, "Block retrieval task stops");
@@ -660,6 +660,12 @@ impl EpochManager {
         self.round_manager_tx = Some(round_manager_tx.clone());
 
         counters::TOTAL_VOTING_POWER.set(epoch_state.verifier.total_voting_power() as f64);
+        counters::VALIDATOR_VOTING_POWER.set(
+            epoch_state
+                .verifier
+                .get_voting_power(&self.author)
+                .unwrap_or(0) as f64,
+        );
 
         let mut round_manager = RoundManager::new(
             epoch_state,

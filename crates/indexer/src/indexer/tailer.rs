@@ -1,6 +1,5 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use crate::models::ledger_info::LedgerInfo;
 use crate::{
     database::{execute_with_better_error, PgDbPool},
     indexer::{
@@ -9,17 +8,21 @@ use crate::{
         processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
-    schema::ledger_infos::{self, dsl},
+    models::{
+        ledger_info::LedgerInfo,
+        processor_status::{ProcessorStatusV2, ProcessorStatusV2Query},
+    },
+    schema::{ledger_infos, processor_status},
 };
 use anyhow::{ensure, Context, Result};
 use aptos_api::context::Context as ApiContext;
 use aptos_logger::{debug, info};
 use chrono::ParseError;
 use diesel::{
-    prelude::*,
+    pg::upsert::excluded,
     sql_query,
     sql_types::{BigInt, Text},
-    RunQueryDsl,
+    ExpressionMethods, RunQueryDsl,
 };
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
 use std::{fmt::Debug, sync::Arc};
@@ -66,16 +69,9 @@ impl Tailer {
             processor_name = self.processor.name(),
             "Checking if chain id is correct"
         );
-        let mut conn = self
-            .connection_pool
-            .get()
-            .expect("DB connection should be available at this stage");
+        let mut conn = self.connection_pool.get()?;
 
-        let query_chain = dsl::ledger_infos
-            .select(dsl::chain_id)
-            .load::<i64>(&mut conn)
-            .expect("Error loading chain id from db");
-        let maybe_existing_chain_id = query_chain.first();
+        let maybe_existing_chain_id = LedgerInfo::get(&mut conn)?.map(|li| li.chain_id);
 
         let new_chain_id = self
             .transaction_fetcher
@@ -86,13 +82,13 @@ impl Tailer {
 
         match maybe_existing_chain_id {
             Some(chain_id) => {
-                ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
+                ensure!(chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
                 info!(
                     processor_name = self.processor.name(),
                     chain_id = chain_id,
                     "Chain id matches! Continue to index...",
                 );
-                Ok(*chain_id as u64)
+                Ok(chain_id as u64)
             }
             None => {
                 info!(
@@ -163,9 +159,48 @@ impl Tailer {
         (num_txns, results)
     }
 
+    /// Store last processed version from database. We can assume that all previously processed
+    /// versions are successful because any gap would cause the processor to panic
+    pub fn update_last_processed_version(&self, processor_name: &str, version: u64) -> Result<()> {
+        let mut conn = self.connection_pool.get()?;
+
+        let status = ProcessorStatusV2 {
+            processor: processor_name.to_owned(),
+            last_success_version: version as i64,
+        };
+        execute_with_better_error(
+            &mut conn,
+            diesel::insert_into(processor_status::table)
+                .values(&status)
+                .on_conflict(processor_status::processor)
+                .do_update()
+                .set((
+                    processor_status::last_success_version
+                        .eq(excluded(processor_status::last_success_version)),
+                    processor_status::last_updated.eq(excluded(processor_status::last_updated)),
+                )),
+            Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
+        )?;
+        Ok(())
+    }
+
+    /// Get last version processed successfully from databse
+    pub fn get_start_version(&self, processor_name: &String) -> Result<Option<i64>> {
+        let mut conn = self.connection_pool.get()?;
+
+        match ProcessorStatusV2Query::get_by_processor(processor_name, &mut conn)? {
+            Some(status) => Ok(Some(status.last_success_version + 1)),
+            None => Ok(None),
+        }
+    }
+
     /// Get starting version from database. Starting version is defined as the first version that's either
     /// not successful or missing from the DB.
-    pub fn get_start_version(&self, processor_name: &String) -> Option<i64> {
+    pub fn get_start_version_long(
+        &self,
+        processor_name: &String,
+        lookback_versions: i64,
+    ) -> Option<i64> {
         let mut conn = self
             .connection_pool
             .get()
@@ -174,64 +209,64 @@ impl Tailer {
         // This query gets the first version that isn't equal to the next version (versions would be sorted of course).
         // There's also special handling if the gap happens in the beginning.
         let sql = "
-          WITH raw_boundaries AS
-          (
-              SELECT
-                  MAX(version) AS MAX_V,
-                  MIN(version) AS MIN_V
-              FROM
-                  processor_statuses
-              WHERE
-                  name = $1
-                  AND success = TRUE
-          ),
-          boundaries AS
-          (
-              SELECT
-                  MAX(version) AS MAX_V,
-                  MIN(version) AS MIN_V
-              FROM
-                  processor_statuses, raw_boundaries
-              WHERE
-                  name = $1
-                  AND success = true
-                  and version >= GREATEST(MAX_V - $2, 0)
-          ),
-          gap AS
-          (
-              SELECT
-                  MIN(version) + 1 AS maybe_gap
-              FROM
-                  (
-                      SELECT
-                          version,
-                          LEAD(version) OVER (
-                      ORDER BY
-                          version ASC) AS next_version
-                      FROM
-                          processor_statuses,
-                          boundaries
-                      WHERE
-                          name = $1
-                          AND success = TRUE
-                          AND version >= GREATEST(MAX_V - $2, 0)
-                  ) a
-              WHERE
-                  version + 1 <> next_version
-          )
-          SELECT
-              CASE
-                  WHEN
-                      MIN_V <> GREATEST(MAX_V - $2, 0)
-                  THEN
-                      GREATEST(MAX_V - $2, 0)
-                  ELSE
-                      COALESCE(maybe_gap, MAX_V + 1)
-              END
-              AS version
-          FROM
-              gap, boundaries
-          ";
+        WITH raw_boundaries AS
+        (
+            SELECT
+                MAX(version) AS MAX_V,
+                MIN(version) AS MIN_V
+            FROM
+                processor_statuses
+            WHERE
+                name = $1
+                AND success = TRUE
+        ),
+        boundaries AS
+        (
+            SELECT
+                MAX(version) AS MAX_V,
+                MIN(version) AS MIN_V
+            FROM
+                processor_statuses, raw_boundaries
+            WHERE
+                name = $1
+                AND success = true
+                and version >= GREATEST(MAX_V - $2, 0)
+        ),
+        gap AS
+        (
+            SELECT
+                MIN(version) + 1 AS maybe_gap
+            FROM
+                (
+                    SELECT
+                        version,
+                        LEAD(version) OVER (
+                    ORDER BY
+                        version ASC) AS next_version
+                    FROM
+                        processor_statuses,
+                        boundaries
+                    WHERE
+                        name = $1
+                        AND success = TRUE
+                        AND version >= GREATEST(MAX_V - $2, 0)
+                ) a
+            WHERE
+                version + 1 <> next_version
+        )
+        SELECT
+            CASE
+                WHEN
+                    MIN_V <> GREATEST(MAX_V - $2, 0)
+                THEN
+                    GREATEST(MAX_V - $2, 0)
+                ELSE
+                    COALESCE(maybe_gap, MAX_V + 1)
+            END
+            AS version
+        FROM
+            gap, boundaries
+        ";
         #[derive(Debug, QueryableByName)]
         pub struct Gap {
             #[diesel(sql_type = BigInt)]
@@ -240,7 +275,7 @@ impl Tailer {
         let mut res: Vec<Option<Gap>> = sql_query(sql)
             .bind::<Text, _>(processor_name)
             // This is the number used to determine how far we look back for gaps. Increasing it may result in slower startup
-            .bind::<BigInt, _>(1500000)
+            .bind::<BigInt, _>(lookback_versions)
             .get_results(&mut conn)
             .unwrap();
         res.pop().unwrap().map(|g| g.version)
@@ -266,11 +301,12 @@ mod test {
     use super::*;
     use crate::{
         database::{new_db_pool, PgPoolConnection},
-        models::transactions::TransactionModel,
+        models::transactions::TransactionQuery,
         processors::default_processor::DefaultTransactionProcessor,
     };
     use aptos_api_test_context::new_test_context;
     use aptos_api_types::{LedgerInfo as APILedgerInfo, Transaction, U64};
+    use diesel::RunQueryDsl;
     use serde_json::json;
 
     struct FakeFetcher {
@@ -364,6 +400,7 @@ mod test {
                "event_root_hash":"0xcbdbb1b830d1016d45a828bb3171ea81826e8315f14140acfbd7886f49fbcb40",
                "gas_used":"0",
                "block_height":"0",
+               "epoch":"0",
                "success":true,
                "vm_status":"Executed successfully",
                "accumulator_root_hash":"0x6a527d06063dfd42c6b3a862574d5f3ec1660afb8058135edda5072712bfdb51",
@@ -563,7 +600,7 @@ mod test {
             .unwrap();
 
         // A block_metadata_transaction
-        let block_metadata_transaction: Transaction = serde_json::from_value(json!(
+        let mut block_metadata_transaction: Transaction = serde_json::from_value(json!(
             {
               "type": "block_metadata_transaction",
               "version": "69158",
@@ -639,6 +676,10 @@ mod test {
               ]
             }
         )).unwrap();
+        // This is needed because deserializer only parses epoch once so info.epoch is always None
+        if let Transaction::BlockMetadataTransaction(ref mut bmt) = block_metadata_transaction {
+            bmt.info.epoch = Some(aptos_api_types::U64::from(1));
+        }
 
         tailer
             .processor
@@ -648,7 +689,7 @@ mod test {
 
         // This is a block metadata transaction
         let (tx1, ut1, bmt1, events1, wsc1) =
-            TransactionModel::get_by_version(69158, &mut conn_pool.get().unwrap()).unwrap();
+            TransactionQuery::get_by_version(69158, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(tx1.type_, "block_metadata_transaction");
         assert!(ut1.is_none());
         assert!(bmt1.is_some());
@@ -657,7 +698,7 @@ mod test {
 
         // This is the genesis transaction
         let (tx0, ut0, bmt0, events0, wsc0) =
-            TransactionModel::get_by_version(0, &mut conn_pool.get().unwrap()).unwrap();
+            TransactionQuery::get_by_version(0, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(tx0.type_, "genesis_transaction");
         assert!(ut0.is_none());
         assert!(bmt0.is_none());
@@ -670,6 +711,7 @@ mod test {
               "type": "user_transaction",
               "version": "691595",
               "block_height": "100",
+              "epoch":"1",
               "hash": "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb",
               "state_change_hash": "0xebfe1eb7aa5321e7a7d741d927487163c34c821eaab60646ae0efd02b286c97c",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
@@ -776,7 +818,7 @@ mod test {
 
         // This is a user transaction, so the bmt should be None
         let (tx2, ut2, bmt2, events2, wsc2) =
-            TransactionModel::get_by_version(691595, &mut conn_pool.get().unwrap()).unwrap();
+            TransactionQuery::get_by_version(691595, &mut conn_pool.get().unwrap()).unwrap();
         assert_eq!(
             tx2.hash,
             "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb"
@@ -795,6 +837,7 @@ mod test {
               "type": "user_transaction",
               "version": "260885",
               "block_height": "100",
+              "epoch":"3",
               "hash": "0xb8bbd3936b05e3643f4b4f910bb00c9b6fa817c1935c74b9a16b5b7a2c8a69a3",
               "state_change_hash": "0xde91b595abbeef217fb0be956df0909c1459ba8d82ed12b983e226ecbf0a4ec5",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",

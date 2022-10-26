@@ -31,6 +31,7 @@ import {
   Uint64,
   AnyNumber,
 } from "./bcs";
+import { Ed25519PublicKey } from "./aptos_types";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -186,7 +187,7 @@ export class AptosClient {
    * @example An example of an account resource
    * ```
    * {
-   *    type: "0x1::AptosAccount::Coin",
+   *    type: "0x1::aptos_coin::AptosCoin",
    *    data: { value: 6 }
    * }
    * ```
@@ -320,7 +321,7 @@ export class AptosClient {
    * for which events are queried. This refers to the account that events were emitted
    * to, not the account hosting the move module that emits that event type.
    * @param eventHandleStruct String representation of an on-chain Move struct type.
-   * (e.g. `0x1::Coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
+   * (e.g. `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
    * @param fieldName The field name of the EventHandle in the struct
    * @param query Optional query object
    * @param query.start The start sequence number in the EVENT STREAM, defaulting to the latest event.
@@ -357,23 +358,41 @@ export class AptosClient {
    * Generates and submits a transaction to the transaction simulation
    * endpoint. For this we generate a transaction with a fake signature.
    *
-   * @param accountFrom The account that will be used to send the transaction
-   * for simulation.
+   * @param accountOrPubkey The sender or sender's public key. When private key is available, `AptosAccount` instance
+   * can be used to send the transaction for simulation. If private key is not available, sender's public key can be
+   * used to send the transaction for simulation.
    * @param rawTransaction The raw transaction to be simulated, likely created
    * by calling the `generateTransaction` function.
    * @param query.estimateGasUnitPrice If set to true, the gas unit price in the
    * transaction will be ignored and the estimated value will be used.
    * @param query.estimateMaxGasAmount If set to true, the max gas value in the
    * transaction will be ignored and the maximum possible gas will be used.
+   * @param query.estimatePrioritizedGasUnitPrice If set to true, the transaction will use a higher price than the
+   * original estimate.
    * @returns The BCS encoded signed transaction, which you should then provide
    *
    */
   async simulateTransaction(
-    accountFrom: AptosAccount,
+    accountOrPubkey: AptosAccount | Ed25519PublicKey,
     rawTransaction: TxnBuilderTypes.RawTransaction,
-    query?: { estimateGasUnitPrice?: boolean; estimateMaxGasAmount?: boolean },
+    query?: {
+      estimateGasUnitPrice?: boolean;
+      estimateMaxGasAmount?: boolean;
+      estimatePrioritizedGasUnitPrice: boolean;
+    },
   ): Promise<Gen.UserTransaction[]> {
-    const signedTxn = AptosClient.generateBCSSimulation(accountFrom, rawTransaction);
+    let signedTxn: Uint8Array;
+
+    if (accountOrPubkey instanceof AptosAccount) {
+      signedTxn = AptosClient.generateBCSSimulation(accountOrPubkey, rawTransaction);
+    } else {
+      const txnBuilder = new TransactionBuilderEd25519(() => {
+        const invalidSigBytes = new Uint8Array(64);
+        return new TxnBuilderTypes.Ed25519Signature(invalidSigBytes);
+      }, accountOrPubkey.toBytes());
+
+      signedTxn = txnBuilder.sign(rawTransaction);
+    }
     return this.submitBCSSimulation(signedTxn, query);
   }
 
@@ -402,17 +421,24 @@ export class AptosClient {
    * transaction will be ignored and the estimated value will be used.
    * @param query?.estimateMaxGasAmount If set to true, the max gas value in the
    * transaction will be ignored and the maximum possible gas will be used.
+   * @param query?.estimatePrioritizedGasUnitPrice If set to true, the transaction will use a higher price than the
+   * original estimate.
    * @returns Simulation result in the form of UserTransaction.
    */
   @parseApiError
   async submitBCSSimulation(
     bcsBody: Uint8Array,
-    query?: { estimateGasUnitPrice?: boolean; estimateMaxGasAmount?: boolean },
+    query?: {
+      estimateGasUnitPrice?: boolean;
+      estimateMaxGasAmount?: boolean;
+      estimatePrioritizedGasUnitPrice?: boolean;
+    },
   ): Promise<Gen.UserTransaction[]> {
     // Need to construct a customized post request for transactions in BCS payload.
     const queryParams = {
       estimate_gas_unit_price: query?.estimateGasUnitPrice ?? false,
       estimate_max_gas_amount: query?.estimateMaxGasAmount ?? false,
+      estimate_prioritized_gas_unit_price: query?.estimatePrioritizedGasUnitPrice ?? false,
     };
     return this.client.request.request<Gen.UserTransaction[]>({
       url: "/transactions/simulate",

@@ -3,6 +3,13 @@ global:
   evaluation_interval: 15s
   external_labels:
     chain_name: {{ .Values.chain.name }}
+    {{- if .Values.validator.name }}
+    owner: {{ .Values.validator.name }}
+    {{- else if .Values.fullnode.name  }}
+    owner: {{ .Values.fullnode.name }}
+    {{- else }}
+    owner: release:{{ .Release.Name }}
+    {{- end }}
 
 # Alertmanager configuration
 alerting:
@@ -39,7 +46,13 @@ scrape_configs:
     action: drop
     regex: '(.+)_request_duration_seconds_bucket'
   - target_label: owner
+    {{- if .Values.validator.name }}
     replacement: {{ .Values.validator.name }}
+    {{- else if .Values.fullnode.name  }}
+    replacement: {{ .Values.fullnode.name }}
+    {{- else }}
+    replacement: {{ .Release.Name }}
+    {{- end }}
 {{ end }}
 
 - job_name: 'kubernetes-nodes'
@@ -183,26 +196,6 @@ scrape_configs:
   - source_labels: [__meta_kubernetes_namespace]
     action: replace
     target_label: namespace
-  - source_labels: [__meta_kubernetes_pod_name]
-    action: replace
-    target_label: kubernetes_pod_name
-  # Explicitly drop all vector metrics
-  - source_labels: [namespace]
-    regex: 'vector'
-    action: drop
-
-- job_name: "aptos-procs"
-
-  kubernetes_sd_configs:
-  - role: pod
-
-  relabel_configs:
-  - source_labels: [__meta_kubernetes_pod_container_port_number]
-    action: keep
-    regex: "9101"
-  - source_labels: [__meta_kubernetes_namespace]
-    action: replace
-    target_label: namespace
   - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
     action: replace
     target_label: role
@@ -212,6 +205,10 @@ scrape_configs:
   - source_labels: [__meta_kubernetes_pod_name]
     action: replace
     target_label: kubernetes_pod_name
+  # Explicitly drop all vector metrics
+  - source_labels: [namespace]
+    regex: 'vector'
+    action: drop
 
 {{ if .Values.monitoring.prometheus.remote_write.enabled }}
 {{ with .Values.monitoring.prometheus.remote_write }}

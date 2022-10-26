@@ -12,7 +12,7 @@ use crate::{
 use aptos_crypto::{ed25519::*, traits::*, HashValue};
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
-const TEST_GAS_PRICE: u64 = 0;
+const TEST_GAS_PRICE: u64 = 100;
 
 static EMPTY_SCRIPT: &[u8] = include_bytes!("empty_script.mv");
 

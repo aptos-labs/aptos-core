@@ -3,7 +3,7 @@
 
 use super::new_test_context;
 use aptos_api_test_context::current_function_name;
-use aptos_api_types::{new_vm_utf8_string, AsConverter, MoveConverter, MoveType};
+use aptos_api_types::{new_vm_utf8_string, AsConverter, HexEncodedBytes, MoveConverter, MoveType};
 use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::MoveResolverExt};
 use move_core_types::{
     account_address::AccountAddress,
@@ -33,6 +33,7 @@ async fn test_value_conversion() {
         "hello",
         new_vm_utf8_string("hello"),
     );
+    assert_value_conversion_bytes(&converter, "0x1::string::String", &[147, 148, 149]);
     assert_value_conversion(
         &converter,
         "vector<u8>",
@@ -73,4 +74,25 @@ fn assert_value_conversion<'r, R: MoveResolverExt, V: Serialize>(
     let move_value_back = converter.try_into_move_value(&type_tag, &vm_bytes).unwrap();
     let json_value_back = serde_json::to_value(move_value_back).unwrap();
     assert_eq!(json_value_back, json!(json_value));
+}
+
+fn assert_value_conversion_bytes<'r, R: MoveResolverExt>(
+    converter: &MoveConverter<'r, R>,
+    json_move_type: &str,
+    vm_bytes: &[u8],
+) {
+    let move_type: MoveType = serde_json::from_value(json!(json_move_type)).unwrap();
+    let type_tag = move_type.try_into().unwrap();
+
+    let move_value_back = converter
+        .try_into_move_value(&type_tag, &bcs::to_bytes(vm_bytes).unwrap())
+        .unwrap();
+    let json_value_back = serde_json::to_string(&move_value_back).unwrap();
+    assert_eq!(
+        json_value_back,
+        format!(
+            "\"Unparsable utf-8 {}\"",
+            HexEncodedBytes(vm_bytes.to_vec())
+        )
+    );
 }

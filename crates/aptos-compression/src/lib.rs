@@ -42,6 +42,13 @@ pub fn compress(
     client: CompressionClient,
     max_bytes: usize,
 ) -> Result<CompressedData, CompressionError> {
+    if raw_data.len() > max_bytes {
+        return Err(CompressionError(format!(
+            "Uncompressed size greater than max. size: {}, max: {}",
+            raw_data.len(),
+            max_bytes
+        )));
+    }
     // Start the compression timer
     let timer = start_compression_operation_timer(COMPRESS, client.clone());
 
@@ -58,6 +65,9 @@ pub fn compress(
         }
     };
 
+    // Ensure that the compressed data size is not greater than the max bytes limit. This can
+    // happen in case of uncompressible data, where the compression size will be more than the
+    // uncompressed size.
     if compressed_data.len() > max_bytes {
         return Err(CompressionError(format!(
             "Compressed size greater than max. size: {}, max: {}",

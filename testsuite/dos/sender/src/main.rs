@@ -94,7 +94,11 @@ async fn burst_target(addr: Arc<String>, burst: u16) {
             let mut buf = BytesMut::with_capacity(4096);
 
             _ = stream.set_nodelay(true);
-            //println!("{:?} Connected to {:?}", stream.local_addr(), stream.peer_addr());
+            println!(
+                "{:?} Connected to {:?}",
+                stream.local_addr(),
+                stream.peer_addr()
+            );
             stream.write_all(b"Hello World!\n").await?;
             let n = stream.read_buf(&mut buf).await?;
             let curr = counter.fetch_add(1, Ordering::Relaxed);
@@ -106,7 +110,7 @@ async fn burst_target(addr: Arc<String>, burst: u16) {
                         "{curr}/{}:{}: Got: {:?}",
                         burst,
                         ack.fetch_add(1, Ordering::Relaxed),
-                        String::from_utf8((&buf[..n]).to_vec()).unwrap()
+                        String::from_utf8(buf[..n].to_vec()).unwrap()
                     );
                 } else {
                     println!(

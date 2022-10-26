@@ -1,14 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::transactions::Transaction, schema::events};
+use crate::{models::transactions::Transaction, schema::events, util::standardize_address};
 use aptos_api_types::Event as APIEvent;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize,
-)]
+use super::transactions::TransactionQuery;
+
+#[derive(Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(account_address, creation_number, sequence_number))]
 #[diesel(table_name = events)]
@@ -20,7 +20,21 @@ pub struct Event {
     pub transaction_block_height: i64,
     pub type_: String,
     pub data: serde_json::Value,
-    // Default time columns
+}
+
+/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
+#[derive(Associations, Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[diesel(belongs_to(TransactionQuery, foreign_key = transaction_version))]
+#[diesel(primary_key(account_address, creation_number, sequence_number))]
+#[diesel(table_name = events)]
+pub struct EventQuery {
+    pub sequence_number: i64,
+    pub creation_number: i64,
+    pub account_address: String,
+    pub transaction_version: i64,
+    pub transaction_block_height: i64,
+    pub type_: String,
+    pub data: serde_json::Value,
     pub inserted_at: chrono::NaiveDateTime,
 }
 
@@ -31,14 +45,13 @@ impl Event {
         transaction_block_height: i64,
     ) -> Self {
         Event {
-            account_address: event.guid.account_address.to_string(),
+            account_address: standardize_address(&event.guid.account_address.to_string()),
             creation_number: event.guid.creation_number.0 as i64,
             sequence_number: event.sequence_number.0 as i64,
             transaction_version,
             transaction_block_height,
             type_: event.typ.to_string(),
             data: event.data.clone(),
-            inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 

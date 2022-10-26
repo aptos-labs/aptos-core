@@ -12,7 +12,6 @@ on:
 jobs:
   # Test under sub optimal circumstances (network delay)
   run-forge-three-region:
-
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:

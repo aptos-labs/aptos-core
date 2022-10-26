@@ -20,6 +20,9 @@ pub struct ExecutionConfig {
     pub genesis_file_location: PathBuf,
     pub concurrency_level: u16,
     pub num_proof_reading_threads: u16,
+    pub paranoid_type_verification: bool,
+    pub paranoid_hot_potato_verification: bool,
+    pub processed_transactions_detailed_counters: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -46,6 +49,9 @@ impl Default for ExecutionConfig {
             // Parallel execution by default.
             concurrency_level: 8,
             num_proof_reading_threads: 32,
+            paranoid_type_verification: true,
+            paranoid_hot_potato_verification: true,
+            processed_transactions_detailed_counters: false,
         }
     }
 }
@@ -130,7 +136,7 @@ mod test {
     #[test]
     fn test_some_and_load_genesis() {
         let fake_genesis = Transaction::GenesisTransaction(WriteSetPayload::Direct(
-            ChangeSet::new(WriteSetMut::new(vec![]).freeze().unwrap(), vec![]),
+            ChangeSet::new(WriteSetMut::new(vec![]).freeze().unwrap(), vec![], 3).unwrap(),
         ));
         let (mut config, path) = generate_config();
         config.genesis = Some(fake_genesis.clone());

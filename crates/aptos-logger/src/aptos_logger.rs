@@ -4,6 +4,7 @@
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
+use crate::sample::SampleRate;
 use crate::telemetry_log_writer::{TelemetryLog, TelemetryLogWriter};
 use crate::{
     counters::{
@@ -11,6 +12,7 @@ use crate::{
         STRUCT_LOG_PARSE_ERROR_COUNT, STRUCT_LOG_QUEUE_ERROR_COUNT, STRUCT_LOG_SEND_ERROR_COUNT,
     },
     logger::Logger,
+    sample,
     struct_log::TcpWriter,
     Event, Filter, Key, Level, LevelFilter, Metadata,
 };
@@ -530,10 +532,17 @@ impl Logger for AptosData {
     fn flush(&self) {
         if let Some(sender) = &self.sender {
             let (oneshot_sender, oneshot_receiver) = sync::mpsc::sync_channel(1);
-            sender
-                .send(LoggerServiceEvent::Flush(oneshot_sender))
-                .unwrap();
-            oneshot_receiver.recv().unwrap();
+            match sender.try_send(LoggerServiceEvent::Flush(oneshot_sender)) {
+                Ok(_) => {
+                    if let Err(err) = oneshot_receiver.recv_timeout(FLUSH_TIMEOUT) {
+                        eprintln!("[Logging] Unable to flush recv: {}", err);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("[Logging] Unable to flush send: {}", err);
+                    std::thread::sleep(FLUSH_TIMEOUT);
+                }
+            }
         }
     }
 }
@@ -608,11 +617,17 @@ impl LoggerService {
                             match writer.flush() {
                                 Ok(rx) => {
                                     if let Err(err) = rx.recv_timeout(FLUSH_TIMEOUT) {
-                                        eprintln!("flush recv failed: {}", err);
+                                        sample!(
+                                            SampleRate::Duration(Duration::from_secs(60)),
+                                            eprintln!("Timed out flushing telemetry: {}", err)
+                                        );
                                     }
                                 }
                                 Err(err) => {
-                                    eprintln!("flush failed: {}", err);
+                                    sample!(
+                                        SampleRate::Duration(Duration::from_secs(60)),
+                                        eprintln!("Failed to flush telemetry: {}", err)
+                                    );
                                 }
                             }
                         }

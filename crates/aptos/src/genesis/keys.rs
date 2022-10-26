@@ -28,6 +28,8 @@ const VALIDATOR_FILE: &str = "validator-identity.yaml";
 const VFN_FILE: &str = "validator-full-node-identity.yaml";
 
 /// Generate account key, consensus key, and network key for a validator
+///
+/// These keys are used for running a validator or operator in a network
 #[derive(Parser)]
 pub struct GenerateKeys {
     /// Output directory for the key files
@@ -101,7 +103,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
 /// Set validator configuration for a single validator in the git repository
 #[derive(Parser)]
 pub struct SetValidatorConfiguration {
-    /// Name of validator
+    /// Name of the validator
     #[clap(long)]
     pub(crate) username: String,
 
@@ -118,10 +120,14 @@ pub struct SetValidatorConfiguration {
     pub(crate) stake_amount: u64,
 
     /// Commission rate to pay operator
+    ///
+    /// This is a percentage between 0% and 100%
     #[clap(long, default_value_t = 0)]
     pub(crate) commission_percentage: u64,
 
-    /// Whether the validator will be joining the genesis validator set.
+    /// Whether the validator will be joining the genesis validator set
+    ///
+    /// If set this validator will already be in the validator set at genesis
     #[clap(long)]
     pub(crate) join_during_genesis: bool,
 
@@ -216,7 +222,7 @@ impl CliCommand<()> for SetValidatorConfiguration {
 
         // Build operator configuration file
         let operator_config = OperatorConfiguration {
-            operator_account_address: operator_identity.account_address,
+            operator_account_address: operator_identity.account_address.into(),
             operator_account_public_key: operator_identity.account_public_key.clone(),
             consensus_public_key,
             consensus_proof_of_possession,
@@ -227,11 +233,11 @@ impl CliCommand<()> for SetValidatorConfiguration {
         };
 
         let owner_config = OwnerConfiguration {
-            owner_account_address: owner_identity.account_address,
+            owner_account_address: owner_identity.account_address.into(),
             owner_account_public_key: owner_identity.account_public_key,
-            voter_account_address: voter_identity.account_address,
+            voter_account_address: voter_identity.account_address.into(),
             voter_account_public_key: voter_identity.account_public_key,
-            operator_account_address: operator_identity.account_address,
+            operator_account_address: operator_identity.account_address.into(),
             operator_account_public_key: operator_identity.account_public_key,
             stake_amount: self.stake_amount,
             commission_percentage: self.commission_percentage,
@@ -287,7 +293,7 @@ impl CliCommand<()> for GenerateLayoutTemplate {
 
 /// Generate a WriteSet genesis compiled from a script file.
 ///
-/// This will compile a piece of Move script and generate a writeset from that script.
+/// This will compile a Move script and generate a writeset from that script.
 #[derive(Parser)]
 pub struct GenerateAdminWriteSet {
     /// Path of the output genesis file

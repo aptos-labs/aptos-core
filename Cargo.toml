@@ -18,9 +18,9 @@ members = [
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
+    "aptos-move/framework/artifacts-test",
     "aptos-move/framework/cached-packages",
     "aptos-move/gas-algebra-ext",
-    "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
@@ -75,6 +75,7 @@ members = [
     "crates/transaction-emitter-lib",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
+    "ecosystem/sf-indexer/firehose-stream",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -116,6 +117,7 @@ members = [
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
+    "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
     "testsuite/forge",
@@ -148,6 +150,41 @@ default-members = [
     "storage/backup/backup-cli",
     "ecosystem/node-checker",
 ]
+
+[workspace.package]
+rust-version = "1.64"
+
+[workspace.dependencies]
+# BEGIN MOVE DEPENDENCIES
+move-abigen = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-cli = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-compiler ={ git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753", features = ["address32"] }
+move-docgen = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-ir-compiler = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-model = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-package = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-prover = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-stackless-bytecode = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-symbol-pool = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753", features = ["table-extension"] }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753", features = ["lazy_natives"] }
+move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753", features = ["table-extension"] }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+read-write-set = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "64a03b1d5bdc3751b95d89c675e63f1ca205e753" }
+# END MOVE DEPENDENCIES
 
 [profile.release]
 debug = true

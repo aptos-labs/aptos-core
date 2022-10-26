@@ -3,9 +3,9 @@
 
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
-use move_deps::move_core_types::identifier::Identifier;
-use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
-use move_deps::move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
+use move_core_types::identifier::Identifier;
+use move_core_types::language_storage::{StructTag, TypeTag};
+use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -650,7 +650,7 @@ fn string_args_generic_instantiation() {
         name: Identifier::new("String").expect("valid identifier"),
         type_params: vec![],
     };
-    let string_type = TypeTag::Struct(string_struct);
+    let string_type = TypeTag::Struct(Box::new(string_struct));
 
     fail_generic(vec![address_type, string_type], tests);
 }

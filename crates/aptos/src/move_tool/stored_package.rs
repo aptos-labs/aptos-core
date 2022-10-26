@@ -6,7 +6,7 @@ use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
 use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
 use framework::unzip_metadata_str;
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
+use move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
 use std::fs;
 use std::path::Path;
@@ -132,6 +132,62 @@ impl<'a> CachedPackageMetadata<'a> {
             let source = unzip_metadata_str(&module.source)?;
             fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;
         }
+        Ok(())
+    }
+
+    pub fn verify(&self, package_metadata: &PackageMetadata) -> anyhow::Result<()> {
+        let self_metadata = self.metadata;
+
+        if self_metadata.name != package_metadata.name {
+            bail!(
+                "Package name doesn't match {} : {}",
+                package_metadata.name,
+                self_metadata.name
+            )
+        } else if self_metadata.deps != package_metadata.deps {
+            bail!(
+                "Dependencies don't match {:?} : {:?}",
+                package_metadata.deps,
+                self_metadata.deps
+            )
+        } else if self_metadata.modules != package_metadata.modules {
+            bail!(
+                "Modules don't match {:?} : {:?}",
+                package_metadata.modules,
+                self_metadata.modules
+            )
+        } else if self_metadata.manifest != package_metadata.manifest {
+            bail!(
+                "Manifest doesn't match {:?} : {:?}",
+                package_metadata.manifest,
+                self_metadata.manifest
+            )
+        } else if self_metadata.upgrade_policy != package_metadata.upgrade_policy {
+            bail!(
+                "Upgrade policy doesn't match {:?} : {:?}",
+                package_metadata.upgrade_policy,
+                self_metadata.upgrade_policy
+            )
+        } else if self_metadata.upgrade_number != package_metadata.upgrade_number {
+            bail!(
+                "Upgrade number doesn't match {:?} : {:?}",
+                package_metadata.upgrade_number,
+                self_metadata.upgrade_number
+            )
+        } else if self_metadata.extension != package_metadata.extension {
+            bail!(
+                "Extensions doesn't match {:?} : {:?}",
+                package_metadata.extension,
+                self_metadata.extension
+            )
+        } else if self_metadata.source_digest != package_metadata.source_digest {
+            bail!(
+                "Source digests doesn't match {:?} : {:?}",
+                package_metadata.source_digest,
+                self_metadata.source_digest
+            )
+        }
+
         Ok(())
     }
 }

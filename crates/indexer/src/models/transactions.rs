@@ -6,7 +6,6 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    models::{events::EventModel, write_set_changes::WriteSetChangeModel},
     schema::{block_metadata_transactions, transactions, user_transactions},
     util::u64_to_bigdecimal,
 };
@@ -21,11 +20,14 @@ use diesel::{
 };
 
 use super::{
-    block_metadata_transactions::BlockMetadataTransaction, signatures::Signature,
-    user_transactions::UserTransaction, write_set_changes::WriteSetChangeDetail,
+    block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionQuery},
+    events::{EventModel, EventQuery},
+    signatures::Signature,
+    user_transactions::{UserTransaction, UserTransactionQuery},
+    write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel, WriteSetChangeQuery},
 };
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]
 #[diesel(table_name = transactions)]
 pub struct Transaction {
@@ -43,8 +45,30 @@ pub struct Transaction {
     pub accumulator_root_hash: String,
     pub num_events: i64,
     pub num_write_set_changes: i64,
-    // Default time columns
+    pub epoch: i64,
+}
+
+/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
+#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[diesel(primary_key(version))]
+#[diesel(table_name = transactions)]
+pub struct TransactionQuery {
+    pub version: i64,
+    pub block_height: i64,
+    pub hash: String,
+    pub type_: String,
+    pub payload: Option<serde_json::Value>,
+    pub state_change_hash: String,
+    pub event_root_hash: String,
+    pub state_checkpoint_hash: Option<String>,
+    pub gas_used: BigDecimal,
+    pub success: bool,
+    pub vm_status: String,
+    pub accumulator_root_hash: String,
+    pub num_events: i64,
+    pub num_write_set_changes: i64,
     pub inserted_at: chrono::NaiveDateTime,
+    pub epoch: i64,
 }
 
 impl Transaction {
@@ -54,6 +78,7 @@ impl Transaction {
         type_: String,
         num_events: i64,
         block_height: i64,
+        epoch: i64,
     ) -> Self {
         Self {
             type_,
@@ -70,7 +95,7 @@ impl Transaction {
             accumulator_root_hash: info.accumulator_root_hash.to_string(),
             num_events,
             num_write_set_changes: info.changes.len() as i64,
-            inserted_at: chrono::Utc::now().naive_utc(),
+            epoch,
         }
     }
 
@@ -89,10 +114,11 @@ impl Transaction {
             .block_height
             .unwrap()
             .0 as i64;
+        let epoch = transaction.transaction_info().unwrap().epoch.unwrap().0 as i64;
         match transaction {
             APITransaction::UserTransaction(user_txn) => {
                 let (user_txn_output, signatures) =
-                    UserTransaction::from_transaction(user_txn, block_height);
+                    UserTransaction::from_transaction(user_txn, block_height, epoch);
                 let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
                     &user_txn.info.changes,
                     user_txn.info.version.0 as i64,
@@ -108,6 +134,7 @@ impl Transaction {
                         transaction.type_str().to_string(),
                         user_txn.events.len() as i64,
                         block_height,
+                        epoch,
                     ),
                     Some(TransactionDetail::User(user_txn_output, signatures)),
                     EventModel::from_events(
@@ -135,6 +162,7 @@ impl Transaction {
                         transaction.type_str().to_string(),
                         0,
                         block_height,
+                        epoch,
                     ),
                     None,
                     EventModel::from_events(
@@ -159,6 +187,7 @@ impl Transaction {
                         transaction.type_str().to_string(),
                         0,
                         block_height,
+                        epoch,
                     ),
                     Some(TransactionDetail::BlockMetadata(
                         BlockMetadataTransaction::from_transaction(
@@ -182,6 +211,7 @@ impl Transaction {
                     transaction.type_str().to_string(),
                     0,
                     block_height,
+                    epoch,
                 ),
                 None,
                 vec![],
@@ -222,42 +252,45 @@ impl Transaction {
         }
         (txns, txn_details, events, wscs, wsc_details)
     }
+}
 
+impl TransactionQuery {
     pub fn get_many_by_version(
         start_version: u64,
         number_to_get: i64,
         conn: &mut PgPoolConnection,
     ) -> diesel::QueryResult<
         Vec<(
-            Transaction,
-            Option<UserTransaction>,
-            Option<BlockMetadataTransaction>,
-            Vec<EventModel>,
-            Vec<WriteSetChangeModel>,
+            Self,
+            Option<UserTransactionQuery>,
+            Option<BlockMetadataTransactionQuery>,
+            Vec<EventQuery>,
+            Vec<WriteSetChangeQuery>,
         )>,
     > {
         let mut txs = transactions::table
             .filter(transactions::version.ge(start_version as i64))
             .order(transactions::version.asc())
             .limit(number_to_get as i64)
-            .load::<Transaction>(conn)?;
+            .load::<Self>(conn)?;
 
-        let mut user_transactions: Vec<Vec<UserTransaction>> = UserTransaction::belonging_to(&txs)
-            .load::<UserTransaction>(conn)?
-            .grouped_by(&txs);
-
-        let mut block_metadata_transactions: Vec<Vec<BlockMetadataTransaction>> =
-            BlockMetadataTransaction::belonging_to(&txs)
-                .load::<BlockMetadataTransaction>(conn)?
+        let mut user_transactions: Vec<Vec<UserTransactionQuery>> =
+            UserTransactionQuery::belonging_to(&txs)
+                .load::<UserTransactionQuery>(conn)?
                 .grouped_by(&txs);
 
-        let mut events: Vec<Vec<EventModel>> = EventModel::belonging_to(&txs)
-            .load::<EventModel>(conn)?
+        let mut block_metadata_transactions: Vec<Vec<BlockMetadataTransactionQuery>> =
+            BlockMetadataTransactionQuery::belonging_to(&txs)
+                .load::<BlockMetadataTransactionQuery>(conn)?
+                .grouped_by(&txs);
+
+        let mut events: Vec<Vec<EventQuery>> = EventQuery::belonging_to(&txs)
+            .load::<EventQuery>(conn)?
             .grouped_by(&txs);
 
-        let mut write_set_changes: Vec<Vec<WriteSetChangeModel>> =
-            WriteSetChangeModel::belonging_to(&txs)
-                .load::<WriteSetChangeModel>(conn)?
+        let mut write_set_changes: Vec<Vec<WriteSetChangeQuery>> =
+            WriteSetChangeQuery::belonging_to(&txs)
+                .load::<WriteSetChangeQuery>(conn)?
                 .grouped_by(&txs);
 
         // Convert to the nice result tuple
@@ -279,15 +312,15 @@ impl Transaction {
         version: u64,
         conn: &mut PgPoolConnection,
     ) -> diesel::QueryResult<(
-        Transaction,
-        Option<UserTransaction>,
-        Option<BlockMetadataTransaction>,
-        Vec<EventModel>,
-        Vec<WriteSetChangeModel>,
+        Self,
+        Option<UserTransactionQuery>,
+        Option<BlockMetadataTransactionQuery>,
+        Vec<EventQuery>,
+        Vec<WriteSetChangeQuery>,
     )> {
         let transaction = transactions::table
             .filter(transactions::version.eq(version as i64))
-            .first::<Transaction>(conn)?;
+            .first::<Self>(conn)?;
 
         let (user_transaction, block_metadata_transaction, events, write_set_changes) =
             transaction.get_details_for_transaction(conn)?;
@@ -305,15 +338,15 @@ impl Transaction {
         transaction_hash: &str,
         conn: &mut PgPoolConnection,
     ) -> diesel::QueryResult<(
-        Transaction,
-        Option<UserTransaction>,
-        Option<BlockMetadataTransaction>,
-        Vec<EventModel>,
-        Vec<WriteSetChangeModel>,
+        Self,
+        Option<UserTransactionQuery>,
+        Option<BlockMetadataTransactionQuery>,
+        Vec<EventQuery>,
+        Vec<WriteSetChangeQuery>,
     )> {
         let transaction = transactions::table
             .filter(transactions::hash.eq(&transaction_hash))
-            .first::<Transaction>(conn)?;
+            .first::<Self>(conn)?;
 
         let (user_transaction, block_metadata_transaction, events, write_set_changes) =
             transaction.get_details_for_transaction(conn)?;
@@ -331,33 +364,33 @@ impl Transaction {
         &self,
         conn: &mut PgPoolConnection,
     ) -> diesel::QueryResult<(
-        Option<UserTransaction>,
-        Option<BlockMetadataTransaction>,
-        Vec<EventModel>,
-        Vec<WriteSetChangeModel>,
+        Option<UserTransactionQuery>,
+        Option<BlockMetadataTransactionQuery>,
+        Vec<EventQuery>,
+        Vec<WriteSetChangeQuery>,
     )> {
-        let mut user_transaction: Option<UserTransaction> = None;
-        let mut block_metadata_transaction: Option<BlockMetadataTransaction> = None;
+        let mut user_transaction: Option<UserTransactionQuery> = None;
+        let mut block_metadata_transaction: Option<BlockMetadataTransactionQuery> = None;
 
         let events = crate::schema::events::table
             .filter(crate::schema::events::transaction_version.eq(&self.version))
-            .load::<EventModel>(conn)?;
+            .load::<EventQuery>(conn)?;
 
         let write_set_changes = crate::schema::write_set_changes::table
             .filter(crate::schema::write_set_changes::transaction_version.eq(&self.version))
-            .load::<WriteSetChangeModel>(conn)?;
+            .load::<WriteSetChangeQuery>(conn)?;
 
         match self.type_.as_str() {
             "user_transaction" => {
                 user_transaction = user_transactions::table
                     .filter(user_transactions::version.eq(&self.version))
-                    .first::<UserTransaction>(conn)
+                    .first::<UserTransactionQuery>(conn)
                     .optional()?;
             }
             "block_metadata_transaction" => {
                 block_metadata_transaction = block_metadata_transactions::table
                     .filter(block_metadata_transactions::version.eq(&self.version))
-                    .first::<BlockMetadataTransaction>(conn)
+                    .first::<BlockMetadataTransactionQuery>(conn)
                     .optional()?;
             }
             "genesis_transaction" => {}

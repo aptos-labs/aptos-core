@@ -33,7 +33,7 @@ storage-service-client = { path = "../storage-service/client" }
 storage-service-types = { path = "../storage-service/types" }
 
 [dev-dependencies]
-bcs = "0.1.3"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 claims = "0.7"
 maplit = "1.0.2"
 tokio = { version = "1.21.0", features = ["rt", "macros"], default-features = false }

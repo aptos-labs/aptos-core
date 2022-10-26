@@ -1,5 +1,5 @@
 /// PropertyMap is a specialization of SimpleMap for Tokens.
-/// It maps a String key to a PropertyValue that consists of type (string) and value (vecotr<u8>)
+/// It maps a String key to a PropertyValue that consists of type (string) and value (vector<u8>)
 /// It provides basic on-chain serialization of primitive and string to property value with type information
 /// It also supports deserializing property value to it original type.
 module aptos_token::property_map {
@@ -62,15 +62,15 @@ module aptos_token::property_map {
         values: vector<vector<u8>>,
         types: vector<String>
     ): PropertyMap {
-        assert!(vector::length(&keys) <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(EPROPERTY_NUMBER_EXCEED_LIMIT));
-        assert!(vector::length(&keys) == vector::length(&values), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
-        assert!(vector::length(&keys) == vector::length(&types), error::invalid_argument(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
+        let length = vector::length(&keys);
+        assert!(length <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(EPROPERTY_NUMBER_EXCEED_LIMIT));
+        assert!(length == vector::length(&values), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
+        assert!(length == vector::length(&types), error::invalid_argument(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
 
-        let properties = PropertyMap {
-            map: simple_map::create<String, PropertyValue>(),
-        };
+        let properties = empty();
+
         let i = 0;
-        while (i < vector::length(&keys)) {
+        while (i < length) {
             let key = *vector::borrow(&keys, i);
             assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
             simple_map::add(
@@ -78,6 +78,28 @@ module aptos_token::property_map {
                 key,
                 PropertyValue { value: *vector::borrow(&values, i), type: *vector::borrow(&types, i) }
             );
+            i = i + 1;
+        };
+        properties
+    }
+
+    /// Create property map directly from key and property value
+    public fun new_with_key_and_property_value(
+        keys: vector<String>,
+        values: vector<PropertyValue>
+    ): PropertyMap {
+        let length = vector::length(&keys);
+        assert!(length <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(EPROPERTY_NUMBER_EXCEED_LIMIT));
+        assert!(length == vector::length(&values), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
+
+        let properties = empty();
+
+        let i = 0;
+        while (i < length) {
+            let key = *vector::borrow(&keys, i);
+            let val = *vector::borrow(&values, i);
+            assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
+            add(&mut properties, key, val);
             i = i + 1;
         };
         properties
@@ -175,18 +197,19 @@ module aptos_token::property_map {
         let val_len = vector::length(&values);
         let typ_len = vector::length(&types);
         assert!(key_len == val_len, error::invalid_state(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
-        assert!(val_len == typ_len, error::invalid_state(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
+        assert!(key_len == typ_len, error::invalid_state(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
 
         let i = 0;
         while (i < vector::length(&keys)) {
+            let key = vector::borrow(&keys, i);
             let prop_val = PropertyValue {
                 value: *vector::borrow(&values, i),
                 type: *vector::borrow(&types, i),
             };
-            if (contains_key(map, vector::borrow(&keys, i))) {
-                update_property_value(map, vector::borrow(&keys, i), prop_val);
+            if (contains_key(map, key)) {
+                update_property_value(map, key, prop_val);
             } else {
-                add(map, *vector::borrow(&keys, i), prop_val);
+                add(map, *key, prop_val);
             };
             i = i + 1;
         }
@@ -303,5 +326,15 @@ module aptos_token::property_map {
         let pm = create_property_list();
         add(&mut pm, string::utf8(b"addr"), pv);
         assert!(read_address(&pm, &string::utf8(b"addr")) == data, 1)
+    }
+
+    #[test]
+    fun test_create_property_map_from_key_value_pairs() {
+        let data1: address = @0xcafe;
+        let data2: bool = false;
+        let pvs = vector<PropertyValue>[create_property_value(&data1), create_property_value(&data2)];
+        let keys = vector<String>[string::utf8(b"addr"), string::utf8(b"flag")];
+        let pm = new_with_key_and_property_value(keys, pvs);
+        assert!(length(&pm) == 2, 1);
     }
 }

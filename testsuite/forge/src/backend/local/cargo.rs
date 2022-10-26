@@ -152,20 +152,26 @@ pub fn git_merge_base<R: AsRef<str>>(rev: R) -> Result<String> {
     }
 }
 
+pub fn cargo_build_common_args() -> Vec<&'static str> {
+    let use_release = use_release();
+    let mut args = vec!["build", "--features=failpoints,indexer"];
+    if use_release {
+        args.push("--release");
+    };
+    args
+}
+
 fn cargo_build_aptos_node<D, T>(directory: D, target_directory: T) -> Result<PathBuf>
 where
     D: AsRef<Path>,
     T: AsRef<Path>,
 {
-    let use_release = use_release();
-
     let target_directory = target_directory.as_ref();
     let directory = directory.as_ref();
 
-    let mut args = vec!["build", "--bin=aptos-node", "--features=failpoints,indexer"];
-    if use_release {
-        args.push("--release");
-    }
+    let mut args = cargo_build_common_args();
+    // build the aptos-node package directly to avoid feature unification issues
+    args.push("--package=aptos-node");
     info!("Compiling with cargo args: {:?}", args);
     let output = Command::new("cargo")
         .current_dir(directory)
@@ -177,7 +183,7 @@ where
     if output.status.success() {
         let bin_path = target_directory.join(format!(
             "{}/{}{}",
-            if use_release { "release" } else { "debug" },
+            if use_release() { "release" } else { "debug" },
             "aptos-node",
             env::consts::EXE_SUFFIX
         ));

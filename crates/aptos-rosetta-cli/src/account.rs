@@ -45,12 +45,13 @@ pub struct AccountBalanceCommand {
     /// Account to list the balance
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     account: AccountAddress,
-
+    /// Whether to show the amount of stake instead of the normal balance
     #[clap(long)]
     stake_amount: bool,
 }
 
 impl AccountBalanceCommand {
+    #[allow(clippy::manual_retain)]
     pub async fn execute(self) -> anyhow::Result<AccountBalanceResponse> {
         let account_identifier = if self.stake_amount {
             AccountIdentifier::total_stake_account(self.account)

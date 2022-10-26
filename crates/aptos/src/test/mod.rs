@@ -9,7 +9,7 @@ use crate::account::{
     list::{ListAccount, ListQuery},
     transfer::{TransferCoins, TransferSummary},
 };
-use crate::common::init::InitTool;
+use crate::common::init::{InitTool, Network};
 use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
     EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
@@ -22,13 +22,13 @@ use crate::common::utils::write_to_file;
 
 use crate::move_tool::{
     ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
-    InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
+    IncludedArtifactsArgs, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
     LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
     ShowValidatorStake, StakePoolResult, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
-    ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
+    ValidatorConfig, ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
 use crate::stake::{
@@ -49,7 +49,6 @@ use aptos_sdk::move_types::identifier::Identifier;
 use aptos_sdk::move_types::language_storage::ModuleId;
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
-use aptos_types::validator_config::ValidatorConfig;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -228,7 +227,6 @@ impl CliTestFramework {
                 rest_options: self.rest_options(),
                 gas_options: gas_options.unwrap_or_default(),
                 prompt_options: PromptOptions::yes(),
-                estimate_max_gas: true,
                 ..Default::default()
             },
             new_private_key: Some(new_private_key),
@@ -361,7 +359,11 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<TransactionSummary> {
+    pub async fn add_stake(
+        &self,
+        index: usize,
+        amount: u64,
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         AddStake {
             txn_options: self.transaction_options(
                 index,
@@ -381,7 +383,7 @@ impl CliTestFramework {
         &self,
         index: usize,
         amount: u64,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         UnlockStake {
             txn_options: self.transaction_options(index, None),
             amount,
@@ -403,7 +405,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<TransactionSummary> {
+    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<Vec<TransactionSummary>> {
         IncreaseLockup {
             txn_options: self.transaction_options(index, None),
         }
@@ -472,6 +474,7 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             profile_options: Default::default(),
             analyze_mode: AnalyzeMode::All,
+            pool_addresses: vec![],
         }
         .execute()
         .await
@@ -501,6 +504,7 @@ impl CliTestFramework {
 
     pub async fn init(&self, private_key: &Ed25519PrivateKey) -> CliTypedResult<()> {
         InitTool {
+            network: Some(Network::Custom),
             rest_url: Some(self.endpoint.clone()),
             faucet_url: Some(self.faucet_endpoint.clone()),
             rng_args: RngArgs::from_seed([0; 32]),
@@ -540,7 +544,7 @@ impl CliTestFramework {
                 // TODO(greg): revisit after fixing gas estimation
                 Some(GasOptions {
                     gas_unit_price: Some(1),
-                    max_gas: Some(10000),
+                    max_gas: Some(100000),
                 }),
             ),
             initial_stake_amount,
@@ -580,7 +584,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         operator_index: usize,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         SetOperator {
             txn_options: self.transaction_options(owner_index, None),
             operator_address: self.account_id(operator_index),
@@ -593,7 +597,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         voter_index: usize,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         SetDelegatedVoter {
             txn_options: self.transaction_options(owner_index, None),
             voter_address: self.account_id(voter_index),
@@ -790,7 +794,9 @@ impl CliTestFramework {
         CompilePackage {
             move_options: self.move_options(account_strs),
             save_metadata: false,
-            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            included_artifacts_args: IncludedArtifactsArgs {
+                included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            },
         }
         .execute()
         .await
@@ -815,15 +821,15 @@ impl CliTestFramework {
         index: usize,
         gas_options: Option<GasOptions>,
         account_strs: BTreeMap<&str, &str>,
-        legacy_flow: bool,
         included_artifacts: Option<IncludedArtifacts>,
     ) -> CliTypedResult<TransactionSummary> {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
-            legacy_flow,
             override_size_check: false,
-            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::All),
+            included_artifacts_args: IncludedArtifactsArgs {
+                included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            },
         }
         .execute()
         .await
@@ -936,7 +942,6 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             gas_options: gas_options.unwrap_or_default(),
             prompt_options: PromptOptions::yes(),
-            estimate_max_gas: true,
             ..Default::default()
         }
     }

@@ -6,11 +6,14 @@ use crate::types::{
     NetworkIdentifier, Operation, PartialBlockIdentifier, Peer, PublicKey, Signature,
     SigningPayload, SyncStatus, Transaction, TransactionIdentifier, Version,
 };
-use crate::AccountAddress;
+use crate::{AccountAddress, ApiError};
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::chain_id::ChainId;
 use aptos_types::transaction::{RawTransaction, SignedTransaction};
-use serde::{Deserialize, Serialize};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 /// Request for an account's currency balance either now, or historically
 ///
@@ -208,6 +211,16 @@ pub struct MetadataOptions {
     /// Public keys to sign simulated transaction.  Must be present if max_gas_amount is not provided
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_keys: Option<Vec<PublicKey>>,
+    /// Taking the estimated gas price, and multiplying it
+    /// times this number divided by 100 e.g. 120 is 120%
+    /// of the estimated price
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_multiplier: Option<u32>,
+    /// Gas price priority.  If the priority is low, it will
+    /// use a deprioritized price.  If it's normal, it will use the estimated
+    /// price, and if it's high, it will use the prioritized price.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_priority: Option<GasPricePriority>,
 }
 
 /// Response with network specific data for constructing a transaction
@@ -325,19 +338,99 @@ pub struct ConstructionPreprocessRequest {
     pub metadata: Option<PreprocessMetadata>,
 }
 
+/// This object holds all the possible "changes" to payloads
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct PreprocessMetadata {
     /// Expiry time of the transaction in unix epoch seconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry_time_secs: Option<U64>,
+    /// Sequence number to use for this transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sequence_number: Option<U64>,
+    /// Max gas amount for this transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_gas_amount: Option<U64>,
+    /// Gas unit price for this transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_price: Option<U64>,
+    /// Public keys used for this transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_keys: Option<Vec<PublicKey>>,
+    /// Taking the estimated gas price, and multiplying it
+    /// times this number divided by 100 e.g. 120 is 120%
+    /// of the estimated price
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_multiplier: Option<u32>,
+    /// Gas price priority.  If the priority is low, it will
+    /// use a deprioritized price.  If it's normal, it will use the estimated
+    /// price, and if it's high, it will use the prioritized price.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_priority: Option<GasPricePriority>,
+}
+
+/// A gas price priority for what gas price to use
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum GasPricePriority {
+    Low,
+    Normal,
+    High,
+}
+
+impl GasPricePriority {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GasPricePriority::Low => "low",
+            GasPricePriority::Normal => "normal",
+            GasPricePriority::High => "high",
+        }
+    }
+}
+
+impl Default for GasPricePriority {
+    fn default() -> Self {
+        GasPricePriority::Normal
+    }
+}
+
+impl Display for GasPricePriority {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for GasPricePriority {
+    type Err = ApiError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().trim() {
+            "low" => Ok(Self::Low),
+            "normal" => Ok(Self::Normal),
+            "high" => Ok(Self::High),
+            _ => Err(ApiError::InvalidInput(Some(format!(
+                "{} is an invalid gas price priority",
+                s
+            )))),
+        }
+    }
+}
+
+impl Serialize for GasPricePriority {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_str().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for GasPricePriority {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let str = <String>::deserialize(deserializer)?;
+        Self::from_str(&str).map_err(|err| D::Error::custom(err.to_string()))
+    }
 }
 
 /// Response for direct input into a [`ConstructionMetadataRequest`]

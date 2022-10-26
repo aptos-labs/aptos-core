@@ -5,10 +5,9 @@ use std::time::Duration;
 
 use crate::metrics::{HISTOGRAM, RESPONSE_STATUS};
 use aptos_logger::{
-    debug, error, info,
+    debug, info,
     prelude::{sample, SampleRate},
-    sample::Sampling,
-    Schema,
+    warn, Schema,
 };
 use poem::{http::header, Endpoint, Request, Response, Result};
 use poem_openapi::OperationId;
@@ -47,7 +46,7 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
     log.elapsed = elapsed;
 
     if log.status >= 500 {
-        sample!(SampleRate::Duration(Duration::from_secs(1)), error!(log));
+        sample!(SampleRate::Duration(Duration::from_secs(1)), warn!(log));
     } else if log.status >= 400 {
         sample!(SampleRate::Duration(Duration::from_secs(60)), info!(log));
     } else {

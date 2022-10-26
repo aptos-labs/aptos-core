@@ -3,12 +3,13 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_sdk::types::LocalAccount;
+use aptos_sdk::{transaction_builder::aptos_stdlib::aptos_token_stdlib, types::LocalAccount};
 use move_core_types::account_address::AccountAddress;
 use move_package::BuildConfig;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{convert::TryInto, path::PathBuf};
+use storage_interface::DbReader;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resource() {
@@ -119,6 +120,99 @@ async fn test_get_account_module_not_found() {
         .get(&get_account_module("0x1", "NoNoNo"))
         .await;
     context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_merkle_leaves_with_nft_transfer() {
+    let mut context = new_test_context(current_function_name!());
+
+    let ctx = &mut context;
+    let creator = &mut ctx.gen_account();
+    let owner = &mut ctx.gen_account();
+    let txn1 = ctx.mint_user_account(creator);
+    let txn2 = ctx.account_transfer(creator, owner, 100_000);
+
+    let collection_name = "collection name".to_owned().into_bytes();
+    let token_name = "token name".to_owned().into_bytes();
+    let collection_builder =
+        ctx.transaction_factory()
+            .payload(aptos_token_stdlib::token_create_collection_script(
+                collection_name.clone(),
+                "description".to_owned().into_bytes(),
+                "uri".to_owned().into_bytes(),
+                20_000_000,
+                vec![false, false, false],
+            ));
+
+    let collection_txn = creator.sign_with_transaction_builder(collection_builder);
+
+    let token_builder =
+        ctx.transaction_factory()
+            .payload(aptos_token_stdlib::token_create_token_script(
+                collection_name.clone(),
+                token_name.clone(),
+                "collection description".to_owned().into_bytes(),
+                3,
+                4,
+                "uri".to_owned().into_bytes(),
+                creator.address(),
+                1,
+                0,
+                vec![false, false, false, false, true],
+                vec!["age".as_bytes().to_vec()],
+                vec!["3".as_bytes().to_vec()],
+                vec!["int".as_bytes().to_vec()],
+            ));
+
+    let token_txn = creator.sign_with_transaction_builder(token_builder);
+
+    ctx.commit_block(&vec![txn1, txn2, collection_txn, token_txn])
+        .await;
+
+    let num_leaves_at_beginning = ctx
+        .db
+        .get_state_leaf_count(ctx.db.get_latest_version().unwrap())
+        .unwrap();
+
+    let transfer_to_owner_txn = creator.sign_multi_agent_with_transaction_builder(
+        vec![owner],
+        ctx.transaction_factory()
+            .payload(aptos_token_stdlib::token_direct_transfer_script(
+                creator.address(),
+                collection_name.clone(),
+                token_name.clone(),
+                0,
+                1,
+            )),
+    );
+    ctx.commit_block(&vec![transfer_to_owner_txn]).await;
+    let num_leaves_after_transfer_nft = ctx
+        .db
+        .get_state_leaf_count(ctx.db.get_latest_version().unwrap())
+        .unwrap();
+    assert_eq!(
+        num_leaves_after_transfer_nft,
+        num_leaves_at_beginning + 2 /* 1 token store + 1 token*/
+    );
+
+    let transfer_to_creator_txn = owner.sign_multi_agent_with_transaction_builder(
+        vec![creator],
+        ctx.transaction_factory()
+            .payload(aptos_token_stdlib::token_direct_transfer_script(
+                creator.address(),
+                collection_name.clone(),
+                token_name.clone(),
+                0,
+                1,
+            )),
+    );
+    ctx.commit_block(&vec![transfer_to_creator_txn]).await;
+    let num_leaves_after_return_nft = ctx
+        .db
+        .get_state_leaf_count(ctx.db.get_latest_version().unwrap())
+        .unwrap();
+
+    assert_eq!(num_leaves_after_return_nft, num_leaves_at_beginning + 1);
 }
 
 #[ignore] // TODO: deactivate because of module-bundle publish not longer there; reactivate.
