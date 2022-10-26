@@ -421,13 +421,17 @@ impl StateStore {
     pub fn get_values_by_key_prefix(
         &self,
         key_prefix: &StateKeyPrefix,
+        prev_key_opt: Option<&StateKey>,
         desired_version: Version,
-    ) -> Result<HashMap<StateKey, StateValue>> {
+        limit: u64,
+    ) -> Result<(HashMap<StateKey, StateValue>, Option<StateKey>)> {
+        let mut prev_key_opt = prev_key_opt.cloned();
         let mut read_opts = ReadOptions::default();
         // Without this, iterators are not guaranteed a total order of all keys, but only keys for the same prefix.
         // For example,
-        // aptos/abc|0
+        // aptos/abc|2
         // aptos/abc|1
+        // aptos/abc|0
         // aptos/abd|1
         // if we seek('aptos/'), and call next, we may not reach `aptos/abd/1` because the prefix extractor we adopted
         // here will stick with prefix `aptos/abc` and return `None` or any arbitrary result after visited all the
@@ -435,17 +439,22 @@ impl StateStore {
         read_opts.set_total_order_seek(true);
         let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
         let mut result = HashMap::new();
-        let mut prev_key = None;
-        iter.seek(&(key_prefix))?;
+        if let Some(prev_key) = &prev_key_opt {
+            iter.seek(&(prev_key.clone(), 0))?;
+        } else {
+            iter.seek(&key_prefix)?;
+        };
+        let mut count = 0;
         while let Some(((state_key, version), state_value_opt)) = iter.next().transpose()? {
             // In case the previous seek() ends on the same key with version 0.
-            if Some(&state_key) == prev_key.as_ref() {
+            if Some(&state_key) == prev_key_opt.as_ref() {
                 continue;
             }
             // Cursor is currently at the first available version of the state key.
             // Check if the key_prefix is a valid prefix of the state_key we got from DB.
-            if !key_prefix.is_prefix(&state_key)? {
+            if !key_prefix.is_prefix(&state_key)? || count == limit {
                 // No more keys matching the key_prefix, we can return the result.
+                prev_key_opt = None;
                 break;
             }
 
@@ -456,6 +465,7 @@ impl StateStore {
 
             if let Some(state_value) = state_value_opt {
                 result.insert(state_key.clone(), state_value);
+                count += 1;
             }
             // We don't allow fetching arbitrarily large number of values to be fetched as this can
             // potentially slowdown the DB.
@@ -466,11 +476,11 @@ impl StateStore {
                     MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX
                 ));
             }
-            prev_key = Some(state_key.clone());
+            prev_key_opt = Some(state_key.clone());
             // Seek to the next key - this can be done by seeking to the current key with version 0
             iter.seek(&(state_key, 0))?;
         }
-        Ok(result)
+        Ok((result, prev_key_opt))
     }
 
     /// Gets the proof that proves a range of accounts.
