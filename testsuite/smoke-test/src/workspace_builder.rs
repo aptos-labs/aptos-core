@@ -64,7 +64,8 @@ fn build_dir() -> PathBuf {
 // Path to a specified binary
 pub fn get_bin<S: AsRef<str>>(bin_name: S) -> PathBuf {
     assert_ne!(
-        "aptos-node", bin_name,
+        "aptos-node",
+        bin_name.as_ref(),
         "aptos-node must be built and used via local swarm cargo_build_aptos_node"
     );
 

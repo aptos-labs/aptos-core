@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use crate::test_utils::{assert_balance, create_and_fund_account, transfer_coins};
 use aptos_config::config::NodeConfig;
-use forge::{NodeExt, Swarm, SwarmExt};
+use forge::{NodeExt, Swarm};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
