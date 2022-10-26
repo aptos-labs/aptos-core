@@ -18,7 +18,18 @@ const sidebars = {
   aptosSidebar: [
     "index",
     "whats-new-in-docs",
-    "guides/getting-started",
+    {
+      type: "category",
+      label: "Getting Started",
+      link: { type: "doc", id: "guides/getting-started" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "cli-tools/aptos-cli-tool/install-aptos-cli",
+        "cli-tools/build-aptos-cli",
+        "cli-tools/install-move-prover",
+      ],
+    },
     {
       type: "category",
       label: "Developer Tutorials",
@@ -232,14 +243,7 @@ const sidebars = {
         "sdks/rust-sdk",
       ],
     },
-    {
-      type: "category",
-      label: "Aptos CLI",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
-      items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
-    },
+    "cli-tools/aptos-cli-tool/use-aptos-cli",
     {
       type: "html",
       value: "White Paper",
