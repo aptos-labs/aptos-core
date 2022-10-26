@@ -1,18 +1,20 @@
 ---
-title: "Installing Aptos CLI"
+title: "Installing Aptos CLI Binaries"
 id: "install-aptos-cli"
 ---
 
 # Installing Aptos CLI
 
-The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool. See [Use Aptos CLI](use-aptos-cli) for how to use the CLI.
+The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool using precompiled binaries that reduce variables in setting up your environment. Also see:
 
-To download the Aptos source code, related tools, and IDE plugins for the Move programming language, follow [Getting Started](../../guides/getting-started.md).
+* [Building Aptos CLI from Source](../build-from-source.md) for an advanced alternative to using the precompiled binaries.
+* [Installing the Move Prover](../install-move-prover.md) for an optional tool to validate your Move code.
+* [Using Aptos CLI](use-aptos-cli.md) for detailed instructions on employing the Aptos CLI.
 
-Install the CLI by downloading the precompiled binary for your platform, as described below. 
+To download the Aptos source code, related tools, and IDE plugins for the Move programming language, follow the instructions below. Whenever possible, install the CLI by downloading the precompiled binary for your platform, as described below. If needed, you may build from source.
 
-:::tip Move Prover Dependencies
-If you want to use the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to validate your Move code, [install the Move Prover dependencies](#optional-install-the-dependencies-of-move-prover) after installing the CLI binary.
+:::tip Use setup script
+Aptos offers the [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies. 
 :::
 
 ## Download precompiled binary
@@ -35,9 +37,8 @@ These instructions have been tested on macOS Monterey (12.6)
    When you update the CLI binary with the latest version, note that the newer version binary will be downloaded to your default Downloads folder. Remember to move this newer version binary from the Downloads folder to the `~/bin/aptos` folder to update and overwrite the older version.
 :::
 
-1. Make this `~/bin/aptos` an executable by running this command: 
-   - `chmod +x ~/bin/aptos`.
-   - On macOS when you attempt to run the `aptos` tool for the first time, you will be blocked by the macOS that this app is from an "unknown developer". This is normal. Follow the simple steps recommended by the Apple support in [Open a Mac app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) to remove this blocker.
+1. Make the `~/bin/aptos` directory executable by running this command: `chmod +x ~/bin/aptos`
+1. Follow the simple steps recommended by the Apple support in [Open a Mac app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) to remove the "unknown developer" blocker.
 1. Type `~/bin/aptos help` to read help instructions.
 1. Add `~/bin` to your path in your `.bashrc` or `.zshrc` file for future use.
 
@@ -87,181 +88,5 @@ These instructions have been tested on Windows 11 and Windows Server 2022. Windo
    :::
 1. Open a powershell terminal via the windows start menu
 1. In the powershell terminal, you can get help instructions by running the command with help.  For example ` .\Downloads\aptos-cli-0.3.5-Windows-x86_64\aptos.exe help` to read help instructions.
-
-</details>
-
-## (Optional) Install the dependencies of Move Prover
-
-If you want to use the Move Prover, install the dependencies by following the below steps:
-
-:::tip
-Currently, Windows is not supported by the Move Prover.
-:::
-
-<details>
-<summary>Prover macOS installation</summary>
-
-### macOS
-
-:::tip
-These instructions have been tested on macOS Monterey (12.6)
-:::
-
-1. Ensure you have `brew` installed https://brew.sh/.
-1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
-1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
-1. Change directory into `aptos-core`: `cd aptos-core`
-1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh -yp`
-1. Source the profile file: `source ~/.profile`.
-
-   :::info
-   Note that you have to include environment variable definitions in `~/.profile` into your shell. Depending on your setup, the  `~/.profile` may be already automatically loaded for each login shell, or it may not. If not, you may
-   need to add `. ~/.profile` to your `~/.bash_profile` or other shell configuration manually.
-   :::
-
-1. You can now run the Move Prover to prove an example:
-    ```bash
-    aptos move prove --package-dir aptos-move/move-examples/hello_prover/
-    ```
-   
-</details>
-
-<details>
-<summary>Prover Linux installation</summary>
-
-### Linux
-
-:::tip 
-Some Linux distributions are not supported. Currently, OpenSUSE and Amazon Linux do not support the automatic installation via the `dev_setup.sh` script.
-:::
-
-1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
-1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
-1. Change directory into `aptos-core`: `cd aptos-core`
-1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh -yp`
-1. Source the profile file: `source ~/.profile`.
-
-   :::info
-   Note that you have to include environment variable definitions in `~/.profile` into your shell. Depending on your setup, the  `~/.profile` may be already automatically loaded for each login shell, or it may not. If not, you may
-   need to add `. ~/.profile` to your `~/.bash_profile` or other shell configuration manually.
-   :::
-
-1. You can now run the Move Prover to prove an example:
-    ```bash
-    aptos move prove --package-dir aptos-move/move-examples/hello_prover/
-    ```
-
-</details>
-
-## (Advanced users only) Build the CLI binary from the source code
-
-If you are an advanced user and would like to build the CLI binary by downloading the source code, follow the below steps. **This is not recommended** unless you are on a platform unsupported by the prebuilt binaries.
-
-<details>
-<summary>macOS</summary>
-
-### macOS
-#### Setup dependencies
-
-**> Using the automated script**
-
-1. If on Mac, ensure you have `brew` installed https://brew.sh/
-1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
-1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
-1. Change directory into `aptos-core`: `cd aptos-core`
-1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh`
-1. Update your current shell environment: `source ~/.cargo/env`.
-
-**> Manual installation of dependencies**
-
-If the script above doesn't work for you, you can install these manually, but it's **not recommended**.
-
-1. Install [Rust](https://www.rust-lang.org/tools/install)
-1. Install [Git](https://git-scm.com/download)
-1. Install [CMake](https://cmake.org/download/)
-1. Install [LLVM](https://releases.llvm.org/)
-
-#### Building the Aptos CLI
-
-1. Checkout the correct branch `git checkout --track origin/<branch>`, where `<branch>` is:
-    - `devnet` for building on the Aptos devnet.
-    - `testnet` for building on the Aptos testnet.
-    - `main` for the current development branch.
-1. Build the CLI tool: `cargo build --package aptos --release`.
-1. The binary will be available in at
-    - `target/release/aptos`
-1. (Optional) Move this executable to a place on your path e.g. `~/bin/aptos`.
-1. You can now get help instructions by running `~/bin/aptos help`
-
-</details>
-
-<details>
-<summary>Linux</summary>
-
-### Linux
-#### Setup dependencies
-
-**> Using the automated script**
-
-1. If on Mac, ensure you have `brew` installed https://brew.sh/
-1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
-1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
-1. Change directory into `aptos-core`: `cd aptos-core`
-1. Run the dev setup script to prepare your environment: `./scripts/dev_setup.sh`
-1. Update your current shell environment: `source ~/.cargo/env`
-
-**> Manual installation of dependencies**
-
-If the script above does not work for you, you can install these manually, but it is **not recommended**:
-
-1. [Rust](https://www.rust-lang.org/tools/install).
-1. [Git](https://git-scm.com/download).
-1. [CMake](https://cmake.org/download/).
-1. [LLVM](https://releases.llvm.org/).
-
-#### Building the Aptos CLI
-
-1. Checkout the correct branch `git checkout --track origin/<branch>`, where `<branch>` is:
-    - `devnet` for building on the Aptos devnet.
-    - `testnet` for building on the Aptos testnet.
-    - `main` for the current development branch.
-1. Build the CLI tool: `cargo build --package aptos --release`.
-1. The binary will be available in at
-   - `target/release/aptos`
-1. (Optional) Move this executable to a place on your path e.g. `~/bin/aptos`.
-1. You can now get help instructions by running `~/bin/aptos help`
-
-</details>
-
-<details>
-<summary>Windows</summary>
-
-### Windows
-
-#### Setup dependencies
-
-:::tip
-The aptos-core codebase currently has no script similar to the `dev_setup.sh` script for
-Windows.  All dependencies must be manually installed.
-:::
-
-**> Manual installation of dependencies**
-
-1. Install [Rust](https://www.rust-lang.org/tools/install).
-1. Install [Git](https://git-scm.com/download).
-1. Install [CMake](https://cmake.org/download/).
-1. If on Windows ARM, install [Visual Studio Preview](https://visualstudio.microsoft.com/vs/preview/).
-1. Install [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022).
-1. Install [LLVM](https://releases.llvm.org/).
-
-#### Building aptos-core
-
-1. Checkout the correct branch `git checkout --track origin/<branch>`, where `<branch>` is:
-    - `devnet` for building on the Aptos devnet.
-    - `testnet` for building on the Aptos testnet.
-    - `main` for the current development branch.
-1. Build the CLI tool: `cargo build --package aptos --release`.
-1. The binary will be available at - `target\release\aptos.exe`
-1. You can now get help instructions by running `target\release\aptos.exe` in a Powershell window.
 
 </details>
