@@ -53,6 +53,6 @@ runs:
         for n in `seq 1 $N`
         do
           wait -n
-          echo [main process] run $n finished.
+          echo [main process] 1 out of $N runs finished.
         done
         echo [main process] finished.
