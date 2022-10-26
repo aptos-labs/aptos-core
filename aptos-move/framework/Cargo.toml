@@ -59,12 +59,11 @@ move-vm-types ={ workspace = true }
 rand_core = "0.5.1"
 
 [dev-dependencies]
-claims = "0.7"
-dir-diff = "0.3.2"
-fs_extra = "1.2.0"
-
 aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["testing"] }
+claims = "0.7"
+
+cached-packages = { path = "cached-packages" }  # keep to ensure build of artifacts
 move-cli = { workspace = true }
 move-prover = { workspace = true }
 
