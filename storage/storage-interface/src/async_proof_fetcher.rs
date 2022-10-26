@@ -101,9 +101,10 @@ impl AsyncProofFetcher {
                     .verify_by_hash(root_hash, state_key.hash(), value_hash)
                     .map_err(|err| {
                         anyhow!(
-                            "Proof is invalid for key {:?} with state root hash {:?}: {}.",
+                            "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
                             state_key,
                             root_hash,
+                            version,
                             err
                         )
                     })
