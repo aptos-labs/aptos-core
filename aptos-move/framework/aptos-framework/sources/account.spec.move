@@ -1,145 +1,192 @@
 spec aptos_framework::account {
-    
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
     }
 
-    spec create_signer {
+    spec create_signer(addr: address): signer {
         pragma opaque;
         aborts_if [abstract] false;
         ensures [abstract] signer::address_of(result) == addr;
     }
 
-    spec initialize {
-        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
-        aborts_if exists<OriginatingAddress>(signer::address_of(aptos_framework));
-        ensures exists<OriginatingAddress>(signer::address_of(aptos_framework));
+    spec initialize(aptos_framework: &signer) {
+        let aptos_addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
+        aborts_if exists<OriginatingAddress>(aptos_addr);
+        ensures exists<OriginatingAddress>(aptos_addr);
     }
 
-    spec create_account {
-        pragma aborts_if_is_partial;
-        aborts_if exists<Account>(new_address);
+    spec create_account(new_address: address): signer {
+        include CreateAccount {addr: new_address};
         aborts_if new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
-    }
-
-    spec create_account_unchecked {
-        pragma aborts_if_is_partial;
-        let authentication_key = bcs::to_bytes(new_address);
-        aborts_if vector::length(authentication_key) != 32;
         ensures signer::address_of(result) == new_address;
     }
 
-    spec get_guid_next_creation_num {
+    spec create_account_unchecked(new_address: address): signer {
+        include CreateAccount {addr: new_address};
+        ensures signer::address_of(result) == new_address;
+    }
+
+    spec schema CreateAccount {
+        addr: address;
+        let authentication_key = bcs::to_bytes(addr);
+        aborts_if len(authentication_key) != 32;
+        aborts_if exists<Account>(addr);
+    }
+
+    spec get_guid_next_creation_num(addr: address): u64 {
         aborts_if !exists<Account>(addr);
         ensures result == global<Account>(addr).guid_creation_num;
     }
 
-    spec get_sequence_number {
+    spec get_sequence_number(addr: address): u64 {
         aborts_if !exists<Account>(addr);
         ensures result == global<Account>(addr).sequence_number;
     }
 
-    spec increment_sequence_number {
-        let post adr_post = global<Account>(addr);
-        let adr = global<Account>(addr);
-        let sequence = adr.sequence_number;
+    spec increment_sequence_number(addr: address) {
+        let sequence_number = global<Account>(addr).sequence_number;
         aborts_if !exists<Account>(addr);
-        aborts_if sequence >= MAX_U64;
-        aborts_if sequence + 1 > MAX_U128;
-        ensures adr_post.sequence_number == adr.sequence_number + 1;
+        aborts_if sequence_number == MAX_U64;
+        modifies global<Account>(addr);
+        let post post_sequence_number = global<Account>(addr).sequence_number;
+        ensures post_sequence_number == sequence_number + 1;
     }
 
-    spec get_authentication_key {
+    spec get_authentication_key(addr: address): vector<u8> {
         aborts_if !exists<Account>(addr);
         ensures result == global<Account>(addr).authentication_key;
     }
 
-    spec rotate_authentication_key_internal {
+    spec rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) {
         let addr = signer::address_of(account);
-        let account_resource = global<Account>(addr);
+        let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if vector::length(new_auth_key) != 32;
+        modifies global<Account>(addr);
+        ensures account_resource.authentication_key == new_auth_key;
     }
 
-    spec assert_valid_signature_and_get_auth_key {
+    spec assert_valid_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
+        // TODO: complex aborts conditions.
         pragma aborts_if_is_partial;
         aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME;
     }
 
-    spec rotate_authentication_key {
+    spec rotate_authentication_key(
+        account: &signer,
+        from_scheme: u8,
+        from_public_key_bytes: vector<u8>,
+        to_scheme: u8,
+        to_public_key_bytes: vector<u8>,
+        cap_rotate_key: vector<u8>,
+        cap_update_table: vector<u8>,
+    ) {
+        // TODO: complex aborts conditions.
         pragma aborts_if_is_partial;
         let addr = signer::address_of(account);
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if from_scheme != ED25519_SCHEME && from_scheme != MULTI_ED25519_SCHEME;
+        modifies global<Account>(addr);
+        modifies global<OriginatingAddress>(@aptos_framework);
     }
 
-    spec offer_signer_capability {
+    spec offer_signer_capability(
+        account: &signer,
+        signer_capability_sig_bytes: vector<u8>,
+        account_scheme: u8,
+        account_public_key_bytes: vector<u8>,
+        recipient_address: address
+    ) {
+        // TODO: complex aborts conditions.
         pragma aborts_if_is_partial;
         let source_address = signer::address_of(account);
         aborts_if !exists<Account>(recipient_address);
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
+        modifies global<Account>(source_address);
     }
 
-    spec revoke_signer_capability {
-        pragma aborts_if_is_partial;
+    spec revoke_signer_capability(account: &signer, to_be_revoked_address: address) {
         aborts_if !exists<Account>(to_be_revoked_address);
+        let addr = signer::address_of(account);
+        let account_resource = global<Account>(addr);
+        aborts_if !exists<Account>(addr);
+        aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,to_be_revoked_address);
+        modifies global<Account>(addr);
         ensures exists<Account>(to_be_revoked_address);
     }
 
-    spec create_authorized_signer {
-        pragma aborts_if_is_partial;
-        let account_resource = global<Account>(offerer_address);
-        aborts_if !exists<Account>(offerer_address);
+    spec create_authorized_signer(account: &signer, offerer_address: address): signer {
+        include AccountContainsAddr{
+            account: account,
+            address: offerer_address,
+        };
+        modifies global<Account>(offerer_address);
         ensures exists<Account>(offerer_address);
         ensures signer::address_of(result) == offerer_address;
     }
 
-    spec create_resource_address {
+    spec schema AccountContainsAddr {
+        account: signer;
+        address: address;
+        let addr = signer::address_of(account);
+        let account_resource = global<Account>(address);
+        aborts_if !exists<Account>(address);
+        aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,addr);
+    }
+
+    spec create_resource_address(source: &address, seed: vector<u8>): address {
         pragma verify = false;
     }
 
-    spec create_resource_account {
+    spec create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
         pragma verify = false;
     }
 
-    spec create_framework_reserved_account {
-        pragma aborts_if_is_partial;
-        aborts_if addr != @0x1 &&
-                addr != @0x2 &&
-                addr != @0x3 &&
-                addr != @0x4 &&
-                addr != @0x5 &&
-                addr != @0x6 &&
-                addr != @0x7 &&
-                addr != @0x8 &&
-                addr != @0x9 &&
-                addr != @0xa;
+    spec create_framework_reserved_account(addr: address): (signer, SignerCapability) {
+        aborts_if spec_is_framework_address(addr);
+        include CreateAccount {addr};
+        ensures signer::address_of(result_1) == addr;
         ensures result_2 == SignerCapability { account: addr };
     }
 
-    spec create_guid {
+    spec fun spec_is_framework_address(addr: address): bool{
+        addr != @0x1 &&
+        addr != @0x2 &&
+        addr != @0x3 &&
+        addr != @0x4 &&
+        addr != @0x5 &&
+        addr != @0x6 &&
+        addr != @0x7 &&
+        addr != @0x8 &&
+        addr != @0x9 &&
+        addr != @0xa
+    }
+
+    spec create_guid(account_signer: &signer): guid::GUID {
         let addr = signer::address_of(account_signer);
         let account = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if account.guid_creation_num + 1 > MAX_U64;
+        modifies global<Account>(addr);
     }
 
-    spec new_event_handle {
+    spec new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
         let addr = signer::address_of(account);
         let account = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if account.guid_creation_num + 1 > MAX_U64;
     }
 
-    spec register_coin {
+    spec register_coin<CoinType>(account_addr: address) {
         aborts_if !exists<Account>(account_addr);
+        modifies global<Account>(account_addr);
     }
 
-    spec create_signer_with_capability {
+    spec create_signer_with_capability(capability: &SignerCapability): signer {
         let addr = capability.account;
         ensures signer::address_of(result) == addr;
     }
-
 }
