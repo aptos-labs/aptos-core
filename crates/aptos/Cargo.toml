@@ -74,6 +74,9 @@ move-vm-runtime = { workspace = true, features = [ "testing" ] }
 
 storage-interface = { path = "../../storage/storage-interface" }
 
+[target.'cfg(unix)'.dependencies]
+jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+
 [features]
 default = []
 fuzzing = []

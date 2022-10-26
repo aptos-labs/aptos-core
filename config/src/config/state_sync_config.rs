@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 // The maximum message size per state sync message
-pub const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; /* 16 MiB */
+pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -65,6 +65,7 @@ pub struct StateSyncDriverConfig {
     pub progress_check_interval_ms: u64, // The interval (ms) at which to check state sync progress
     pub max_connection_deadline_secs: u64, // The max time (secs) to wait for connections from peers
     pub max_consecutive_stream_notifications: u64, // The max number of notifications to process per driver loop
+    pub max_num_stream_timeouts: u64, // The max number of stream timeouts allowed before termination
     pub max_pending_data_chunks: u64, // The max number of data chunks pending execution or commit
     pub max_stream_wait_time_ms: u64, // The max time (ms) to wait for a data stream notification
     pub num_versions_to_skip_snapshot_sync: u64, // The version lag we'll tolerate before snapshot syncing
@@ -81,6 +82,7 @@ impl Default for StateSyncDriverConfig {
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
+            max_num_stream_timeouts: 6,
             max_pending_data_chunks: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
@@ -178,7 +180,7 @@ impl Default for AptosDataClientConfig {
         Self {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
-            response_timeout_ms: 10000,
+            response_timeout_ms: 20000, // 20 seconds
             summary_poll_interval_ms: 200,
             use_compression: true,
         }
