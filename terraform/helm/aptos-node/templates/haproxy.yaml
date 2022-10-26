@@ -154,14 +154,10 @@ spec:
         - containerPort: 9101
         - containerPort: 9102
         - containerPort: 9103
-        livenessProbe:
+        livenessProbe: # restart haproxy if the underlying VFN is not reachable
           httpGet:
-            path: /healthy
-            port: 9101
-        readinessProbe:
-          httpGet:
-            path: /healthy
-            port: 9101
+            path: /v1/-/healthy
+            port: 8080
         volumeMounts:
         - name: haproxy-config
           mountPath: /usr/local/etc/haproxy

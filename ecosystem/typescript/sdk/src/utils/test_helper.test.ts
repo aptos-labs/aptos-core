@@ -23,3 +23,5 @@ test("noop", () => {
   // 1. Guarantee that this test library won't get compiled
   // 2. Prevent jest from exploding when it finds a file with no tests in it
 });
+
+export const longTestTimeout = 60 * 1000;

@@ -164,7 +164,7 @@ impl AptosNodeArgs {
 
 /// Runtime handle to ensure that all inner runtimes stay in scope
 pub struct AptosHandle {
-    _api: Runtime,
+    _api: Option<Runtime>,
     _backup: Runtime,
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
@@ -800,12 +800,16 @@ pub fn setup_environment(
 
     let (mp_client_sender, mp_client_events) = mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = bootstrap_api(
-        &node_config,
-        chain_id,
-        aptos_db.clone(),
-        mp_client_sender.clone(),
-    )?;
+    let api_runtime = if node_config.api.enabled {
+        Some(bootstrap_api(
+            &node_config,
+            chain_id,
+            aptos_db.clone(),
+            mp_client_sender.clone(),
+        )?)
+    } else {
+        None
+    };
     let sf_runtime = match bootstrap_fh_stream(
         &node_config,
         chain_id,

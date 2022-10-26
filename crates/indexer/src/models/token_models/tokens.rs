@@ -16,7 +16,7 @@ use crate::{
     database::PgPoolConnection,
     models::move_resources::MoveResource,
     schema::tokens,
-    util::{ensure_not_negative, parse_timestamp},
+    util::{ensure_not_negative, parse_timestamp, standardize_address},
 };
 use aptos_api_types::{
     DeleteTableItem as APIDeleteTableItem, Transaction as APITransaction,
@@ -260,7 +260,7 @@ impl Token {
             let token_pg = Self {
                 collection_data_id_hash,
                 token_data_id_hash,
-                creator_address: token_data_id.creator,
+                creator_address: standardize_address(&token_data_id.creator),
                 collection_name,
                 name,
                 property_version: token_id.property_version,
@@ -317,7 +317,7 @@ impl Token {
             let token = Self {
                 collection_data_id_hash,
                 token_data_id_hash,
-                creator_address: token_data_id.creator,
+                creator_address: standardize_address(&token_data_id.creator),
                 collection_name,
                 name,
                 property_version: token_id.property_version,
@@ -393,7 +393,7 @@ impl TableMetadataForToken {
         );
 
         let value = TableMetadataForToken {
-            owner_address: resource.address,
+            owner_address: standardize_address(&resource.address),
             table_type: write_resource.data.typ.to_string(),
         };
         let table_handle: TableHandle = match TokenResource::from_resource(
@@ -408,13 +408,8 @@ impl TableMetadataForToken {
             TokenResource::PendingClaimsResource(inner) => inner.pending_claims.handle,
         };
         Ok(Some(HashMap::from([(
-            Self::standardize_handle(&table_handle),
+            standardize_address(&table_handle),
             value,
         )])))
-    }
-
-    /// Removes leading 0s after 0x in a table to standardize between resources and table items
-    pub fn standardize_handle(handle: &str) -> String {
-        format!("0x{}", &handle[2..].trim_start_matches('0'))
     }
 }
