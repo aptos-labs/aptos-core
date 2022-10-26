@@ -22,7 +22,7 @@ Aptos blockchain node deployment
 | fullnode.groups | list | `[{"name":"fullnode","replicas":1}]` | Specify fullnode groups by `name` and number of `replicas` |
 | fullnode.nodeSelector | object | `{}` |  |
 | fullnode.resources.limits.cpu | float | `15.5` |  |
-| fullnode.resources.limits.memory | string | `"30Gi"` |  |
+| fullnode.resources.limits.memory | string | `"26Gi"` |  |
 | fullnode.resources.requests.cpu | int | `15` |  |
 | fullnode.resources.requests.memory | string | `"26Gi"` |  |
 | fullnode.rust_log | string | `"info"` | Log level for the fullnode |
@@ -75,7 +75,7 @@ Aptos blockchain node deployment
 | validator.nodeSelector | object | `{}` |  |
 | validator.remoteLogAddress | string | `nil` | Address for remote logging. See `logger` helm chart |
 | validator.resources.limits.cpu | float | `15.5` |  |
-| validator.resources.limits.memory | string | `"30Gi"` |  |
+| validator.resources.limits.memory | string | `"26Gi"` |  |
 | validator.resources.requests.cpu | int | `15` |  |
 | validator.resources.requests.memory | string | `"26Gi"` |  |
 | validator.rust_log | string | `"info"` | Log level for the validator |
