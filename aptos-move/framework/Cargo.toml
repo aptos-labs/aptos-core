@@ -12,7 +12,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.57"
 aptos-aggregator = { path = "../../aptos-move/aptos-aggregator" }
-aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
 aptos-sdk-builder = { path = "../aptos-sdk-builder" }
 aptos-state-view = { path = "../../storage/state-view" }
@@ -56,6 +56,7 @@ move-stackless-bytecode ={ workspace = true }
 move-table-extension ={ workspace = true }
 move-vm-runtime ={ workspace = true }
 move-vm-types ={ workspace = true }
+rand_core = "0.5.1"
 
 [dev-dependencies]
 claims = "0.7"
@@ -72,6 +73,7 @@ move-unit-test = { workspace = true }
 [features]
 default = []
 fuzzing = ["aptos-types/fuzzing", "proptest", "proptest-derive"]
+testing = []
 
 [lib]
 doctest = false

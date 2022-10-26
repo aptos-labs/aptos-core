@@ -5,7 +5,7 @@ import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import { TokenClient } from "./token_client";
 
-import { getFaucetClient, NODE_URL } from "./utils/test_helper.test";
+import { getFaucetClient, longTestTimeout, NODE_URL } from "./utils/test_helper.test";
 
 test(
   "full tutorial nft token flow",
@@ -94,5 +94,5 @@ test(
     const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
-  60 * 1000,
+  longTestTimeout,
 );

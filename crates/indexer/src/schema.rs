@@ -139,6 +139,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_staking_pool_voter (staking_pool_address) {
+        staking_pool_address -> Varchar,
+        voter_address -> Varchar,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_token_datas (token_data_id_hash) {
         token_data_id_hash -> Varchar,
         creator_address -> Varchar,
@@ -466,6 +475,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_ans_lookup,
     current_coin_balances,
     current_collection_datas,
+    current_staking_pool_voter,
     current_token_datas,
     current_token_ownerships,
     current_token_pending_claims,

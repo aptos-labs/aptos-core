@@ -28,8 +28,6 @@ use std::{sync::Arc, time::Duration};
 use storage_interface::DbReader;
 use tokio::time::timeout;
 
-// TODO(joshlind): make these configurable!
-const MAX_NUM_DATA_STREAM_TIMEOUTS: u64 = 3;
 pub const PENDING_DATA_LOG_FREQ_SECS: u64 = 3;
 
 // TODO(joshlind): add unit tests to the speculative stream state.
@@ -112,6 +110,7 @@ impl SpeculativeStreamState {
 /// Note: this assumes the `active_data_stream` exists.
 pub async fn get_data_notification(
     max_stream_wait_time_ms: u64,
+    max_num_stream_timeouts: u64,
     active_data_stream: Option<&mut DataStreamListener>,
 ) -> Result<DataNotification, Error> {
     let active_data_stream = active_data_stream.expect("The active data stream should exist!");
@@ -127,10 +126,10 @@ pub async fn get_data_notification(
         active_data_stream.num_consecutive_timeouts += 1;
 
         // Check if we've timed out too many times
-        if active_data_stream.num_consecutive_timeouts >= MAX_NUM_DATA_STREAM_TIMEOUTS {
+        if active_data_stream.num_consecutive_timeouts >= max_num_stream_timeouts {
             Err(Error::CriticalDataStreamTimeout(format!(
                 "{:?}",
-                MAX_NUM_DATA_STREAM_TIMEOUTS
+                max_num_stream_timeouts
             )))
         } else {
             Err(Error::DataStreamNotificationTimeout(format!(
