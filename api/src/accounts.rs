@@ -12,7 +12,7 @@ use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStructTag, U64,
+    MoveModuleId, MoveResource, MoveStructTag, StateKeyPrefixWrapper, U64,
 };
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
@@ -20,6 +20,7 @@ use aptos_types::account_state::AccountState;
 use aptos_types::event::EventHandle;
 use aptos_types::event::EventKey;
 use aptos_types::state_store::state_key::StateKey;
+use aptos_types::state_store::state_key_prefix::StateKeyPrefix;
 use move_core_types::value::MoveValue;
 use move_core_types::{
     identifier::Identifier,
@@ -31,6 +32,7 @@ use poem_openapi::{param::Path, OpenApi};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::sync::Arc;
+use storage_interface::MAX_REQUEST_LIMIT;
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {
@@ -64,7 +66,13 @@ impl AccountsApi {
         fail_point_poem("endpoint_get_account")?;
         self.context
             .check_api_output_enabled("Get account", &accept_type)?;
-        let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
+        let account = Account::new(
+            self.context.clone(),
+            address.0,
+            ledger_version.0,
+            None,
+            None,
+        )?;
         account.account(&accept_type)
     }
 
@@ -90,11 +98,25 @@ impl AccountsApi {
         ///
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
+        /// todo
+        ///
+        /// todo
+        start: Query<Option<StateKeyPrefixWrapper>>,
+        /// todo
+        ///
+        /// todo
+        limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<MoveResource>> {
         fail_point_poem("endpoint_get_account_resources")?;
         self.context
             .check_api_output_enabled("Get account resources", &accept_type)?;
-        let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
+        let account = Account::new(
+            self.context.clone(),
+            address.0,
+            ledger_version.0,
+            start.0.map(StateKeyPrefix::from),
+            limit.0,
+        )?;
         account.resources(&accept_type)
     }
 
@@ -120,11 +142,25 @@ impl AccountsApi {
         ///
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
+        /// todo
+        ///
+        /// todo
+        start: Query<Option<StateKeyPrefixWrapper>>,
+        /// todo
+        ///
+        /// todo
+        limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_modules")?;
         self.context
             .check_api_output_enabled("Get account modules", &accept_type)?;
-        let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
+        let account = Account::new(
+            self.context.clone(),
+            address.0,
+            ledger_version.0,
+            start.0.map(StateKeyPrefix::from),
+            limit.0,
+        )?;
         account.modules(&accept_type)
     }
 }
@@ -136,6 +172,10 @@ pub struct Account {
     address: Address,
     /// Lookup ledger version
     ledger_version: u64,
+    /// todo
+    start: Option<StateKeyPrefix>,
+    /// todo
+    limit: Option<u16>,
     /// Current ledger info
     pub latest_ledger_info: LedgerInfo,
 }
@@ -147,6 +187,8 @@ impl Account {
         context: Arc<Context>,
         address: Address,
         requested_ledger_version: Option<U64>,
+        start: Option<StateKeyPrefix>,
+        limit: Option<u16>,
     ) -> Result<Self, BasicErrorWith404> {
         // Use the latest ledger version, or the requested associated version
         let (latest_ledger_info, requested_ledger_version) = context
@@ -158,6 +200,8 @@ impl Account {
             context,
             address,
             ledger_version: requested_ledger_version,
+            start,
+            limit,
             latest_ledger_info,
         })
     }
@@ -243,7 +287,6 @@ impl Account {
                             &self.latest_ledger_info,
                         )
                     })?;
-
                 BasicResponse::try_from_json((
                     converted_resources,
                     &self.latest_ledger_info,
@@ -315,7 +358,9 @@ impl Account {
         self.context
             .get_account_state(
                 self.address.into(),
+                self.start.as_ref(),
                 self.ledger_version,
+                self.limit.map(|v| v as u64).unwrap_or(MAX_REQUEST_LIMIT),
                 &self.latest_ledger_info,
             )?
             .ok_or_else(|| {

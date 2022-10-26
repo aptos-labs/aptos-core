@@ -30,7 +30,7 @@ pub enum StateKey {
 }
 
 #[repr(u8)]
-#[derive(Clone, Debug, FromPrimitive, ToPrimitive)]
+#[derive(Clone, Debug, Deserialize, FromPrimitive, Serialize, ToPrimitive)]
 pub enum StateKeyTag {
     AccessPath,
     TableItem,

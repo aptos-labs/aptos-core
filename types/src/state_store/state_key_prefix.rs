@@ -3,10 +3,11 @@
 
 use crate::state_store::state_key::{StateKey, StateKeyTag};
 use move_core_types::account_address::AccountAddress;
+use serde::{Deserialize, Serialize};
 
 // Struct for defining prefix of a state key, which can be used for finding all the values with a
 // particular key prefix
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct StateKeyPrefix {
     tag: StateKeyTag,
     bytes: Vec<u8>,

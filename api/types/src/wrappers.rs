@@ -12,9 +12,12 @@
 
 use crate::VerifyInput;
 use anyhow::bail;
-use aptos_types::event::EventKey;
+use aptos_types::{
+    event::EventKey,
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix},
+};
 use move_core_types::identifier::{IdentStr, Identifier};
-use poem_openapi::Object;
+use poem_openapi::{NewType, Object};
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
@@ -112,5 +115,39 @@ impl From<EventGuid> for EventKey {
             event_key_wrapper.creation_number.0,
             event_key_wrapper.account_address.into(),
         )
+    }
+}
+
+// todo
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StateKeyPrefixWrapper(pub StateKeyPrefix);
+
+impl fmt::Display for StateKeyPrefixWrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // todo don't use unwrap
+        let hex_string = hex::encode(bcs::to_bytes(&self).unwrap());
+        write!(f, "{}", hex_string)
+    }
+}
+
+impl FromStr for StateKeyPrefixWrapper {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
+        // don't use unwrap
+        let state_key_prefix: StateKeyPrefix = bcs::from_bytes(&hex::decode(s).unwrap()).unwrap();
+        Ok(StateKeyPrefixWrapper(state_key_prefix))
+    }
+}
+
+impl From<StateKeyPrefix> for StateKeyPrefixWrapper {
+    fn from(value: StateKeyPrefix) -> StateKeyPrefixWrapper {
+        Self(value)
+    }
+}
+
+impl From<StateKeyPrefixWrapper> for StateKeyPrefix {
+    fn from(value: StateKeyPrefixWrapper) -> StateKeyPrefix {
+        value.0
     }
 }

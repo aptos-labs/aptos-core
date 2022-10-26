@@ -46,6 +46,7 @@ use poem_openapi::{
     ApiRequest, OpenApi,
 };
 use std::sync::Arc;
+use storage_interface::MAX_REQUEST_LIMIT;
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -458,7 +459,9 @@ impl TransactionsApi {
                 .context
                 .get_account_state(
                     signed_transaction.sender(),
+                    None,
                     ledger_info.version(),
+                    MAX_REQUEST_LIMIT,
                     &ledger_info,
                 )?
                 .ok_or_else(|| {
@@ -796,7 +799,7 @@ impl TransactionsApi {
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
         // Verify the account exists
-        let account = Account::new(self.context.clone(), address, None)?;
+        let account = Account::new(self.context.clone(), address, None, None, None)?;
         account.account_state()?;
 
         let latest_ledger_info = account.latest_ledger_info;

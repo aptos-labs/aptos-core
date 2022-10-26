@@ -234,13 +234,15 @@ impl Context {
     pub fn get_state_values(
         &self,
         address: AccountAddress,
+        start: Option<&StateKeyPrefix>,
         version: u64,
+        limit: u64,
     ) -> Result<HashMap<StateKey, StateValue>> {
         let (kvs, cursor) = self.db.get_state_values_by_key_prefix(
             &StateKeyPrefix::from(address),
-            None,
+            start,
             version,
-            MAX_REQUEST_LIMIT,
+            limit,
         )?;
         if cursor.is_some() {
             bail!("Too many state items under account {}.", address);
@@ -251,14 +253,18 @@ impl Context {
     pub fn get_account_state<E: InternalError>(
         &self,
         address: AccountAddress,
+        start: Option<&StateKeyPrefix>,
         version: u64,
+        limit: u64,
         latest_ledger_info: &LedgerInfo,
     ) -> Result<Option<AccountState>, E> {
         AccountState::from_access_paths_and_values(
             address,
-            &self.get_state_values(address, version).map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
-            })?,
+            &self
+                .get_state_values(address, start, version, limit)
+                .map_err(|err| {
+                    E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+                })?,
         )
         .context("Failed to read account state at requested version")
         .map_err(|err| {
@@ -501,7 +507,13 @@ impl Context {
             // Get the current account state, and get the sequence number to get the limit most
             // recent transactions
             let account_state = self
-                .get_account_state(address, ledger_info.version(), ledger_info)?
+                .get_account_state(
+                    address,
+                    None,
+                    ledger_info.version(),
+                    MAX_REQUEST_LIMIT,
+                    ledger_info,
+                )?
                 .ok_or_else(|| {
                     E::not_found_with_code(
                         "Account not found",
