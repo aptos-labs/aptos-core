@@ -221,6 +221,13 @@ impl QuorumStoreWrapper {
                 self.latest_logical_time.round() + self.batch_expiry_round_gap_when_init;
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
 
+            debug!(
+                "QS: latest_logical_time {:?} blockstore commit round {} order round {}",
+                self.latest_logical_time,
+                self.block_store.commit_round(),
+                self.block_store.ordered_round()
+            );
+
             self.quorum_store_sender
                 .send(QuorumStoreCommand::EndBatch(
                     serialized_txns,

@@ -284,6 +284,24 @@ pub static RECEIVED_BATCH_REQUEST_TIMEOUT_COUNT: Lazy<IntCounter> = Lazy::new(||
     .unwrap()
 });
 
+/// Count for the number of expired batches due to smaller epoch when pulling the proofs for consensus.
+pub static BATCH_EXPIRED_SMALLER_EPOCH_WHEN_PULL_PROOFS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_gap_batch_expired_smaller_epoch_when_pull_count",
+        "Count for the number of expired batches due to smaller epoch when pulling the proofs for consensus."
+    )
+    .unwrap()
+});
+
+/// Count for the number of expired batches due to smaller round when pulling the proofs for consensus.
+pub static BATCH_EXPIRED_SMALLER_ROUND_WHEN_PULL_PROOFS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_gap_batch_expired_smaller_round_when_pull_count",
+        "Count for the number of expired batches due to smaller round when pulling the proofs for consensus."
+    )
+    .unwrap()
+});
+
 /// Latencies
 
 /// Histogram of the time durations for batch creation.

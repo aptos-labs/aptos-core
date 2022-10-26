@@ -280,9 +280,16 @@ impl ProofQueue {
                     }
                     None => {} // Proof was already committed, skip.
                 }
-            } else if *expiration < current_time && expiration.round() < current_time.round() {
-                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-                    .observe((current_time.round() - expiration.round()) as f64);
+            }
+            if *expiration < current_time {
+                if expiration.epoch() < current_time.epoch() {
+                    counters::BATCH_EXPIRED_SMALLER_EPOCH_WHEN_PULL_PROOFS_COUNT.inc();
+                }
+                if expiration.round() < current_time.round() {
+                    counters::BATCH_EXPIRED_SMALLER_ROUND_WHEN_PULL_PROOFS_COUNT.inc();
+                    counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                        .observe((current_time.round() - expiration.round()) as f64);
+                }
             }
             size = size - 1;
         }
