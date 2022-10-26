@@ -222,6 +222,7 @@ impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
         message: ConsensusMsg,
         timeout: Duration,
     ) -> Result<ConsensusMsg, RpcError> {
+        debug!("Sending an RPC {:?}", message);
         let protocol = self.preferred_protocol_for_peer(recipient, RPC)?;
         self.network_sender
             .send_rpc(recipient, protocol, message, timeout)

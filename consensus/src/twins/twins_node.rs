@@ -5,6 +5,7 @@ use crate::{
     commit_notifier::QuorumStoreCommitNotifier,
     counters,
     epoch_manager::EpochManager,
+    experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
     network_tests::{NetworkPlayground, TwinId},
@@ -48,7 +49,7 @@ use tokio::runtime::{Builder, Runtime};
 pub struct SMRNode {
     pub id: TwinId,
     pub storage: Arc<MockStorage>,
-    pub commit_cb_receiver: mpsc::UnboundedReceiver<LedgerInfoWithSignatures>,
+    pub ordered_blocks_events: mpsc::UnboundedReceiver<OrderedBlocks>,
     _runtime: Runtime,
     _shared_mempool: MockSharedMempool,
     _state_sync: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
@@ -81,12 +82,12 @@ impl SMRNode {
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
         let (state_sync_client, state_sync) = mpsc::unbounded();
-        let (commit_cb_sender, commit_cb_receiver) = mpsc::unbounded::<LedgerInfoWithSignatures>();
+        let (ordered_blocks_tx, ordered_blocks_events) = mpsc::unbounded::<OrderedBlocks>();
         let shared_mempool = MockSharedMempool::new();
         let (quorum_store_to_mempool_sender, _) = mpsc::channel(1_024);
         let state_computer = Arc::new(MockStateComputer::new(
             state_sync_client,
-            commit_cb_sender,
+            ordered_blocks_tx,
             Arc::clone(&storage),
         ));
         let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
@@ -152,7 +153,7 @@ impl SMRNode {
         Self {
             id: twin_id,
             _runtime: runtime,
-            commit_cb_receiver,
+            ordered_blocks_events,
             storage,
             _shared_mempool: shared_mempool,
             _state_sync: state_sync,

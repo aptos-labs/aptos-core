@@ -100,11 +100,11 @@ fn drop_config_test() {
 
     timed_block_on(&mut runtime, async {
         // Check that the commit log for n0 is not empty
-        let node0_commit = nodes[0].commit_cb_receiver.next().await;
+        let node0_commit = nodes[0].ordered_blocks_events.next().await;
         assert!(node0_commit.is_some());
 
         // Check that the commit log for n2 is empty
-        let node2_commit = match nodes[2].commit_cb_receiver.try_next() {
+        let node2_commit = match nodes[2].ordered_blocks_events.try_next() {
             Ok(Some(node_commit)) => Some(node_commit),
             _ => None,
         };
@@ -165,7 +165,7 @@ fn twins_vote_dedup_test() {
         // have been created
         let mut commit_seen = false;
         for node in &mut nodes {
-            if let Ok(Some(_node_commit)) = node.commit_cb_receiver.try_next() {
+            if let Ok(Some(_node_commit)) = node.ordered_blocks_events.try_next() {
                 commit_seen = true;
             }
         }
@@ -240,16 +240,28 @@ fn twins_proposer_test() {
     runtime.spawn(playground.start());
 
     timed_block_on(&mut runtime, async {
-        let node0_commit = nodes[0].commit_cb_receiver.next().await;
-        let twin0_commit = nodes[4].commit_cb_receiver.next().await;
+        let node0_commit = nodes[0].ordered_blocks_events.next().await;
+        let twin0_commit = nodes[4].ordered_blocks_events.next().await;
 
         match (node0_commit, twin0_commit) {
             (Some(node0_commit_inner), Some(twin0_commit_inner)) => {
-                let node0_commit_id = node0_commit_inner.ledger_info().commit_info().id();
-                let twin0_commit_id = twin0_commit_inner.ledger_info().commit_info().id();
-                // Proposal from both node0 and twin_node0 are going to
-                // get committed in their respective partitions
-                assert_ne!(node0_commit_id, twin0_commit_id);
+                assert_eq!(
+                    node0_commit_inner.ordered_blocks.len(),
+                    twin0_commit_inner.ordered_blocks.len()
+                );
+                for (node0_block, twin0_block) in node0_commit_inner
+                    .ordered_blocks
+                    .iter()
+                    .zip(twin0_commit_inner.ordered_blocks.iter())
+                {
+                    let node0_commit_id =
+                        node0_block.quorum_cert().ledger_info().commit_info().id();
+                    let twin0_commit_id =
+                        twin0_block.quorum_cert().ledger_info().commit_info().id();
+                    // Proposal from both node0 and twin_node0 are going to
+                    // get committed in their respective partitions
+                    assert_ne!(node0_commit_id, twin0_commit_id);
+                }
             }
             _ => panic!("[TwinsTest] Test failed due to no commit(s)"),
         }
@@ -297,16 +309,28 @@ fn twins_commit_test() {
     runtime.spawn(playground.start());
 
     timed_block_on(&mut runtime, async {
-        let node0_commit = nodes[0].commit_cb_receiver.next().await;
-        let twin0_commit = nodes[4].commit_cb_receiver.next().await;
+        let node0_commit = nodes[0].ordered_blocks_events.next().await;
+        let twin0_commit = nodes[4].ordered_blocks_events.next().await;
 
         match (node0_commit, twin0_commit) {
             (Some(node0_commit_inner), Some(twin0_commit_inner)) => {
-                let node0_commit_id = node0_commit_inner.ledger_info().commit_info().id();
-                let twin0_commit_id = twin0_commit_inner.ledger_info().commit_info().id();
-                // Proposals from both node0 and twin_node0 are going to race,
-                // but only one of them will form a commit
-                assert_eq!(node0_commit_id, twin0_commit_id);
+                assert_eq!(
+                    node0_commit_inner.ordered_blocks.len(),
+                    twin0_commit_inner.ordered_blocks.len()
+                );
+                for (node0_block, twin0_block) in node0_commit_inner
+                    .ordered_blocks
+                    .iter()
+                    .zip(twin0_commit_inner.ordered_blocks.iter())
+                {
+                    let node0_commit_id =
+                        node0_block.quorum_cert().ledger_info().commit_info().id();
+                    let twin0_commit_id =
+                        twin0_block.quorum_cert().ledger_info().commit_info().id();
+                    // Proposals from both node0 and twin_node0 are going to race,
+                    // but only one of them will form a commit
+                    assert_eq!(node0_commit_id, twin0_commit_id);
+                }
             }
             _ => panic!("[TwinsTest] Test failed due to no commit(s)"),
         }
