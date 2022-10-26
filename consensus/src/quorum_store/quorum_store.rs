@@ -7,6 +7,7 @@ use crate::quorum_store::{
     batch_aggregator::BatchAggregator,
     batch_reader::BatchReader,
     batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
+    counters,
     network_listener::NetworkListener,
     proof_builder::{ProofBuilder, ProofBuilderCommand, ProofReturnChannel},
     quorum_store_db::QuorumStoreDB,
@@ -376,6 +377,8 @@ impl QuorumStore {
                         .send(batch_store_command)
                         .await
                         .expect("Failed to send to BatchStore");
+
+                    counters::NUM_FRAGMENT_PER_BATCH.observe(self.fragment_id as f64);
 
                     self.fragment_id = 0;
                 }

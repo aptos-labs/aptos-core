@@ -866,7 +866,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
             )),
             Some(StateProgressThreshold {
-                max_no_progress_secs: 10.0,
+                max_no_progress_secs: 20.0,
                 max_round_gap: 4,
             }),
         ))
