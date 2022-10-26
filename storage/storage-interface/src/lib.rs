@@ -50,6 +50,10 @@ pub mod sync_proof_fetcher;
 use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
 
+// This is last line of defense against large queries slipping through external facing interfaces,
+// like the API and State Sync, etc.
+pub const MAX_REQUEST_LIMIT: u64 = 10000;
+
 pub trait StateSnapshotReceiver<K, V>: Send {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
 
@@ -251,8 +255,10 @@ pub trait DbReader: Send + Sync {
     fn get_state_values_by_key_prefix(
         &self,
         key_prefix: &StateKeyPrefix,
+        cursor: Option<&StateKeyPrefix>,
         version: Version,
-    ) -> Result<HashMap<StateKey, StateValue>> {
+        limit: u64,
+    ) -> Result<(HashMap<StateKey, StateValue>, Option<StateKeyPrefix>)> {
         unimplemented!()
     }
 

@@ -421,8 +421,10 @@ impl StateStore {
     pub fn get_values_by_key_prefix(
         &self,
         key_prefix: &StateKeyPrefix,
+        _cursor: Option<&StateKeyPrefix>,
         desired_version: Version,
-    ) -> Result<HashMap<StateKey, StateValue>> {
+        _limit: u64,
+    ) -> Result<(HashMap<StateKey, StateValue>, Option<StateKeyPrefix>)> {
         let mut read_opts = ReadOptions::default();
         // Without this, iterators are not guaranteed a total order of all keys, but only keys for the same prefix.
         // For example,
@@ -470,7 +472,7 @@ impl StateStore {
             // Seek to the next key - this can be done by seeking to the current key with version 0
             iter.seek(&(state_key, 0))?;
         }
-        Ok(result)
+        Ok((result, None))
     }
 
     /// Gets the proof that proves a range of accounts.

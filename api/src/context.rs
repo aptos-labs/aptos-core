@@ -7,7 +7,7 @@ use crate::response::{
     block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
     InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
 };
-use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
+use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
     AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, TransactionOnChainData,
 };
@@ -37,7 +37,7 @@ use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
-    DbReader, Order,
+    DbReader, Order, MAX_REQUEST_LIMIT,
 };
 
 // Context holds application scope context
@@ -236,8 +236,16 @@ impl Context {
         address: AccountAddress,
         version: u64,
     ) -> Result<HashMap<StateKey, StateValue>> {
-        self.db
-            .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
+        let (kvs, cursor) = self.db.get_state_values_by_key_prefix(
+            &StateKeyPrefix::from(address),
+            None,
+            version,
+            MAX_REQUEST_LIMIT,
+        )?;
+        if cursor.is_some() {
+            bail!("Too many state items under account {}.", address);
+        }
+        Ok(kvs)
     }
 
     pub fn get_account_state<E: InternalError>(
