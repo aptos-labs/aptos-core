@@ -10,6 +10,7 @@ Start here to learn how the Move language works on the Aptos blockchain.
 - ### [Move on Aptos](move-on-aptos.md)
 - ### [Upgrading Move Code](upgrading-move-code.md)
 - ### [Your First Move module](../../tutorials/first-move-module.md)
+- ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
 
 ## Aptos Move documentation
 
