@@ -55,6 +55,15 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
 }
 
 #[test]
+fn test_veiled_coin() {
+    let named_address = BTreeMap::from([(
+        String::from("veiled_coin"),
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+    )]);
+    run_tests_for_pkg("veiled_coin", named_address);
+}
+
+#[test]
 fn test_data_structures() {
     let named_address = BTreeMap::from([(
         String::from("data_structures"),

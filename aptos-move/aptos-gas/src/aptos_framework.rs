@@ -41,6 +41,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 440_000 * MUL],
 
     [.ristretto255.point_add, "ristretto255.point_add", 2_135 * MUL],
+    [.ristretto255.point_clone, optional "ristretto255.point_clone", 150 * MUL],
     [.ristretto255.point_compress, "ristretto255.point_compress", 40_000 * MUL],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 40_500 * MUL],
     [.ristretto255.point_equals, "ristretto255.point_equals", 2_300 * MUL],
@@ -56,6 +57,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     // (assuming same implementation complexity, which might not be the case
     [.ristretto255.sha512_per_byte, "ristretto255.scalar_sha512_per_byte", 60 * MUL],
     [.ristretto255.sha512_per_hash, "ristretto255.scalar_sha512_per_hash", 3_240 * MUL],
+
+    [.ristretto255.sha2_512_per_byte, optional "ristretto255.sha2_512_per_byte", 60 * MUL],
+    [.ristretto255.sha2_512_per_hash, optional "ristretto255.sha2_512_per_hash", 3_240 * MUL],
 
     [.ristretto255.scalar_add, "ristretto255.scalar_add", 770 * MUL],
     [.ristretto255.scalar_reduced_from_32_bytes, "ristretto255.scalar_reduced_from_32_bytes", 710 * MUL],
@@ -74,6 +78,11 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     [.hash.keccak256.base, optional "hash.keccak256.base", 4000 * MUL],
     [.hash.keccak256.per_byte, optional "hash.keccak256.per_byte", 45 * MUL],
+
+    [.bulletproofs.base, optional "bulletproofs.base", 10_000 * MUL],
+    [.bulletproofs.per_byte_rangeproof_deserialize, optional "bulletproofs.per_byte_rangeproof_deserialize", 150 * MUL],
+    [.bulletproofs.per_bit_rangeproof_verify, optional "bulletproofs.per_bit_rangeproof_verify", 128_000 * MUL],
+
 
     [.type_info.type_of.base, "type_info.type_of.base", 300 * MUL],
     // TODO(Gas): the on-chain name is wrong...

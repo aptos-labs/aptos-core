@@ -132,7 +132,7 @@ module aptos_framework::coin {
     }
 
     /// This should be called by on-chain governance to update the config and allow
-    // or disallow upgradability of total supply.
+    /// or disallow upgradability of total supply.
     public fun allow_supply_upgrades(aptos_framework: &signer, allowed: bool) acquires SupplyConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         let allow_upgrades = &mut borrow_global_mut<SupplyConfig>(@aptos_framework).allow_upgrades;
@@ -198,7 +198,6 @@ module aptos_framework::coin {
         }
     }
 
-    // Public functions
     /// Burn `coin` with capability.
     /// The capability `_cap` should be passed as a reference to `BurnCapability<CoinType>`.
     public fun burn<CoinType>(
