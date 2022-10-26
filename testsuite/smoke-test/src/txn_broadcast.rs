@@ -25,9 +25,6 @@ async fn test_txn_broadcast() {
     let version = swarm.versions().max().unwrap();
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
-    // Inject failure
-    let _aptos_cli = crate::workspace_builder::get_bin("aptos");
-
     let validator = validator_peer_ids[1];
     let vfn = swarm
         .add_validator_fullnode(
