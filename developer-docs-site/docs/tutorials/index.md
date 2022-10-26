@@ -7,7 +7,7 @@ slug: "aptos-quickstarts"
 
 If you are new to the Aptos blockchain, begin with these quickstarts before you get into in-depth development. These tutorials will help you become familiar with how to develop for the Aptos blockchain using the Aptos SDK.
 
-### Install macOS prerequisites
+## Install macOS prerequisites
 
 If running macOS, install the following packages in the order specified to take these tutorials:
 
@@ -21,6 +21,21 @@ If running macOS, install the following packages in the order specified to take 
     brew install yarn
     ```
 1. **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
+
+## Adjust network and funding source
+
+For development purposes, the tutorials here assume you are working in the Aptos devnet network and therefore interacting with the devnet Aptos node and faucet service for creating and funding accounts. As noted in the relevant tutorials, these targets can be configured with the following environment variables:
+  * `APTOS_NODE_URL`
+  * `APTOS_FAUCET_URL`
+
+Here are the options for funding by network:
+  * *Mainnet* - There is no faucet in-wallet; you have to get funds from an exchange.
+  * *Testnet* - Use the faucet button in-wallet or use the testnet faucet at: https://aptoslabs.com/testnet-faucet.
+  * *Devnet* - Use the faucet button in-wallet or use the devnet faucet at: https://faucet.devnet.aptoslabs.com
+
+For more information on the available Aptos networks, see [Aptos Blockchain Deployments](../nodes/aptos-deployments.md).
+
+## Take tutorials
 
 ### [Your First Transaction](first-transaction.md)
 
