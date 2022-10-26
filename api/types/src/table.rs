@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{MoveType, VerifyInput, VerifyInputWithRecursion};
+use crate::{HexEncodedBytes, MoveType, VerifyInput, VerifyInputWithRecursion};
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -20,4 +20,10 @@ impl VerifyInput for TableItemRequest {
         self.key_type.verify(0)?;
         self.value_type.verify(0)
     }
+}
+
+/// Table Item request for the GetTableItemRaw API
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct RawTableItemRequest {
+    pub key: HexEncodedBytes,
 }
