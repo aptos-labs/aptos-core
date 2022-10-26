@@ -134,7 +134,7 @@ impl RecoveryManager {
                         },
                         Err(e) => {
                             counters::ERROR_COUNT.inc();
-                            error!(error = ?e, kind = error_kind(&e));
+                            warn!(error = ?e, kind = error_kind(&e));
                         }
                     }
                 }
