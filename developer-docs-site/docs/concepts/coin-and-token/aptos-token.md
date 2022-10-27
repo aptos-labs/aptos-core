@@ -169,7 +169,7 @@ The following tables describe fields at the struct level.
 | `Token` | The amount is the number of tokens. |
 | `TokenId` | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |
 
-### Coin and token field descriptions
+### Field descriptions
 
 The following tables contain descriptions and examples on each token field.
 
