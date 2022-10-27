@@ -84,7 +84,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineState<V> {
     }
 
     fn merge_deltas(&self) -> Option<DeltaOp> {
-        let mut d = self.delta_suffix.1.last().unwrap().clone();
+        let mut d = *self.delta_suffix.1.last().unwrap();
         for prev_d in self.delta_suffix.1.iter().rev().skip(1) {
             if d.merge_onto(*prev_d).is_err() {
                 return None;
@@ -168,7 +168,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
                     let mut result = vec![];
                     for k in read_set.iter() {
-                        result.push(current_world.get(k).map(|s| s.clone()));
+                        result.push(current_world.get(k).cloned());
                     }
 
                     // We ensure that the latest state is always reflected in exactly one of
@@ -197,7 +197,9 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                                 current_world
                                     .entry(k.clone())
                                     .and_modify(|state| state.apply_delta(*delta))
-                                    .or_insert(BaselineState::from_delta(*delta, storage_default));
+                                    .or_insert_with(|| {
+                                        BaselineState::from_delta(*delta, storage_default)
+                                    });
                             }
                         }
                     }
