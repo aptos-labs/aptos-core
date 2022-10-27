@@ -22,6 +22,9 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Specification](#@Specification_1)
     -  [Function `code_dependency_check_enabled`](#@Specification_1_code_dependency_check_enabled)
     -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
+    -  [Function `is_enabled`](#@Specification_1_is_enabled)
+    -  [Function `set`](#@Specification_1_set)
+    -  [Function `contains`](#@Specification_1_contains)
 
 
 <pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
@@ -430,6 +433,65 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>pragma</b> opaque = <b>true</b>;
 <b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
+</code></pre>
+
+
+
+<a name="@Specification_1_is_enabled"></a>
+
+### Function `is_enabled`
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(feature);
+</code></pre>
+
+
+
+
+<a name="0x1_features_spec_is_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(feature: u64): bool;
+</code></pre>
+
+
+
+<a name="@Specification_1_set"></a>
+
+### Function `set`
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64, <b>include</b>: bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_contains"></a>
+
+### Function `contains`
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_contains">contains</a>(<a href="features.md#0x1_features">features</a>: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
 </code></pre>
 
 
