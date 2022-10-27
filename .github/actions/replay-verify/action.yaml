@@ -24,7 +24,7 @@ runs:
       shell: bash
       run: |
         set -o nounset -o errexit -o pipefail
-        N=32
+        N=48
         PER_PARTITION=$(( ($LATEST_VERSION - $HISTORY_START) / $N ))
 
         for n in `seq 1 $N`
@@ -53,6 +53,6 @@ runs:
         for n in `seq 1 $N`
         do
           wait -n
-          echo [main process] 1 out of $N runs finished.
+          echo [main process] $n out of $N runs finished.
         done
         echo [main process] finished.
