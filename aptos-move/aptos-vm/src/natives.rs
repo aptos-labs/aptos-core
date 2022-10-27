@@ -51,18 +51,24 @@ pub fn aptos_natives(
         .collect()
 }
 
-pub fn assert_no_test_natives() {
-    assert!(aptos_natives(
-        NativeGasParameters::zeros(),
-        AbstractValueSizeGasParameters::zeros(),
-        LATEST_GAS_FEATURE_VERSION
+pub fn assert_no_test_natives(err_msg: &str) {
+    assert!(
+        aptos_natives(
+            NativeGasParameters::zeros(),
+            AbstractValueSizeGasParameters::zeros(),
+            LATEST_GAS_FEATURE_VERSION
+        )
+        .into_iter()
+        .all(|(_, module_name, func_name, _)| {
+            !(module_name.as_str() == "unit_test"
+                && func_name.as_str() == "create_signers_for_testing"
+                || module_name.as_str() == "ed25519"
+                    && func_name.as_str() == "generate_keys_internal"
+                || module_name.as_str() == "ed25519" && func_name.as_str() == "sign_internal")
+        }),
+        "{}",
+        err_msg
     )
-    .into_iter()
-    .all(|(_, module_name, func_name, _)| {
-        !(module_name.as_str() == "unit_test" && func_name.as_str() == "create_signers_for_testing"
-            || module_name.as_str() == "ed25519" && func_name.as_str() == "generate_keys_internal"
-            || module_name.as_str() == "ed25519" && func_name.as_str() == "sign_internal")
-    }))
 }
 
 #[cfg(feature = "testing")]
