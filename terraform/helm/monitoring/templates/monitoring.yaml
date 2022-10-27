@@ -208,6 +208,7 @@ spec:
            {{- end }}
            prometheus \
             --web.enable-lifecycle \
+            --web.external-url=http://mon.{{ $.Values.service.domain }} \
             --config.file=/etc/prometheus/prometheus.yml \
             --storage.tsdb.retention.time={{ .prometheus.tsdb_retention_time }} \
             --storage.tsdb.min-block-duration={{ .prometheus.tsdb_min_block_duration }} \

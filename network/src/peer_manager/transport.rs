@@ -256,7 +256,7 @@ where
                 Ok(())
             }
             Err(err) => {
-                error!(
+                warn!(
                     NetworkSchema::new(&self.network_context)
                         .remote_peer(&peer_id)
                         .network_address(&addr),

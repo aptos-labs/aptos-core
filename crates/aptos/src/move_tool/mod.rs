@@ -37,7 +37,9 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use framework::docgen::DocgenOptions;
 use framework::natives::code::UpgradePolicy;
+use framework::prover::ProverOptions;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_cli::base::test::UnitTestResult;
@@ -58,7 +60,6 @@ use {
         language_storage::{ModuleId, TypeTag},
     },
     move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
-    move_prover, move_prover_boogie_backend,
     move_unit_test::UnitTestingConfig,
 };
 
@@ -80,6 +81,7 @@ pub enum MoveTool {
     RunScript(RunScript),
     Test(TestPackage),
     Prove(ProvePackage),
+    Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
 }
 
@@ -97,6 +99,7 @@ impl MoveTool {
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
         }
     }
@@ -376,12 +379,11 @@ impl CliCommand<()> for TransactionalTestOpts {
 /// the Move prover
 #[derive(Parser)]
 pub struct ProvePackage {
-    /// A filter string to determine which files to verify
-    #[clap(long)]
-    pub filter: Option<String>,
-
     #[clap(flatten)]
     move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    prover_options: ProverOptions,
 }
 
 #[async_trait]
@@ -391,38 +393,61 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            test_mode: true,
-            install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
-        };
-
-        const APTOS_NATIVE_TEMPLATE: &[u8] = include_bytes!("aptos-natives.bpl");
-
-        let mut options = move_prover::cli::Options::default();
-        options.backend.custom_natives =
-            Some(move_prover_boogie_backend::options::CustomNativeOptions {
-                template_bytes: APTOS_NATIVE_TEMPLATE.to_vec(),
-                module_instance_names: vec![],
-            });
+        let ProvePackage {
+            move_options,
+            prover_options,
+        } = self;
 
         let result = task::spawn_blocking(move || {
-            move_cli::base::prove::run_move_prover(
-                config,
-                self.move_options.get_package_path()?.as_path(),
-                &self.filter,
-                true,
-                move_prover::cli::Options::default(),
+            prover_options.prove(
+                move_options.get_package_path()?.as_path(),
+                move_options.named_addresses(),
             )
         })
         .await
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
-
         match result {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
         }
+    }
+}
+
+/// Documents a Move package
+///
+/// This converts the content of the package into markdown for documentation.
+#[derive(Parser)]
+pub struct DocumentPackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    docgen_options: DocgenOptions,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for DocumentPackage {
+    fn command_name(&self) -> &'static str {
+        "DocumentPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let DocumentPackage {
+            move_options,
+            docgen_options,
+        } = self;
+        let build_options = BuildOptions {
+            with_srcs: false,
+            with_abis: false,
+            with_source_maps: false,
+            with_error_map: false,
+            with_docs: true,
+            install_dir: None,
+            named_addresses: move_options.named_addresses(),
+            docgen_options: Some(docgen_options),
+        };
+        BuiltPackage::build(move_options.get_package_path()?, build_options)?;
+        Ok("succeeded")
     }
 }
 
@@ -502,7 +527,7 @@ impl IncludedArtifacts {
                 // Always enable error map bytecode injection
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
             Sparse => BuildOptions {
                 with_srcs: true,
@@ -510,7 +535,7 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
             All => BuildOptions {
                 with_srcs: true,
@@ -518,7 +543,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
         }
     }

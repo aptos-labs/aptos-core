@@ -326,15 +326,15 @@ Hence in practice, payload gas is unlikely to be a concern.
 [#4540]:                           https://github.com/aptos-labs/aptos-core/pull/4540/files
 [`aptos-gas/src/`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/
 [`aptos_global_constants`]:        https://github.com/aptos-labs/aptos-core/blob/main/config/global-constants/src/lib.rs
-[`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
+[`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
 [BCS sequence specification]:      https://github.com/diem/bcs#fixed-and-variable-length-sequences
 [`gas_meter.rs`]:                  https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/gas_meter.rs
-[`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_initialize
+[`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#0x1_storage_gas_initialize
 [`instr.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/instr.rs
 [`move_stdlib.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/move_stdlib.rs
-[`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_on_reconfig
-[`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md
+[`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#@Specification_16_on_reconfig
+[`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md
 [`storage_gas.move`]:              https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/storage_gas.move
-[`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_StorageGas
+[`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#resource-storagegas
 [`table.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/table.rs
 [`transaction.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction.rs

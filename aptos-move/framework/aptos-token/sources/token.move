@@ -156,7 +156,7 @@ module aptos_token::token {
         // the id to the common token data shared by token with different property_version
         token_data_id: TokenDataId,
         // the property_version of a token.
-        // Token with dfiferent property_version can have different value of PropertyMap
+        // Token with different property_version can have different value of PropertyMap
         property_version: u64,
     }
 

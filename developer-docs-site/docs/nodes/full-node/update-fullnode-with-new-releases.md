@@ -20,7 +20,7 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 4. If you use the Rust binary, pull the latest of `devnet` via `git checkout devnet && git pull`, and build the binary again.
 
-5. Download the new [genesis.blob][devnet_genesis] file and the new [waypoint][devnet_waypoint].
+5. Download the new [genesis.blob](../node-files-all-networks/node-files.md#genesisblob) file and the new [waypoint](../node-files-all-networks/node-files.md#waypointtxt).
 
 6. Update the configuration file (e.g., `fullnode.yaml`) with the new waypoint (if you configure the waypoint directly there).
 

@@ -431,7 +431,7 @@ impl AptosNetDataClient {
                     }
                 };
 
-                error!(
+                warn!(
                     (LogSchema::new(LogEntry::StorageServiceResponse)
                         .event(LogEvent::ResponseError)
                         .request_type(&request.get_label())
@@ -785,7 +785,7 @@ pub(crate) fn poll_peer(
         let storage_summary = match result {
             Ok(storage_summary) => storage_summary,
             Err(error) => {
-                error!(
+                warn!(
                     (LogSchema::new(LogEntry::StorageSummaryResponse)
                         .event(LogEvent::PeerPollingError)
                         .message("Error encountered when polling peer!")

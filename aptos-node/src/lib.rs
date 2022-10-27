@@ -5,7 +5,7 @@
 
 mod log_build_information;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::{
@@ -164,7 +164,7 @@ impl AptosNodeArgs {
 
 /// Runtime handle to ensure that all inner runtimes stay in scope
 pub struct AptosHandle {
-    _api: Runtime,
+    _api: Option<Runtime>,
     _backup: Runtime,
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
@@ -301,9 +301,8 @@ where
         fnn.runtime_threads = Some(1);
         // If a config path was provided, use that as the template
         if let Some(config_path) = config_path {
-            if let Ok(config) = NodeConfig::load_config(config_path) {
-                template = config;
-            }
+            template = NodeConfig::load_config(&config_path)
+                .with_context(|| format!("Failed to load config at path: {:?}", config_path))?;
         }
 
         template.logger.level = Level::Debug;
@@ -800,12 +799,16 @@ pub fn setup_environment(
 
     let (mp_client_sender, mp_client_events) = mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = bootstrap_api(
-        &node_config,
-        chain_id,
-        aptos_db.clone(),
-        mp_client_sender.clone(),
-    )?;
+    let api_runtime = if node_config.api.enabled {
+        Some(bootstrap_api(
+            &node_config,
+            chain_id,
+            aptos_db.clone(),
+            mp_client_sender.clone(),
+        )?)
+    } else {
+        None
+    };
     let sf_runtime = match bootstrap_fh_stream(
         &node_config,
         chain_id,
