@@ -132,19 +132,25 @@ If the file is no longer available, the wallet can fall back to use the `animati
 
 ## Token data model
 
+The [following diagram](/img/docs/aptos-token-standard-flow.svg) depicts the flow of token data through Aptos.
+
 <ThemedImage
 alt="Signed Transaction Flow"
 sources={{
-light: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
-dark: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
+light: useBaseUrl('/img/docs/aptos-token-standard-flow.svg'),
+dark: useBaseUrl('/img/docs/aptos-token-standard-flow-dark.svg'),
 }}
 />
 
 ## Token resources
 
-The token-related data are stored at both creator’s account and owner’s account.
+As shown in the diagram above, token-related data are stored at both the creator’s account and the owner’s account.
 
-### Resource stored at the creator’s address
+### Struct-level resources
+
+The following tables describe fields at the struct level. 
+
+#### Resource stored at the creator’s address
 
 | Field | Description |
 | --- | --- |
@@ -157,13 +163,86 @@ The token-related data are stored at both creator’s account and owner’s acco
 | Royalty | Specifies the denominator and numerator for calculating the royalty fee. It also has the payee account address for depositing the royalty. |
 | `PropertyValue` | Contains both value of a property and type of property. |
 
-### Resource stored at the owner’s address
+#### Resource stored at the owner’s address
 
 | Field | Description |
 | --- | --- |
 | `TokenStore` | The main struct for storing the token owned by this address. It maps `TokenId` to the actual token. |
 | `Token` | The amount is the number of tokens. |
 | `TokenId` | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |
+
+### Coin and token field descriptions
+
+The following tables contain descriptions and examples on each token field.
+
+#### Coin module key struct
+
+##### [`Coin`](https://github.com/aptos-labs/aptos-core/blob/744c2def47cddced878fda9bbd5633022fdb083a/aptos-move/framework/aptos-framework/sources/coin.move#L68)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| value | u64 | Value of the token, eg: 1000000000 |
+
+##### [`CoinInfo`](https://github.com/aptos-labs/aptos-core/blob/744c2def47cddced878fda9bbd5633022fdb083a/aptos-move/framework/aptos-framework/sources/coin.move#L92)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| name | String | Name of the token, eg: Aptos Coin |
+| symbol | String | Symbol for the token, eg: APT |
+| decimals | u8 | Determines how the value of coin is represented; for example APT’s decimal is 8, so a value of 100000000 is represented by 1 APT coin |
+| supply | Option&lt;OptionalAggregator&gt; | option::some(optional_aggregator::new(MAX_U128, parallelizable)) |
+
+#### Token module key struct
+
+##### [`Token`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move#L144)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| id | TokenId | Unique identification of the token |
+| amount | u64 | The number of tokens stored |
+| token_properties | PropertyMap | The properties of this token; PropertyMap is a key-value map used for storing different types in one map; the value of PropertyMap contains both the value and type information |
+
+##### `TokenId`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| token_data_id | TokenId | Identification for the metadata of the token |
+| property_version | u64 | The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT |
+
+##### `TokenDataId`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| creator | address | The address of the creator, eg: 0xcafe |
+| collection | String | The name of collection; this is unique under the same account, eg: “Aptos Animal Collection” |
+| name | String | The name of the token; this is the same as the name field of TokenData |
+
+##### `TokenData`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| maximum | u64 | The maximal number of tokens that can be minted under this TokenData; if the maximum is 0, there is no limit |
+| largest_property_version | u64 | The current largest property version of all tokens with this TokenData |
+| supply | String | The number of tokens with this TokenData |
+| uri | String | The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4 |
+| royalty | Royalty | The denominator and numerator for calculating the royalty fee; it also contains payee account address for depositing the Royalty |
+| name | String | The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: “Aptos Animal #1234” |
+| description | String | The description of the token |
+| default_properties | PropertyMap | The properties are stored in the TokenData that are shared by all tokens  |
+| mutability_config | TokenMutabilityConfig | Specifies which fields are mutable  |
+
+##### `CollectionData`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| description | String | A description for the token collection Eg: “Aptos Toad Overload” |
+| name | String | The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: “Animal Collection” |
+| uri | String | The URI for the collection; its length should be smaller than 512 characters |
+| supply | u64 | The number of different TokenData entries in this collection |
+| maximum | u64 | If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
+
+If maximal is 0, Aptos doen’t track the supply of this collection, and there is no limit |
+| mutability_config | CollectionMutabilityConfig | Specifies which fields are mutable  |
 
 ## Token lifecycle
 
