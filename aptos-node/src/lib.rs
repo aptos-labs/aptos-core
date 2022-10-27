@@ -889,9 +889,20 @@ pub fn setup_environment(
     })
 }
 
+pub const ERROR_MSG_BAD_FEATURE_FLAGS: &str = r#"
+aptos-node was compiled with feature flags that shouldn't be enabled.
+
+This is caused by cargo's feature unification.
+When you compile two crates with a shared dependency, if one enables a feature flag for the dependency, then it is also enabled for the other crate.
+
+PLEASE RECOMPILE APTOS-NODE SEPARATELY using the following command:
+    cargo build --package aptos-node
+
+"#;
+
 #[cfg(test)]
 mod tests {
-    use crate::setup_environment;
+    use crate::{setup_environment, ERROR_MSG_BAD_FEATURE_FLAGS};
     use aptos_config::config::{NodeConfig, WaypointConfig};
     use aptos_temppath::TempPath;
     use aptos_types::waypoint::Waypoint;
@@ -916,6 +927,6 @@ mod tests {
     #[cfg(feature = "check-vm-features")]
     #[test]
     fn test_aptos_vm_does_not_have_test_natives() {
-        aptos_vm::natives::assert_no_test_natives()
+        aptos_vm::natives::assert_no_test_natives(ERROR_MSG_BAD_FEATURE_FLAGS)
     }
 }
