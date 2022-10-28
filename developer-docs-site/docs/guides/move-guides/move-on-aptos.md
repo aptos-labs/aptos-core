@@ -147,8 +147,16 @@ public fun withdraw<T>(account: address, amount: u64): Coin<T>
 ```
 anyone would be able to remove coins from the `account`
 
-## Additional Resources
+## Aptos Move documentation
 
-* [The Move Book](https://move-language.github.io/move/)
-* [The Aptos Framework documentation](https://github.com/aptos-labs/aptos-core/tree/framework-docs)
-* [Getting Started](/guides/getting-started)
+* [Aptos tokens](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md)
+* [Aptos framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md)
+* [Aptos stdlib](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/overview.md)
+* [Move stdlib](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/overview.md)
+
+## Supporting Move documentation
+
+* [Move Book](https://move-language.github.io/move/)
+* [Move Tutorial](https://github.com/move-language/move/tree/main/language/documentation/tutorial)
+* [Move language repository](https://github.com/move-language/move)
+* [Move by example](https://move-book.com/)

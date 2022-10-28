@@ -20,10 +20,690 @@
   "liveNow": false,
   "panels": [
     {
-      "collapsed": true,
+      "collapsed": false,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
-      "id": 1084,
+      "id": 284,
+      "panels": [],
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
+      "title": "Backup Coordinator Activities",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "latest" },
+            "properties": [{ "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 1 },
+      "id": 741,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_backup_handler_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "interval": "",
+          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} backed up",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_epoch_ending_epoch",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} latest",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "hide": false,
+          "legendFormat": "latest",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Epoch Ending Backup: Epoch vs Latest Epoch",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "latest" },
+            "properties": [{ "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 1 },
+      "id": 746,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_backup_handler_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_transaction_version",
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} latest",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "hide": false,
+          "legendFormat": "latest",
+          "range": true,
+          "refId": "latest"
+        }
+      ],
+      "title": "Transaction Backup: Version vs latest version",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "State version of the snapshot being taken, compared to latest version of the ledger.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "latest" },
+            "properties": [{ "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 1 },
+      "id": 660,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_backup_handler_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "interval": "",
+          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} backed up",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_state_snapshot_version",
+          "interval": "",
+          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} latest",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "hide": false,
+          "legendFormat": "latest",
+          "range": true,
+          "refId": "latest"
+        }
+      ],
+      "title": "State Snapshot: Version vs Latest Version",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "Note the number of accounts is the latest, not that at specified version.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "  total" },
+            "properties": [{ "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+      "id": 744,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_backup_handler_state_snapshot_leaf_index{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} + 1 ",
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}-progress",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.8, aptos_jellyfish_leaf_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} total",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "State snapshot: Progress vs Total Accounts",
+      "type": "timeseries"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+      "hiddenSeries": false,
+      "id": 659,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "maxPerRow": 3,
+      "nullPointMode": "null",
+      "options": { "alertThreshold": true },
+      "percentage": false,
+      "pluginVersion": "9.1.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "rate(aptos_backup_handler_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[5m])",
+          "hide": false,
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Transaction backup: transactions per second",
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+      "type": "graph",
+      "xaxis": { "mode": "time", "show": true, "values": [] },
+      "yaxes": [
+        { "format": "cps", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "yaxis": { "align": false }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+      "hiddenSeries": false,
+      "id": 658,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "maxPerRow": 3,
+      "nullPointMode": "null",
+      "options": { "alertThreshold": true },
+      "percentage": false,
+      "pluginVersion": "9.1.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "rate(aptos_backup_handler_state_snapshot_leaf_index{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[5m])",
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "State snapshot: items per second",
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+      "type": "graph",
+      "xaxis": { "mode": "time", "show": true, "values": [] },
+      "yaxes": [
+        { "format": "cps", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "yaxis": { "align": false }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 15 },
+      "hiddenSeries": false,
+      "id": 745,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "maxPerRow": 3,
+      "nullPointMode": "null",
+      "options": { "alertThreshold": true },
+      "percentage": false,
+      "pluginVersion": "9.1.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_backup_service_latency_s_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=\"transactions\"}",
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Transaction Backup: Num Taken",
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+      "type": "graph",
+      "xaxis": { "mode": "time", "show": true, "values": [] },
+      "yaxes": [
+        { "format": "none", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "yaxis": { "align": false }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 15 },
+      "id": 657,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_backup_service_latency_s_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=\"epoch_ending_ledger_infos\"}",
+          "format": "time_series",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Epoch Ending Backup: Num Taken",
+      "type": "timeseries"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 15 },
+      "hiddenSeries": false,
+      "id": 743,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": { "alertThreshold": true },
+      "percentage": false,
+      "pluginVersion": "9.1.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_backup_service_latency_s_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=\"state_snapshot\"}",
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "State Snapsho: Num Taken",
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+      "type": "graph",
+      "xaxis": { "mode": "time", "show": true, "values": [] },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "yaxis": { "align": false }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "When the backup coordinator is live, this shows as a upward trend line.",
+      "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 22 },
+      "hiddenSeries": false,
+      "id": 255,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "maxPerRow": 3,
+      "nullPointMode": "null",
+      "options": { "alertThreshold": true },
+      "percentage": false,
+      "pluginVersion": "9.1.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_backup_service_latency_s_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=\"db_state\"} and irate(aptos_backup_service_latency_s_count[1m]) > 0",
+          "interval": "",
+          "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Backup Coordinator Heartbeats",
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+      "type": "graph",
+      "xaxis": { "mode": "time", "show": true, "values": [] },
+      "yaxes": [
+        { "format": "none", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "yaxis": { "align": false }
+    },
+    {
+      "collapsed": true,
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 29 },
+      "id": 3289,
       "panels": [
         {
           "aliasColors": {},
@@ -31,12 +711,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "Right edge of the graph shows latest state of the restore job and when it entered such state.",
+          "description": "Right edge of the graph shows latest state of the backup-verify job and when it entered such state.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 30 },
           "hiddenSeries": false,
-          "id": 3290,
+          "id": 3287,
           "legend": {
             "avg": false,
             "current": false,
@@ -62,21 +742,23 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
+              "editorMode": "code",
+              "expr": "aptos_db_backup_verify_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_backup_verify_coordinator_succeed_timestamp_s > aptos_db_backup_verify_coordinator_start_timestamp_s\nunless aptos_db_backup_verify_coordinator_fail_timestamp_s > aptos_db_backup_verify_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_backup_verify_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_backup_verify_transaction_version[1m]) > 0)",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} running since",
+              "range": true,
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
+              "expr": "aptos_db_backup_verify_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_backup_verify_coordinator_start_timestamp_s > aptos_db_backup_verify_coordinator_succeed_timestamp_s\nunless aptos_db_backup_verify_coordinator_fail_timestamp_s > aptos_db_backup_verify_coordinator_succeed_timestamp_s",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} succeeded since",
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
+              "expr": "aptos_db_backup_verify_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_backup_verify_coordinator_start_timestamp_s > aptos_db_backup_verify_coordinator_fail_timestamp_s\nunless aptos_db_backup_verify_coordinator_succeed_timestamp_s > aptos_db_backup_verify_coordinator_fail_timestamp_s",
               "hide": false,
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} failed since",
@@ -101,12 +783,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "save: Version of txn being saved without replaying\nreplay: Version of txn being replayed\ntarget: When \"replay\" hits this version, the restore is done.",
+          "description": "Epoch of the epoch ending LedgerInfo verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 30 },
           "hiddenSeries": false,
-          "id": 1108,
+          "id": 3292,
           "legend": {
             "avg": false,
             "current": false,
@@ -132,397 +814,15 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0",
+              "expr": "aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} saved",
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}  replayed",
-              "refId": "B"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_target_version and (irate(aptos_db_restore_transaction_save_version[1m]) > 0 or irate(aptos_db_restore_transaction_replay_version[1m]) > 0)",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} target",
-              "refId": "C"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "Transaction Restore Progress",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "none", "logBase": 1, "show": true },
-            { "format": "none", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": true }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "",
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
-          "hiddenSeries": false,
-          "id": 1109,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "(aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} saved",
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "(aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} replayed",
-              "refId": "B"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "Transaction Restore Progress %",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "percentunit", "logBase": 1, "max": "1.1", "min": "0", "show": true },
-            { "format": "percentunit", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": true }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "\"Committed\" version is the version on the latest ledger info saved.\n\n\"Synced\" version is the version on the latest transaction saved, it's only different when state-sync is working to catch up with peers.\n",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
-          "hiddenSeries": false,
-          "id": 1086,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} synced",
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_storage_ledger_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} committed",
-              "refId": "B"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "Committed and Synced Versions",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "none", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
-          "hiddenSeries": false,
-          "id": 1088,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "links": [],
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_consensus_current_round",
-              "format": "time_series",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{kubernetes_pod_name}}",
               "refId": "A"
             }
           ],
           "thresholds": [],
           "timeRegions": [],
-          "title": "Consensus Current Round",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "short", "label": "", "logBase": 1, "min": "0", "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        }
-      ],
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
-      "title": "Restore Status Monitoring",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 1 },
-      "id": 284,
-      "panels": [
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "When the backup coordinator is live, this shows as a upward trend line.",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 2 },
-          "hiddenSeries": false,
-          "id": 255,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "maxPerRow": 3,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "repeatDirection": "h",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_backup_service_latency_s_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=\"db_state\"} and irate(aptos_backup_service_latency_s_count[1m]) > 0",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "Backup Coordinator Heartbeats",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "none", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 2 },
-          "hiddenSeries": false,
-          "id": 657,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "maxPerRow": 3,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "repeatDirection": "h",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_backup_service_latency_s_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=\"epoch_ending_ledger_infos\"} and irate(aptos_backup_service_latency_s_count[1m]) > 0",
-              "format": "time_series",
-              "instant": false,
-              "interval": "",
-              "intervalFactor": 1,
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "Epoch Ending Backup: Num Taken",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "none", "label": "", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 2 },
-          "hiddenSeries": false,
-          "id": 743,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_backup_service_latency_s_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=\"state_snapshot\"} and irate(aptos_backup_service_latency_s_count[1m]) > 0",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "State Snapsho: Num Taken",
+          "title": "Epoch Ending Epoch",
           "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
           "type": "graph",
           "xaxis": { "mode": "time", "show": true, "values": [] },
@@ -538,13 +838,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+          "description": "Version of the epoch ending LedgerInfo verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 30 },
           "hiddenSeries": false,
-          "id": 745,
+          "id": 3294,
           "legend": {
             "avg": false,
             "current": false,
@@ -556,7 +855,6 @@
           },
           "lines": true,
           "linewidth": 1,
-          "maxPerRow": 3,
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
@@ -564,7 +862,6 @@
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
-          "repeatDirection": "h",
           "seriesOverrides": [],
           "spaceLength": 10,
           "stack": false,
@@ -572,15 +869,70 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_backup_service_latency_s_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=\"transactions\"} and irate(aptos_backup_service_latency_s_count[1m]) > 0",
+              "expr": "aptos_db_backup_verify_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{kubernetes_pod_name}}",
               "refId": "A"
             }
           ],
           "thresholds": [],
           "timeRegions": [],
-          "title": "Transaction Backup: Num Taken",
+          "title": "Epoch Ending Version",
+          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true, "values": [] },
+          "yaxes": [
+            { "format": "short", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "yaxis": { "align": false }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "Version of the state snapshot being verified",
+          "fill": 0,
+          "fillGradient": 0,
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 38 },
+          "hiddenSeries": false,
+          "id": 3295,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": { "alertThreshold": true },
+          "percentage": false,
+          "pluginVersion": "9.1.1",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_backup_verify_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) != 0",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "State Snapshot Version",
           "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
           "type": "graph",
           "xaxis": { "mode": "time", "show": true, "values": [] },
@@ -596,12 +948,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+          "description": "Version of the transaction verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 9 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 38 },
           "hiddenSeries": false,
-          "id": 741,
+          "id": 3293,
           "legend": {
             "avg": false,
             "current": false,
@@ -627,22 +979,15 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_backup_handler_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and irate(aptos_backup_handler_epoch_ending_epoch[1m]) > 0",
+              "expr": "aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{kubernetes_pod_name}}",
               "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and irate(aptos_backup_handler_epoch_ending_epoch[1m]) > 0",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
-              "refId": "B"
             }
           ],
           "thresholds": [],
           "timeRegions": [],
-          "title": "Epoch Ending Backup: Epoch vs Latest Epoch",
+          "title": "Transaction Version",
           "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
           "type": "graph",
           "xaxis": { "mode": "time", "show": true, "values": [] },
@@ -658,13 +1003,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "State version of the snapshot being taken, compared to latest version of the ledger.",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+          "description": "The speed of transaction verification.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 9 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 38 },
           "hiddenSeries": false,
-          "id": 660,
+          "id": 3296,
           "legend": {
             "avg": false,
             "current": false,
@@ -676,7 +1020,6 @@
           },
           "lines": true,
           "linewidth": 1,
-          "maxPerRow": 3,
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
@@ -684,7 +1027,6 @@
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
-          "repeatDirection": "h",
           "seriesOverrides": [],
           "spaceLength": 10,
           "stack": false,
@@ -692,286 +1034,33 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_backup_handler_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "expr": "irate(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) > 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}-snapshot",
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_state_snapshot_version",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}-latest",
-              "refId": "B"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "State Snapshot: Version vs Latest Version",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "none", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "Note the number of accounts is the latest, not that at specified version.",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 16 },
-          "hiddenSeries": false,
-          "id": 744,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "maxPerRow": 3,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "repeatDirection": "h",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_backup_handler_state_snapshot_leaf_index{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} + 1 ",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}-progress",
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "(aptos_storage_ledger{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"new_state_leaves\"} - ignoring(type) aptos_storage_ledger{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"stale_state_leaves\"}) and aptos_backup_handler_state_snapshot_leaf_index",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}-total",
-              "refId": "B"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "State snapshot: Progress vs Total Accounts",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "none", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 16 },
-          "hiddenSeries": false,
-          "id": 658,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "maxPerRow": 3,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "repeatDirection": "h",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "irate(aptos_backup_handler_state_snapshot_leaf_index{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{kubernetes_pod_name}}",
               "refId": "A"
             }
           ],
           "thresholds": [],
           "timeRegions": [],
-          "title": "State snapshot: accounts per second",
+          "title": "Transactions per Second",
           "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
           "type": "graph",
           "xaxis": { "mode": "time", "show": true, "values": [] },
           "yaxes": [
-            { "format": "cps", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "",
-          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 16 },
-          "hiddenSeries": false,
-          "id": 746,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "maxPerRow": 3,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "9.1.1",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "repeatDirection": "h",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_backup_handler_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and irate(aptos_backup_handler_transaction_version[1m]) > 0",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and irate(aptos_backup_handler_transaction_version[1m]) > 0",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
-              "refId": "B"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "Transaction Backup: Version vs latest version",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "none", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "",
-          "fieldConfig": { "defaults": { "custom": {}, "links": [] }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 23 },
-          "hiddenSeries": false,
-          "id": 659,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "maxPerRow": 3,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "7.2.0",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "repeatDirection": "h",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "irate(aptos_backup_handler_transaction_version[1m]) > 0",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "Transaction backup: transactions per second",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "cps", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true },
             { "format": "short", "logBase": 1, "show": true }
           ],
           "yaxis": { "align": false }
         }
       ],
       "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
-      "title": "Backup Coordinator Activities",
+      "title": "Backup Verify",
       "type": "row"
     },
     {
       "collapsed": true,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 2 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
       "id": 240,
       "panels": [
         {
@@ -980,10 +1069,10 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": { "defaults": { "custom": {}, "links": [] }, "overrides": [] },
+          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 102 },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 30 },
           "hiddenSeries": false,
           "id": 867,
           "legend": {
@@ -1000,7 +1089,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "7.2.0",
+          "pluginVersion": "9.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1036,10 +1125,10 @@
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "description": "",
-          "fieldConfig": { "defaults": { "custom": {}, "links": [] }, "overrides": [] },
+          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 109 },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 37 },
           "hiddenSeries": false,
           "id": 326,
           "legend": {
@@ -1057,7 +1146,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "7.2.0",
+          "pluginVersion": "9.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1096,7 +1185,7 @@
     {
       "collapsed": true,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
       "id": 1101,
       "panels": [
         {
@@ -1593,8 +1682,8 @@
     {
       "collapsed": true,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
-      "id": 3289,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "id": 1084,
       "panels": [
         {
           "aliasColors": {},
@@ -1602,20 +1691,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "Right edge of the graph shows latest state of the backup-verify job and when it entered such state.",
-          "fieldConfig": {
-            "defaults": {
-              "custom": { "filterable": false },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
-            },
-            "overrides": []
-          },
+          "description": "Right edge of the graph shows latest state of the restore job and when it entered such state.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 44 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
           "hiddenSeries": false,
-          "id": 3287,
+          "id": 3290,
           "legend": {
             "avg": false,
             "current": false,
@@ -1630,7 +1711,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "7.2.0",
+          "pluginVersion": "9.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1641,21 +1722,21 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_backup_verify_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_backup_verify_coordinator_succeed_timestamp_s > aptos_db_backup_verify_coordinator_start_timestamp_s\nunless aptos_db_backup_verify_coordinator_fail_timestamp_s > aptos_db_backup_verify_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_backup_verify_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_backup_verify_transaction_version[1m]) > 0)",
+              "expr": "aptos_db_restore_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} running since",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_backup_verify_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_backup_verify_coordinator_start_timestamp_s > aptos_db_backup_verify_coordinator_succeed_timestamp_s\nunless aptos_db_backup_verify_coordinator_fail_timestamp_s > aptos_db_backup_verify_coordinator_succeed_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} succeeded since",
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_backup_verify_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_backup_verify_coordinator_start_timestamp_s > aptos_db_backup_verify_coordinator_fail_timestamp_s\nunless aptos_db_backup_verify_coordinator_succeed_timestamp_s > aptos_db_backup_verify_coordinator_fail_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
               "hide": false,
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} failed since",
@@ -1680,13 +1761,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "Epoch of the epoch ending LedgerInfo verified",
-          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
+          "description": "save: Version of txn being saved without replaying\nreplay: Version of txn being replayed\ntarget: When \"replay\" hits this version, the restore is done.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 44 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
           "hiddenSeries": false,
-          "id": 3292,
+          "id": 1108,
           "legend": {
             "avg": false,
             "current": false,
@@ -1701,7 +1781,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "7.2.0",
+          "pluginVersion": "9.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1712,23 +1792,37 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
+              "expr": "aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{kubernetes_pod_name}} saved",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}  replayed",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_restore_coordinator_target_version and (irate(aptos_db_restore_transaction_save_version[1m]) > 0 or irate(aptos_db_restore_transaction_replay_version[1m]) > 0)",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} target",
+              "refId": "C"
             }
           ],
           "thresholds": [],
           "timeRegions": [],
-          "title": "Epoch Ending Epoch",
+          "title": "Transaction Restore Progress",
           "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
           "type": "graph",
           "xaxis": { "mode": "time", "show": true, "values": [] },
           "yaxes": [
-            { "format": "short", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
+            { "format": "none", "logBase": 1, "show": true },
+            { "format": "none", "logBase": 1, "show": true }
           ],
-          "yaxis": { "align": false }
+          "yaxis": { "align": true }
         },
         {
           "aliasColors": {},
@@ -1736,13 +1830,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "Version of the epoch ending LedgerInfo verified",
-          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
+          "description": "",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 44 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
           "hiddenSeries": false,
-          "id": 3294,
+          "id": 1109,
           "legend": {
             "avg": false,
             "current": false,
@@ -1757,7 +1850,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "7.2.0",
+          "pluginVersion": "9.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1768,23 +1861,30 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_backup_verify_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
+              "expr": "(aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{kubernetes_pod_name}} saved",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "(aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} replayed",
+              "refId": "B"
             }
           ],
           "thresholds": [],
           "timeRegions": [],
-          "title": "Epoch Ending Version",
+          "title": "Transaction Restore Progress %",
           "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
           "type": "graph",
           "xaxis": { "mode": "time", "show": true, "values": [] },
           "yaxes": [
-            { "format": "short", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
+            { "format": "percentunit", "logBase": 1, "max": "1.1", "min": "0", "show": true },
+            { "format": "percentunit", "logBase": 1, "show": true }
           ],
-          "yaxis": { "align": false }
+          "yaxis": { "align": true }
         },
         {
           "aliasColors": {},
@@ -1792,13 +1892,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "Version of the state snapshot being verified",
-          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
+          "description": "\"Committed\" version is the version on the latest ledger info saved.\n\n\"Synced\" version is the version on the latest transaction saved, it's only different when state-sync is working to catch up with peers.\n",
+          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 52 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
           "hiddenSeries": false,
-          "id": 3295,
+          "id": 1086,
           "legend": {
             "avg": false,
             "current": false,
@@ -1813,7 +1913,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "7.2.0",
+          "pluginVersion": "9.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1824,15 +1924,22 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_backup_verify_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) != 0",
+              "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} synced",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_storage_ledger_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} committed",
+              "refId": "B"
             }
           ],
           "thresholds": [],
           "timeRegions": [],
-          "title": "State Snapshot Version",
+          "title": "Committed and Synced Versions",
           "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
           "type": "graph",
           "xaxis": { "mode": "time", "show": true, "values": [] },
@@ -1848,13 +1955,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "Version of the transaction verified",
-          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
+          "description": "",
+          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 52 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
           "hiddenSeries": false,
-          "id": 3293,
+          "id": 1088,
           "legend": {
             "avg": false,
             "current": false,
@@ -1866,10 +1973,11 @@
           },
           "lines": true,
           "linewidth": 1,
+          "links": [],
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "7.2.0",
+          "pluginVersion": "9.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1880,86 +1988,32 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
+              "expr": "aptos_consensus_current_round",
+              "format": "time_series",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
               "refId": "A"
             }
           ],
           "thresholds": [],
           "timeRegions": [],
-          "title": "Transaction Version",
+          "title": "Consensus Current Round",
           "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
           "type": "graph",
           "xaxis": { "mode": "time", "show": true, "values": [] },
           "yaxes": [
-            { "format": "none", "logBase": 1, "show": true },
-            { "format": "short", "logBase": 1, "show": true }
-          ],
-          "yaxis": { "align": false }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "The speed of transaction verification.",
-          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 52 },
-          "hiddenSeries": false,
-          "id": 3296,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "options": { "alertThreshold": true },
-          "percentage": false,
-          "pluginVersion": "7.2.0",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "irate(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) > 0",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeRegions": [],
-          "title": "Transactions per Second",
-          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-          "type": "graph",
-          "xaxis": { "mode": "time", "show": true, "values": [] },
-          "yaxes": [
-            { "format": "short", "logBase": 1, "show": true },
+            { "format": "short", "label": "", "logBase": 1, "min": "0", "show": true },
             { "format": "short", "logBase": 1, "show": true }
           ],
           "yaxis": { "align": false }
         }
       ],
       "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
-      "title": "Backup Verify",
+      "title": "Restore Status Monitoring",
       "type": "row"
     }
   ],
+  "refresh": "10s",
   "schemaVersion": 37,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -2218,6 +2272,6 @@
   "timezone": "",
   "title": "Storage (Backup and Restore)",
   "uid": "9oXpx4n4z",
-  "version": 17,
+  "version": 25,
   "weekStart": ""
 }

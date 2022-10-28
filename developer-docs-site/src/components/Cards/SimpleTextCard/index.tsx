@@ -1,23 +1,26 @@
-import React from 'react';
-import PropTypes from 'prop-types';
+import React from "react";
+import PropTypes from "prop-types";
 
-import BaseContainer from '../BaseContainer';
-import WithBackgroundImage from '../WithBackgroundImage';
+import BaseContainer from "../BaseContainer";
+import WithBackgroundImage from "../WithBackgroundImage";
 
-import clsx from 'clsx';
-import styles from './styles.module.css';
+import clsx from "clsx";
+import styles from "./styles.module.css";
 
 const SimpleTextCard = ({ bolded, icon, iconDark, overlay, smallerImage, title, to }) => (
   <BaseContainer className={styles.root} overlay={overlay} to={to}>
     <WithBackgroundImage
-        className={clsx(styles.image, {
-            [styles.smaller]: smallerImage
-        })}
-        imageLight={icon}
-        imageDark={iconDark} />
-    <span className={clsx(styles.title, {
-      [styles.bolded]: bolded
-    })}>
+      className={clsx(styles.image, {
+        [styles.smaller]: smallerImage,
+      })}
+      imageLight={icon}
+      imageDark={iconDark}
+    />
+    <span
+      className={clsx(styles.title, {
+        [styles.bolded]: bolded,
+      })}
+    >
       {title}
     </span>
   </BaseContainer>
