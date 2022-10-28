@@ -11,9 +11,8 @@
 -  [Function `struct_name`](#0x1_type_info_struct_name)
 -  [Function `type_of`](#0x1_type_info_type_of)
 -  [Function `type_name`](#0x1_type_info_type_name)
--  [Specification](#@Specification_0)
-    -  [Function `type_of`](#@Specification_0_type_of)
-    -  [Function `type_name`](#@Specification_0_type_name)
+-  [Function `verify_type_of`](#0x1_type_info_verify_type_of)
+-  [Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -176,40 +175,69 @@
 
 </details>
 
-<a name="@Specification_0"></a>
+<a name="0x1_type_info_verify_type_of"></a>
 
-## Specification
-
-
-<a name="@Specification_0_type_of"></a>
-
-### Function `type_of`
+## Function `verify_type_of`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of">verify_type_of</a>()
 </code></pre>
 
 
 
+<details>
+<summary>Implementation</summary>
 
-<pre><code><b>pragma</b> opaque;
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of">verify_type_of</a>() {
+    <b>let</b> <a href="type_info.md#0x1_type_info">type_info</a> = <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>&gt;();
+    <b>let</b> account_address = <a href="type_info.md#0x1_type_info_account_address">account_address</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>let</b> module_name = <a href="type_info.md#0x1_type_info_module_name">module_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>let</b> struct_name = <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>spec</b> {
+        <b>assert</b> account_address == @aptos_std;
+        <b>assert</b> module_name == b"<a href="type_info.md#0x1_type_info">type_info</a>";
+        <b>assert</b> struct_name == b"<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>";
+    };
+}
 </code></pre>
 
 
 
-<a name="@Specification_0_type_name"></a>
+</details>
 
-### Function `type_name`
+<a name="0x1_type_info_verify_type_of_generic"></a>
+
+## Function `verify_type_of_generic`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
 </code></pre>
 
 
 
+<details>
+<summary>Implementation</summary>
 
-<pre><code><b>pragma</b> opaque;
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;() {
+    <b>let</b> <a href="type_info.md#0x1_type_info">type_info</a> = <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;();
+    <b>let</b> account_address = <a href="type_info.md#0x1_type_info_account_address">account_address</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>let</b> module_name = <a href="type_info.md#0x1_type_info_module_name">module_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>let</b> struct_name = <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>spec</b> {
+        <b>assert</b> account_address == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().account_address;
+        <b>assert</b> module_name == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().module_name;
+        <b>assert</b> struct_name == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().struct_name;
+    };
+}
 </code></pre>
+
+
+
+</details>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html
